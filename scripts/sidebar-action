@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
+action="${1:-}"
+token="${2:-}"
+state_file="${TMUX_CANOPY_STATE:?}"
+sidebar="${TMUX_PANE:-}"
+row_identity="${3:-}"
+if [[ "$action" == diagnostics || ( "$token" == V:failure && "$action" == actions ) ]]; then
+  exec "$SCRIPT_DIR/doctor" --popup
+fi
+# The retry row is informational, never a target for object mutations.
+if [[ "$token" == V:failure && "$action" != view-* ]]; then exit 0; fi
+unset TMUX_CANOPY_OCCURRENCE
+if [[ "$token" == P:* && "$row_identity" == "$token:"* && "${row_identity##*:}" =~ ^\$[0-9]+$ ]]; then
+  export TMUX_CANOPY_OCCURRENCE="${row_identity##*:}"
+fi
+
+process_belongs_to_pane() {
+  local pid="$1" pane="$2" root current parent steps=0
+  [[ "$pid" =~ ^[1-9][0-9]*$ && -n "$pane" ]] || return 1
+  root="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null || true)"
+  [[ "$root" =~ ^[1-9][0-9]*$ ]] || return 1
+  current="$pid"
+  while ((steps++ < 128)); do
+    [[ "$current" == "$root" ]] && return 0
+    parent="$(ps -o ppid= -p "$current" 2>/dev/null | tr -d ' ')"
+    [[ "$parent" =~ ^[1-9][0-9]*$ && "$parent" != "$current" ]] || return 1
+    current="$parent"
+  done
+  return 1
+}
+
+target_pane() {
+  local target
+  target="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_target 2>/dev/null || true)"
+  [[ -n "$target" ]] && printf '%s\n' "$target"
+}
+
+set_view() {
+  local view="$1" tmp
+  tmp="$(mktemp "${state_file}.XXXXXX")"
+  awk -F '\t' '$1 != "VIEW"' "$state_file" > "$tmp" 2>/dev/null || true
+  printf 'VIEW\t%s\n' "$view" >> "$tmp"
+  mv "$tmp" "$state_file"
+}
+
+menu_command() {
+  local menu_action="$1" menu_token="$2"
+  local command
+  command="$(tmux_shell env "TMUX_CANOPY_STATE=$state_file" "TMUX_CANOPY_CLIENT=${TMUX_CANOPY_CLIENT:-}" \
+    "TMUX_PANE=$sidebar" "$BASH" "$SCRIPT_DIR/sidebar-action" "$menu_action" "$menu_token")"
+  sidebar_menu_job "$command; $(tmux_shell tmux send-keys -t "$sidebar" C-r) 2>/dev/null || true"
+}
+
+process_menu() {
+  local process_token="$1" term kill focus
+  term="$(menu_command process-term "$process_token")"
+  kill="$(menu_command process-kill "$process_token")"
+  focus="$(menu_command activate "$process_token")"
+  sidebar_display_menu "${TMUX_CANOPY_CLIENT:-}" "$sidebar" -x C -y C -T " Process ${process_token#X:} " \
+    'Focus owning pane' f "$focus" \
+    'Send TERM' t "$term" \
+    'Send KILL (confirm)' K "$kill" \
+    'Diagnostics' D "$(menu_command diagnostics "$process_token")" \
+    'Cancel' q ''
+}
+
+buffer_menu() {
+  local buffer_token="$1" paste delete
+  paste="$(menu_command activate "$buffer_token")"
+  delete="$(menu_command delete "$buffer_token")"
+  # A buffer name can contain tmux format jobs; never use it as a menu format.
+  sidebar_display_menu "${TMUX_CANOPY_CLIENT:-}" "$sidebar" -x C -y C -T ' Buffer actions ' \
+    'Paste into target pane' p "$paste" \
+    'Delete buffer' x "$delete" \
+    'Diagnostics' D "$(menu_command diagnostics "$buffer_token")" \
+    'Cancel' q ''
+}
+
+case "$action" in
+  view-tree) set_view tree ;;
+  view-processes) set_view processes ;;
+  view-buffers) set_view buffers ;;
+
+  activate)
+    case "$token" in
+      B:*)
+        target="$(target_pane)"
+        [[ -n "$target" ]] && tmux paste-buffer -b "${token#B:}" -t "$target" 2>/dev/null || true
+        ;;
+      X:*)
+        rest="${token#X:}"; pane="${rest#*:}"
+        "$SCRIPT_DIR/tree-action" activate "P:$pane"
+        ;;
+      Q:*) "$SCRIPT_DIR/tree-action" activate "P:${token#Q:}" ;;
+      V:*) ;;
+      *) "$SCRIPT_DIR/tree-action" activate "$token" ;;
+    esac
+    ;;
+
+  actions)
+    case "$token" in
+      B:*) buffer_menu "$token" ;;
+      X:*) process_menu "$token" ;;
+      Q:*) "$SCRIPT_DIR/tree-action" actions "P:${token#Q:}" ;;
+      V:*) ;;
+      *) "$SCRIPT_DIR/tree-action" actions "$token" ;;
+    esac
+    ;;
+
+  delete)
+    case "$token" in
+      B:*) tmux delete-buffer -b "${token#B:}" 2>/dev/null || true ;;
+      X:*) process_menu "$token" ;;
+      Q:*) "$SCRIPT_DIR/tree-action" delete "P:${token#Q:}" ;;
+      *) "$SCRIPT_DIR/tree-action" delete "$token" ;;
+    esac
+    ;;
+
+  process-term)
+    rest="${token#X:}"; pid="${rest%%:*}"; pane="${rest#*:}"
+    process_belongs_to_pane "$pid" "$pane" && kill -TERM "$pid" 2>/dev/null || true
+    ;;
+  process-kill)
+    rest="${token#X:}"; pid="${rest%%:*}"
+    confirm="$(menu_command process-kill-confirm "$token")"
+    sidebar_display_menu "${TMUX_CANOPY_CLIENT:-}" "$sidebar" -x C -y C -T " Kill process $pid? " \
+      'Yes, send KILL' y "$confirm" \
+      'Cancel' n ''
+    ;;
+  process-kill-confirm)
+    rest="${token#X:}"; pid="${rest%%:*}"; pane="${rest#*:}"
+    process_belongs_to_pane "$pid" "$pane" && kill -KILL "$pid" 2>/dev/null || true
+    ;;
+
+  *) "$SCRIPT_DIR/tree-action" "$action" "$token" ;;
+esac

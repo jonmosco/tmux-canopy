@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -u
+
+token="${1:-}"
+case "$token" in
+  S:*)
+    target="${token#S:}"
+    tmux display-message -p -t "$target" 'Session #{session_name} (#{session_id})\nCreated: #{t:session_created}\nWindows: #{session_windows}\nAttached clients: #{session_attached}\nActivity: #{t:session_activity}'
+    ;;
+  W:*)
+    body="${token#W:}"; target="${body%%:*}"
+    tmux display-message -p -t "$target" 'Window #{window_index}:#{window_name} (#{window_id})\nSize: #{window_width}x#{window_height}\nPanes: #{window_panes}\nLayout: #{window_layout}\nLinked sessions: #{window_linked_sessions}\nZoomed: #{window_zoomed_flag}\nSynchronized: #{synchronize-panes}'
+    ;;
+  P:*)
+    target="${token#P:}"
+    tmux display-message -p -t "$target" 'Pane #{pane_index} (#{pane_id})\nPID: #{pane_pid}\nTTY: #{pane_tty}\nSize: #{pane_width}x#{pane_height}\nCommand: #{pane_current_command}\nPath: #{pane_current_path}\nTitle: #{pane_title}\nDead: #{pane_dead}\nExit status: #{pane_dead_status}\nStarted: #{t:pane_start_time}'
+    ;;
+esac
+
+if [[ "${TMUX_CANOPY_INFO_TEST:-0}" != '1' ]]; then
+  printf '\nPress any key to close…'
+  IFS= read -r -s -n 1 </dev/tty || true
+fi

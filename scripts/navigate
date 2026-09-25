@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/navigation.sh"
+
+client="${1:-}"
+direction="${2:-next}"
+[[ -n "$client" ]] || exit 0
+case "$direction" in
+  next) target_spec=':+' ;;
+  previous) target_spec=':-' ;;
+  last) target_spec=':!' ;;
+  index:[0-9]) target_spec=":${direction#index:}" ;;
+  *) exit 0 ;;
+esac
+sidebar_navigate "$client" "$target_spec" "${3:-42}" "${4:-window}" "${5:-move}" select

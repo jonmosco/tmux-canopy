@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+client="${1:-}"
+target_pane="${2:-}"
+width="${3:-42}"
+scope="${4:-window}"
+toggle_key="${5:-T}"
+last_window_key="${6:-Tab}"
+transition="${7:-move}"
+
+minimum_width="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
+maximum_width="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
+minimum_content_width="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
+zoom_action="$(tmux show-option -gqv @tmux-canopy-zoom-action 2>/dev/null || true)"
+runtime_width="$(tmux show-option -gqv @tmux_canopy_runtime_width 2>/dev/null || true)"
+: "${minimum_width:=24}"
+: "${maximum_width:=48}"
+: "${minimum_content_width:=40}"
+: "${zoom_action:=refuse}"
+if [[ "$transition" == 'slot' && "$width" =~ ^[1-9][0-9]*$ && "$runtime_width" =~ ^[1-9][0-9]*$ ]]; then
+  width="$runtime_width"
+fi
+
+sidebar_pane="$(sidebar_for_client "$client")"
+
+# Adopt sidebars created before client ownership was introduced rather than
+# leaving behind an orphan or opening a duplicate.
+if [[ -z "$sidebar_pane" ]]; then
+  sidebar_pane="$(unowned_sidebar)"
+  if [[ -n "$sidebar_pane" ]]; then
+    tmux set-option -p -t "$sidebar_pane" @tmux_canopy_client "$client"
+  fi
+fi
+
+if [[ -n "$sidebar_pane" ]]; then
+  restore_zoom_pane="$(tmux show-option -pqv -t "$sidebar_pane" @tmux_canopy_restore_zoom_pane 2>/dev/null || true)"
+  clear_sidebar_cache "$client"
+  tmux kill-pane -t "$sidebar_pane"
+  [[ "$transition" == 'slot' ]] && cleanup_slots_if_no_sidebars
+  if [[ -n "$restore_zoom_pane" ]] && pane_exists "$restore_zoom_pane"; then
+    tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+  fi
+  exit 0
+fi
+
+# Preflight precedes unzoom/splitting: a missing/incompatible dependency must
+# not disturb application geometry. Closing an existing dock needs no preflight.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/ui-options.sh"
+sidebar_preflight "$client" "$target_pane" || exit 1
+
+restore_zoom_pane=''
+if [[ "$(tmux display-message -p -t "$target_pane" '#{window_zoomed_flag}' 2>/dev/null || true)" == '1' ]]; then
+  if [[ "$zoom_action" == 'unzoom' ]]; then
+    restore_zoom_pane="$target_pane"
+    tmux resize-pane -Z -t "$target_pane"
+  else
+    tmux display-message -c "$client" 'tmux-canopy: unzoom the pane before opening (or set @tmux-canopy-zoom-action unzoom)' 2>/dev/null || true
+    exit 0
+  fi
+fi
+
+requested_width="$width"
+resolved_width="$(clamp_sidebar_width "$target_pane" "$width" "$minimum_width" "$maximum_width" "$minimum_content_width" 2>/dev/null || true)"
+if [[ -z "$resolved_width" ]]; then
+  tmux display-message -c "$client" "tmux-canopy: window is too narrow (requires ${minimum_width}+${minimum_content_width}+1 columns)" 2>/dev/null || true
+  [[ -n "$restore_zoom_pane" ]] && tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+  exit 0
+fi
+width="$resolved_width"
+tmux set-option -gq @tmux_canopy_runtime_width "$requested_width"
+
+sidebar_pane="$(
+  tmux split-window -d -h -b -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' \
+    -e "TMUX_CANOPY_CLIENT=$client" -e "TMUX_CANOPY_WIDTH=$width" \
+    -e "TMUX_CANOPY_SCOPE=$scope" -e "TMUX_CANOPY_KEY=$toggle_key" \
+    -e "TMUX_CANOPY_LAST_KEY=$last_window_key" -e "TMUX_CANOPY_TRANSITION=$transition" \
+    -e "TMUX_CANOPY_FZF_BINARY=$SIDEBAR_FZF_BINARY" -e "TMPDIR=${TMPDIR:-/tmp}" \
+    "$BASH" "$SCRIPT_DIR/sidebar" 2>/dev/null
+)"
+
+if [[ -n "$sidebar_pane" ]]; then
+  # Publish the internal marker only after ownership/target metadata is ready.
+  tmux set-option -p -t "$sidebar_pane" @tmux_canopy_client "$client" \; \
+    set-option -p -t "$sidebar_pane" @tmux_canopy_target "$target_pane" \; \
+    set-option -p -t "$sidebar_pane" @tmux_canopy 1
+  if [[ -n "$restore_zoom_pane" ]]; then
+    tmux set-option -p -t "$sidebar_pane" @tmux_canopy_restore_zoom_pane "$restore_zoom_pane"
+  fi
+  cache_sidebar_for_client "$client" "$sidebar_pane"
+  tmux select-pane -t "$sidebar_pane" \; \
+    if-shell -F -t "$sidebar_pane" "$(sidebar_empty_window_condition)" \
+      "run-shell -b $(tmux_quote "$(tmux_shell "$SCRIPT_DIR/reap-empty")")" \; \
+    run-shell -b "$(tmux_shell "$SCRIPT_DIR/refresh-sidebar" "$target_pane" "$client")"
+else
+  sidebar_failure "$client" split 'Could not create the sidebar pane. Application panes were not replaced.'
+  if [[ -n "$restore_zoom_pane" ]] && pane_exists "$restore_zoom_pane"; then
+    tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+  fi
+  exit 1
+fi

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+token="${1:-}"
+[[ -n "$token" ]] || exit 0
+clean=$'s/[\001-\037\177]/ /'
+
+case "$token" in
+  S:*)
+    target="${token#S:}"
+    tmux display-message -p -t "$target" \
+      "Session: #{${clean}:session_name} · #{session_windows}w · #{session_attached} clients"$'\nWindows' 2>/dev/null
+    tmux list-windows -t "$target" -F \
+      "#{?window_active,●,○} #{window_index}:#{${clean}:window_name}  #{window_panes} panes" 2>/dev/null
+    ;;
+
+  W:*)
+    window_body="${token#W:}"
+    target="${window_body%%:*}"
+    [[ "$window_body" != *:* ]] || target="${window_body#*:}:$target"
+    tmux display-message -p -t "$target" \
+      "Window: #{${clean}:session_name}:#{window_index} #{${clean}:window_name}"$'\n''#{window_width}x#{window_height} · #{window_panes} panes · #{window_linked_sessions} links' 2>/dev/null
+    tmux list-panes -t "$target" \
+      -f '#{&&:#{!=:#{@tmux_canopy},1},#{!=:#{@tmux_canopy_slot},1}}' -F \
+      "#{?pane_active,●,·} #{pane_id}  #{${clean}:pane_current_command}  #{${clean}:pane_current_path}" 2>/dev/null
+    ;;
+
+  P:*)
+    exec "$SCRIPT_DIR/pane-preview" "${token#P:}"
+    ;;
+esac

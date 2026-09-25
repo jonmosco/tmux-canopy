@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/ui-options.sh"
+mode="${1:---report}"
+owner="${2:-${TMUX_CANOPY_CLIENT:-}}"
+target="${3:-${TMUX_PANE:-}}"
+# Infer a plain-terminal invocation's owner only when one live client is using
+# this pane. Never choose an arbitrary client when multiple terminals share it.
+if [[ -z "$owner" && "$target" =~ ^%[0-9]+$ ]]; then
+  matches=()
+  while IFS='|' read -r candidate current; do
+    [[ "$current" != "$target" ]] || matches+=("$candidate")
+  done < <(tmux list-clients -F '#{client_tty}|#{pane_id}' 2>/dev/null)
+  ((${#matches[@]} != 1)) || owner="${matches[0]}"
+fi
+if [[ "$mode" == --popup ]]; then
+  [[ -n "$owner" && "$target" =~ ^%[0-9]+$ ]] || exit 0
+  tmux list-clients -F '#{client_tty}' 2>/dev/null | grep -Fxq -- "$owner" || exit 0
+  exec tmux display-popup -c "$owner" -t "$target" -w '85%' -h '70%' \
+    -T ' Sidebar diagnostics · any key closes ' -E "$BASH" "$SCRIPT_DIR/doctor" --render "$owner" "$target"
+fi
+if [[ "$mode" == --check ]]; then
+  sidebar_preflight "$owner" "$target"
+  exit $?
+fi
+# Version output is bounded and stripped of terminal control bytes. No raw
+# stderr, shell environment, buffer samples, or captured terminal text is shown.
+safe_line() { LC_ALL=C tr '\001-\037\177' ' ' | head -c 180; printf '\n'; }
+printf 'tmux-canopy diagnostics\n\n'
+printf 'tmux client: '; tmux -V 2>/dev/null | safe_line
+printf 'tmux server: '; tmux display-message -p '#{version}' 2>/dev/null | safe_line
+printf 'fzf on PATH: '; sidebar_clean_fzf fzf --version 2>/dev/null | safe_line
+printf 'Enlarged preview (less): '
+if command -v less >/dev/null 2>&1; then printf 'available\n'; else printf 'unavailable (optional)\n'; fi
+printf 'Process view (ps): '
+if command -v ps >/dev/null 2>&1; then printf 'available\n'; else printf 'unavailable\n'; fi
+printf '\nRequired commands, formats, UI options and temporary state: '
+result=0
+if sidebar_preflight "$owner" "$target"; then printf 'OK\n'; else printf 'FAILED\n'; result=1; fi
+printf '\nLast recorded failure for this owner:\n'
+if [[ -n "$owner" ]]; then
+  last="$(tmux show-option -gqv "@tmux_canopy_failure_$(sidebar_client_key "$owner")" 2>/dev/null || true)"
+  printf '%s' "${last:-None}" | safe_line
+else
+  printf 'No unambiguous owner; pass --report CLIENT_TTY PANE_ID.\n'
+fi
+printf '\nInherited fzf defaults are ignored; actions use /bin/sh.\nOnly fixed failure summaries are retained in tmux, one per owner.\nSource failures show a retry row; Ctrl-r retries without restarting fzf.\n'
+if [[ "$mode" == --render ]]; then
+  printf '\nPress any key to close…'
+  IFS= read -r -s -n 1 </dev/tty || true
+fi
+exit "$result"

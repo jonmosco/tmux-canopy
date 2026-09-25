@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Internal panes must not keep an otherwise finished tmux window alive.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+empty="$(sidebar_empty_window_condition)"
+lock=tmux-canopy-empty-windows
+locked=0
+owner_lock='' guard=''
+declare -A moved=() refocus=()
+
+release_owner() {
+  if [[ -n "$owner_lock" ]]; then
+    tmux set-option -gu "$guard" \; wait-for -U "$owner_lock" 2>/dev/null || true
+    owner_lock='' guard=''
+  fi
+}
+# shellcheck disable=SC2329 # EXIT trap.
+finish() {
+  release_owner
+  ((locked == 0)) || tmux wait-for -U "$lock" 2>/dev/null || true
+}
+trap finish EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+tmux wait-for -L "$lock" 2>/dev/null || exit 0
+locked=1
+
+IFS='|' read -r requested runtime minimum maximum min_content transition scope < <(
+  tmux display-message -p '#{@tmux-canopy-width}|#{@tmux_canopy_runtime_width}|#{@tmux-canopy-min-width}|#{@tmux-canopy-max-width}|#{@tmux-canopy-min-content-width}|#{@tmux-canopy-transition}|#{@tmux-canopy-scope}' 2>/dev/null)
+: "${requested:=42}" "${minimum:=24}" "${maximum:=48}" "${min_content:=40}" "${transition:=move}" "${scope:=window}"
+if [[ "$requested" =~ ^[1-9][0-9]*$ && "$runtime" =~ ^([1-9][0-9]*|[1-9][0-9]?%)$ ]]; then requested="$runtime"; fi
+
+# Only snapshots of IDs/flags/geometry are needed. Never kill a whole window:
+# a new application pane may appear while this worker is running.
+while IFS= read -r window; do
+  [[ -n "$window" ]] || continue
+  [[ "$(tmux display-message -p -t "$window" "$empty" 2>/dev/null)" == 1 ]] || continue
+  while IFS='|' read -r owner current_window; do
+    [[ "$current_window" != "$window" ]] || refocus["$owner"]=1
+  done < <(tmux list-clients -F '#{client_tty}|#{window_id}' 2>/dev/null)
+
+  while IFS='|' read -r sidebar owner; do
+    [[ -n "$sidebar" ]] || continue
+    key="$(sidebar_client_key "$owner")"
+    pending_lock="tmux-canopy-follow-$key"
+    tmux wait-for -L "$pending_lock" 2>/dev/null || continue
+    owner_lock="$pending_lock"
+    guard="@tmux_canopy_transition_$key"
+    tmux set-option -gq "$guard" 1 2>/dev/null || { release_owner; continue; }
+    # Navigation or pane creation may have won the race to this lock.
+    source_window="$(pane_window "$sidebar" 2>/dev/null || true)"
+    if [[ "$source_window" != "$window" || "$(tmux display-message -p -t "$sidebar" "$empty" 2>/dev/null)" != 1 ]]; then
+      release_owner; continue
+    fi
+    live_session='' live_window=''
+    while IFS='|' read -r tty session candidate_window; do
+      if [[ "$tty" == "$owner" ]]; then live_session="$session"; live_window="$candidate_window"; break; fi
+    done < <(tmux list-clients -F '#{client_tty}|#{session_id}|#{window_id}' 2>/dev/null)
+
+    destination='' width=''
+    if [[ -n "$live_session" && "$(tmux display-message -p -t "$sidebar" '#{pane_dead}' 2>/dev/null)" != 1 ]]; then
+      # With native detachment enabled, do not borrow space from an unrelated
+      # session just to park a dock whose owning session is about to disappear.
+      cross_session=1
+      [[ "$(tmux show-option -v -t "$live_session" detach-on-destroy 2>/dev/null)" != on ]] || cross_session=0
+      # Prefer the owner's live window, then its last window. This is only a
+      # parking choice: no select-window/switch-client changes native history.
+      # Once the old window actually dies, tmux chooses the successor itself.
+      while IFS='|' read -r _rank candidate destination_window total; do
+        width="$(clamp_sidebar_width_for_total "$total" "$requested" "$minimum" "$maximum" "$min_content")" || continue
+        destination="$candidate"; break
+      done < <(tmux list-panes -a -F '#{session_id}|#{window_id}|#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{window_last_flag}|#{pane_active}|#{pane_last}|#{window_width}' 2>/dev/null |
+        awk -F '|' -v session="$live_session" -v current="$live_window" -v old="$window" -v cross="$cross_session" '
+          $2 != old && $4 != "1" && $5 != "1" && (cross || $1==session) {
+            rank=($1==session ? 100 : 0) + ($1==session && $2==current ? 100 : 0) + ($1==session && $6==1 ? 50 : 0) + ($7==1 ? 2 : ($8==1 ? 1 : 0))
+            print rank "|" $3 "|" $2 "|" $9
+          }' | sort -t '|' -k1,1nr)
+    fi
+    if [[ -n "$destination" ]]; then
+      previous_slot="$(slot_for_window "$destination_window")"
+      slot="$(ensure_slot_for_window "$destination_window" "$destination" "$width")" || slot=''
+      if [[ -n "$slot" ]]; then
+        # Recheck atomically before moving. Killing just the exchanged slot
+        # closes an empty source, but never kills concurrently created content.
+        tmux if-shell -F -t "$sidebar" "$empty" \
+          "swap-pane -d -s $sidebar -t $slot ; set-option -p -t $sidebar @tmux_canopy_target $destination ; kill-pane -t $slot" 2>/dev/null || true
+        if [[ "$(pane_window "$sidebar" 2>/dev/null || true)" != "$window" ]]; then
+          moved["$owner"]=1
+        elif [[ -z "$previous_slot" ]]; then
+          tmux kill-pane -t "$slot" 2>/dev/null || true
+        fi
+      fi
+    else
+      # No attached owner or no remaining window that can fit a dock. Let the
+      # last window/session end normally rather than leave an internal zombie.
+      tmux if-shell -F -t "$sidebar" "$empty" "kill-pane -t $sidebar" 2>/dev/null || true
+    fi
+    release_owner
+  done < <(tmux list-panes -t "$window" -f '#{==:#{@tmux_canopy},1}' -F '#{pane_id}|#{@tmux_canopy_client}' 2>/dev/null)
+
+  # Also reap inactive slot-only windows. Each removal revalidates the live
+  # window so a concurrent split or join is never mistaken for empty content.
+  while IFS= read -r slot; do
+    [[ -n "$slot" ]] || continue
+    tmux if-shell -F -t "$slot" "$empty" "kill-pane -t $slot" 2>/dev/null || true
+  done < <(tmux list-panes -t "$window" -f '#{==:#{@tmux_canopy_slot},1}' -F '#{pane_id}' 2>/dev/null)
+done < <(tmux list-windows -a -f "$empty" -F '#{window_id}' 2>/dev/null | sort -u)
+
+# Selection has now settled after native window/session destruction. Follow
+# that choice, not a predicted next index; this also handles detach-on-destroy.
+while IFS='|' read -r sidebar owner; do
+  [[ -n "$sidebar" && -n "$owner" ]] || continue
+  live="$(client_pane "$owner" 2>/dev/null || true)"
+  [[ -n "$live" ]] || continue
+  if [[ "$scope" == global || "${moved[$owner]:-}" == 1 ]]; then
+    "$SCRIPT_DIR/follow" "$owner" "$live" "$requested" "$transition"
+  fi
+  if [[ "${refocus[$owner]:-}" == 1 ]]; then
+    live="$(client_pane "$owner" 2>/dev/null || true)"
+    if [[ -n "$live" && "$(tmux display-message -p -t "$live" '#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}}' 2>/dev/null)" == 1 ]]; then
+      target="$(content_pane_for_window "$(pane_window "$live")")"
+      [[ -z "$target" ]] || tmux select-pane -t "$target" 2>/dev/null || true
+    fi
+  fi
+  live="$(client_pane "$owner" 2>/dev/null || true)"
+  [[ -z "$live" ]] || "$SCRIPT_DIR/refresh-sidebar" "$live" "$owner"
+done < <(tmux list-panes -a -f '#{==:#{@tmux_canopy},1}' -F '#{pane_id}|#{@tmux_canopy_client}' 2>/dev/null | sort -u)
+refresh_sidebars

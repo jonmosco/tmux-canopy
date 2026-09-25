@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/ui-options.sh"
+
+export TMUX_CANOPY_ROOT="${SCRIPT_DIR%/*}"
+export TMUX_CANOPY_RECORD_FORMAT=nul
+if [[ -z "${TMUX_CANOPY_CLIENT:-}" ]]; then
+  TMUX_CANOPY_CLIENT="$(tmux display-message -p '#{client_tty}')"
+  export TMUX_CANOPY_CLIENT
+fi
+owner="${TMUX_CANOPY_CLIENT:-}"
+STATE_FILE="$(mktemp "${TMPDIR:-/tmp}/tmux-canopy.XXXXXX" 2>/dev/null)" || {
+  sidebar_failure "$owner" temporary-state 'Cannot create private sidebar state. Check TMPDIR permissions.'
+  exit 1
+}
+export TMUX_CANOPY_STATE="$STATE_FILE"
+
+# shellcheck disable=SC2329 # Invoked by EXIT, including signal-driven exits.
+cleanup() {
+  rm -f -- "$STATE_FILE"
+  clear_sidebar_cache "$owner"
+  if [[ "${TMUX_CANOPY_TRANSITION:-move}" == slot ]]; then
+    cleanup_slots_if_no_sidebars "${TMUX_PANE:-}"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 0' INT TERM HUP
+
+sidebar_ui_options "${TMUX_PANE:-}"
+"$SCRIPT_DIR/sidebar-source" --stable | env -u FZF_DEFAULT_OPTS -u FZF_DEFAULT_OPTS_FILE -u FZF_DEFAULT_COMMAND "${TMUX_CANOPY_FZF_BINARY:-fzf}" "${SIDEBAR_FZF_ARGS[@]}"
+statuses=("${PIPESTATUS[@]}")
+# fzf's explicit abort (Ctrl-q/Ctrl-c) is normal, as is successful acceptance.
+if ((statuses[1] != 0 && statuses[1] != 130)); then
+  sidebar_failure "$owner" fzf-exit "Sidebar UI stopped unexpectedly (fzf exit ${statuses[1]}). Run scripts/doctor or reopen and use a → Diagnostics."
+  exit 1
+fi
+if ((statuses[1] == 0 && statuses[0] != 0 && statuses[0] != 141)); then
+  sidebar_failure "$owner" source-exit "Sidebar source stopped unexpectedly (exit ${statuses[0]}). See scripts/doctor."
+  exit 1
+fi
+exit 0

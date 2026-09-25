@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -u
+
+state_file="${TMUX_CANOPY_STATE:?}"
+view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null)"
+: "${view:=tree}"
+mode='NAV'
+mode_color='\033[2m'
+if grep -q $'^MOVE\t' "$state_file" 2>/dev/null; then mode='MOVE ⇢'; mode_color='\033[36;1m'
+elif grep -q $'^LINK\t' "$state_file" 2>/dev/null; then mode='LINK ⇉'; mode_color='\033[35;1m'
+elif awk -F '\t' -v now="$(date +%s)" '$1 == "DELETE" && now - $3 <= 5 { found=1 } END { exit !found }' "$state_file" 2>/dev/null; then mode='DELETE ✕'; mode_color='\033[31;1m'
+fi
+
+case "$view" in
+  processes) tabs=' 1 Tree  [2 Processes]  3 Buffers ' ;;
+  buffers) tabs=' 1 Tree   2 Processes  [3 Buffers] ' ;;
+  *) tabs='[1 Tree]  2 Processes   3 Buffers ' ;;
+esac
+
+width="$(tmux display-message -p -t "${TMUX_PANE:-}" '#{pane_width}' 2>/dev/null || printf '42')"
+[[ "$width" =~ ^[1-9][0-9]*$ ]] || width=42
+plain_length=$((${#tabs} + ${#mode}))
+padding=$((width - plain_length - 1))
+((padding < 1)) && padding=1
+printf 'H:\t\033[1;36m%s\033[0m%*s%b%s\033[0m\n' "$tabs" "$padding" '' "$mode_color" "$mode"

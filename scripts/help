@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+toggle_key="${TMUX_CANOPY_KEY:-T}"
+last_window_key="${TMUX_CANOPY_LAST_KEY:-Tab}"
+toggle_key="${toggle_key//[[:cntrl:]]/ }"
+last_window_key="${last_window_key//[[:cntrl:]]/ }"
+
+section() { printf 'S\t%s\n' "$1"; }
+key() { printf 'K\t%s\t%s\n' "$1" "$2"; }
+note() { printf 'N\t%s\n' "$1"; }
+help_records() {
+  section 'Navigation'
+  key 'j / Down' 'Move down'
+  key 'k / Up' 'Move up'
+  key 'Enter' 'Focus the selected object'
+  key 'h / Left' 'Collapse a branch; on a pane, collapse its window'
+  key 'l / Right' 'Expand a branch'
+  key 'Shift-h' 'Collapse all sessions and windows'
+  key 'Shift-l' 'Expand all sessions and windows'
+  key '/' 'Search the current view'
+  key 'Esc' 'Leave search and clear the filter'
+  key 'Ctrl-r' 'Refresh; retry if data is unavailable'
+  note 'The green dot shows the active location. The highlighted row is your selection.'
+
+  section 'Views and previews'
+  key '1' 'Tree: sessions, windows and panes'
+  key '2' 'Processes grouped by their pane'
+  key '3' 'Paste buffers; Enter pastes into the target pane'
+  key 'p' 'Show or hide the preview drawer'
+  key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'
+
+  section 'Manage'
+  key 'a' 'Open actions for the selected object'
+  key 'r' 'Rename a session or window'
+  key 'x, then x' 'Confirm deletion of a pane, window or session'
+  key 'a, then D' 'Open diagnostics'
+  note 'The actions menu also has reorder, link, unlink, layout, zoom, swap, synchronization and dead-pane respawn.'
+
+  section 'Create'
+  key 's' 'Split into stacked panes'
+  key 'v' 'Split into panes side by side'
+  key 't' 'Create a window in the selected session'
+  key 'Shift-s' 'Create a new session'
+  note "New objects use the selected pane's working directory."
+
+  section 'Move'
+  key 'm' 'Mark a window or pane to move'
+  key 'Enter' 'Choose a destination, then place the marked object'
+  key 'c' 'Cancel the move'
+  note 'For a window, choose a node in the destination session. For a pane, choose a pane or window, then a placement.'
+
+  section 'Resize'
+  key '[ / ]' 'Previous or next width preset'
+  key 'w' 'Cycle width presets'
+  key 'Drag border' 'Resize the sidebar; staged mode commits on release'
+  note 'Your chosen width follows the sidebar. Narrow windows temporarily clamp it to leave room for content.'
+
+  section 'Notifications'
+  key 'u' 'Clear notifications on the selected object'
+  key 'Shift-u' 'Clear all sidebar notifications'
+  note '!N means activity, BN means a bell, and the silence badge counts quiet targets. Focusing a target clears its notices.'
+
+  section 'Tmux window switching'
+  key 'prefix + n / p' 'Next or previous window'
+  key 'prefix + 0-9' 'Select a numbered window'
+  [[ "$last_window_key" == off ]] || key "prefix + $last_window_key" 'Return to the last window'
+  key 'prefix + Space' 'Cycle content layouts; keep the sidebar in place'
+
+  section 'Sidebar'
+  key '?' 'Open this help'
+  key 'Ctrl-q' 'Close the sidebar'
+  key "prefix + $toggle_key" 'Toggle the sidebar from any pane'
+  key 'prefix + h' 'Return focus to the sidebar'
+
+  section 'Appearance and behavior'
+  note 'Normal density shows the command above its directory. Compact uses one line; detailed includes the full path and pane details.'
+  note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
+  note 'Session and window selections use their active content pane. In global mode the sidebar follows its owning client.'
+  note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
+}
+
+render_help() {
+  help_records | awk -F '\t' -v width="$1" -v color="${color:-0}" '
+    BEGIN {
+      if (color) { reset="\033[0m"; heading="\033[1;36m"; key="\033[1;33m"; dim="\033[2m" }
+      wide=(width >= 60); column=22
+    }
+    function wrap(text, indent, style, first,    available,piece,cut) {
+      available=width-length(indent)
+      while (length(text)>available) {
+        piece=substr(text,1,available); cut=length(piece)
+        if (substr(text,available+1,1)!=" ") {
+          sub(/ [^ ]*$/, "", piece)
+          if (length(piece)>0) cut=length(piece)
+        }
+        printf "%s%s%s%s\n",first,style,substr(text,1,cut),reset
+        text=substr(text,cut+1); sub(/^ +/, "", text); first=indent
+      }
+      printf "%s%s%s%s\n",first,style,text,reset
+    }
+    $1=="S" {
+      if (section++) print ""
+      wrap($2,"",heading,"")
+      rule=""; for (i=0;i<length($2) && i<width;i++) rule=rule "-"
+      print dim rule reset
+    }
+    $1=="K" {
+      label="[" $2 "]"
+      if (wide && length(label)<column-2) {
+        indent=sprintf("%*s",column,"")
+        first=key label reset sprintf("%*s",column-length(label),"")
+        wrap($3,indent,"",first)
+      } else {
+        wrap(label,"  ",key,"  ")
+        wrap($3,"    ","","    ")
+      }
+    }
+    $1=="N" { wrap($2,"  ",dim,"  ") }
+  '
+}
+
+# Plain output supports documentation/tests without a tmux server or terminal.
+if [[ "${TMUX_CANOPY_HELP_TEST:-0}" == 1 || "${1:-}" == --print ]]; then
+  columns="${2:-80}"
+  [[ "$columns" =~ ^[1-9][0-9]{0,3}$ ]] || columns=80
+  ((columns >= 12)) || columns=12
+  color=0
+  printf 'Sidebar help\n\n'
+  render_help "$columns"
+  exit 0
+fi
+
+if [[ "${1:-}" != --render ]]; then
+  owner="${TMUX_CANOPY_CLIENT:-}"
+  if [[ -n "$owner" && "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]]; then
+    # Match the owning client exactly; never open on an unrelated terminal.
+    while IFS='|' read -r client columns rows; do
+      [[ "$client" == "$owner" ]] || continue
+      if [[ "$columns" =~ ^[0-9]+$ && "$rows" =~ ^[0-9]+$ ]] && ((columns >= 20 && rows >= 10)); then
+        popup_width=$((columns - 2)); ((popup_width <= 90)) || popup_width=90
+        popup_height=$((rows - 2)); ((popup_height <= 40)) || popup_height=40
+        tmux display-popup -c "$owner" -t "$TMUX_PANE" -w "$popup_width" -h "$popup_height" \
+          -T ' Help ' -E -e "TMUX_CANOPY_KEY=$toggle_key" \
+          -e "TMUX_CANOPY_LAST_KEY=$last_window_key" \
+          "$BASH" "$SCRIPT_DIR/help" --render && exit 0
+      fi
+      break
+    done < <(tmux list-clients -F '#{client_tty}|#{client_width}|#{client_height}' 2>/dev/null)
+  fi
+fi
+
+if [[ ! -t 1 ]]; then color=0; render_help 80; exit 0; fi
+theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
+color=1; [[ "$theme" != mono ]] || color=0
+bold=$'\033[1m'; reset=$'\033[0m'; footer_style=$'\033[7m'
+if ((color == 0)); then bold=''; reset=''; footer_style=''; fi
+
+# A small pager keeps Help usable without an optional less/fzf dependency.
+# Only its own terminal is redrawn; no pane or window geometry is changed.
+saved_tty="$(stty -g </dev/tty)" || exit 1
+restore_terminal() {
+  stty "$saved_tty" </dev/tty 2>/dev/null || true
+  printf '\033[0m\033[?25h\033[?1049l'
+}
+trap restore_terminal EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+trap 'dirty=1' WINCH
+stty -echo -icanon min 1 time 0 </dev/tty
+printf '\033[?1049h\033[?25l'
+offset=0; dirty=1; lines=()
+while :; do
+  if ((dirty)); then
+    read -r rows columns < <(stty size </dev/tty)
+    [[ "$rows" =~ ^[1-9][0-9]*$ ]] || rows=24
+    [[ "$columns" =~ ^[1-9][0-9]*$ ]] || columns=42
+    width=$((columns - 1)); ((width >= 8)) || width=8
+    page=$((rows - 4)); ((page > 0)) || page=1
+    mapfile -t lines < <(render_help "$width")
+    dirty=0
+  fi
+  total=${#lines[@]}; maximum=$((total - page)); ((maximum >= 0)) || maximum=0
+  ((offset <= maximum)) || offset=$maximum
+  ((offset >= 0)) || offset=0
+  title='SIDEBAR HELP'
+  controls='j/k scroll  Space page  q/Esc close'
+  ((width >= ${#controls})) || controls='j/k scroll  q close'
+  printf '\033[H%s%s%s\033[K\r\n%s\033[K\r\n\033[K\r\n' "$bold" "${title:0:width}" "$reset" "${controls:0:width}"
+  for ((i=0; i<page; i++)); do
+    printf '%s\033[K\r\n' "${lines[offset+i]:-}"
+  done
+  footer="q close   $((offset+1))-$((offset+page<total ? offset+page : total)) / $total"
+  printf '%s%s%s\033[K' "$footer_style" "${footer:0:width}" "$reset"
+  pressed=''
+  IFS= read -r -s -n 1 pressed </dev/tty || { ((dirty)) && continue; break; }
+  if [[ "$pressed" == $'\033' ]]; then
+    sequence=''; part=''
+    while IFS= read -r -s -n 1 -t 0.03 part </dev/tty; do
+      sequence+="$part"
+      [[ "$part" =~ [a-zA-Z~] ]] && break
+    done
+    [[ -n "$sequence" ]] || break
+    pressed="$pressed$sequence"
+  fi
+  case "$pressed" in
+    q|Q) break ;;
+    j|$'\033[B') ((offset+=1)) ;;
+    k|$'\033[A') ((offset-=1)) ;;
+    ' '|f|$'\033[6~') ((offset+=page)) ;;
+    b|$'\033[5~') ((offset-=page)) ;;
+    g|$'\033[H'|$'\033[1~') offset=0 ;;
+    G|$'\033[F'|$'\033[4~') offset=$maximum ;;
+  esac
+done

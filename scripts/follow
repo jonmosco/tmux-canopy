@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/navigation.sh"
+
+client="${1:-}"
+target_pane="${2:-}"
+[[ -n "$client" && -n "$target_pane" ]] || exit 0
+sidebar_navigate "$client" "$target_pane" "${3:-42}" global "${4:-move}" follow

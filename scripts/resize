@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+action="${1:-}"
+sidebar="${2:-}"
+value="${3:-}"
+[[ -n "$sidebar" && "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == '1' ]] || exit 0
+
+minimum="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
+maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
+min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
+presets="$(tmux show-option -gqv @tmux-canopy-width-presets 2>/dev/null || true)"
+: "${minimum:=24}"
+: "${maximum:=48}"
+: "${min_content:=40}"
+: "${presets:=30,42,48}"
+
+current="$(tmux display-message -p -t "$sidebar" '#{pane_width}' 2>/dev/null || true)"
+[[ "$current" =~ ^[1-9][0-9]*$ ]] || exit 0
+
+mapfile -t widths < <(
+  tr ',' '\n' <<< "$presets" |
+    awk '/^[1-9][0-9]*$/ && !seen[$0]++ { print $0 }' |
+    sort -n
+)
+((${#widths[@]} > 0)) || widths=(30 42 48)
+
+desired="$value"
+case "$action" in
+  previous)
+    desired="${widths[-1]}"
+    for candidate in "${widths[@]}"; do
+      if ((candidate < current)); then desired="$candidate"; else break; fi
+    done
+    ;;
+  next|cycle)
+    desired="${widths[0]}"
+    for candidate in "${widths[@]}"; do
+      if ((candidate > current)); then desired="$candidate"; break; fi
+    done
+    ;;
+  nearest)
+    [[ "$value" =~ ^[0-9]+$ ]] || exit 0
+    desired="${widths[0]}"
+    best_distance=999999
+    for candidate in "${widths[@]}"; do
+      distance=$((candidate > value ? candidate - value : value - candidate))
+      if ((distance < best_distance)); then
+        desired="$candidate"
+        best_distance="$distance"
+      fi
+    done
+    ;;
+  commit) ;;
+  *) exit 0 ;;
+esac
+
+width="$(clamp_sidebar_width "$sidebar" "$desired" "$minimum" "$maximum" "$min_content" 2>/dev/null || true)"
+[[ -n "$width" ]] || exit 0
+
+# One geometry commit means one SIGWINCH/redraw for the sidebar and content.
+tmux resize-pane -t "$sidebar" -x "$width" 2>/dev/null || exit 0
+# Remember the user's choice, not a temporary narrow-window clamp.
+tmux set-option -gq @tmux_canopy_runtime_width "$desired"
+# Invalidate any old live-mode debounce before synchronizing slots once.
+tmux set-option -gq @tmux_canopy_resize_nonce "commit-$(date +%s%N)-$$"
+sync_sidebar_slots "$desired" "$minimum" "$maximum" "$min_content"

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+configured="$(tmux show-option -gqv @tmux-canopy-width 2>/dev/null || true)"
+minimum="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
+maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
+min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
+runtime="$(tmux show-option -gqv @tmux_canopy_runtime_width 2>/dev/null || true)"
+: "${configured:=42}"
+: "${minimum:=24}"
+: "${maximum:=48}"
+: "${min_content:=40}"
+
+requested="$configured"
+if [[ "$configured" =~ ^[1-9][0-9]*$ && "$runtime" =~ ^([1-9][0-9]*|[1-9][0-9]?%)$ ]]; then
+  requested="$runtime"
+fi
+sidebar_width_expression "$requested" "$minimum" "$maximum" "$min_content"
+
+while IFS='|' read -r sidebar owner restore_zoom; do
+  [[ "$sidebar" =~ ^%[0-9]+$ ]] || continue
+  guard="$(sidebar_transition_option "$owner")"
+  # Native predicates recheck live geometry/ownership at commit time. A queued
+  # terminal-resize worker must not resize or kill a dock mid-navigation.
+  resize="if-shell -F -t '$sidebar' '#{!=:#{pane_width},$SIDEBAR_WIDTH_FORMAT}' \"resize-pane -t $sidebar -x '$SIDEBAR_WIDTH_FORMAT'\" ; display-message -p kept"
+  quoted_resize="${resize//\\/\\\\}"
+  quoted_resize="${quoted_resize//\"/\\\"}"
+  body="if-shell -F -t '$sidebar' '$SIDEBAR_WIDTH_FITS_FORMAT' \"$quoted_resize\" \"kill-pane -t $sidebar ; display-message -p closed\""
+  quoted_body="${body//\\/\\\\}"
+  quoted_body="${quoted_body//\"/\\\"}"
+  # -C expands numeric formats before parsing resize-pane's -x argument,
+  # entirely inside tmux (no shell worker for the geometry correction).
+  result="$(tmux if-shell -F -t "$sidebar" "#{&&:#{==:#{@tmux_canopy},1},#{!=:#{$guard},1}}" \
+    "run-shell -C -t '$sidebar' \"$quoted_body\"" 2>/dev/null || true)"
+  if [[ "$result" == closed ]]; then
+    [[ -n "$owner" ]] && clear_sidebar_cache "$owner"
+    if [[ "$restore_zoom" =~ ^%[0-9]+$ ]] && pane_exists "$restore_zoom"; then
+      tmux resize-pane -Z -t "$restore_zoom" 2>/dev/null || true
+    fi
+  elif [[ "$result" == kept ]]; then
+    # Do not replace the user's preferred width with this window's clamp.
+    sync_sidebar_slots "$requested" "$minimum" "$maximum" "$min_content"
+  fi
+done < <(tmux list-panes -a -f '#{==:#{@tmux_canopy},1}' \
+  -F '#{pane_id}|#{@tmux_canopy_client}|#{@tmux_canopy_restore_zoom_pane}' 2>/dev/null)

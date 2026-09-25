@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+target="${1:-}"; requested="${2:-next}"; client="${3:-}"
+case "$requested" in
+  next|previous|tiled|even-horizontal|even-vertical|main-horizontal|main-vertical|main-horizontal-mirrored|main-vertical-mirrored) ;;
+  *) exit 0 ;;
+esac
+[[ -n "$target" ]] || exit 0
+window="$(tmux display-message -p -t "$target" '#{window_id}' 2>/dev/null)"
+[[ "$window" =~ ^@[0-9]+$ ]] || exit 0
+lock="tmux-canopy-content-layout-$window"
+tmux wait-for -L "$lock" || exit 0
+trap 'tmux wait-for -U "$lock" 2>/dev/null || true' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+snapshot="$(tmux display-message -p -t "$window" 'M|#{window_width}|#{window_height}|#{main-pane-width}|#{main-pane-height}|#{@tmux_canopy_content_layout}|#{window_zoomed_flag}' \; \
+  list-panes -t "$window" -F 'P|#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_width}|#{pane_index}' 2>/dev/null)" || exit 0
+if ! awk -F '|' '$1=="P" && ($3==1 || $4==1) { found=1 } END { exit !found }' <<< "$snapshot"; then
+  case "$requested" in
+    next) tmux next-layout -t "$window" ;;
+    previous) tmux previous-layout -t "$window" ;;
+    *) tmux select-layout -t "$window" "$requested" ;;
+  esac
+  exit 0
+fi
+IFS='|' read -r _ _ _ _ _ current zoomed <<< "$snapshot"
+message() {
+  if [[ -n "$client" ]]; then tmux display-message -c "$client" "$1" 2>/dev/null || true; fi
+}
+if [[ "$zoomed" == 1 ]]; then
+  message 'tmux-canopy: unzoom before changing the content layout'
+  exit 0
+fi
+# A close/follow operation may overtake our read. Do not apply a dock-shaped
+# layout to a window whose pane inventory or outer geometry has since changed.
+# P loops iterate by pane ID, whereas list-panes uses pane-index order.
+expected="$(awk -F '|' '
+  $1=="M" { header=$2 "|" $3 "|" $7 "|" }
+  $1=="P" { id=substr($2,2)+0; ids[++n]=id; value[id]=$2 ":" $6 "|" }
+  END {
+    for (i=2;i<=n;i++) { id=ids[i]; j=i-1; while (j>0 && ids[j]>id) { ids[j+1]=ids[j]; j-- } ids[j+1]=id }
+    printf "%s",header; for (i=1;i<=n;i++) printf "%s",value[ids[i]]
+  }' <<< "$snapshot")"
+unchanged="#{==:#{window_width}|#{window_height}|#{window_zoomed_flag}|#{P:#{pane_id}:#{pane_index}|},$expected}"
+layouts=(even-horizontal even-vertical main-horizontal main-vertical tiled main-horizontal-mirrored main-vertical-mirrored)
+index=-1; direction=1; attempts=1
+if [[ "$requested" == next || "$requested" == previous ]]; then
+  for i in "${!layouts[@]}"; do [[ "${layouts[i]}" != "$current" ]] || index="$i"; done
+  if [[ "$requested" == previous ]]; then direction=-1; ((index >= 0)) || index=0; fi
+  attempts="${#layouts[@]}"
+fi
+for ((attempt=0; attempt<attempts; attempt++)); do
+  if [[ "$requested" == next || "$requested" == previous ]]; then
+    index=$(((index + direction + ${#layouts[@]}) % ${#layouts[@]}))
+    layout="${layouts[index]}"
+  else
+    layout="$requested"
+  fi
+  # Skip presets that cannot fit the content area, rather than moving the dock
+  # or briefly laying out all panes and repairing it afterward.
+  generated="$(awk -v layout="$layout" -f "$SCRIPT_DIR/../lib/content-layout.awk" <<< "$snapshot")" || continue
+  tmux if-shell -F -t "$window" "$unchanged" \
+    "select-layout -t '$window' '$generated' ; set-option -wq -t '$window' @tmux_canopy_content_layout '$layout'" 2>/dev/null || true
+  exit 0
+done
+message 'tmux-canopy: layout cannot fit, or dock order is nonstandard; reopen a displaced sidebar'

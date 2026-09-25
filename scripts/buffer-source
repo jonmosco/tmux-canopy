@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -u
+
+theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
+if [[ "$theme" == 'mono' ]]; then reset='' name_color='' dim=''
+else reset=$'\033[0m'; name_color=$'\033[1;36m'; dim=$'\033[2m'; fi
+
+buffers="$(tmux list-buffers -F '#{buffer_name}|#{buffer_size}|#{t:buffer_created}|#{=/80/...:buffer_sample}' 2>/dev/null)" || exit 1
+while IFS='|' read -r name size _created sample; do
+  [[ -n "$name" ]] || continue
+  sample="${sample//$'\n'/ }"
+  printf 'B:%s\t%s %s%s  %s[%s B]%s  %s\n' "$name" "$name_color" "$name" "$reset" "$dim" "$size" "$reset" "$sample"
+done <<< "$buffers"
