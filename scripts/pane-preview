@@ -12,11 +12,23 @@ sep=$'\037'
 # Scrub metadata control characters before splitting. The captured screen's
 # colors are retained separately by capture-pane -e.
 clean=$'s/[\001-\037\177]/ /'
-format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}"
+format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}$sep#{@tmux_canopy_notice_pane_activity}$sep#{@tmux_canopy_notice_pane_bell}$sep#{@tmux_canopy_notice_pane_silence}$sep#{@tmux_canopy_notifications}"
 metadata="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
 [[ -n "$metadata" ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
-IFS="$sep" read -r width height cursor history alternate command directory <<< "$metadata"
+IFS="$sep" read -r width height cursor history alternate command directory activity bell silence configured <<< "$metadata"
 [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[1-9][0-9]*$ && "$cursor" =~ ^[0-9]+$ && "$history" =~ ^[0-9]+$ ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
+unread=''
+if [[ "$configured" != none ]]; then
+  [[ "$activity" != 1 ]] || unread+='activity, '
+  [[ "$bell" != 1 ]] || unread+='bell, '
+  [[ "$silence" != 1 ]] || unread+='silence, '
+fi
+unread="${unread%, }"
+if [[ -n "$unread" ]]; then
+  printf 'Unread: %s\n' "$unread"
+  ((rows > 1)) || exit 0
+  ((rows-=1))
+fi
 budget=$((rows - 2))
 ((budget > 0)) || budget=0
 mode=recent

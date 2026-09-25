@@ -17,8 +17,8 @@ import threading
 import time
 from PIL import Image, ImageDraw, ImageFont
 
-COLS, ROWS = 106, 28
-CW, CH, PAD, TOP = 10, 20, 24, 24
+COLS, ROWS = 96, 26
+CW, CH, PAD, TOP = 11, 23, 24, 24
 # ANSI palettes from the themes' official Alacritty ports; see README.md.
 THEMES = {
     'canopy': {
@@ -132,8 +132,8 @@ def main():
             raise SystemExit(f'Missing dependency: {tool}')
     font_path = args.font or sp.check_output(
         ['fc-match', '-f', '%{file}', 'Hack Nerd Font Mono'], text=True)
-    font = ImageFont.truetype(font_path, 16)
-    small_font = ImageFont.truetype(font_path, 14)
+    font = ImageFont.truetype(font_path, 18)
+    small_font = ImageFont.truetype(font_path, 15)
     frames, durations, captures = [], [], []
     client_process = master = None
     with tempfile.TemporaryDirectory(prefix='canopy-demo-') as directory:
@@ -198,8 +198,8 @@ def main():
                 x = w - PAD - label_width
                 draw.rounded_rectangle((x, y - 2, w - PAD, y + 26), radius=5, fill=theme['ansi'][0])
                 draw.text((x + 12, y + 1), shortcut, font=font, fill=FG)
-            for n in range(5):
-                x = w - PAD - 72 + n * 16
+            for n in range(6):
+                x = w - PAD - 88 + n * 16
                 draw.ellipse((x, y + 42, x + 5, y + 47), fill=GREEN if n == chapter else border)
             frames.append(image)
             durations.append(duration)
@@ -254,6 +254,7 @@ def main():
             run('toggle', client, editor, '42', 'global', 'T', 'Tab', 'slot')
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             time.sleep(1)
+            tm('set-option', '-g', '@tmux_canopy_notifications', 'all')
             keys(*(['Up'] * 12 + ['Down'] * 5))
             overview = (0, 'Your workspace, in one tree', 'Sessions, windows, panes. Shared directories shown once.', '')
             capture(*overview, duration=2600)
@@ -277,16 +278,28 @@ def main():
                 capture(*search, duration=180)
             capture(*search, duration=1900)
             keys('Escape')
+            # Real notification providers on fictional background panes only.
+            for pane, provider in ((api_pane, 'activity'), (doc_pane, 'bell')):
+                window = tm('display-message', '-p', '-t', pane, '#{window_id}')
+                run('notify', 'set', window, pane, provider)
+            time.sleep(.4)
+            keys('C-r')
+            capture(3, 'Unread activity, without the clutter', 'One bold amber badge beside the affected pane.', '', 2600)
             keys('H')
-            capture(3, 'Less noise when you need focus', 'Collapse every branch, then expand the full tree again.', 'H  /  L', 1600)
+            capture(3, 'Unread activity, without the clutter', 'Collapsed branches keep their unread summary.', 'H', 1900)
             keys('L')
-            capture(3, 'Less noise when you need focus', 'Collapse every branch, then expand the full tree again.', 'H  /  L', 1600)
+            capture(3, 'Unread activity, without the clutter', 'Expand to see exactly which pane needs a look.', 'L', 1400)
+            keys('U')
+            keys('H')
+            capture(4, 'Less noise when you need focus', 'Collapse every branch, then expand the full tree again.', 'H  /  L', 1600)
+            keys('L')
+            capture(4, 'Less noise when you need focus', 'Collapse every branch, then expand the full tree again.', 'H  /  L', 1600)
             keys('3')
             keys('Up', 'Up')
             keys('p')
-            capture(4, 'Keep useful snippets close', 'Browse tmux buffers and preview their contents.', '3  /  p', 2100)
+            capture(5, 'Keep useful snippets close', 'Browse tmux buffers and preview their contents.', '3  /  p', 2100)
             keys('j')
-            capture(4, 'Keep useful snippets close', 'Browse tmux buffers and preview their contents.', 'j  /  k', 1600)
+            capture(5, 'Keep useful snippets close', 'Browse tmux buffers and preview their contents.', 'j  /  k', 1600)
             keys('p')
             keys('1')
             keys(*(['Up'] * 12 + ['Down'] * 5))
@@ -304,7 +317,8 @@ def main():
     palette = contact.quantize(colors=128, method=Image.Quantize.MEDIANCUT)
     indexed = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in frames]
     indexed[0].save(args.output / 'canopy-demo.gif', save_all=True, append_images=indexed[1:], duration=durations, loop=0, optimize=True, disposal=1)
-    frames[0].save(args.output / 'canopy-demo.png', optimize=True)
+    poster = next((frame for frame, metadata in zip(frames, captures) if metadata['chapter'] == 3), frames[0])
+    poster.save(args.output / 'canopy-demo.png', optimize=True)
     (args.output / 'canopy-demo-captures.json').write_text(json.dumps(captures, indent=2))
     print(f'Wrote {len(frames)} frames, {sum(durations)/1000:.1f}s, {(args.output / "canopy-demo.gif").stat().st_size:,} bytes to {args.output}')
 

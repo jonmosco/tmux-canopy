@@ -9,6 +9,10 @@
 - Responsive help, shared-directory grouping, colored application icons, and selection highlighting.
 - Apache 2.0 license, public installation instructions, and automated release checks.
 
+### Changed
+
+- Notifications use one amber badge beside each affected pane, with counts on collapsed branches and full types in previews.
+
 ### Fixed
 
 - Slot navigation uses native empty panes, fixing new-window follow failures on macOS caused by `sleep infinity`.
