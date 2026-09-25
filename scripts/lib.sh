@@ -117,7 +117,9 @@ ensure_slot_for_window() {
   fi
   [[ -n "$target_pane" ]] || return 1
 
-  slot_pane="$(tmux split-window -d -h "${placement[@]}" -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' 'exec sleep infinity')"
+  # Native empty panes need no placeholder process or shell startup. In
+  # particular, macOS sleep rejects the GNU-style infinity argument.
+  slot_pane="$(tmux split-window -d -h "${placement[@]}" -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' '')"
   [[ -n "$slot_pane" ]] || return 1
   tmux set-option -p -t "$slot_pane" @tmux_canopy_slot 1 \; \
     set-option -p -t "$slot_pane" @tmux_canopy_position "$position" \; \
