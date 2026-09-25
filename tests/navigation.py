@@ -43,6 +43,17 @@ def main():
         state = temp / 'state'
         calls.touch()
         state.touch()
+        # macOS sleep rejects infinity. Exercise all navigation, including
+        # server-side new-window hooks, with that behavior on Linux as well.
+        platform_bin = temp / 'platform-bin'
+        platform_bin.mkdir()
+        rejected_sleep = temp / 'rejected-infinite-sleep'
+        sleep_wrapper = platform_bin / 'sleep'
+        sleep_wrapper.write_text('#!/bin/sh\nif [ "$1" = infinity ]; then\n  touch ' +
+                                 shlex.quote(str(rejected_sleep)) + '\n  exit 1\nfi\nexec ' +
+                                 shlex.quote(shutil.which('sleep')) + ' "$@"\n')
+        sleep_wrapper.chmod(0o755)
+        env['PATH'] = str(platform_bin) + ':' + env['PATH']
 
         def tm(*args):
             result = subprocess.run([real_tmux, '-L', socket, *args], env=env, text=True,
@@ -207,7 +218,8 @@ def main():
             assert display(sidebar, '#{window_id}') == display(pane_new, '#{window_id}')
             assert fzf_pid(sidebar) == ui_pid
             assert not any('transition_' in line for line in tm('show-options', '-g').splitlines())
-            print('ok - native new-window fallback follows without leaking transition guards')
+            assert not rejected_sleep.exists(), 'placeholder requires nonportable sleep infinity'
+            print('ok - native new-window follows with macOS-style sleep and no transition guard leaks')
             activate(pane_a)
 
             # A newer client in another session must not affect relative targets.

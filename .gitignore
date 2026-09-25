@@ -2,3 +2,4 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.log
+/docs/assets/canopy-demo-captures.json

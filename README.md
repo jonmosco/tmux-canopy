@@ -6,6 +6,12 @@ A persistent sidebar for navigating tmux sessions, windows, panes, processes, an
 
 Canopy moves the same sidebar pane as you switch windows and sessions, preserving your selection, search, and collapsed branches. It lives inside tmux and reserves space for your applications.
 
+## Preview
+
+![Animated tmux-canopy demo showing window navigation, search, folding, and buffer previews in fictional workspaces](docs/assets/canopy-demo.gif)
+
+[View a still image](docs/assets/canopy-demo.png).
+
 ## Features
 
 - Sessions → windows → panes tree with application icons and an active-location marker.

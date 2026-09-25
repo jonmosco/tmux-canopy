@@ -11,6 +11,8 @@
 
 ### Fixed
 
+- Slot navigation uses native empty panes, fixing new-window follow failures on macOS caused by `sleep infinity`.
+
 - Buffer names containing separators now retain their exact identity through preview, paste, and deletion.
 - Configuration reloads restore obsolete bindings and disabled notification monitors, preserving later user overrides.
 - Leaving search restores the full object list.
