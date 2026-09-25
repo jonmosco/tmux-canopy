@@ -16,7 +16,8 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 
 - Sessions → windows → panes tree with application icons and an active-location marker.
 - Left or right placement; **left by default**.
-- Shared-directory grouping, search, previews, and scrollable popup help.
+- Shared-directory grouping, optional compact single-pane rows, previews, and scrollable popup help.
+- Global quick switching, including panes inside collapsed branches.
 - Create, rename, move, link, and delete tmux objects with native menus.
 - Process trees attributed to panes, plus tmux buffer browsing.
 - Activity and bell notifications; optional silence monitoring.
@@ -87,6 +88,7 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `/`, then `Esc` | Search, then return to the full tree |
 | `1` / `2` / `3` | Tree / Processes / Buffers |
 | `a` | Actions for the selected object |
+| `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `p` / `P` | Toggle preview / open enlarged preview |
 | `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |

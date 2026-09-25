@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "${1:-}" == --render ]]; then
+  export TMUX_CANOPY_ROOT="${SCRIPT_DIR%/scripts}"
+  export TMUX_CANOPY_STABLE=1 TMUX_CANOPY_NUL=1 TMUX_CANOPY_HEADER=0
+  folder="${TMUX_CANOPY_SWITCH_DIR:?}"
+  if ! "$SCRIPT_DIR/tree-source" --switcher > "$folder/source"; then
+    printf 'Targets unavailable. Press any key to close and try again.'
+    IFS= read -r -s -n 1 </dev/tty || true
+    exit 1
+  fi
+  theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
+  colors='fg:-1,bg:-1,hl:6:bold,hl+:6:bold,pointer:6,prompt:6,header:-1:dim'
+  [[ "$theme" != mono ]] || colors=bw
+  # No sidebar editing bindings or ambient fzf options in this navigation popup.
+  # shellcheck disable=SC2016 # Expanded by fzf's explicit action shell.
+  env -u FZF_DEFAULT_OPTS -u FZF_DEFAULT_OPTS_FILE -u FZF_DEFAULT_COMMAND \
+    "${TMUX_CANOPY_FZF_BINARY:-fzf}" \
+    --ansi --read0 --print0 --delimiter=$'\t' --with-nth=2 --nth=1.. \
+    --no-multi --layout=reverse --border=none --color="$colors" \
+    --with-shell='/bin/sh -c' --prompt='Switch › ' \
+    --header='All sessions / windows / panes · Enter switch · Esc cancel' \
+    --bind='esc:abort,ctrl-q:abort' \
+    --preview='"$TMUX_CANOPY_ROOT/scripts/sidebar-preview" {1}' \
+    --preview-window='down,35%,wrap,border-top' \
+    < "$folder/source" > "$folder/selection"
+  exit "$?"
+fi
+
+client="${TMUX_CANOPY_CLIENT:-}"
+[[ -n "$client" && "${TMUX_PANE:-}" =~ ^%[0-9]+$ && -r "${TMUX_CANOPY_STATE:-}" ]] || exit 0
+folder="$(mktemp -d "${TMPDIR:-/tmp}/tmux-canopy-switch.XXXXXX")" || exit 1
+trap 'rm -rf -- "$folder"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+# Popup processes inherit the server environment, so explicitly carry the
+# owning sidebar context. All values are argv data, including install paths.
+tmux display-popup -c "$client" -t "$TMUX_PANE" -w '85%' -h '80%' \
+  -T ' Quick switch ' -E \
+  -e "TMUX_CANOPY_SWITCH_DIR=$folder" \
+  -e "TMUX_CANOPY_STATE=$TMUX_CANOPY_STATE" \
+  -e "TMUX_CANOPY_CLIENT=$client" \
+  -e "TMUX_PANE=$TMUX_PANE" \
+  -e "TMUX_CANOPY_FZF_BINARY=${TMUX_CANOPY_FZF_BINARY:-fzf}" \
+  "$BASH" "$SCRIPT_DIR/quick-switch" --render || exit 0
+
+[[ -s "$folder/selection" ]] || exit 0
+IFS=$'\t' read -r -d '' token _label identity < "$folder/selection" || exit 0
+case "$token" in
+  S:*) [[ "$token" =~ ^S:\$[0-9]+$ && "$identity" == "$token" ]] || exit 0 ;;
+  W:*) [[ "$token" =~ ^W:@[0-9]+:\$[0-9]+$ && "$identity" == "$token" ]] || exit 0 ;;
+  P:*) [[ "$token" =~ ^P:%[0-9]+$ && "$identity" =~ ^P:%[0-9]+:\$[0-9]+$ && "$identity" == "$token:"* ]] || exit 0 ;;
+  *) exit 0 ;;
+esac
+# Navigate after the popup closes. Focus never completes a pending move/link.
+"$SCRIPT_DIR/sidebar-action" focus "$token" "$identity"

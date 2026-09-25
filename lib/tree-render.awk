@@ -12,7 +12,7 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
-    current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13
+    current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on")
 }
 $1 == "C" && $2 == client { current_s=$3; current_w=$4; current_p=$5 }
 $1 == "S" { sessions[++ns]=$2; sname[$2]=$3; attached[$2]=$4 }
@@ -129,7 +129,7 @@ END {
         }
     }
     move_p=substr(move,3); move_w=(move ~ /^P:/ ? pw[move_p] : "")
-    if (header) {
+    if (header && !switcher) {
         mode=(move != "" ? "MOVE" : link != "" ? "LINK" : del != "" ? "DELETE" : "")
         mode_color=(del != "" && move == "" && link == "" ? attention : accent)
         # Reserve fzf's pointer gutter and keep operation warnings visible.
@@ -139,6 +139,24 @@ END {
         padding=available-length(tabs)-length(mode); if (padding<1) padding=1
         styled_tabs=tabs; sub(/\]/,"]" reset dim,styled_tabs)
         row("H:",accent styled_tabs reset (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
+    }
+    # A separate flat inventory ignores presentation folds without editing state.
+    # Every linked occurrence retains its session, including pane targets.
+    if (switcher) {
+        for (si=1;si<=ns;si++) {
+            s=sessions[si]; st="S:" s
+            row(st,"Session  " sname[s],st)
+            for (wpos=1;wpos<=nw[s];wpos++) {
+                w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
+                context=sname[s] ":" wi[key] ":" wn[key]
+                row(wt,"Window   " context,wt)
+                for (ppos=1;ppos<=np[w];ppos++) {
+                    p=panes[w,ppos]; pt="P:" p
+                    row(pt,"Pane     " context "." pi[p] "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] " " useful_title(p) "  " path[p] (dead[p] == 1 ? " [exited]" : ""),pt ":" s)
+                }
+            }
+        }
+        exit
     }
     for (si=1;si<=ns;si++) {
         s=sessions[si]; st="S:" s
@@ -153,6 +171,16 @@ END {
             meta=(np[w]>1 ? " " np[w] "p" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
+            if (compact_single && np[w] == 1) {
+                p=panes[w,1]; pt="P:" p
+                if (pt == del) wm="✕"
+                else if (wm == " " && dead[p] == 1) wm="×"
+                badge=(pa[p] || pb[p] || pz[p] ? notice(pa[p],pb[p],pz[p]) : notice(wa[w],wb[w],wz[w]))
+                # Retain the window identity/actions when switching presentation.
+                # Its active content target is necessarily this sole pane.
+                row(wt,dim branch reset " " mark(wm) " " dim window_icon reset " " wi[key] ":" wn[key] "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] badge dim meta " " shortpath(path[p],width-20) reset,wt)
+                continue
+            }
             grouped=(nul && density == "normal" && np[w]>1 && shared_path[w] != "" && !collapsed[wt])
             window_text=dim branch reset " " mark(wm) " " dim window_icon reset " " (collapsed[wt] ? "▸" : "▾") " " wi[key] ":" wn[key] (collapsed[wt] || !unread_panes[w] ? notice(wa[w],wb[w],wz[w],unread_panes[w]) : "") dim meta reset
             if (grouped) {

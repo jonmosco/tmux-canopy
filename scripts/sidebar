@@ -20,7 +20,7 @@ STATE_FILE="$(mktemp "${TMPDIR:-/tmp}/tmux-canopy.XXXXXX" 2>/dev/null)" || {
 }
 export TMUX_CANOPY_STATE="$STATE_FILE"
 
-# shellcheck disable=SC2329 # Invoked by EXIT, including signal-driven exits.
+# shellcheck disable=SC2317,SC2329 # Invoked by EXIT, including signal-driven exits.
 cleanup() {
   rm -f -- "$STATE_FILE"
   clear_sidebar_cache "$owner"

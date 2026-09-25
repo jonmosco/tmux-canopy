@@ -19,6 +19,7 @@ help_records() {
   key 'Shift-h' 'Collapse all sessions and windows'
   key 'Shift-l' 'Expand all sessions and windows'
   key '/' 'Search the current view'
+  key 'Ctrl-g' 'Search all sessions, windows and panes, including collapsed branches; Enter switches, Esc cancels'
   key 'Esc' 'Leave search and clear the filter'
   key 'Ctrl-r' 'Refresh; retry if data is unavailable'
   note 'The green dot shows the active location. The highlighted row is your selection.'
@@ -78,6 +79,7 @@ help_records() {
   note 'Set @tmux-canopy-position to left (default) or right, then close and reopen the sidebar. Right-side mouse resizing is live; release saves the width.'
   note 'Normal density shows the command above its directory. Compact uses one line; detailed includes the full path and pane details.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
+  note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. Default off.'
   note 'Session and window selections use their active content pane. In global mode the sidebar follows its owning client.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }

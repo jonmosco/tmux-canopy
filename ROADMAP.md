@@ -55,6 +55,37 @@ Design requirements:
 - [ ] Use the existing client-aware navigation and width-preserving transitions.
 - [ ] Test stale targets, agent exits, linked windows, and multiple clients.
 
+### 4. Agent request panel and responses (backlog)
+
+Explore a preview-like panel that shows what an agent needs and, for supported
+integrations, lets the user respond without switching to the agent's window or
+pane. Depends on the agent identity and lifecycle metadata above; not implemented.
+
+- [ ] Start with a read-only request panel showing the agent, session/window/pane,
+  request text, relevant context (including a proposed command when supplied),
+  available choices, and freshness. Support wrapping and scrolling at narrow widths.
+- [ ] Define an optional integration contract for request identity, agent-session
+  identity, target pane, request state, and supported response types. Distinguish
+  structured requests from an ordinary terminal-output preview; do not infer
+  actionable approval buttons from captured text alone.
+- [ ] Add an explicit action to focus the request controls, choose a response or
+  enter text, and submit it. Keep ordinary tree navigation separate from submission;
+  cancelling returns to the tree with selection, query, and folds intact.
+- [ ] Prefer an integration's supported response interface. Investigate targeted
+  terminal input only where the integration can verify that the same agent and
+  request still own the input; otherwise offer a jump to the original pane.
+- [ ] Revalidate the target and pending request before sending. Prevent duplicate
+  submissions and handle requests answered elsewhere, agent restarts, pane removal,
+  and multiple clients without sending a response to a shell or replacement agent.
+- [ ] Show sending, acknowledged, failed, or unknown outcomes. Wait for the agent's
+  acknowledgement or lifecycle update before clearing needs-input; do not blindly
+  retry a response whose delivery is uncertain.
+- [ ] Stage delivery: request display first, then supported choice responses, then
+  free-text responses. Keep responses explicitly user-initiated and preserve the
+  current content window/pane and sidebar geometry throughout.
+- [ ] Test stale requests, focus and cancellation, literal response text, duplicate
+  submissions, concurrent clients, acknowledgement failures, and narrow terminals.
+
 ## Switch sidebar side without reopening
 
 Left and right placement are supported today. Changing `@tmux-canopy-position`
@@ -72,7 +103,8 @@ currently takes effect when the sidebar is reopened.
 
 ## Scope
 
-These features add visibility and navigation. Agent launching, task assignment,
+These features add visibility, navigation, and planned user-initiated responses
+to agent requests. Agent launching, task assignment,
 automatic approval, inter-agent coordination, worktree provisioning, and a
 dedicated orchestration API are outside this initial roadmap.
 

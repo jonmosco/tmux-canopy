@@ -219,7 +219,9 @@ move_window_to() {
   clear_move
   target_pane="$(first_content_pane "$source_window")"
   [[ -n "$target_pane" ]] && show_target "$target_pane"
-  [[ -n "$sidebar_pane" ]] && tmux send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+  if [[ -n "$sidebar_pane" ]]; then
+    tmux send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+  fi
 }
 
 move_pane_to() {
@@ -432,7 +434,9 @@ swap_window_direction() {
   else
     adjacent="$(tmux list-windows -t "$session_id" -F '#{window_id}|#{window_index}' | sort -t '|' -k2,2n | awk -F '|' -v idx="$index" '$2 > idx { print $1; exit }')"
   fi
-  [[ -n "$adjacent" ]] && tmux swap-window -d -s "$window_id" -t "$adjacent" 2>/dev/null || true
+  if [[ -n "$adjacent" ]]; then
+    tmux swap-window -d -s "$window_id" -t "$adjacent" 2>/dev/null || true
+  fi
 }
 
 layout_menu() {
@@ -532,7 +536,9 @@ link_window_to() {
   destination_index="$(next_window_index "$destination_session")"
   tmux link-window -d -s "$source_window" -t "${destination_session}:${destination_index}" 2>/dev/null || return 0
   clear_link
-  [[ -n "$sidebar_pane" ]] && tmux send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+  if [[ -n "$sidebar_pane" ]]; then
+    tmux send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+  fi
 }
 
 unlink_window() {
@@ -550,7 +556,7 @@ unlink_window() {
 }
 
 activate_token() {
-  local token="$1" source_token='' source_link='' state_kind state_value _unused occurrence destination
+  local token="$1" source_token='' source_link='' state_kind state_value _unused
   # Activation is a hot path: read operation state once without two awk jobs.
   while IFS=$'\t' read -r state_kind state_value _unused; do
     case "$state_kind" in
@@ -566,22 +572,27 @@ activate_token() {
   elif [[ -n "$source_link" ]]; then
     link_window_to "$source_link" "$token"
   else
-    case "$token" in
-      W:*)
-        occurrence="$(window_session_for_token "$token")"
-        destination="$(window_id_for_token "$token")"
-        [[ -n "$occurrence" ]] && destination="$occurrence:$destination"
-        show_target "$destination"
-        ;;
-      P:*)
-        destination="${token#P:}"
-        # The dot is required: session:%pane is parsed as a window target.
-        [[ -n "${TMUX_CANOPY_OCCURRENCE:-}" ]] && destination="$TMUX_CANOPY_OCCURRENCE:.$destination"
-        show_target "$destination"
-        ;;
-      S:*) show_target "${token#S:}" ;;
-    esac
+    focus_token "$token"
   fi
+}
+
+focus_token() {
+  local token="$1" occurrence destination
+  case "$token" in
+    W:*)
+      occurrence="$(window_session_for_token "$token")"
+      destination="$(window_id_for_token "$token")"
+      [[ -n "$occurrence" ]] && destination="$occurrence:$destination"
+      show_target "$destination"
+      ;;
+    P:*)
+      destination="${token#P:}"
+      # The dot is required: session:%pane is parsed as a window target.
+      [[ -n "${TMUX_CANOPY_OCCURRENCE:-}" ]] && destination="$TMUX_CANOPY_OCCURRENCE:.$destination"
+      show_target "$destination"
+      ;;
+    S:*) show_target "${token#S:}" ;;
+  esac
 }
 
 show_target() {
@@ -607,6 +618,10 @@ case "$action" in
     case "$token" in
       S:*|W:*) remove_state "$token" ;;
     esac
+    ;;
+
+  focus)
+    focus_token "$token"
     ;;
 
   switch|activate)
@@ -722,7 +737,9 @@ case "$action" in
   break-window)
     pane_id="${token#P:}"
     session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
-    [[ -n "$session_id" ]] && tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
+    if [[ -n "$session_id" ]]; then
+      tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
+    fi
     ;;
 
   layout-menu)

@@ -46,7 +46,9 @@ case "$action" in
         tmux set-option -pq -t "$sidebar" @tmux_canopy_staged_sidebar "$sidebar" \; \
           set-option -pq -t "$sidebar" @tmux_canopy_drag_width "$width"
         tmux set-option -wq -t "$window_id" @tmux_canopy_drag_native "$native"
-        [[ -n "$mouse_pane" ]] && tmux set-option -pq -t "$mouse_pane" @tmux_canopy_staged_sidebar "$sidebar" 2>/dev/null || true
+        if [[ -n "$mouse_pane" ]]; then
+          tmux set-option -pq -t "$mouse_pane" @tmux_canopy_staged_sidebar "$sidebar" 2>/dev/null || true
+        fi
         # Release may land inside any content pane, which inherits this marker.
         tmux set-option -wq -t "$window_id" @tmux_canopy_staged_sidebar "$sidebar"
         exit 0
