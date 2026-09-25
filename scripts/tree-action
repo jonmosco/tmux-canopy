@@ -572,12 +572,20 @@ activate_token() {
   elif [[ -n "$source_link" ]]; then
     link_window_to "$source_link" "$token"
   else
-    focus_token "$token"
+    focus_token "$token" filtered
   fi
 }
 
 focus_token() {
-  local token="$1" occurrence destination
+  local token="$1" occurrence destination resolved
+  if [[ "${2:-}" == filtered && ( "$token" == S:* || "$token" == W:* ) ]]; then
+    # Resolve a matching descendant before normal parent-row navigation. Folds
+    # do not remove candidates; a notification cleared since rendering can.
+    resolved="$("$SCRIPT_DIR/tree-source" --focus-target "$token")" || return 0
+    [[ -n "$resolved" ]] || return 0
+    IFS=$'\t' read -r token occurrence <<< "$resolved"
+    if [[ "$token" == P:* && -n "$occurrence" ]]; then export TMUX_CANOPY_OCCURRENCE="$occurrence"; fi
+  fi
   case "$token" in
     W:*)
       occurrence="$(window_session_for_token "$token")"

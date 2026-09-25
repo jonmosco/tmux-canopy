@@ -68,6 +68,15 @@ def main():
             tm('set-option', '-gw', 'aggressive-resize', 'on')
             second = tm('new-window', '-d', '-t', 'one:', '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('split-window', '-d', '-h', '-t', second, 'sleep 600')
+            skewed = tm('new-window', '-d', '-t', 'one:', '-P', '-F', '#{pane_id}', 'sleep 600')
+            skewed_right = tm('split-window', '-d', '-h', '-l', '409', '-t', skewed, '-P', '-F', '#{pane_id}', 'sleep 600')
+            skewed_bottom = tm('split-window', '-d', '-v', '-l', '80', '-t', skewed_right, '-P', '-F', '#{pane_id}', 'sleep 600')
+            warm = tm('new-window', '-d', '-t', 'one:', '-P', '-F', '#{pane_id}', 'sleep 600')
+            warm_right = tm('split-window', '-d', '-h', '-l', '409', '-t', warm, '-P', '-F', '#{pane_id}', 'sleep 600')
+            warm_slot = tm('split-window', '-d', '-h', *(['-b'] if position == 'left' else []), '-f', '-l', '42', '-t', warm, '-P', '-F', '#{pane_id}', '')
+            tm('set-option', '-p', '-t', warm_slot, '@tmux_canopy_slot', '1')
+            tm('set-option', '-p', '-t', warm_slot, '@tmux_canopy_position', position)
+            warm_ratio = int(display(warm_right, '#{pane_width}')) / int(display(warm, '#{pane_width}'))
             native = tm('new-window', '-d', '-t', 'one:', '-P', '-F', '#{pane_id}', 'sleep 600')
             third = tm('new-session', '-d', '-s', 'two', '-x', '510', '-y', '104', '-P', '-F', '#{pane_id}', 'sleep 600')
             for option, value in [('position', position), ('width', '42'), ('scope', 'global'), ('transition', 'slot'), ('notifications', 'none'), ('resize-mode', 'staged'), ('max-width', '48')]:
@@ -102,6 +111,22 @@ def main():
             def fzf_pids():
                 return sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip()
             ui_pid = fzf_pids()
+            run('sidebar-action', 'activate', 'P:' + skewed_bottom)
+            check_width(42)
+            narrow_width = int(display(skewed, '#{pane_width}'))
+            wide_width = int(display(skewed_right, '#{pane_width}'))
+            assert narrow_width >= 25 and 3.5 < wide_width / narrow_width < 4.8, (narrow_width, wide_width)
+            assert display(skewed_right, '#{pane_left}') == display(skewed_bottom, '#{pane_left}')
+            assert int(display(skewed_right, '#{pane_height}')) < int(display(skewed_bottom, '#{pane_height}'))
+            assert display(skewed_bottom, '#{pane_active}') == '1'
+            run('sidebar-action', 'activate', 'P:' + first)
+            run('sidebar-action', 'activate', 'P:' + warm)
+            check_width(42)
+            assert int(display(warm, '#{pane_width}')) >= 25
+            actual_ratio = int(display(warm_right, '#{pane_width}')) / int(display(warm, '#{pane_width}'))
+            assert abs(actual_ratio - warm_ratio) < .3, (actual_ratio, warm_ratio)
+            run('sidebar-action', 'activate', 'P:' + first)
+            print('ok - cold and warm navigation scale uneven content splits without crushing a pane')
             for pane in (second, first, third, first):
                 run('sidebar-action', 'activate', 'P:' + pane)
                 time.sleep(.15)

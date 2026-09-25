@@ -19,10 +19,14 @@ help_records() {
   key 'Shift-h' 'Collapse all sessions and windows'
   key 'Shift-l' 'Expand all sessions and windows'
   key '/' 'Search the current view'
+  key 'F / Ctrl-f' 'Tree filters: All, Current session, Unread, window name and pane title; Ctrl-f also works while searching'
   key 'Ctrl-g' 'Search all sessions, windows and panes, including collapsed branches; Enter switches, Esc cancels'
-  key 'Esc' 'Leave search and clear the filter'
+  key 'Esc' 'Leave search and clear its query'
   key 'Ctrl-r' 'Refresh; retry if data is unavailable'
   note 'The green dot shows the active location. The highlighted row is your selection.'
+
+  note 'Text-filter prompts use tmux prompt keys; Ctrl-c cancels.'
+  note 'Tree filters combine with search and preserve folds. +W/+T in the header means a window-name/pane-title rule; F shows the values. Clear all filters restores everything. Ctrl-g always searches all targets.'
 
   section 'Views and previews'
   key '1' 'Tree: sessions, windows and panes'
@@ -77,10 +81,10 @@ help_records() {
 
   section 'Appearance and behavior'
   note 'Set @tmux-canopy-position to left (default) or right, then close and reopen the sidebar. Right-side mouse resizing is live; release saves the width.'
-  note 'Normal density shows the command above its directory. Compact uses one line; detailed includes the full path and pane details.'
+  note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. Default off.'
-  note 'Session and window selections use their active content pane. In global mode the sidebar follows its owning client.'
+  note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight. Session and window selections use their active content pane.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
 

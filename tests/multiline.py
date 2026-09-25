@@ -29,8 +29,9 @@ def main():
     attached = None
     with tempfile.TemporaryDirectory(prefix='tree-multiline-') as directory:
         temp = Path(directory)
-        state, selected = temp / 'state', temp / 'selected'
+        state, selected, loads = temp / 'state', temp / 'selected', temp / 'loads'
         state.touch()
+        loads.touch()
         dirs = [temp / realm / 'hcm-gitops' for realm in ('commercial', 'fedramp')]
         for path in dirs:
             path.mkdir(parents=True)
@@ -59,13 +60,14 @@ def main():
 
         def probe():
             selected.unlink(missing_ok=True)
-            def poll():
-                if selected.exists() and selected.stat().st_size:
-                    return True
-                tm('send-keys', '-t', sidebar, 'M-z')
-                time.sleep(.08)
-                return False
-            wait(poll, 'selection probe')
+            # One request per response. Queued retry keys can otherwise publish
+            # an old selection after the next navigation key has been sent.
+            tm('send-keys', '-t', sidebar, 'M-z')
+            wait(lambda: selected.exists() and selected.stat().st_size, 'selection probe')
+            # execute-silent pauses fzf input until its child exits. A written
+            # result alone does not mean the UI is ready for the next key.
+            wait(lambda: sp.run(['pgrep', '-P', fzf_pid], stdout=sp.DEVNULL,
+                                stderr=sp.DEVNULL).returncode == 1, 'probe command finished')
             return selected.read_text().rstrip('\n').split('|')
 
         def screen():
@@ -100,7 +102,7 @@ def main():
             print('ok - one stable identity per multiline pane; legacy and other-view framing preserved')
 
             binding = f"alt-z:execute-silent(printf '%s|%s|%s\\n' {{1}} {{3}} {{q}} > {selected})"
-            install_fzf_probe(temp, [binding], script_env)
+            install_fzf_probe(temp, [binding, f'load:execute-silent(printf x >> {loads})'], script_env)
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 44, 160, 0, 0))
             client = os.ttyname(slave)
@@ -116,12 +118,23 @@ def main():
             threading.Thread(target=drain, daemon=True).start()
             wait(lambda: client in tm('list-clients', '-F', '#{client_tty}'), 'client attach')
             script_env['TMUX_CANOPY_CLIENT'] = client
-            sp.run([str(ROOT / 'scripts/toggle'), client, first, '42', 'window'], env=script_env, check=True, timeout=15)
+            sp.run([str(ROOT / 'scripts/toggle'), client, first, '72', 'window'], env=script_env, check=True, timeout=15)
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             script_env['TMUX_PANE'] = sidebar
             wait(lambda: any('…/fedramp/hcm-gitops' in line for line in screen()), 'two-line view rendered')
-            tm('send-keys', '-t', sidebar, 'Home', 'j', 'j')
-            assert probe()[0] == 'P:' + first
+            fzf_pid = sp.check_output(['pgrep', '-P', display(sidebar, '#{pane_pid}'), '-x', 'fzf'], text=True).strip()
+            # Painting precedes completion of fzf's test-only load action.
+            wait(lambda: loads.stat().st_size > 0, 'initial fzf load')
+            wait(lambda: sp.run(['pgrep', '-P', fzf_pid], stdout=sp.DEVNULL,
+                                stderr=sp.DEVNULL).returncode == 1, 'initial load command finished')
+            probe()
+            tm('send-keys', '-t', sidebar, 'Home')
+            assert probe()[0].startswith('S:')
+            tm('send-keys', '-t', sidebar, 'j')
+            assert probe()[0].startswith('W:')
+            tm('send-keys', '-t', sidebar, 'j')
+            observed = probe()
+            assert observed[0] == 'P:' + first, (observed, screen())
             frame = screen()
             assert not any(line.startswith('▌') for line in frame), 'gutter must not form a block bar'
             a = next(i for i, line in enumerate(frame) if '…/commercial/hcm-gitops' in line)
