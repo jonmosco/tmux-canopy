@@ -146,6 +146,28 @@ while True:
                 assert len(run('sidebar-preview', token).splitlines()) <= 12
             assert 'no longer available' in run('sidebar-preview', 'P:%999999')
             print('ok - compact row budgets, latest shell output, color/Unicode, and missing panes')
+            tm('set-option', '-g', '@tmux_canopy_notifications', 'all')
+            for provider in ('activity', 'bell', 'silence'):
+                tm('set-option', '-p', '-t', pane, '@tmux_canopy_notice_pane_' + provider, '1')
+            for rows in ('1', '2', '3', '6', '12'):
+                flagged = run('sidebar-preview', 'P:' + pane, extra={'FZF_PREVIEW_LINES': rows})
+                assert flagged.startswith('Unread: activity, bell, silence\n'), flagged
+                assert len(flagged.splitlines()) <= int(rows)
+            window = display(pane, '#{window_id}')
+            session = display(pane, '#{session_id}')
+            for provider in ('activity', 'bell', 'silence'):
+                tm('set-option', '-w', '-t', window, '@tmux_canopy_notice_' + provider, '1')
+            for token in ('W:' + window, 'S:' + session):
+                assert 'unread: activity bell silence' in run('sidebar-preview', token)
+            tm('set-option', '-g', '@tmux_canopy_notifications', 'none')
+            for token in ('P:' + pane, 'W:' + window, 'S:' + session):
+                assert 'unread:' not in run('sidebar-preview', token).lower()
+            tm('set-option', '-g', '@tmux_canopy_notifications', 'all')
+            for provider in ('activity', 'bell', 'silence'):
+                tm('set-option', '-wu', '-t', window, '@tmux_canopy_notice_' + provider)
+                tm('set-option', '-pu', '-t', pane, '@tmux_canopy_notice_pane_' + provider)
+            print('ok - preview lists all notification types without exceeding its row budget')
+
 
             tm('send-keys', '-t', sidebar, 'M-t')
             before = probe()

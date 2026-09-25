@@ -80,8 +80,8 @@ sleep 0.3
 assert_eq '1' "$("${TMUX_TEST[@]}" show-option -wqv -t "$source_window" @tmux_canopy_notice_activity)" 'activity provider records a window notification'
 notice_file="$(mktemp)"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE=/dev/null TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/tree-source' > '$notice_file'"
-grep -F "W:$source_window" "$notice_file" | grep -Fq '!1' || fail 'tree renders the window activity badge'
-grep -F "S:\$0" "$notice_file" | grep -Fq '!1' || fail 'tree aggregates activity at the session level'
+grep -F "P:$target" "$notice_file" | grep -Fq $'\033[1;33m●' || fail 'tree renders one amber pane activity badge'
+if grep -E '^([SW]):' "$notice_file" | grep -Fq $'\033[1;33m'; then fail 'expanded ancestors must not repeat pane notifications'; fi
 rm -f "$notice_file"
 run_in_server "$target" "'$PROJECT_DIR/scripts/notify' clear-window '$source_window'"
 sleep 0.3

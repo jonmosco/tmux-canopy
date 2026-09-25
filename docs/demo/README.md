@@ -21,3 +21,5 @@ Before publishing, inspect the GIF and text audit for unexpected content and mis
 Dracula is the default for the README preview. Choose `--theme dracula`, `--theme catppuccin-mocha`, `--theme tokyo-night`, or `--theme canopy` (the original demo colors). The banner above the terminal is omitted; feature captions and shortcut hints remain below it.
 
 ANSI colors and default backgrounds/foregrounds come from the official [Dracula](https://github.com/dracula/alacritty/blob/master/dracula.toml), [Catppuccin Mocha](https://github.com/catppuccin/alacritty/blob/main/catppuccin-mocha.toml), and [Tokyo Night](https://github.com/folke/tokyonight.nvim/blob/main/extras/alacritty/tokyonight_night.toml) terminal palettes. Muted text and the surrounding caption frame use demo-specific shades.
+
+The preview uses 18-pixel terminal text in a 96-column layout, with full-resolution GIF and PNG assets. Click the README animation to open it at full size. Notification scenes show generated activity and bell events on fictional background panes.

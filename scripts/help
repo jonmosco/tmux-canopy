@@ -59,7 +59,8 @@ help_records() {
   section 'Notifications'
   key 'u' 'Clear notifications on the selected object'
   key 'Shift-u' 'Clear all sidebar notifications'
-  note '!N means activity, BN means a bell, and the silence badge counts quiet targets. Focusing a target clears its notices.'
+  note 'Amber badges beside names show unread activity (solid dot), a bell, or silence (clock). ASCII uses *, B, and ~. Green still marks the active location.'
+  note 'Expanded branches show badges on panes. Collapsed windows count unread panes; collapsed sessions count unread windows. A single target has no number. Bell takes priority over activity, then silence; the preview lists all types. Focusing a window clears its notices.'
 
   section 'Tmux window switching'
   key 'prefix + n / p' 'Next or previous window'

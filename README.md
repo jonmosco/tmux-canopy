@@ -8,7 +8,7 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 
 ## Preview
 
-![Animated tmux-canopy demo showing window navigation, search, folding, and buffer previews in fictional workspaces](docs/assets/canopy-demo.gif)
+[![Animated tmux-canopy demo showing navigation, readable notification badges, search, folding, and buffers](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)
 
 [View a still image](docs/assets/canopy-demo.png).
 

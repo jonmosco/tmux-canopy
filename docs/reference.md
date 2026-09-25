@@ -282,9 +282,9 @@ Notification sources are comma-separated:
 
 | Source | Badge | Trigger |
 |---|---|---|
-| `activity` | `!N` | Output appears in another tmux window |
-| `bell` | `BN` | An application emits a terminal bell |
-| `silence` | `…N` | A monitored window is silent for the configured interval |
+| `activity` | Amber `●` (`*` in ASCII) | Output appears in another tmux window |
+| `bell` | Amber bell (`B` in ASCII) | An application emits a terminal bell |
+| `silence` | Amber `◷` (`~` in ASCII) | A monitored window is silent for the configured interval |
 | `none` | — | Disable notification hooks |
 | `all` | all | Enable every native provider |
 
@@ -299,6 +299,8 @@ Choose exactly where native alerts are presented:
 The default is `sidebar`. Original `window-status-activity-style`, `window-status-bell-style`, and alert-action values are saved and restored when switching modes. The `status` and `both` modes set configured alert actions to `other` so tmux actually marks background windows. Custom status formats that explicitly contain `#F`, `#{window_flags}`, or alert conditionals must omit those expressions if strict sidebar-only display is desired; tmux does not expose a separate hook-only alert flag.
 
 Native tmux alert hooks record provider state only when tmux supplies a live, non-sidebar, non-placeholder pane and its owning window. Events without a valid open terminal pane are ignored. No process scanner, Git poller, agent API, or external desktop event can create a notification in the default model.
+
+A single bold amber badge sits immediately after the name. Expanded branches show badges on affected panes, without repeating the alert on their ancestors. Collapsed windows count unread panes; collapsed sessions count unread windows. Counts appear only above one, and multiple providers on one target count once. A bell takes priority over activity, then silence; previews list all recorded types. A window-level alert with no remaining flagged pane stays visible on the window until cleared. The green active-location marker is unchanged.
 
 The hooks record provider state on the affected pane and window. Press `u` to clear the selected pane's window, window, or whole session; press `U` to clear all unread state. The tree aggregates unread windows into session rows and clears transient state when the owning client focuses that window. Sidebar, placeholder, dead, missing and wrong-window event sources are ignored.
 

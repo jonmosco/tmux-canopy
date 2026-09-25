@@ -22,6 +22,7 @@ $1 == "W" {
     windows[s,++nw[s]]=w; wi[key]=$4; wn[key]=$5; links[w]=$6; sync[w]=$7
     wa[w]=$8+0; wb[w]=$9+0; wz[w]=$10+0
     sa[s]+=wa[w]; sb[s]+=wb[w]; sz[s]+=wz[w]
+    if (wa[w] || wb[w] || wz[w]) unread_windows[s]++
 }
 $1 == "P" {
     p=$2; if (seen_p[p]++) next
@@ -29,6 +30,7 @@ $1 == "P" {
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
     if (sidebar[p] != 1 && slot[p] != 1) {
         panes[$3,++np[$3]]=p
+        if (pa[p] || pb[p] || pz[p]) unread_panes[$3]++
         if (np[$3] == 1) shared_path[$3]=path[p]
         else if (shared_path[$3] != path[p]) shared_path[$3]=""
         if ($16 == 1) last_content[$3]=p
@@ -43,13 +45,12 @@ function mark(value, color) {
     color=(value == "●" ? green : value == "⇢" || value == "⇉" ? accent : attention)
     return value == " " ? value : color value reset
 }
-function notice(a,b,z, value) {
-    if (notices == "none") return ""
-    value=""
-    if (a>0) value=value " !" a
-    if (b>0) value=value " B" b
-    if (z>0) value=value " …" z
-    return value == "" ? "" : attention " [" substr(value,2) "]" reset
+# One badge per visible target. Counts describe unread descendants, not events
+# or provider totals; multiple providers on one target never inflate the count.
+function notice(a,b,z,count, glyph) {
+    if (notices == "none" || !(a || b || z)) return ""
+    glyph=(b ? bell_badge : a ? activity_badge : silence_badge)
+    return " " attention glyph (count>1 ? count : "") reset
 }
 function shortpath(value, budget, n, parts, shortened) {
     if (value == home) value="~"
@@ -111,6 +112,9 @@ END {
     session_icon=(icons == "nerdfont" ? "󰆍" : icons == "ascii" ? "S" : "◈")
     window_icon=(icons == "nerdfont" ? "󰖯" : icons == "ascii" ? "W" : "▣")
     pane_icon=(icons == "nerdfont" ? "" : icons == "ascii" ? ">" : "▹")
+    activity_badge=(icons == "ascii" ? "*" : "●")
+    bell_badge=(icons == "nerdfont" ? "" : icons == "ascii" ? "B" : "🔔")
+    silence_badge=(icons == "ascii" ? "~" : "◷")
     if (custom_s != "") session_icon=custom_s
     if (custom_w != "") window_icon=custom_w
     if (custom_p != "") pane_icon=custom_p
@@ -140,17 +144,17 @@ END {
         s=sessions[si]; st="S:" s
         sm=(st == del ? "✕" : s == current_s ? "●" : " ")
         meta=nw[s] "w"; if (attached[s]>0) meta=meta " · " attached[s] "c"
-        row(st,(collapsed[st] ? "▸" : "▾") " " mark(sm) " " dim session_icon reset bold " " sname[s] " " dim "[" meta "]" reset notice(sa[s],sb[s],sz[s]),st)
+        row(st,(collapsed[st] ? "▸" : "▾") " " mark(sm) " " dim session_icon reset bold " " sname[s] (collapsed[st] ? notice(sa[s],sb[s],sz[s],unread_windows[s]) : "") " " dim "[" meta "]" reset,st)
         if (collapsed[st]) continue
         for (wpos=1;wpos<=nw[s];wpos++) {
             w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
             branch=(wpos == nw[s] ? branch_end : branch_mid); stem=(wpos == nw[s] ? "   " : stem_mid)
-            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : w == current_w && s == current_s ? "●" : notices != "none" && (wa[w] || wb[w] || wz[w]) ? "!" : " ")
+            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : w == current_w && s == current_s ? "●" : " ")
             meta=(np[w]>1 ? " " np[w] "p" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
             grouped=(nul && density == "normal" && np[w]>1 && shared_path[w] != "" && !collapsed[wt])
-            window_text=dim branch reset " " mark(wm) " " dim window_icon reset " " (collapsed[wt] ? "▸" : "▾") " " wi[key] ":" wn[key] dim meta reset notice(wa[w],wb[w],wz[w])
+            window_text=dim branch reset " " mark(wm) " " dim window_icon reset " " (collapsed[wt] ? "▸" : "▾") " " wi[key] ":" wn[key] (collapsed[wt] || !unread_panes[w] ? notice(wa[w],wb[w],wz[w],unread_panes[w]) : "") dim meta reset
             if (grouped) {
                 continuation=dim stem stem_mid sprintf("%*s",3+length(window_icon),"")
                 window_text=window_text "\n" continuation shortpath(shared_path[w],width-12-length(window_icon)) reset
@@ -177,7 +181,7 @@ END {
                     row(pt,primary (grouped ? "" : "\n" secondary),pt ":" s)
                 } else {
                     # Compact mode and legacy newline consumers stay one-line.
-                    row(pt,prefix sprintf(" %-8s ",command[p]) path_color shortpath(path[p]) reset dim details reset notice(pa[p],pb[p],pz[p]),pt ":" s)
+                    row(pt,prefix " " command[p] notice(pa[p],pb[p],pz[p]) " " path_color shortpath(path[p]) reset dim details reset,pt ":" s)
                 }
             }
         }
