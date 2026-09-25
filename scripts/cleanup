@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+mode="${1:-scan}"
+client="${2:-}"
+
+if [[ "$mode" == 'client' && -n "$client" ]]; then
+  sidebar="$(sidebar_for_client "$client")"
+  if [[ -n "$sidebar" ]]; then
+    restore_zoom="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_restore_zoom_pane 2>/dev/null || true)"
+    tmux kill-pane -t "$sidebar" 2>/dev/null || true
+    if [[ -n "$restore_zoom" ]] && pane_exists "$restore_zoom"; then
+      tmux resize-pane -Z -t "$restore_zoom" 2>/dev/null || true
+    fi
+  fi
+  clear_sidebar_cache "$client"
+fi
+
+# Remove cache entries whose pane vanished or no longer identifies itself as a
+# sidebar. This also repairs interrupted toggles and killed sidebar processes.
+while IFS= read -r option; do
+  [[ -n "$option" ]] || continue
+  pane="$(tmux show-option -gqv "$option" 2>/dev/null || true)"
+  if [[ -z "$pane" ]] || ! pane_exists "$pane" || [[ "$(tmux show-option -pqv -t "$pane" @tmux_canopy 2>/dev/null || true)" != '1' ]]; then
+    tmux set-option -gu "$option" 2>/dev/null || true
+  fi
+done < <(tmux show-options -g 2>/dev/null | awk '$1 ~ /^@tmux_canopy_client_[0-9]+$/ { print $1 }')
+
+while IFS= read -r sidebar; do
+  [[ -n "$sidebar" ]] || continue
+  target="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_target 2>/dev/null || true)"
+  if [[ -z "$target" ]] || ! pane_exists "$target"; then
+    sidebar_window="$(tmux display-message -p -t "$sidebar" '#{window_id}' 2>/dev/null || true)"
+    replacement="$(content_pane_for_window "$sidebar_window" 2>/dev/null || true)"
+    [[ -n "$replacement" ]] && tmux set-option -p -t "$sidebar" @tmux_canopy_target "$replacement"
+  fi
+done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}' 2>/dev/null |
+  awk -F '\t' '$2 == "1" { print $1 }')
+
+sidebar_count="$(tmux list-panes -a -F '#{@tmux_canopy}' 2>/dev/null | awk '$0 == "1" { count++ } END { print count + 0 }')"
+if ((sidebar_count == 0)); then
+  cleanup_sidebar_slots
+  tmux set-option -gu @tmux_canopy_runtime_width 2>/dev/null || true
+elif [[ "$mode" == 'refresh' ]]; then
+  refresh_sidebars
+fi

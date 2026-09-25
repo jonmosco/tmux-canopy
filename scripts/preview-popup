@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "${1:-}" == --render ]]; then
+  if ! command -v less >/dev/null 2>&1; then
+    printf 'The enlarged preview needs less. Press any key to close.'
+    IFS= read -r -s -n 1 </dev/tty || true
+    exit 0
+  fi
+  # Read the popup PTY, not the source pane or inherited drawer dimensions.
+  read -r rows columns < <(stty size </dev/tty)
+  export FZF_PREVIEW_LINES="$((rows - 1))" FZF_PREVIEW_COLUMNS="$columns"
+  export TMUX_CANOPY_PREVIEW_EXPANDED=1
+  # A read-only snapshot: no shell/editor escapes, preprocessors, or history.
+  # -S clips wide lines and permits horizontal scrolling; -R retains SGR color.
+  "$SCRIPT_DIR/sidebar-preview" "${TMUX_CANOPY_PREVIEW_TOKEN:-}" |
+    LESS='' LESSOPEN='' LESSCLOSE='' LESSHISTFILE=- LESSSECURE=1 LESSSECURE_ALLOW='' less -R -S -+F
+  exit 0
+fi
+
+token="${1:-}"
+case "$token" in S:*|W:*|P:*|Q:*|X:*|B:*) ;; *) exit 0 ;; esac
+client="${TMUX_CANOPY_CLIENT:-}"
+[[ -n "$client" && -n "${TMUX_PANE:-}" ]] || exit 0
+# Pass tokens as environment data, never interpolate buffer names into shell
+# commands. Explicit client targeting prevents a second client taking the popup.
+tmux display-popup -c "$client" -t "$TMUX_PANE" -w '85%' -h '80%' \
+  -T ' Preview · q close · arrows scroll ' -E \
+  -e "TMUX_CANOPY_PREVIEW_TOKEN=$token" "$SCRIPT_DIR/preview-popup" --render

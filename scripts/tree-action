@@ -1,0 +1,757 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/navigation.sh"
+
+action="${1:-}"
+if [[ "$action" == diagnostics ]]; then
+  exec "$SCRIPT_DIR/doctor" --popup
+fi
+token="${2:-}"
+state_file="${TMUX_CANOPY_STATE:?}"
+client="${TMUX_CANOPY_CLIENT:-}"
+sidebar_pane="${TMUX_PANE:-}"
+sidebar_width="${TMUX_CANOPY_WIDTH:-42}"
+sidebar_scope="${TMUX_CANOPY_SCOPE:-window}"
+sidebar_transition="${TMUX_CANOPY_TRANSITION:-move}"
+
+[[ -n "$token" || "$action" == collapse-all || "$action" == expand-all ]] || exit 0
+
+remove_state() {
+  local value="$1"
+  local tmp
+  tmp="$(mktemp "${state_file}.XXXXXX")"
+  grep -Fvx -- "$value" "$state_file" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$state_file"
+}
+
+add_state() {
+  grep -Fqx -- "$1" "$state_file" 2>/dev/null || printf '%s\n' "$1" >> "$state_file"
+}
+
+set_all_branches() {
+  local kind view rest snapshot='' tmp
+  # These bindings are tree operations, including when there is no selection.
+  # Do not change saved tree expansion while browsing processes or buffers.
+  while IFS=$'\t' read -r kind view rest; do
+    [[ "$kind" == VIEW ]] || continue
+    [[ "$view" == tree ]] || return 0
+    break
+  done < "$state_file"
+  if [[ "$action" == collapse-all ]]; then
+    # One inventory includes every session/window occurrence, even hidden or
+    # filtered branches and windows linked into multiple sessions.
+    snapshot="$(tmux list-sessions -F 'S:#{session_id}' \; \
+      list-windows -a -F 'W:#{window_id}:#{session_id}' 2>/dev/null)" || return 1
+  fi
+  tmp="$(mktemp "${state_file}.XXXXXX")" || return 1
+  # Replace only expansion records; retain view, move/link and delete state.
+  if awk -F '\t' '
+    FILENAME == ARGV[1] { if ($1 !~ /^[SW]:/) print; next }
+    /^S:\$[0-9]+$/ || /^W:@[0-9]+:\$[0-9]+$/ { if (!seen[$0]++) print }
+  ' "$state_file" - <<< "$snapshot" > "$tmp"; then
+    mv -- "$tmp" "$state_file"
+  else
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+move_source() {
+  awk -F '\t' '$1 == "MOVE" { print $2; exit }' "$state_file" 2>/dev/null
+}
+
+clear_move() {
+  local tmp
+  tmp="$(mktemp "${state_file}.XXXXXX")"
+  awk -F '\t' '$1 != "MOVE"' "$state_file" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$state_file"
+}
+
+set_move() {
+  clear_move
+  printf 'MOVE\t%s\n' "$1" >> "$state_file"
+}
+
+link_source() {
+  awk -F '\t' '$1 == "LINK" { print $2; exit }' "$state_file" 2>/dev/null
+}
+
+clear_link() {
+  local tmp
+  tmp="$(mktemp "${state_file}.XXXXXX")"
+  awk -F '\t' '$1 != "LINK"' "$state_file" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$state_file"
+}
+
+set_link() {
+  clear_link
+  printf 'LINK\t%s\n' "$1" >> "$state_file"
+}
+
+clear_delete() {
+  local tmp
+  tmp="$(mktemp "${state_file}.XXXXXX")"
+  awk -F '\t' '$1 != "DELETE"' "$state_file" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$state_file"
+}
+
+pending_delete() {
+  awk -F '\t' '$1 == "DELETE" { print $2 "\t" $3; exit }' "$state_file" 2>/dev/null
+}
+
+set_delete() {
+  clear_delete
+  printf 'DELETE\t%s\t%s\n' "$1" "$(date +%s)" >> "$state_file"
+}
+
+sidebar_message() {
+  if [[ -n "$client" ]]; then
+    tmux display-message -c "$client" "$1" 2>/dev/null || true
+  else
+    tmux display-message "$1" 2>/dev/null || true
+  fi
+}
+
+window_id_for_token() {
+  local body="${1#W:}"
+  printf '%s\n' "${body%%:*}"
+}
+
+window_session_for_token() {
+  local body="${1#W:}"
+  [[ "$body" == *:* ]] && printf '%s\n' "${body#*:}"
+}
+
+parent_window_token() {
+  local pane_id="${1#P:}"
+  local window_id session_id
+  window_id="$(tmux display-message -p -t "$pane_id" '#{window_id}' 2>/dev/null || true)"
+  session_id="${TMUX_CANOPY_OCCURRENCE:-}"
+  [[ -n "$session_id" ]] || session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
+  [[ -n "$window_id" ]] && printf 'W:%s:%s\n' "$window_id" "$session_id"
+}
+
+first_content_pane() {
+  local target="$1"
+  tmux list-panes -t "$target" -F $'#{pane_id}\t#{@tmux_canopy}\t#{@tmux_canopy_slot}\t#{pane_active}' 2>/dev/null |
+    awk -F '\t' '
+      $2 != "1" && $3 != "1" && $4 == "1" { print $1; exit }
+      $2 != "1" && $3 != "1" && first == "" { first = $1 }
+      END { if (first != "") print first }
+    ' | head -n 1
+}
+
+pane_for_token() {
+  case "$1" in
+    S:*) first_content_pane "${1#S:}" ;;
+    W:*) first_content_pane "$(window_id_for_token "$1")" ;;
+    P:*) printf '%s\n' "${1#P:}" ;;
+  esac
+}
+
+create_split() {
+  local token="$1" direction="$2" target_pane cwd new_pane
+  target_pane="$(pane_for_token "$token")"
+  [[ -n "$target_pane" ]] || return 0
+  cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
+
+  new_pane="$(tmux split-window -d "$direction" -P -F '#{pane_id}' -t "$target_pane" -c "$cwd")"
+  [[ -n "$new_pane" ]] && show_target "$new_pane"
+}
+
+create_window() {
+  local token="$1" target_pane session_id cwd new_pane
+  target_pane="$(pane_for_token "$token")"
+  [[ -n "$target_pane" ]] || return 0
+  session_id="$(tmux display-message -p -t "$target_pane" '#{session_id}' 2>/dev/null || true)"
+  cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
+  [[ -n "$session_id" ]] || return 0
+
+  new_pane="$(tmux new-window -d -P -F '#{pane_id}' -t "${session_id}:" -c "$cwd")"
+  [[ -n "$new_pane" ]] && show_target "$new_pane"
+}
+
+create_session() {
+  local token="$1" target_pane cwd number=1 name new_pane
+  target_pane="$(pane_for_token "$token")"
+  [[ -n "$target_pane" ]] || return 0
+  cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
+
+  while tmux has-session -t "=session-$number" 2>/dev/null; do
+    ((number++))
+  done
+  name="session-$number"
+  new_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -c "$cwd")"
+  [[ -n "$new_pane" ]] && show_target "$new_pane"
+}
+
+session_for_token() {
+  local target_pane occurrence_session
+  case "$1" in
+    S:*) printf '%s\n' "${1#S:}" ;;
+    W:*)
+      occurrence_session="$(window_session_for_token "$1")"
+      if [[ -n "$occurrence_session" ]]; then printf '%s\n' "$occurrence_session"; else tmux display-message -p -t "$(window_id_for_token "$1")" '#{session_id}' 2>/dev/null; fi
+      ;;
+    P:*) tmux display-message -p -t "${1#P:}" '#{session_id}' 2>/dev/null ;;
+  esac
+}
+
+next_window_index() {
+  tmux list-windows -t "$1" -F '#{window_index}' 2>/dev/null |
+    sort -n | tail -n 1 | awk '{ print $1 + 1 }'
+}
+
+move_window_to() {
+  local source_token="$1" destination_token="$2"
+  local source_window destination_session destination_index target_pane
+  source_window="$(window_id_for_token "$source_token")"
+  destination_session="$(session_for_token "$destination_token")"
+  [[ -n "$source_window" && -n "$destination_session" ]] || return 0
+
+  destination_index="$(next_window_index "$destination_session")"
+  tmux move-window -d -s "$source_window" -t "${destination_session}:${destination_index}" || return 0
+  clear_move
+  target_pane="$(first_content_pane "$source_window")"
+  [[ -n "$target_pane" ]] && show_target "$target_pane"
+  [[ -n "$sidebar_pane" ]] && tmux send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+}
+
+move_pane_to() {
+  local source_token="$1" destination_token="$2" placement="$3"
+  local source_pane destination_pane destination_session
+  source_pane="${source_token#P:}"
+  destination_pane="$(pane_for_token "$destination_token")"
+  [[ -n "$source_pane" && -n "$destination_pane" && "$source_pane" != "$destination_pane" ]] || return 0
+
+  case "$placement" in
+    left)  tmux move-pane -d -h -b -s "$source_pane" -t "$destination_pane" ;;
+    right) tmux move-pane -d -h -s "$source_pane" -t "$destination_pane" ;;
+    above) tmux move-pane -d -v -b -s "$source_pane" -t "$destination_pane" ;;
+    below) tmux move-pane -d -v -s "$source_pane" -t "$destination_pane" ;;
+    window)
+      destination_session="$(session_for_token "$destination_token")"
+      [[ -n "$destination_session" ]] || return 0
+      tmux break-pane -d -s "$source_pane" -t "${destination_session}:" >/dev/null
+      ;;
+    *) return 0 ;;
+  esac || return 0
+
+  clear_move
+  show_target "$source_pane"
+}
+
+menu_command() {
+  local source_token="$1" destination_token="$2" placement="$3"
+  sidebar_menu_job "$(action_shell complete-move "$source_token" "$destination_token" "$placement")"
+}
+
+open_pane_move_menu() {
+  local source_token="$1" destination_token="$2"
+  local left right above below window
+  local -a client_args
+  [[ -n "$(pane_for_token "$destination_token")" ]] || return 0
+  left="$(menu_command "$source_token" "$destination_token" left)"
+  right="$(menu_command "$source_token" "$destination_token" right)"
+  above="$(menu_command "$source_token" "$destination_token" above)"
+  below="$(menu_command "$source_token" "$destination_token" below)"
+  window="$(menu_command "$source_token" "$destination_token" window)"
+
+  client_args=()
+  if [[ -n "$client" ]]; then
+    client_args=(-c "$client")
+  fi
+  tmux display-menu "${client_args[@]}" -t "$sidebar_pane" -x C -y C \
+    -T " Move ${source_token#P:} " \
+    "Left of target" h "$left" \
+    "Right of target" l "$right" \
+    "Above target" k "$above" \
+    "Below target" j "$below" \
+    "" "" "" \
+    "Break into window" w "$window" \
+    "Cancel" q ""
+}
+
+apply_rename() {
+  local target="$1" name="$2"
+  [[ -n "$name" ]] || return 0
+  case "$target" in
+    S:*) tmux rename-session -t "${target#S:}" "$name" ;;
+    W:*) tmux rename-window -t "$(window_id_for_token "$target")" "$name" ;;
+  esac
+}
+
+rename_token() {
+  local target="$1" current object_id command label prompt_target='' scope='' response
+  local response_key="@tmux_canopy_rename_${BASHPID}_${RANDOM}" scope_args=()
+  [[ -n "$client" ]] && prompt_target="-t $(tmux_quote "$client")"
+  case "$target" in
+    S:*)
+      object_id="${target#S:}"; command=rename-session; label='Rename session:'
+      current="$(tmux display-message -p -t "$object_id" '#{session_name}' 2>/dev/null || true)"
+      ;;
+    W:*)
+      object_id="$(window_id_for_token "$target")"; command=rename-window; label='Rename window:'
+      scope='-w'; scope_args=(-w)
+      current="$(tmux display-message -p -t "$object_id" '#{window_name}' 2>/dev/null || true)"
+      ;;
+    *) sidebar_message 'tmux-canopy: select a session or window to rename'; return ;;
+  esac
+  # Parse a native block BEFORE substituting the response. Save its argv data
+  # without -F, then read it after the prompt returns. rename-* itself expands
+  # formats, so escape # before applying even an already safely parsed name.
+  # -l preserves commas; -I performs one format expansion of its initial value.
+  # shellcheck disable=SC2064 # Capture safely quoted locals before this function returns.
+  trap "$(shell_join tmux set-option "${scope_args[@]}" -u -t "$object_id" "$response_key") 2>/dev/null || true" EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  current="${current//#/##}"
+  tmux if-shell -F 1 \
+    "command-prompt -l $prompt_target -I $(tmux_quote "$current") -p $(tmux_quote "$label") { set-option $scope -t $(tmux_quote "$object_id") $response_key %% }"
+  if response="$(tmux show-option "${scope_args[@]}" -v -t "$object_id" "$response_key" 2>/dev/null)"; then
+    tmux "$command" -t "$object_id" -- "${response//#/##}"
+  fi
+}
+
+fallback_pane() {
+  local excluded_kind="$1" excluded_id="$2"
+  tmux list-panes -a -F '#{pane_id}|#{window_id}|#{session_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}' 2>/dev/null |
+    awk -F '|' -v kind="$excluded_kind" -v id="$excluded_id" '
+      $4 != "1" && $5 != "1" && !((kind == "window" && $2 == id) || (kind == "session" && $3 == id)) { print $1; exit }
+    '
+}
+
+delete_token_now() {
+  local target="$1" kind id content_count total_count fallback sidebar_window target_window replacement
+  kind="${target%%:*}"
+  id="${target#*:}"
+  [[ "$kind" == 'W' ]] && id="$(window_id_for_token "$target")"
+
+  if [[ "$kind" == 'P' ]]; then
+    [[ "$(tmux show-option -pqv -t "$id" @tmux_canopy 2>/dev/null || true)" != '1' ]] || return 0
+    [[ "$(tmux show-option -pqv -t "$id" @tmux_canopy_slot 2>/dev/null || true)" != '1' ]] || return 0
+    target_window="$(tmux display-message -p -t "$id" '#{window_id}' 2>/dev/null || true)"
+    content_count="$(tmux list-panes -t "$target_window" -F '#{@tmux_canopy}|#{@tmux_canopy_slot}' 2>/dev/null |
+      awk -F '|' '$1 != "1" && $2 != "1" { count++ } END { print count + 0 }')"
+    if ((content_count <= 1)); then
+      total_count="$(tmux list-windows -a -F '#{window_id}' 2>/dev/null | awk '!seen[$0]++ { count++ } END { print count + 0 }')"
+      if ((total_count <= 1)); then
+        sidebar_message 'tmux-canopy: refusing to delete the last tmux window'
+        clear_delete
+        return 0
+      fi
+    fi
+    tmux kill-pane -t "$id" || return 0
+    if ((content_count <= 1)); then
+      # Do not turn a last-pane deletion into arbitrary cross-session navigation.
+      # Preserve the dock, remove internal leftovers, and let tmux select normally.
+      "$SCRIPT_DIR/reap-empty"
+    else
+      replacement="$(content_pane_for_window "$target_window" 2>/dev/null || true)"
+      [[ -n "$replacement" && -n "$sidebar_pane" ]] && tmux set-option -p -t "$sidebar_pane" @tmux_canopy_target "$replacement"
+    fi
+    clear_delete
+    return 0
+  fi
+
+  if [[ "$kind" == 'W' ]]; then
+    total_count="$(tmux list-windows -a -F '#{window_id}' 2>/dev/null | awk '!seen[$0]++ { count++ } END { print count + 0 }')"
+    if ((total_count <= 1)); then
+      sidebar_message 'tmux-canopy: refusing to delete the last tmux window'
+      clear_delete
+      return 0
+    fi
+    if [[ -n "$sidebar_pane" ]]; then
+      sidebar_window="$(tmux display-message -p -t "$sidebar_pane" '#{window_id}' 2>/dev/null || true)"
+      if [[ "$sidebar_window" == "$id" ]]; then
+        fallback="$(fallback_pane window "$id")"
+        [[ -n "$fallback" ]] || return 0
+        show_target "$fallback"
+      fi
+    fi
+    tmux kill-window -t "$id" 2>/dev/null || true
+  elif [[ "$kind" == 'S' ]]; then
+    total_count="$(tmux list-sessions -F '#{session_id}' 2>/dev/null | wc -l)"
+    if ((total_count <= 1)); then
+      sidebar_message 'tmux-canopy: refusing to delete the last tmux session'
+      clear_delete
+      return 0
+    fi
+    if [[ -n "$sidebar_pane" && "$(tmux display-message -p -t "$sidebar_pane" '#{session_id}' 2>/dev/null || true)" == "$id" ]]; then
+      fallback="$(fallback_pane session "$id")"
+      [[ -n "$fallback" ]] || return 0
+      show_target "$fallback"
+    fi
+    tmux kill-session -t "$id" 2>/dev/null || true
+  fi
+  clear_delete
+}
+
+request_delete() {
+  local target="$1" pending pending_token pending_time now
+  pending="$(pending_delete)"
+  IFS=$'\t' read -r pending_token pending_time <<< "$pending"
+  now="$(date +%s)"
+  if [[ "$pending_token" == "$target" && "$pending_time" =~ ^[0-9]+$ && $((now - pending_time)) -le 5 ]]; then
+    delete_token_now "$target"
+  else
+    set_delete "$target"
+    sidebar_message 'tmux-canopy: press x again within 5 seconds to confirm deletion'
+  fi
+}
+
+action_shell() {
+  tmux_shell env "TMUX_CANOPY_STATE=$state_file" "TMUX_CANOPY_CLIENT=$client" \
+    "TMUX_CANOPY_WIDTH=$sidebar_width" "TMUX_CANOPY_SCOPE=$sidebar_scope" \
+    "TMUX_CANOPY_TRANSITION=$sidebar_transition" "TMUX_PANE=$sidebar_pane" \
+    "$BASH" "$SCRIPT_DIR/tree-action" "$@"
+}
+
+action_menu_command() {
+  sidebar_menu_job "$(action_shell "$@"); $(tmux_shell tmux send-keys -t "$sidebar_pane" C-r) 2>/dev/null || true"
+}
+
+show_info() {
+  local target="$1"
+  tmux display-popup -c "$client" -t "$sidebar_pane" -w '70%' -h '45%' -E "$BASH" "$SCRIPT_DIR/info" "$target"
+}
+
+swap_window_direction() {
+  local token="$1" direction="$2" window_id session_id index adjacent
+  window_id="$(window_id_for_token "$token")"
+  session_id="$(session_for_token "$token")"
+  index="$(tmux list-windows -t "$session_id" -F '#{window_id}|#{window_index}' | awk -F '|' -v id="$window_id" '$1 == id { print $2; exit }')"
+  [[ -n "$index" ]] || return 0
+  if [[ "$direction" == 'up' ]]; then
+    adjacent="$(tmux list-windows -t "$session_id" -F '#{window_id}|#{window_index}' | sort -t '|' -k2,2n | awk -F '|' -v idx="$index" '$2 < idx { id=$1 } END { print id }')"
+  else
+    adjacent="$(tmux list-windows -t "$session_id" -F '#{window_id}|#{window_index}' | sort -t '|' -k2,2n | awk -F '|' -v idx="$index" '$2 > idx { print $1; exit }')"
+  fi
+  [[ -n "$adjacent" ]] && tmux swap-window -d -s "$window_id" -t "$adjacent" 2>/dev/null || true
+}
+
+layout_menu() {
+  local token="$1" tiled even_h even_v main_h main_v next previous rotate
+  tiled="$(action_menu_command layout "$token" tiled)"
+  even_h="$(action_menu_command layout "$token" even-horizontal)"
+  even_v="$(action_menu_command layout "$token" even-vertical)"
+  main_h="$(action_menu_command layout "$token" main-horizontal)"
+  main_v="$(action_menu_command layout "$token" main-vertical)"
+  next="$(action_menu_command layout "$token" next)"
+  previous="$(action_menu_command layout "$token" previous)"
+  rotate="$(action_menu_command rotate "$token")"
+  sidebar_display_menu "$client" "$sidebar_pane" -x C -y C -T ' Window layout ' \
+    'Tiled' t "$tiled" 'Even horizontal' h "$even_h" 'Even vertical' v "$even_v" \
+    'Main horizontal' H "$main_h" 'Main vertical' V "$main_v" \
+    'Next layout' n "$next" 'Previous layout' p "$previous" \
+    'Rotate panes' r "$rotate" 'Cancel' q ''
+}
+
+sync_window_toggle() {
+  local token="$1" window_id enabled yes
+  window_id="$(window_id_for_token "$token")"
+  enabled="$(tmux show-window-option -v -t "$window_id" synchronize-panes 2>/dev/null || true)"
+  if [[ "$enabled" == 'on' ]]; then
+    tmux set-window-option -t "$window_id" synchronize-panes off
+  else
+    yes="$(action_menu_command sync-confirm "$token")"
+    sidebar_display_menu "$client" "$sidebar_pane" -x C -y C -T ' Broadcast input to every pane? ' \
+      'Enable synchronized input' y "$yes" 'Cancel' n ''
+  fi
+}
+
+show_action_menu() {
+  local target="$1"
+  local -a client_args
+  [[ -n "$client" ]] && client_args=(-c "$client") || client_args=()
+  case "$target" in
+    S:*)
+      tmux display-menu "${client_args[@]}" -t "$sidebar_pane" -x C -y C -T ' Session actions ' \
+        'New window' n "$(action_menu_command create-window "$target")" \
+        'Rename' r "$(action_menu_command rename "$target")" \
+        'Information' i "$(action_menu_command info "$target")" \
+        'Delete (arm)' x "$(action_menu_command delete "$target")" \
+        'Diagnostics' D "$(action_menu_command diagnostics "$target")" \
+        'Cancel' q ''
+      ;;
+    W:*)
+      tmux display-menu "${client_args[@]}" -t "$sidebar_pane" -x C -y C -T ' Window actions ' \
+        'Focus' f "$(action_menu_command activate "$target")" \
+        'Rename' r "$(action_menu_command rename "$target")" \
+        'Move up' k "$(action_menu_command window-up "$target")" \
+        'Move down' j "$(action_menu_command window-down "$target")" \
+        'Mark to move sessions' m "$(action_menu_command move-toggle "$target")" \
+        'Mark to link into session' L "$(action_menu_command link-toggle "$target")" \
+        'Unlink from this session' u "$(action_menu_command unlink "$target")" \
+        'Layouts…' l "$(action_menu_command layout-menu "$target")" \
+        'Toggle synchronized input' y "$(action_menu_command sync-toggle "$target")" \
+        'Information' i "$(action_menu_command info "$target")" \
+        'Delete (arm)' x "$(action_menu_command delete "$target")" \
+        'Diagnostics' D "$(action_menu_command diagnostics "$target")" \
+        'Cancel' q ''
+      ;;
+    P:*)
+      tmux display-menu "${client_args[@]}" -t "$sidebar_pane" -x C -y C -T ' Pane actions ' \
+        'Focus' f "$(action_menu_command activate "$target")" \
+        'Zoom/unzoom' z "$(action_menu_command zoom "$target")" \
+        'Swap up' k "$(action_menu_command pane-up "$target")" \
+        'Swap down' j "$(action_menu_command pane-down "$target")" \
+        'Mark to move' m "$(action_menu_command move-toggle "$target")" \
+        'Break into window' b "$(action_menu_command break-window "$target")" \
+        'Respawn dead pane' R "$(action_menu_command respawn "$target")" \
+        'Information' i "$(action_menu_command info "$target")" \
+        'Delete (arm)' x "$(action_menu_command delete "$target")" \
+        'Diagnostics' D "$(action_menu_command diagnostics "$target")" \
+        'Cancel' q ''
+      ;;
+  esac
+}
+
+clear_notification_token() {
+  local target="$1" window_id
+  case "$target" in
+    S:*) TMUX_CANOPY_NOTIFY_QUIET=1 "$SCRIPT_DIR/notify" clear-session "${target#S:}" ;;
+    W:*) TMUX_CANOPY_NOTIFY_QUIET=1 "$SCRIPT_DIR/notify" clear-window "$(window_id_for_token "$target")" ;;
+    P:*)
+      window_id="$(tmux display-message -p -t "${target#P:}" '#{window_id}' 2>/dev/null || true)"
+      [[ -n "$window_id" ]] && TMUX_CANOPY_NOTIFY_QUIET=1 "$SCRIPT_DIR/notify" clear-window "$window_id"
+      ;;
+  esac
+}
+
+link_window_to() {
+  local source_token="$1" destination_token="$2" source_window destination_session destination_index
+  source_window="$(window_id_for_token "$source_token")"
+  destination_session="$(session_for_token "$destination_token")"
+  [[ -n "$source_window" && -n "$destination_session" ]] || return 0
+  destination_index="$(next_window_index "$destination_session")"
+  tmux link-window -d -s "$source_window" -t "${destination_session}:${destination_index}" 2>/dev/null || return 0
+  clear_link
+  [[ -n "$sidebar_pane" ]] && tmux send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+}
+
+unlink_window() {
+  local token="$1" window_id session_id index linked
+  window_id="$(window_id_for_token "$token")"
+  session_id="$(window_session_for_token "$token")"
+  linked="$(tmux display-message -p -t "$window_id" '#{window_linked_sessions}' 2>/dev/null || true)"
+  if [[ ! "$linked" =~ ^[2-9][0-9]*$ && "$linked" != '2' ]]; then
+    sidebar_message 'tmux-canopy: window is not linked to another session'
+    return 0
+  fi
+  index="$(tmux list-windows -t "$session_id" -F '#{window_id}|#{window_index}' 2>/dev/null | awk -F '|' -v id="$window_id" '$1 == id { print $2; exit }')"
+  [[ -n "$session_id" && -n "$index" ]] || return 0
+  tmux unlink-window -t "${session_id}:${index}" 2>/dev/null || true
+}
+
+activate_token() {
+  local token="$1" source_token='' source_link='' state_kind state_value _unused occurrence destination
+  # Activation is a hot path: read operation state once without two awk jobs.
+  while IFS=$'\t' read -r state_kind state_value _unused; do
+    case "$state_kind" in
+      MOVE) [[ -n "$source_token" ]] || source_token="$state_value" ;;
+      LINK) [[ -n "$source_link" ]] || source_link="$state_value" ;;
+    esac
+  done < "$state_file"
+  if [[ -n "$source_token" ]]; then
+    case "$source_token" in
+      W:*) move_window_to "$source_token" "$token" ;;
+      P:*) open_pane_move_menu "$source_token" "$token" ;;
+    esac
+  elif [[ -n "$source_link" ]]; then
+    link_window_to "$source_link" "$token"
+  else
+    case "$token" in
+      W:*)
+        occurrence="$(window_session_for_token "$token")"
+        destination="$(window_id_for_token "$token")"
+        [[ -n "$occurrence" ]] && destination="$occurrence:$destination"
+        show_target "$destination"
+        ;;
+      P:*)
+        destination="${token#P:}"
+        # The dot is required: session:%pane is parsed as a window target.
+        [[ -n "${TMUX_CANOPY_OCCURRENCE:-}" ]] && destination="$TMUX_CANOPY_OCCURRENCE:.$destination"
+        show_target "$destination"
+        ;;
+      S:*) show_target "${token#S:}" ;;
+    esac
+  fi
+}
+
+show_target() {
+  sidebar_navigate "$client" "$1" "$sidebar_width" "$sidebar_scope" "$sidebar_transition" select "$sidebar_pane"
+}
+
+case "$action" in
+  collapse-all|expand-all)
+    set_all_branches
+    ;;
+
+  collapse)
+    case "$token" in
+      S:*|W:*) add_state "$token" ;;
+      P:*)
+        parent="$(parent_window_token "$token")"
+        [[ -n "$parent" ]] && add_state "$parent"
+        ;;
+    esac
+    ;;
+
+  expand)
+    case "$token" in
+      S:*|W:*) remove_state "$token" ;;
+    esac
+    ;;
+
+  switch|activate)
+    activate_token "$token"
+    ;;
+
+  move-toggle)
+    case "$token" in
+      W:*|P:*)
+        if [[ "$(move_source)" == "$token" ]]; then
+          clear_move
+        else
+          set_move "$token"
+        fi
+        ;;
+    esac
+    ;;
+
+  move-cancel)
+    clear_move
+    clear_link
+    ;;
+
+  link-toggle)
+    if [[ "$token" == W:* ]]; then
+      if [[ "$(link_source)" == "$token" ]]; then clear_link; else set_link "$token"; fi
+    fi
+    ;;
+
+  unlink)
+    [[ "$token" == W:* ]] && unlink_window "$token"
+    ;;
+
+  complete-move)
+    move_pane_to "$token" "${3:-}" "${4:-}"
+    [[ -n "$sidebar_pane" ]] && tmux send-keys -t "$sidebar_pane" C-r
+    ;;
+
+  split-horizontal)
+    # A horizontal split creates panes stacked above and below each other.
+    create_split "$token" -v
+    ;;
+
+  split-vertical)
+    # A vertical split creates panes beside each other.
+    create_split "$token" -h
+    ;;
+
+  create-window)
+    create_window "$token"
+    ;;
+
+  create-session)
+    create_session "$token"
+    ;;
+
+  rename)
+    rename_token "$token"
+    ;;
+
+  rename-apply)
+    apply_rename "$token" "${3:-}"
+    ;;
+
+  delete)
+    request_delete "$token"
+    ;;
+
+  notification-clear)
+    clear_notification_token "$token"
+    ;;
+
+  notifications-clear-all)
+    TMUX_CANOPY_NOTIFY_QUIET=1 "$SCRIPT_DIR/notify" clear-all
+    ;;
+
+  resize-previous)
+    "$SCRIPT_DIR/resize" previous "$sidebar_pane"
+    ;;
+
+  resize-next|resize-cycle)
+    "$SCRIPT_DIR/resize" next "$sidebar_pane"
+    ;;
+
+  actions)
+    show_action_menu "$token"
+    ;;
+
+  info)
+    show_info "$token"
+    ;;
+
+  window-up)
+    swap_window_direction "$token" up
+    ;;
+
+  window-down)
+    swap_window_direction "$token" down
+    ;;
+
+  pane-up)
+    tmux swap-pane -d -U -t "${token#P:}" 2>/dev/null || true
+    ;;
+
+  pane-down)
+    tmux swap-pane -d -D -t "${token#P:}" 2>/dev/null || true
+    ;;
+
+  zoom)
+    tmux resize-pane -Z -t "${token#P:}" 2>/dev/null || true
+    ;;
+
+  break-window)
+    pane_id="${token#P:}"
+    session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
+    [[ -n "$session_id" ]] && tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
+    ;;
+
+  layout-menu)
+    layout_menu "$token"
+    ;;
+
+  layout)
+    window_id="$(window_id_for_token "$token")"
+    "$SCRIPT_DIR/content-layout" "$window_id" "${3:-}" "$client" >/dev/null 2>&1 || true
+    ;;
+
+  rotate)
+    tmux rotate-window -t "$(window_id_for_token "$token")" 2>/dev/null || true
+    ;;
+
+  sync-toggle)
+    sync_window_toggle "$token"
+    ;;
+
+  sync-confirm)
+    tmux set-window-option -t "$(window_id_for_token "$token")" synchronize-panes on
+    ;;
+
+  respawn)
+    pane_id="${token#P:}"
+    if [[ "$(tmux display-message -p -t "$pane_id" '#{pane_dead}' 2>/dev/null || true)" == '1' ]]; then
+      tmux respawn-pane -t "$pane_id" 2>/dev/null || true
+    else
+      sidebar_message 'tmux-canopy: respawn is limited to dead panes'
+    fi
+    ;;
+esac

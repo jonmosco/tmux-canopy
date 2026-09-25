@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+action="${1:-}"
+mouse_pane="${2:-}"
+window_id="${3:-}"
+mouse_x="${4:-}"
+mode="${5:-staged}"
+
+clear_markers() {
+  local pane window
+  while IFS= read -r pane; do
+    [[ -n "$pane" ]] && tmux set-option -pu -t "$pane" @tmux_canopy_staged_sidebar 2>/dev/null || true
+  done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy_staged_sidebar}' 2>/dev/null |
+    awk -F '\t' '$2 != "" { print $1 }')
+  while IFS= read -r window; do
+    [[ -n "$window" ]] && tmux set-option -wu -t "$window" @tmux_canopy_staged_sidebar 2>/dev/null || true
+  done < <(tmux list-windows -a -f '#{@tmux_canopy_staged_sidebar}' -F '#{window_id}' 2>/dev/null)
+}
+
+case "$action" in
+  start)
+    clear_markers
+    [[ -n "$window_id" ]] || window_id="$(tmux display-message -p -t "$mouse_pane" '#{window_id}' 2>/dev/null || true)"
+    while IFS='|' read -r sidebar left width; do
+      [[ -n "$sidebar" && "$left" =~ ^[0-9]+$ && "$width" =~ ^[1-9][0-9]*$ ]] || continue
+      border=$((left + width))
+      # tmux supplies mouse_pane but no mouse_x on the border itself. A
+      # full-height left sidebar owns its right border. Numeric coordinates
+      # remain supported for callers using the original helper interface.
+      if [[ "$mouse_pane" == "$sidebar" && -z "$mouse_x" ]] ||
+         { [[ "$mouse_x" =~ ^[0-9]+$ ]] && ((mouse_x >= border - 1 && mouse_x <= border + 1)); }; then
+        tmux set-option -pq -t "$sidebar" @tmux_canopy_staged_sidebar "$sidebar"
+        [[ -n "$mouse_pane" ]] && tmux set-option -pq -t "$mouse_pane" @tmux_canopy_staged_sidebar "$sidebar" 2>/dev/null || true
+        # Release may land inside any content pane, which inherits this marker.
+        tmux set-option -wq -t "$window_id" @tmux_canopy_staged_sidebar "$sidebar"
+        exit 0
+      fi
+    done < <(tmux list-panes -t "$window_id" -F '#{pane_id}|#{pane_left}|#{pane_width}|#{@tmux_canopy}' 2>/dev/null |
+      awk -F '|' '$4 == "1" { print $1 "|" $2 "|" $3 }')
+    ;;
+
+  end)
+    sidebar="$mouse_pane"
+    [[ -n "$sidebar" && "$mouse_x" =~ ^[0-9]+$ ]] || { clear_markers; exit 0; }
+    left="$(tmux display-message -p -t "$sidebar" '#{pane_left}' 2>/dev/null || true)"
+    [[ "$left" =~ ^[0-9]+$ ]] || left=0
+    desired=$((mouse_x - left))
+    ((desired > 0)) || { clear_markers; exit 0; }
+    if [[ "$mode" == 'preset' ]]; then
+      "$SCRIPT_DIR/resize" nearest "$sidebar" "$desired"
+    else
+      "$SCRIPT_DIR/resize" commit "$sidebar" "$desired"
+    fi
+    clear_markers
+    ;;
+
+  clear)
+    clear_markers
+    ;;
+esac

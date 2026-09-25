@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# A read-only, row-budgeted snapshot. fzf/less clip display cells horizontally;
+# never fold lines, strip ANSI with byte slicing, or resize the source pane.
+set -u
+pane="${1:-}"
+[[ "$pane" =~ ^%[0-9]+$ ]] || exit 0
+rows="${FZF_PREVIEW_LINES:-12}"; columns="${FZF_PREVIEW_COLUMNS:-42}"
+[[ "$rows" =~ ^[1-9][0-9]{0,4}$ ]] || rows=12
+[[ "$columns" =~ ^[1-9][0-9]{0,4}$ ]] || columns=42
+expanded="${TMUX_CANOPY_PREVIEW_EXPANDED:-0}"
+sep=$'\037'
+# Scrub metadata control characters before splitting. The captured screen's
+# colors are retained separately by capture-pane -e.
+clean=$'s/[\001-\037\177]/ /'
+format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}"
+metadata="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
+[[ -n "$metadata" ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
+IFS="$sep" read -r width height cursor history alternate command directory <<< "$metadata"
+[[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[1-9][0-9]*$ && "$cursor" =~ ^[0-9]+$ && "$history" =~ ^[0-9]+$ ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
+budget=$((rows - 2))
+((budget > 0)) || budget=0
+mode=recent
+case "${command##*/}" in
+  nvim|vim|vi|top|htop|btop|k9s|less|more|lazygit) mode=screen ;;
+esac
+[[ "$alternate" == 1 ]] && mode=screen
+start=0; end=0
+if [[ "$mode" == screen ]]; then
+  if [[ "$expanded" == 1 ]]; then
+    end=$((height - 1))
+  elif ((budget > 0)); then
+    # Keep the cursor visible, but never pull shell history into a TUI screen.
+    start=$((cursor - budget / 2))
+    ((start + budget <= height)) || start=$((height - budget))
+    ((start >= 0)) || start=0
+    end=$((start + budget - 1))
+    ((end < height)) || end=$((height - 1))
+  fi
+else
+  end="$cursor"
+  if [[ "$expanded" == 1 ]]; then
+    start=$((end - 299))
+  else
+    start=$((end - budget + 1))
+  fi
+  ((start >= -history)) || start=$((-history))
+fi
+hint="$mode"
+if ((width > columns)) || { [[ "$expanded" != 1 ]] && ((height > budget)); }; then hint+=' crop'; fi
+printf '%s · %s · %sx%s [%s]\n' "$pane" "$command" "$width" "$height" "$hint"
+((rows >= 2)) || exit 0
+if [[ -n "${HOME:-}" ]]; then
+  [[ "$directory" != "$HOME" ]] || directory='~'
+  # shellcheck disable=SC2088 # Literal tilde for display, not a filesystem path.
+  [[ "$directory" != "$HOME/"* ]] || directory='~/'"${directory#"$HOME/"}"
+fi
+if ((${#directory} > columns)) && [[ "$directory" == */* ]]; then directory="…/${directory##*/}"; fi
+printf '%s\n' "$directory"
+((budget > 0)) || exit 0
+# No -J: physical terminal rows must stay separate. No -a: capture the active
+# screen, not the saved alternate-screen contents. Negative rows are shell-only.
+tmux capture-pane -ep -t "$pane" -S "$start" -E "$end" 2>/dev/null || printf 'Pane exited during capture.\n'

@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+# Hooks retain their old pane/client argument order. The hook's expanded pane
+# is deliberately ignored: it can be stale after a window/session transition.
+mode=request
+if [[ "${1:-}" == worker ]]; then
+  mode=worker; expected_sidebar="${2:-}"; client="${3:-}"; token="${4:-}"; previous="${5:-}"
+else
+  client="${2:-}"
+fi
+[[ -n "$client" ]] || exit 0
+key="$(sidebar_client_key "$client")"
+guard="@tmux_canopy_transition_$key"
+
+snapshot() {
+  local kind a b c d e f g h j
+  sidebar='' current='' session='' window='' location='' target='' valid='' guarded=''
+  local saved='' saved_session='' last=''
+  local -A windows=() internal=() last_panes=()
+  while IFS='|' read -r kind a b c d e f g h j; do
+    case "$kind" in
+      C)
+        if [[ "$a" == "$client" ]]; then
+          session="$b"; window="$c"; current="$d"; guarded="$e"
+        fi
+        ;;
+      P)
+        windows["$a"]="$b"
+        internal["$a"]=''
+        [[ "$c" == 1 || "$d" == 1 ]] && internal["$a"]=1
+        if [[ "$c" != 1 && "$d" != 1 && "$f" == 1 ]]; then last_panes["$b"]="$a"; fi
+        if [[ "$c" == 1 && "$e" == "$client" ]]; then
+          sidebar="$a"; saved="$g"; saved_session="$h"
+          pending="$j"
+        fi
+        ;;
+    esac
+  done < <(tmux list-clients -F "C|#{client_tty}|#{session_id}|#{window_id}|#{pane_id}|#{$guard}" \; \
+    list-panes -a -F 'P|#{pane_id}|#{window_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_client}|#{pane_last}|#{@tmux_canopy_target}|#{@tmux_canopy_target_session}|#{@tmux_canopy_focus_pending}' 2>/dev/null)
+  [[ -n "$sidebar" && -n "$current" && -n "${windows[$current]:-}" ]] || return 1
+  # Validate this exact client at commit time too. A newer event can overtake
+  # an older background request; the older snapshot must not overwrite it.
+  # Client loops retain the explicitly targeted pane context. Use their
+  # client_session field plus the targeted pane/window's active flags instead
+  # of assuming #{pane_id} inside an L loop is the client's selected pane.
+  # Explicit pane component, not session:window (which can fall back to active).
+  live_target="$session:.$current"
+  live="#{L:#{?#{==:#{client_tty},$client},#{client_session},}}"
+  valid="#{&&:#{==:$live,#{session_name}},#{&&:#{window_active},#{pane_active}}}"
+  owner="#{&&:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_client},$client}}"
+  if [[ "$current" == "$sidebar" ]]; then
+    # pane_last survives even a content->sidebar click faster than a worker
+    # could run. Never mistake another sidebar or a placeholder for content.
+    last="${last_panes[$window]:-}"
+    if [[ -n "$last" ]]; then
+      target="$last"
+      valid="#{&&:$valid,#{==:#{P:#{?pane_last,#{pane_id},}},$last}}"
+    elif [[ -n "$saved" && -n "${windows[$saved]:-}" && -z "${internal[$saved]}" ]]; then
+      target="$saved"; window="${windows[$saved]}"; session="${saved_session:-$session}"
+    else
+      return 1
+    fi
+  elif [[ -z "${internal[$current]}" ]]; then
+    target="$current"
+  else
+    return 1
+  fi
+  location="$session|$window|$target"
+}
+
+# Validate live focus in its own pane context, then ownership/claim in the
+# sidebar context. Quote the nested command without interpreting shell text.
+commit() {
+  local condition="$1" body="$2"
+  tmux if-shell -F -t "$live_target" "$valid" \
+    "if-shell -F -t '$sidebar' '#{&&:$owner,$condition}' $(tmux_quote "$body")" 2>/dev/null || true
+}
+
+# Only unset this worker's own claim. A killed worker's claim expires, so a
+# subsequent focus event can recover without restarting the sidebar.
+release() {
+  tmux if-shell -F -t "$expected_sidebar" "#{==:#{@tmux_canopy_focus_pending},$token}" \
+    "set-option -pu -t $expected_sidebar @tmux_canopy_focus_pending ; set-option -pu -t $expected_sidebar @tmux_canopy_focus_deadline" 2>/dev/null || true
+}
+
+if [[ "$mode" == worker ]]; then
+  [[ "$expected_sidebar" =~ ^%[0-9]+$ && "$token" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 0
+  trap release EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  # Trailing-edge debounce: extend the wait when the live target changes.
+  # The bounded worker is event-driven, not a persistent poller/daemon.
+  for ((attempt=0; attempt<20; attempt++)); do
+    sleep 0.075
+    snapshot || exit 0
+    [[ "$sidebar" == "$expected_sidebar" && "$pending" == "$token" ]] || exit 0
+    [[ "$guarded" != 1 ]] || continue
+    if [[ "$location" != "$previous" && "$attempt" -lt 19 ]]; then
+      previous="$location"
+      continue
+    fi
+    commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
+    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-r\" ; "
+    commands+="set-option -pu -t $sidebar @tmux_canopy_focus_pending ; set-option -pu -t $sidebar @tmux_canopy_focus_deadline"
+    committed="$(commit "#{&&:#{==:#{@tmux_canopy_focus_pending},$token},#{!=:#{$guard},1}}" "$commands ; display-message -p focus-committed")"
+    if [[ "$committed" == focus-committed ]]; then
+      trap - EXIT
+      exit 0
+    fi
+    # Focus changed between the snapshot and commit. Keep the claim and retry:
+    # the newer request may already have coalesced into this same worker.
+  done
+  release
+  trap - EXIT
+  tmux run-shell -b "$(tmux_shell "$SCRIPT_DIR/refresh-sidebar" "$target" "$client")" 2>/dev/null || true
+  exit 0
+fi
+
+snapshot || exit 0
+# A transition's last selection hook will schedule the settled destination.
+# Requests already in flight may read intermediate geometry: don't publish it.
+[[ "$guarded" != 1 ]] || exit 0
+printf -v now '%(%s)T' -1
+token="$now.$$.$RANDOM"
+expired="#{||:#{!:#{@tmux_canopy_focus_pending}},#{<:#{@tmux_canopy_focus_deadline},$now}}"
+changed="#{!=:#{@tmux_canopy_focus_location},$location}"
+commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
+worker="run-shell -b $(tmux_quote "$(tmux_shell "$SCRIPT_DIR/refresh-sidebar" worker "$sidebar" "$client" "$token" "$location")")"
+claim="set-option -p -t $sidebar @tmux_canopy_focus_pending '$token' ; set-option -p -t $sidebar @tmux_canopy_focus_deadline '$((now+3))' ; $worker"
+commands+="if-shell -F -t $sidebar '#{&&:$changed,$expired}' $(tmux_quote "$claim")"
+commit "#{!=:#{$guard},1}" "$commands"

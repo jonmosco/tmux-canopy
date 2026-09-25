@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
+state_file="${TMUX_CANOPY_STATE:-}"
+export TMUX_CANOPY_STABLE=0 TMUX_CANOPY_NUL=0
+# Old live UIs retain newline framing; only new UIs opt into NUL records.
+[[ "${TMUX_CANOPY_RECORD_FORMAT:-}" == nul ]] && TMUX_CANOPY_NUL=1
+for argument in "$@"; do
+  case "$argument" in
+    --stable) TMUX_CANOPY_STABLE=1 ;;
+    --read0) TMUX_CANOPY_NUL=1 ;;
+  esac
+done
+
+render_source() {
+  set -o pipefail
+  local view=tree kind value _rest
+  [[ -r "$state_file" ]] || return 1
+  while IFS=$'\t' read -r kind value _rest; do
+    if [[ "$kind" == VIEW ]]; then view="$value"; break; fi
+  done < "$state_file"
+  if [[ "$view" != processes && "$view" != buffers ]]; then
+    export TMUX_CANOPY_HEADER=1
+    exec "$SCRIPT_DIR/tree-source"
+  fi
+  {
+    "$SCRIPT_DIR/view-header" || return
+    case "$view" in
+      processes) "$SCRIPT_DIR/process-source" ;;
+      buffers) "$SCRIPT_DIR/buffer-source" ;;
+    esac
+  } | awk -F '\t' -v stable="$TMUX_CANOPY_STABLE" -v nul="$TMUX_CANOPY_NUL" '
+    BEGIN { OFS="\t"; ORS=(nul ? sprintf("%c",0) : "\n") }
+    !seen[$1]++ { if (stable) print $1,$2,$1; else print }
+  '
+}
+
+# Stage complete records in memory, not diagnostic files. In particular, buffer
+# samples must not become disk logs or orphaned snapshot files after SIGKILL.
+records=()
+source_pid=''
+trap '[[ -z "$source_pid" ]] || kill "$source_pid" 2>/dev/null || true' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+exec {source_fd}< <(render_source 2>/dev/null)
+source_pid=$!
+if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then
+  mapfile -d '' -t records <&"$source_fd"
+else
+  mapfile -t records <&"$source_fd"
+fi
+exec {source_fd}<&-
+wait "$source_pid"
+rc=$?
+source_pid=''
+if ((rc == 0)); then
+  if ((${#records[@]})); then
+    if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then printf '%s\0' "${records[@]}"
+    else printf '%s\n' "${records[@]}"
+    fi
+  fi
+  exit 0
+fi
+sidebar_failure "${TMUX_CANOPY_CLIENT:-}" source "Sidebar data unavailable (source exit $rc). Ctrl-r retries; a opens diagnostics."
+record() {
+  printf '%s\t%s' "$1" "$2"
+  [[ "$TMUX_CANOPY_STABLE" == 1 ]] && printf '\t%s' "$1"
+  if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then printf '\0'; else printf '\n'; fi
+}
+record H:failure 'Sidebar data unavailable'
+record V:failure 'Ctrl-r retry · a Diagnostics'
+# A valid error record keeps the same fzf alive and supports reload recovery.
+exit 0
