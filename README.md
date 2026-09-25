@@ -16,8 +16,9 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 
 - Sessions → windows → panes tree with application icons and an active-location marker.
 - Left or right placement; **left by default**.
-- Shared-directory grouping, optional compact single-pane rows, previews, and scrollable popup help.
+- Width-aware directory grouping, optional minimal and compact views, previews, and scrollable popup help.
 - Global quick switching, including panes inside collapsed branches.
+- Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus.
 - Process trees attributed to panes, plus tmux buffer browsing.
 - Activity and bell notifications; optional silence monitoring.
@@ -72,6 +73,7 @@ set -g @tmux-canopy-transition 'slot'     # slot or move
 set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
 set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
+set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-icon-theme 'unicode'  # unicode, ascii, nerdfont, or auto
 ```
 
@@ -85,9 +87,10 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `Enter` | Focus the selected target |
 | `h` / `l` | Collapse / expand |
 | `H` / `L` | Collapse / expand all |
-| `/`, then `Esc` | Search, then return to the full tree |
+| `/`, then `Esc` | Search, then clear the search query |
 | `1` / `2` / `3` | Tree / Processes / Buffers |
 | `a` | Actions for the selected object |
+| `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `p` / `P` | Toggle preview / open enlarged preview |
 | `[` / `]` | Previous / next width preset |
@@ -96,6 +99,10 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `Ctrl-q` | Close the sidebar |
 
 Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
+
+The default Tree view uses one active-pane dot, shorter branch prefixes, and
+directory labels that adapt to sidebar width. For the leanest view, set
+`@tmux-canopy-density 'minimal'` and press `Ctrl-r` in the sidebar.
 
 See the [configuration and command reference](docs/reference.md) for all controls, appearance settings, notifications, and architecture.
 

@@ -5,6 +5,9 @@ FILENAME == ARGV[1] {
     if (state[1] == "MOVE" && move == "") move=state[2]
     else if (state[1] == "LINK" && link == "") link=state[2]
     else if (state[1] == "DELETE" && now-state[3] <= 5) del=state[2]
+    else if (state[1] == "FILTER") { filter_set=1; filter=state[2] }
+    else if (state[1] == "FILTER_WINDOW") { window_set=1; window_filter=state[2] }
+    else if (state[1] == "FILTER_TITLE") { title_set=1; title_filter=state[2] }
     else if (state[1] ~ /^[SW]:/) collapsed[state[1]]=1
     next
 }
@@ -12,7 +15,10 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
-    current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on")
+    current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
+    if (!filter_set) filter=$15
+    if (!window_set) window_filter=$16
+    if (!title_set) title_filter=$17
 }
 $1 == "C" && $2 == client { current_s=$3; current_w=$4; current_p=$5 }
 $1 == "S" { sessions[++ns]=$2; sname[$2]=$3; attached[$2]=$4 }
@@ -35,6 +41,74 @@ $1 == "P" {
         else if (shared_path[$3] != path[p]) shared_path[$3]=""
         if ($16 == 1) last_content[$3]=p
     }
+}
+# Build visibility before folding. Counts and compact eligibility still use the
+# full content inventory; text constraints are literal, case-insensitive substrings.
+function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first) {
+    if (filter != "session" && filter != "unread") filter="all"
+    filtered=(!switcher && (filter != "all" || window_filter != "" || title_filter != ""))
+    for (si=1;si<=ns;si++) {
+        s=sessions[si]
+        for (wpos=1;wpos<=nw[s];wpos++) {
+            w=windows[s,wpos]; key=s SUBSEP w
+            if (filtered && filter == "session" && s != filter_session) continue
+            if (filtered && window_filter != "" && !index(tolower(wn[key]),tolower(window_filter))) continue
+            first=""
+            if (!(w in counted)) {
+                counted[w]=1
+                for (ppos=1;ppos<=np[w];ppos++) {
+                    p=panes[w,ppos]
+                    keep=(!filtered || ((title_filter == "" || index(tolower(title[p]),tolower(title_filter))) &&
+                        (filter != "unread" || (notices != "none" && (pa[p] || pb[p] || pz[p])))))
+                    if (!keep) continue
+                    visible_p[p]=1; shown_p[w]++
+                    if (first == "") first=p
+                    if (pa[p] || pb[p] || pz[p]) shown_unread[w]++
+                    vwa[w]+=pa[p]; vwb[w]+=pb[p]; vwz[w]+=pz[p]
+                }
+                first_p[w]=first
+                # Consecutive panes with one directory share one visible path.
+                first=""; previous=""
+                for (ppos=1;ppos<=np[w];ppos++) {
+                    p=panes[w,ppos]
+                    if (!visible_p[p]) continue
+                    if (path[p] != "" && path[p] == previous) {
+                        group_count[first]++
+                        group_member[p]=1
+                    } else {
+                        first=p; group_count[p]=1; previous=path[p]
+                    }
+                }
+                # Retain a window-only alert when its original reporting pane
+                # has gone away, but do not invent a pane matching a title rule.
+                if (!filtered || (!unread_panes[w] && title_filter == "")) {
+                    vwa[w]=wa[w]; vwb[w]=wb[w]; vwz[w]=wz[w]
+                }
+            }
+            alert=(notices != "none" && (vwa[w] || vwb[w] || vwz[w]))
+            if (filtered && !shown_p[w] && !(filter == "unread" && title_filter == "" && alert)) continue
+            visible_w[key]=1; shown_w[s]++; total_visible++
+            if (first_w[s] == "") first_w[s]=w
+            vsa[s]+=vwa[w]; vsb[s]+=vwb[w]; vsz[s]+=vwz[w]
+            if (alert) shown_unread_w[s]++
+        }
+        visible_s[s]=(!filtered || shown_w[s]>0)
+    }
+}
+function resolve_focus(token, kind,s,w,p,parts) {
+    if (!filtered) { printf "%s\t\n",token; return }
+    split(token,parts,":"); kind=parts[1]
+    if (kind == "S") {
+        s=parts[2]
+        if (!visible_s[s]) return
+        w=(s == current_s && visible_w[s,current_w] ? current_w : first_w[s])
+    } else if (kind == "W") {
+        w=parts[2]; s=parts[3]
+        if (!visible_w[s,w]) return
+    } else return
+    p=(s == current_s && pw[current_p] == w && visible_p[current_p] ? current_p : first_p[w])
+    if (p != "") printf "P:%s\t%s\n",p,s
+    else printf "W:%s:%s\t\n",w,s
 }
 function row(token, value, identity, terminator) {
     terminator=(nul ? sprintf("%c",0) : "\n")
@@ -64,6 +138,47 @@ function shortpath(value, budget, n, parts, shortened) {
     # fzf does the final ANSI/Unicode cell clipping; never byte-slice a path.
     if (budget>0 && length(shortened)>budget) return "…/" parts[n]
     return shortened
+}
+
+# Show the shortest directory suffix that distinguishes paths in this window.
+# At wide widths include the parent for context. Full paths remain in previews.
+function pathlabel(p,w,budget,    value,parts,n,depth,candidate,q,other,matches,need,otherparts,othern) {
+    value=path[p]
+    if (value == "") return "(directory unavailable)"
+    if (density == "detailed" || density == "compact") return shortpath(value,budget)
+    if (value == home) return "~"
+    n=split(value,parts,"/")
+    depth=(width>=72 ? 2 : 1)
+    if (depth>n) depth=n
+    while (1) {
+        candidate=parts[n-depth+1]
+        for (q=n-depth+2;q<=n;q++) candidate=candidate "/" parts[q]
+        matches=0
+        for (q=1;q<=np[w];q++) {
+            other=path[panes[w,q]]
+            if (other == value || other == "") continue
+            othern=split(other,otherparts,"/")
+            if (othern>=depth && substr(other,length(other)-length(candidate)+1)==candidate &&
+                (othern==depth || substr(other,length(other)-length(candidate),1)=="/")) { matches=1; break }
+        }
+        if (!matches || depth>=n) break
+        depth++
+    }
+    need=(depth<n ? "…/" : "") candidate
+    if (budget>0 && length(need)>budget && depth>1) return "…/" parts[n]
+    return need
+}
+function title_detail(p,    value,limit) {
+    if (density == "compact" || width<38) return ""
+    value=useful_title(p)
+    if (density == "detailed") return " " pi[p] (value != "" ? " " value : "")
+    if (value == "") return ""
+    limit=width-25-length(command[p])
+    if (density == "normal" && width<56 && width>=32)
+        limit-=length(pathlabel(p,pw[p],width-16))+3
+    if (limit<8) return ""
+    if (length(value)>limit) value=substr(value,1,limit-1) "…"
+    return " " value
 }
 function useful_title(p, value) {
     value=title[p]
@@ -120,6 +235,7 @@ END {
     if (custom_p != "") pane_icon=custom_p
     branch_mid=(icons == "ascii" ? "|-" : "├─"); branch_end=(icons == "ascii" ? "`-" : "└─")
     stem_mid=(icons == "ascii" ? "|  " : "│  ")
+    filter_session=current_s
     if (sidebar[current_p] == 1) {
         last=last_content[pw[current_p]]
         if (last != "") { current_p=last; current_w=pw[last] }
@@ -128,14 +244,26 @@ END {
             current_p=target[current_p]; current_w=pw[current_p]
         }
     }
+    prepare_filter()
+    if (ENVIRON["TMUX_CANOPY_FILTER_TARGET"] != "") {
+        resolve_focus(ENVIRON["TMUX_CANOPY_FILTER_TARGET"])
+        exit
+    }
     move_p=substr(move,3); move_w=(move ~ /^P:/ ? pw[move_p] : "")
     if (header && !switcher) {
         mode=(move != "" ? "MOVE" : link != "" ? "LINK" : del != "" ? "DELETE" : "")
         mode_color=(del != "" && move == "" && link == "" ? attention : accent)
         # Reserve fzf's pointer gutter and keep operation warnings visible.
-        available=width-2; reserved=(mode != "" ? length(mode)+1 : 0)
+        available=width-2
+        filter_label=(filter == "session" ? "Session" : filter == "unread" ? "Unread" : "All")
+        if (window_filter != "") filter_label=filter_label "+W"
+        if (title_filter != "") filter_label=filter_label "+T"
+        reserved=length(filter_label)+3+(mode != "" ? length(mode)+1 : 0)
         tabs="[1 Tree]  2 Proc  3 Buff"
         if (length(tabs)+reserved>available) tabs="[1 T]  2 P  3 B"
+        if (length(tabs)+reserved>available) tabs="[1] 2 3"
+        if (length(tabs)+reserved>available) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
+        tabs=tabs " [" filter_label "]"
         padding=available-length(tabs)-length(mode); if (padding<1) padding=1
         styled_tabs=tabs; sub(/\]/,"]" reset dim,styled_tabs)
         row("H:",accent styled_tabs reset (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
@@ -158,58 +286,72 @@ END {
         }
         exit
     }
+    if (filtered && !total_visible) row("V:empty","No matches · F filters","V:empty")
     for (si=1;si<=ns;si++) {
         s=sessions[si]; st="S:" s
-        sm=(st == del ? "✕" : s == current_s ? "●" : " ")
-        meta=nw[s] "w"; if (attached[s]>0) meta=meta " · " attached[s] "c"
-        row(st,(collapsed[st] ? "▸" : "▾") " " mark(sm) " " dim session_icon reset bold " " sname[s] (collapsed[st] ? notice(sa[s],sb[s],sz[s],unread_windows[s]) : "") " " dim "[" meta "]" reset,st)
+        if (!visible_s[s]) continue
+        sm=(st == del ? "✕" : " ")
+        meta=(filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
+        session_glyph=(custom_s != "" ? dim session_icon reset " " : "")
+        session_style=(s == current_s ? bold : "")
+        row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) : "") dim meta reset,st)
         if (collapsed[st]) continue
+        visible_wpos=0
         for (wpos=1;wpos<=nw[s];wpos++) {
             w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
-            branch=(wpos == nw[s] ? branch_end : branch_mid); stem=(wpos == nw[s] ? "   " : stem_mid)
-            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : w == current_w && s == current_s ? "●" : " ")
-            meta=(np[w]>1 ? " " np[w] "p" : "")
+            if (!visible_w[key]) continue
+            visible_wpos++
+            branch=(visible_wpos == shown_w[s] ? branch_end : branch_mid); stem=(visible_wpos == shown_w[s] ? "   " : stem_mid)
+            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : " ")
+            meta=(filtered ? " [" shown_p[w] "/" np[w] "p]" : collapsed[wt] && np[w]>1 ? " [" np[w] "p]" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
-            if (compact_single && np[w] == 1) {
+            window_glyph=(custom_w != "" ? dim window_icon reset " " : "")
+            window_style=(w == current_w && s == current_s ? bold : "")
+            if (compact_single && np[w] == 1 && shown_p[w] == 1) {
                 p=panes[w,1]; pt="P:" p
                 if (pt == del) wm="✕"
                 else if (wm == " " && dead[p] == 1) wm="×"
-                badge=(pa[p] || pb[p] || pz[p] ? notice(pa[p],pb[p],pz[p]) : notice(wa[w],wb[w],wz[w]))
+                badge=(pa[p] || pb[p] || pz[p] ? notice(pa[p],pb[p],pz[p]) : notice(vwa[w],vwb[w],vwz[w]))
                 # Retain the window identity/actions when switching presentation.
                 # Its active content target is necessarily this sole pane.
-                row(wt,dim branch reset " " mark(wm) " " dim window_icon reset " " wi[key] ":" wn[key] "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] badge dim meta " " shortpath(path[p],width-20) reset,wt)
+                compact_path=(density == "minimal" || width<56 ? "" : " " pathlabel(p,w,width-24))
+                if (p == current_p && s == current_s && wm == " ") wm="●"
+                row(wt,dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] badge dim meta compact_path reset,wt)
                 continue
             }
-            grouped=(nul && density == "normal" && np[w]>1 && shared_path[w] != "" && !collapsed[wt])
-            window_text=dim branch reset " " mark(wm) " " dim window_icon reset " " (collapsed[wt] ? "▸" : "▾") " " wi[key] ":" wn[key] (collapsed[wt] || !unread_panes[w] ? notice(wa[w],wb[w],wz[w],unread_panes[w]) : "") dim meta reset
+            grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
+                group_count[first_p[w]] == shown_p[w] && path[first_p[w]] != "" && !collapsed[wt])
+            window_text=dim branch reset " " (collapsed[wt] ? "▸ " : "▾ ") (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") dim meta reset
             if (grouped) {
-                continuation=dim stem stem_mid sprintf("%*s",3+length(window_icon),"")
-                window_text=window_text "\n" continuation shortpath(shared_path[w],width-12-length(window_icon)) reset
+                continuation=dim stem stem_mid "   "
+                window_text=window_text "\n" continuation pathlabel(panes[w,1],w,width-12) reset
             }
             row(wt,window_text,wt)
             if (collapsed[wt]) continue
+            visible_ppos=0
             for (ppos=1;ppos<=np[w];ppos++) {
                 p=panes[w,ppos]; pt="P:" p
+                if (!visible_p[p]) continue
+                visible_ppos++
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p]==1 ? "×" : " ")
-                details=""
-                if (density != "compact") {
-                    useful=useful_title(p)
-                    if (density == "detailed") details=" " pi[p] " " useful
-                    else if (useful != "") details=" " useful
-                }
+                details=title_detail(p)
                 icon=appicon(command[p])
-                prefix=dim stem (ppos == np[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(command[p]) icon reset
+                prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(command[p]) icon reset
+                show_path=(density == "detailed" || density == "compact" || (density == "normal" && width>=32))
+                first_group=(group_count[p]>1 && !group_member[p] && density == "normal")
+                pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-length(icon)) : "")
+                if (first_group && pane_path != "") pane_path=pane_path " · " group_count[p] " panes"
                 if (nul && density != "compact") {
-                    # Grouped panes use one line; other panes use two. Both
-                    # retain one action token and occurrence-aware identity.
-                    primary=prefix " " command[p] notice(pa[p],pb[p],pz[p]) dim details reset
-                    continuation=dim stem (ppos == np[w] ? "   " : stem_mid) reset sprintf("%*s",3+length(icon),"")
-                    secondary=continuation path_color (path[p] != "" ? shortpath(path[p],width-12-length(icon)) : "(directory unavailable)") reset
-                    row(pt,primary (grouped ? "" : "\n" secondary),pt ":" s)
+                    inline_path=(density == "normal" && width<56 && pane_path != "" ? " " path_color pane_path reset : "")
+                    primary=prefix " " command[p] notice(pa[p],pb[p],pz[p]) dim details reset inline_path
+                    continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+length(icon),"")
+                    secondary=continuation path_color pane_path reset
+                    row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : ""),pt ":" s)
                 } else {
-                    # Compact mode and legacy newline consumers stay one-line.
-                    row(pt,prefix " " command[p] notice(pa[p],pb[p],pz[p]) " " path_color shortpath(path[p]) reset dim details reset,pt ":" s)
+                    # Legacy newline consumers stay one line per object.
+                    path_text=(show_path && pane_path != "" ? " " path_color pane_path reset : "")
+                    row(pt,prefix " " command[p] notice(pa[p],pb[p],pz[p]) path_text dim details reset,pt ":" s)
                 }
             }
         }

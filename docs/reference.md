@@ -6,7 +6,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 
 - Sessions → windows → panes hierarchy
 - Real, fixed-width, full-height pane on the left (default) or right edge
-- Live active session/window/pane markers, independent of the sidebar selection
+- One active pane marker and emphasized parent names, independent of the sidebar selection
 - Vim-style collapse and expand controls
 - Normal and fuzzy-filter modes
 - Session/window metadata and live pane previews
@@ -34,7 +34,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - Window reorder, cross-session link/unlink, layouts, pane rotation, and guarded synchronized input
 - Pane zoom, swap, break-to-window, dead-pane respawn, and object information popups
 - Switchable Tree, pane-attributed Processes, and tmux Buffers views
-- ANSI semantic colors, continuous tree guides, density-aware paths, dynamic mode tabs, and adaptive preview
+- ANSI semantic colors, compact tree guides, width-aware paths, dynamic mode tabs, and adaptive preview
 - Responsive fixed or percentage widths with minimum sidebar/content constraints
 - Staged one-shot mouse resizing and compact/default/wide width presets
 - Geometry-stable window switches with debounced, owner-only active-location refreshes
@@ -98,8 +98,9 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `t` | Create a window in the selected node's session |
 | `S` | Create the next available `session-N` session |
 | `/` | Enter fuzzy-filter mode |
+| `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
-| `Esc` | Leave filter mode and return to tree navigation |
+| `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
 | `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
 | `Ctrl-q` | Close |
@@ -112,6 +113,51 @@ Tree navigation starts in a normal mode so navigation and creation keys remain a
 Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use `prefix + h` to return to it.
 
 Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use `b` to page back and `g`/`G` for the beginning/end. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
+
+### Tree filters
+
+Press **F** (or **Ctrl-f**, including while searching) to choose:
+
+- **All sessions** — the complete tree, subject to any text rules.
+- **Current session** — the owning client's current session; follows session changes.
+- **Unread** — panes with activity, bell, or silence notifications, plus their parents.
+  Window-only alerts remain visible if the reporting pane has gone away. Focusing
+  a window clears its terminal notifications, so it can disappear from this view.
+  These notifications do not establish whether an agent needs input.
+- **Window contains / Pane title contains** — optional, case-insensitive literal
+  substrings. Both rules combine with the selected view; an empty response clears
+  that rule. Punctuation is literal, with no glob or regular-expression syntax.
+  Native prompt keys follow tmux settings; Ctrl-c cancels.
+- **Clear all filters** — show everything, including clearing both text rules.
+- **Use configured defaults** — discard temporary overrides and read the options below.
+
+The Tree header shows **All**, **Session**, or **Unread**. **+W** and **+T** indicate
+active window-name and pane-title rules; open the filter menu to inspect or edit
+those values. Very narrow sidebars abbreviate the scope to A/S/U. No matches shows
+an explicit hint to reopen the filter menu. Counts show matching/total objects.
+
+Selecting a filter returns to Tree view. Filters survive window changes and view
+switches for the lifetime of that sidebar; Processes and Buffers remain independent.
+`/` searches the rendered filtered tree, and **j/k/arrows** traverse those results.
+**Enter** on a session/window focuses a matching descendant, including inside a
+collapsed branch. Tree folds and search queries are preserved; selection stays on
+its object while that object remains visible. Actions on a window still affect
+that whole window, including content excluded by a filter.
+
+**Ctrl-g** always searches all sessions/windows/panes. Native tmux next/previous
+window bindings also retain their normal scope. Filters do not turn a multi-pane
+window into a compact single-pane row merely because only one pane matches.
+
+Optional startup/configuration defaults:
+
+```tmux
+set -g @tmux-canopy-filter 'all' # all, session, unread
+set -g @tmux-canopy-filter-window '' # e.g. Orchestrator
+set -g @tmux-canopy-filter-title '' # e.g. orch:
+```
+
+Reload configuration and press Ctrl-r to read changed defaults. A menu choice
+keeps precedence until **Use configured defaults** or the sidebar is reopened.
 
 ### Global quick switcher
 
@@ -129,7 +175,9 @@ pending move or link; that operation stays pending. Removed targets are ignored.
 
 Set `@tmux-canopy-compact-single-panes` to `on`, then press **Ctrl-r**. The default
 is `off`. A window containing exactly one content pane becomes one line with its
-window name, application icon, command, notification badge, and directory.
+window name, application icon, command, and notification badge. The directory
+appears when the sidebar is wide enough. The `minimal` density enables this
+automatically.
 Sidebar and slot panes do not count; filtering does not change pane counts.
 
 The combined row keeps its window identity: **Enter** focuses the sole content
@@ -339,17 +387,52 @@ The option model is provider-neutral: each provider owns a namespaced pane/windo
 
 ### Appearance
 
-`ansi` uses the terminal's standard palette for semantic session, window, pane, path, active, unread, move, link, and deletion roles; `mono` disables source styling. Density may be `compact`, `normal`, or `detailed`:
+`ansi` uses the terminal's standard palette for application icons, active panes,
+notifications, and pending operations; `mono` disables source styling. Density
+may be `minimal`, `normal`, `compact`, or `detailed`:
 
-- **Normal (default):** When two or more content panes in a window share the same nonempty directory, it appears once beneath the expanded window name and those panes use one line each. Otherwise, pane entries have two physical lines: command/icon/active marker and notifications first, then a subdued working directory aligned beneath the command. Useful titles remain secondary on the first line. Paths prefer `…/parent/directory`, falling back to `…/directory` when the parent would crowd out the basename.
-- **Compact:** one line per pane, with the command and shortened directory inline; useful when many panes must fit onscreen.
-- **Detailed:** two lines per pane, retaining the full path plus pane index/useful title. Long lines are clipped; the preview/popup provides more room.
+- **Normal (default):** At 31 columns or fewer, rows show commands and statuses.
+  From 32 to 55 columns, directory names appear inline once per adjacent group.
+  At 56 columns or more, the directory moves to a subdued second line. Shared
+  directories appear once on the window row when all visible panes match, or
+  beneath the first pane of a matching adjacent group. A directory uses its
+  basename, adding parent names when two distinct paths would be ambiguous;
+  wide views also show one parent for context. Titles appear when room permits.
+- **Minimal:** Single content pane windows combine window and pane into one row.
+  Multi-pane windows keep one row per pane; directory lines and ordinary
+  pane counts are hidden. Filtered counts remain visible. Titles appear only when they fit. This preset includes the effect of
+  `@tmux-canopy-compact-single-panes on`.
+- **Compact:** One line per pane, retaining each shortened directory inline.
+- **Detailed:** Two lines per pane, retaining the full path, pane index, and
+  useful title. Long lines are clipped; the preview provides more room.
 
-Session rows stay single-line. A shared directory is the second line of its window entry and disappears when that window is collapsed. There is no blank padding between entries and no selected-only expansion that would make neighboring entries jump. Each window or pane entry forms one selectable fzf item: `j/k` advances one object, clicking either line selects its object, and Enter/actions retain the same stable identity. Filtering can match the command or displayed directory; a shared directory matches its window, while individual paths match their panes. Compact and detailed densities retain per-pane directories. Processes and Buffers keep their existing row layouts.
+The active pane has one green dot. Its session and window names are bold; fzf's
+highlight and cyan pointer identify the selected row. A minimal combined window
+row carries the dot when it contains the active pane. Default session and window
+icons are omitted to leave room for names; explicitly configured icons remain.
+Expanded branches omit pane/client totals unless a Tree filter is active.
+Collapsed branches keep counts that explain hidden children and notifications.
+Linked and synchronized state remains visible. Every displayed object keeps its
+stable action identity. The full directory is available in pane preview and
+Ctrl-g global quick switch. Tree search matches the directory text shown in
+its current width; Ctrl-g searches full paths even when they are hidden.
 
-Paths use the terminal's default foreground with dim styling rather than a fixed light text color. Lines do not wrap or horizontally scroll on selection. fzf handles final ANSI/Unicode cell clipping. To change density at runtime, set `@tmux-canopy-density` and press `Ctrl-r` in the sidebar; this preserves the selected object without restarting fzf.
+Paths use the terminal's default foreground with dim styling rather than a
+fixed light text color. Lines do not wrap or horizontally scroll on selection.
+fzf handles final ANSI/Unicode cell clipping. To change density at runtime, set
+`@tmux-canopy-density` and press `Ctrl-r`; the selected object remains selected.
 
-Selection styles are `subtle`, `solid`, `reverse`, or `pointer`. The default subtle style uses a muted gray background and a cyan pointer while preserving icon and notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palette index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`). `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid` uses a cyan background. Monochrome mode also disables fzf UI colors. The compact header shows `1 Tree`, `2 Proc`, and `3 Buff`, with brackets around the active view. At narrow widths, labels shorten to `1 T`, `2 P`, and `3 B`. Pending `MOVE`, `LINK`, or `DELETE` operations remain visible; ordinary navigation has no mode badge. The search input appears only after `/` and disappears on `Esc`; fzf counters and the top separator are hidden. Tree rows use `├─`, `└─`, and `│` guides with Nerd Font structural/application glyphs.
+Selection styles are `subtle`, `solid`, `reverse`, or `pointer`. The default subtle
+style uses a muted gray background and a cyan pointer while preserving icon and
+notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palette
+index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
+`pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
+uses a cyan background. Monochrome mode also disables fzf UI colors. The compact
+header shows `1 Tree`, `2 Proc`, and `3 Buff`, with brackets around the active
+view. At narrow widths, labels shorten to `1 T`, `2 P`, and `3 B`. Pending
+`MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
+only after `/` and disappears on `Esc`; fzf counters and the top separator are
+hidden. Tree rows use `├─`, `└─`, and `│` guides with colored application icons.
 
 ### Preview
 
@@ -406,6 +489,7 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `scripts/reap-empty` | Finish content-empty windows while preserving the dock and native successor selection |
 | `scripts/notify` | Validate/deduplicate events, batch unread clears, and coalesce refresh workers |
 | `scripts/notification-lib.sh` | Native hook predicates and expiring clear claims |
+| `scripts/tree-filter` | Tree filter menu, literal text prompts, and per-sidebar overrides |
 | `scripts/view-header` | Render dynamic view tabs and operation mode state |
 | `scripts/sidebar-source` | Publish complete in-memory view snapshots or a recoverable error row |
 | `scripts/launch-lib.sh` | Shell/tmux quoting, preflight checks, and bounded owner-targeted failures |
@@ -472,6 +556,10 @@ The multiline suite checks NUL framing and legacy compatibility, one identity pe
 The launch suite copies the project to a path containing spaces, quotes, dollar signs, commas, parentheses and literal tmux-format text. It tests missing/incompatible fzf, damaged installations and unusable TMPDIR without geometry/zoom changes; Bash/zsh/fish default shells when installed; hostile ambient fzf defaults; real provider failure/recovery with preserved fzf/query; empty-view switching; diagnostics menus; native hooks/toggle bindings; runtime fzf failures; owner-only failure delivery; and literal buffer names/rename responses, including tmux command/format-job injection attempts. Test-only wrappers inject probe bindings; production does not accept ambient fzf bindings.
 
 The lifecycle suite exercises real shell exit and Ctrl-D, native pane killing and confirmed last-pane deletion, retained-dead panes, background slot-only windows, warm multi-pane destinations, linked-window closure, session fallback/detachment, unrelated client detachment, and sidebar/fzf PID preservation in global/window scope and slot/move modes. Final-session detachment must not send resize signals to an unrelated application.
+
+The filter suite checks linked/current-session scope, unread aggregation, literal
+text matching, configuration overrides, empty results, compact eligibility, narrow
+headers, native menus/prompts, and matching-descendant navigation.
 
 The quick-switch suite exercises the actual popup with collapsed branches, compact
 rows, linked-session targets, pending operations, cancellation, and deleted targets.

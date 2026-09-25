@@ -112,7 +112,7 @@ sidebar_navigate() (
   local nav_key nav_guard nav_lock nav_locked=0 nav_notice_window=''
   local nav_target nav_session nav_window nav_current nav_current_session nav_current_window
   local nav_position nav_sidebar nav_slot nav_slot_width nav_first nav_active nav_last nav_guarded
-  local nav_requested nav_minimum nav_maximum nav_min_content nav_source_width
+  local nav_requested nav_minimum nav_maximum nav_min_content nav_source_width nav_saved_layout
   local SIDEBAR_WIDTH_FORMAT SIDEBAR_WIDTH_FITS_FORMAT
   local -A nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=()
   local -a commands=() placement=()
@@ -182,6 +182,9 @@ sidebar_navigate() (
       # switches the existing slot preserves content geometry during this step.
       # Freeze relative next/last/index resolution before changing the client.
       nav_spec="$nav_session:.$nav_target"
+      # Native shrinking subtracts columns instead of retaining proportions and
+      # can crush an application pane to one column in a stale, large window.
+      nav_saved_layout="$(tmux display-message -p -t "$nav_target" '#{window_layout}' 2>/dev/null || true)"
       if [[ "$nav_current_session" != "$nav_session" ]]; then
         commands+=(switch-client -c "$nav_client" -t "$nav_session:$nav_window" ';')
       else
@@ -189,6 +192,8 @@ sidebar_navigate() (
       fi
       tmux "${commands[@]}" || exit 0
       commands=()
+      "$SCRIPT_DIR/restore-window-layout" "$nav_target" "$nav_saved_layout" "$nav_slot" \
+        "$nav_requested" "$nav_minimum" "$nav_maximum" "$nav_min_content"
       sidebar_navigation_snapshot || exit 0
     fi
   fi

@@ -25,7 +25,7 @@ def main():
     master = process = None
     with tempfile.TemporaryDirectory(prefix='canopy-switch-test-') as directory:
         temp = Path(directory)
-        selected, state_path, started = (temp / name for name in ('selected', 'state-path', 'started'))
+        selected, state_path, started, loads = (temp / name for name in ('selected', 'state-path', 'started', 'loads'))
 
         def tm(*args):
             result = sp.run([executable, '-L', socket, *args], env=env, capture_output=True, text=True, timeout=15)
@@ -81,7 +81,8 @@ def main():
             install_fzf_probe(temp, [
                 f"alt-z:execute-silent(printf '%s|%s|%s' {{1}} {{3}} {{q}} > {selected})",
                 f'''alt-y:execute-silent(printf '%s' "$TMUX_CANOPY_STATE" > {state_path})''',
-                f'start:execute-silent(touch {started})'], script_env)
+                f'start:execute-silent(touch {started})',
+                f'load:+execute-silent(printf x >> {loads})'], script_env)
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 44, 160, 0, 0))
             client = os.ttyname(slave)
@@ -145,6 +146,11 @@ def main():
 
             # Stale inventory must not redirect to an unrelated active object.
             stale = tm('new-window', '-d', '-t', 'two:', '-n', 'ephemeral-target', '-P', '-F', '#{pane_id}', 'sleep 600')
+            # Let the structural reload finish before asking fzf to execute a popup.
+            count = loads.stat().st_size if loads.exists() else 0
+            tm('send-keys', '-t', sidebar, 'C-r')
+            wait(lambda: loads.exists() and loads.stat().st_size > count, 'new-window reload')
+            probe()
             open_switch()
             os.write(master, b'ephemeral-target sleep')
             wait(lambda: probe(True)[0] == f'P:{stale}', 'stale candidate selected')

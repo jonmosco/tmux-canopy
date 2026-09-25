@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Restore split proportions after tmux automatically resizes a selected window.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+target="${1:-}"; saved="${2:-}"; dock="${3:-}"
+[[ -n "$target" && -n "$saved" ]] || exit 0
+signature='#{window_id}|#{window_width}|#{window_height}|#{window_zoomed_flag}|#{P:#{pane_id}:#{pane_index}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}|}'
+snapshot="$(tmux display-message -p -t "$target" "#{window_layout}
+$signature" 2>/dev/null)" || exit 0
+current="${snapshot%%$'\n'*}"; expected="${snapshot#*$'\n'}"
+IFS='|' read -r window total _ zoomed _ <<< "$expected"
+[[ "$window" =~ ^@[0-9]+$ && "$zoomed" == 0 ]] || exit 0
+old_box="${saved#*,}"; new_box="${current#*,}"
+[[ "${old_box%%,*}" != "${new_box%%,*}" ]] || exit 0
+dock_width=''
+if [[ -n "$dock" ]]; then
+  dock_width="$(clamp_sidebar_width_for_total "$total" "${4:-42}" "${5:-24}" "${6:-0}" "${7:-40}")" || exit 0
+fi
+generated="$(printf '%s\n%s\n' "$saved" "$current" | awk -v dock="$dock" -v dock_width="$dock_width" -f "$SCRIPT_DIR/../lib/scale-layout.awk")" || exit 0
+# A split, move, resize, or zoom may overtake this worker. Recheck all geometry
+# and pane indices inside tmux before applying the saved topology.
+tmux if-shell -F -t "$window" "#{==:$signature,$expected}" \
+  "select-layout -t '$window' '$generated'" 2>/dev/null || true

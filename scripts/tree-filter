@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
+state_file="${TMUX_CANOPY_STATE:?}"
+sidebar="${TMUX_PANE:-}"
+client="${TMUX_CANOPY_CLIENT:-}"
+action="${1:-menu}"
+[[ -r "$state_file" ]] || exit 0
+
+set_field() {
+  local field="$1" value="$2" tmp
+  value="${value//[[:cntrl:]]/ }"
+  tmp="$(mktemp "${state_file}.XXXXXX")" || return 1
+  if awk -F '\t' -v key="$field" '$1 != key && $1 != "VIEW"' "$state_file" > "$tmp" &&
+     printf '%s\t%s\nVIEW\ttree\n' "$field" "$value" >> "$tmp"; then
+    mv -- "$tmp" "$state_file"
+  else
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+reset_fields() {
+  local tmp
+  tmp="$(mktemp "${state_file}.XXXXXX")" || return 1
+  if awk -F '\t' '$1 !~ /^FILTER(_WINDOW|_TITLE)?$/ && $1 != "VIEW"' "$state_file" > "$tmp"; then
+    if [[ "$action" == clear ]]; then
+      printf 'FILTER\tall\nFILTER_WINDOW\t\nFILTER_TITLE\t\n' >> "$tmp"
+    fi
+    printf 'VIEW\ttree\n' >> "$tmp"
+    mv -- "$tmp" "$state_file"
+  else
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+field_value() {
+  local field="$1" option="$2" kind value rest
+  while IFS=$'\t' read -r kind value rest; do
+    if [[ "$kind" == "$field" ]]; then printf '%s' "$value"; return; fi
+  done < "$state_file"
+  tmux show-option -gqv "$option" 2>/dev/null || true
+}
+
+prompt_field() {
+  local field="$1" option="$2" label="$3" value response
+  local response_key="@tmux_canopy_filter_${BASHPID}_${RANDOM}"
+  [[ -n "$client" && "$sidebar" =~ ^%[0-9]+$ ]] || return 0
+  value="$(field_value "$field" "$option")"
+  value="${value//[[:cntrl:]]/ }"; value="${value//#/##}"
+  # Capture literal prompt text in a temporary pane option, then read argv data.
+  # shellcheck disable=SC2064 # Capture the already-quoted pane/key on setup.
+  trap "$(tmux_shell tmux set-option -pu -t "$sidebar" "$response_key") 2>/dev/null || true" EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  tmux if-shell -F 1 \
+    "command-prompt -l -t $(tmux_quote "$client") -I $(tmux_quote "$value") -p $(tmux_quote "$label") { set-option -p -t $(tmux_quote "$sidebar") $response_key %% }" || return 0
+  if response="$(tmux show-option -pv -t "$sidebar" "$response_key" 2>/dev/null)"; then
+    set_field "$field" "$response"
+  fi
+}
+
+menu_command() {
+  local command
+  command="$(tmux_shell env "TMUX_CANOPY_STATE=$state_file" "TMUX_CANOPY_CLIENT=$client" \
+    "TMUX_PANE=$sidebar" "$BASH" "$SCRIPT_DIR/tree-filter" "$1")"
+  sidebar_menu_job "$command"
+}
+
+case "$action" in
+  menu)
+    mode="$(field_value FILTER @tmux-canopy-filter)"
+    window="$(field_value FILTER_WINDOW @tmux-canopy-filter-window)"
+    title="$(field_value FILTER_TITLE @tmux-canopy-filter-title)"
+    [[ "$mode" == session || "$mode" == unread ]] || mode=all
+    all_label='All sessions'; session_label='Current session'; unread_label='Unread'
+    case "$mode" in all) all_label="* $all_label" ;; session) session_label="* $session_label" ;; unread) unread_label="* $unread_label" ;; esac
+    window="${window//[[:cntrl:]]/ }"; title="${title//[[:cntrl:]]/ }"
+    window="${window:0:50}"; title="${title:0:50}"
+    # Menu labels are tmux formats: escape user-supplied # before display.
+    window="${window//#/##}"; title="${title//#/##}"
+    sidebar_display_menu "$client" "$sidebar" -x C -y C -T ' Tree filters ' \
+      "$all_label" a "$(menu_command all)" \
+      "$session_label" s "$(menu_command session)" \
+      "$unread_label" u "$(menu_command unread)" \
+      "Window contains: ${window:-any}" w "$(menu_command window)" \
+      "Pane title contains: ${title:-any}" t "$(menu_command title)" \
+      'Clear all filters' c "$(menu_command clear)" \
+      'Use configured defaults' d "$(menu_command defaults)" \
+      'Cancel' q ''
+    exit 0
+    ;;
+  all|session|unread) set_field FILTER "$action" || exit 1 ;;
+  window) prompt_field FILTER_WINDOW @tmux-canopy-filter-window 'Window name contains (empty clears):' ;;
+  title) prompt_field FILTER_TITLE @tmux-canopy-filter-title 'Pane title contains (empty clears):' ;;
+  set-window) set_field FILTER_WINDOW "${2:-}" || exit 1 ;;
+  set-title) set_field FILTER_TITLE "${2:-}" || exit 1 ;;
+  clear|defaults) reset_fields || exit 1 ;;
+  *) exit 1 ;;
+esac
+if [[ -n "$sidebar" ]]; then tmux send-keys -t "$sidebar" C-r 2>/dev/null || true; fi

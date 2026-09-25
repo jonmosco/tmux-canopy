@@ -56,16 +56,16 @@ def main():
                             if theme == 'ansi':
                                 assert '\x1b[1;33m' not in rows[identity]
                         collapsed = render(collapsed='W:@0:$0\nW:@1:$0\n', **args)
-                        assert 'web '+badge(bell+'2') in collapsed['W:@0:$0']
-                        assert 'api '+badge(silence) in collapsed['W:@1:$0']
+                        assert 'web' in collapsed['W:@0:$0'] and badge(bell+'2') in collapsed['W:@0:$0']
+                        assert 'api' in collapsed['W:@1:$0'] and badge(silence) in collapsed['W:@1:$0']
                         assert not any(k.startswith('P:') for k in collapsed)
                         sessions = render(collapsed='S:$0\nS:$1\n', linked=True, **args)
-                        assert 'work '+badge(bell+'2') in sessions['S:$0']
-                        assert 'linked '+badge(bell) in sessions['S:$1']
+                        assert 'work' in sessions['S:$0'] and badge(bell+'2') in sessions['S:$0']
+                        assert 'linked' in sessions['S:$1'] and badge(bell) in sessions['S:$1']
                         disabled = render(enabled=False, **args)
                         assert 'nvim '+badge(bell) not in disabled['P:%0:$0']
                         orphan = render(orphan=True, **args)
-                        assert 'web '+badge(bell) in orphan['W:@0:$0']
+                        assert 'web' in orphan['W:@0:$0'] and badge(bell) in orphan['W:@0:$0']
                         if theme == 'ansi':
                             assert '\x1b[1;32m●\x1b[0m' in rows['P:%0:$0']
                         else:

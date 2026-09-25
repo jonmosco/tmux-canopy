@@ -8,6 +8,7 @@ sidebar_ui_options() {
   local action_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-action"'
   local preview_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-preview"'
   local help_cmd='"$TMUX_CANOPY_ROOT/scripts/help"'
+  local filter_cmd='"$TMUX_CANOPY_ROOT/scripts/tree-filter"'
   local switcher_cmd='"$TMUX_CANOPY_ROOT/scripts/quick-switch"'
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
   preview_mode="$(tmux show-option -gqv @tmux-canopy-preview 2>/dev/null || true)"
@@ -49,11 +50,13 @@ sidebar_ui_options() {
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'
     --bind="ctrl-g:execute-silent($switcher_cmd)"
+    --bind="F:execute-silent($filter_cmd)"
+    --bind="ctrl-f:execute-silent($filter_cmd)"
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     --bind='load:+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:show-input+enable-search+clear-query+unbind(h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
-    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
+    --bind='/:show-input+enable-search+clear-query+unbind(F,h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
+    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     # View changes must work even when the current view has no selectable row.

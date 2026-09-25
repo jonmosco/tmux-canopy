@@ -24,6 +24,7 @@ render() {
       FZF_PREVIEW_LINES="$((rows - 1))" "$SCRIPT_DIR/pane-preview" "$pane"
       ;;
     Q:*) "$SCRIPT_DIR/pane-preview" "${token#Q:}" ;;
+    V:empty) printf 'No panes match the Tree filters.\nF / Ctrl-f changes filters; Ctrl-g searches everything.\n' ;;
     V:*) printf 'Switch views with 1 (Tree), 2 (Processes), or 3 (Buffers).\n' ;;
     *) "$SCRIPT_DIR/tree-preview" "$token" ;;
   esac
