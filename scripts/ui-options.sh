@@ -8,6 +8,7 @@ sidebar_ui_options() {
   local action_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-action"'
   local preview_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-preview"'
   local help_cmd='"$TMUX_CANOPY_ROOT/scripts/help"'
+  local switcher_cmd='"$TMUX_CANOPY_ROOT/scripts/quick-switch"'
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
   preview_mode="$(tmux show-option -gqv @tmux-canopy-preview 2>/dev/null || true)"
   preview_height="$(tmux show-option -gqv @tmux-canopy-preview-height 2>/dev/null || true)"
@@ -47,6 +48,7 @@ sidebar_ui_options() {
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'
+    --bind="ctrl-g:execute-silent($switcher_cmd)"
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     --bind='load:+change-header-lines(0)+change-header-lines(1)'

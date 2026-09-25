@@ -148,7 +148,7 @@ sidebar_navigate() (
 
   # Serialize structural navigation across all entry points. Nested follow
   # hooks see the guard above and return before waiting on this lock.
-  # shellcheck disable=SC2329 # Invoked by the EXIT trap in this subshell.
+  # shellcheck disable=SC2317,SC2329 # Invoked by the EXIT trap in this subshell.
   navigation_cleanup() {
     if ((nav_locked)); then
       local -a finish=(set-option -gu "$nav_guard" ';')

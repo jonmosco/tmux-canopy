@@ -84,6 +84,7 @@ buffer_menu() {
 }
 
 case "$action" in
+  focus) "$SCRIPT_DIR/tree-action" focus "$token" ;;
   view-tree) set_view tree ;;
   view-processes) set_view processes ;;
   view-buffers) set_view buffers ;;
@@ -93,7 +94,9 @@ case "$action" in
       B:*|B2:*)
         buffer_decode_token "$token" || exit 0
         target="$(target_pane)"
-        [[ -n "$target" ]] && tmux paste-buffer -b "$BUFFER_NAME" -t "$target" 2>/dev/null || true
+        if [[ -n "$target" ]]; then
+          tmux paste-buffer -b "$BUFFER_NAME" -t "$target" 2>/dev/null || true
+        fi
         ;;
       X:*)
         rest="${token#X:}"; pane="${rest#*:}"
@@ -126,7 +129,9 @@ case "$action" in
 
   process-term)
     rest="${token#X:}"; pid="${rest%%:*}"; pane="${rest#*:}"
-    process_belongs_to_pane "$pid" "$pane" && kill -TERM "$pid" 2>/dev/null || true
+    if process_belongs_to_pane "$pid" "$pane"; then
+      kill -TERM "$pid" 2>/dev/null || true
+    fi
     ;;
   process-kill)
     rest="${token#X:}"; pid="${rest%%:*}"
@@ -137,7 +142,9 @@ case "$action" in
     ;;
   process-kill-confirm)
     rest="${token#X:}"; pid="${rest%%:*}"; pane="${rest#*:}"
-    process_belongs_to_pane "$pid" "$pane" && kill -KILL "$pid" 2>/dev/null || true
+    if process_belongs_to_pane "$pid" "$pane"; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
     ;;
 
   *) "$SCRIPT_DIR/tree-action" "$action" "$token" ;;

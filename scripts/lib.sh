@@ -131,7 +131,9 @@ ensure_slot_for_window() {
 cleanup_sidebar_slots() {
   local slot_pane
   while IFS= read -r slot_pane; do
-    [[ -n "$slot_pane" ]] && tmux kill-pane -t "$slot_pane" 2>/dev/null || true
+    if [[ -n "$slot_pane" ]]; then
+      tmux kill-pane -t "$slot_pane" 2>/dev/null || true
+    fi
   done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy_slot}' 2>/dev/null |
     awk -F '\t' '$2 == "1" { print $1 }')
 }
@@ -239,7 +241,9 @@ sidebar_width_expression() {
 refresh_sidebars() {
   local pane
   while IFS= read -r pane; do
-    [[ -n "$pane" ]] && tmux send-keys -t "$pane" C-r 2>/dev/null || true
+    if [[ -n "$pane" ]]; then
+      tmux send-keys -t "$pane" C-r 2>/dev/null || true
+    fi
   done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}' 2>/dev/null |
     awk -F '\t' '$2 == "1" { print $1 }')
 }

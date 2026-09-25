@@ -69,7 +69,9 @@ requested_width="$width"
 resolved_width="$(clamp_sidebar_width "$target_pane" "$width" "$minimum_width" "$maximum_width" "$minimum_content_width" 2>/dev/null || true)"
 if [[ -z "$resolved_width" ]]; then
   tmux display-message -c "$client" "tmux-canopy: window is too narrow (requires ${minimum_width}+${minimum_content_width}+1 columns)" 2>/dev/null || true
-  [[ -n "$restore_zoom_pane" ]] && tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+  if [[ -n "$restore_zoom_pane" ]]; then
+    tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+  fi
   exit 0
 fi
 width="$resolved_width"

@@ -21,7 +21,7 @@ if [[ "$action" == refresh ]]; then
   [[ "$token" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 0
   release="set-option -gu @tmux_canopy_notice_pending ; set-option -gu @tmux_canopy_notice_deadline"
   match="#{==:#{@tmux_canopy_notice_pending},$token}"
-  # shellcheck disable=SC2329
+  # shellcheck disable=SC2317,SC2329 # Invoked by the EXIT trap below.
   release_claim() { tmux if-shell -F "$match" "$release" 2>/dev/null || true; }
   trap release_claim EXIT
   trap 'exit 130' INT

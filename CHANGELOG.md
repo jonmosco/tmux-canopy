@@ -4,6 +4,8 @@
 
 ### Added
 
+- Ctrl-g global quick switcher searches sessions, windows, and panes inside collapsed branches without changing tree state.
+- Optional compact rows for single-pane windows via `@tmux-canopy-compact-single-panes`.
 - Persistent client-owned sidebar with tree, process, and buffer views.
 - Left/right placement, stable slots, live mouse resizing, and width presets.
 - Responsive help, shared-directory grouping, colored application icons, and selection highlighting.

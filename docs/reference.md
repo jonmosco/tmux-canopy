@@ -98,6 +98,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `t` | Create a window in the selected node's session |
 | `S` | Create the next available `session-N` session |
 | `/` | Enter fuzzy-filter mode |
+| `Ctrl-g` | Open the global quick switcher, including collapsed panes |
 | `Esc` | Leave filter mode and return to tree navigation |
 | `Ctrl-r` | Refresh |
 | `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
@@ -111,6 +112,31 @@ Tree navigation starts in a normal mode so navigation and creation keys remain a
 Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use `prefix + h` to return to it.
 
 Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use `b` to page back and `g`/`G` for the beginning/end. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
+
+### Global quick switcher
+
+Press **Ctrl-g** from any sidebar view, including while filtering. Type to search
+all sessions, windows, and content panes in the current tmux server. Each result
+includes its session/window context; pane results also match command, title, and
+full working directory. Linked windows have a result in each session.
+
+**Enter** focuses the result; **Esc** or **Ctrl-q** cancels. This popup takes a fresh
+snapshot when opened and has a read-only preview. It preserves the sidebar's
+view, query, selection, and folds. Switching is navigation only, even with a
+pending move or link; that operation stays pending. Removed targets are ignored.
+
+### Compact single-pane windows
+
+Set `@tmux-canopy-compact-single-panes` to `on`, then press **Ctrl-r**. The default
+is `off`. A window containing exactly one content pane becomes one line with its
+window name, application icon, command, notification badge, and directory.
+Sidebar and slot panes do not count; filtering does not change pane counts.
+
+The combined row keeps its window identity: **Enter** focuses the sole content
+pane, **r** renames the window, and **a** opens window actions. Multi-pane windows
+retain the normal hierarchy. The setting works with every density and preserves
+saved folds, which apply again when compact mode is disabled or a second content
+pane is added. Use the quick switcher to preview or focus any pane individually.
 
 ### Native object actions
 
@@ -194,6 +220,7 @@ set -g @tmux-canopy-silence-seconds '30'
 set -g @tmux-canopy-icon-theme 'nerdfont'
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
+set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
 set -g @tmux-canopy-selection-style 'subtle'
 set -g @tmux-canopy-preview 'auto'
 set -g @tmux-canopy-preview-height '35%'
@@ -445,6 +472,10 @@ The multiline suite checks NUL framing and legacy compatibility, one identity pe
 The launch suite copies the project to a path containing spaces, quotes, dollar signs, commas, parentheses and literal tmux-format text. It tests missing/incompatible fzf, damaged installations and unusable TMPDIR without geometry/zoom changes; Bash/zsh/fish default shells when installed; hostile ambient fzf defaults; real provider failure/recovery with preserved fzf/query; empty-view switching; diagnostics menus; native hooks/toggle bindings; runtime fzf failures; owner-only failure delivery; and literal buffer names/rename responses, including tmux command/format-job injection attempts. Test-only wrappers inject probe bindings; production does not accept ambient fzf bindings.
 
 The lifecycle suite exercises real shell exit and Ctrl-D, native pane killing and confirmed last-pane deletion, retained-dead panes, background slot-only windows, warm multi-pane destinations, linked-window closure, session fallback/detachment, unrelated client detachment, and sidebar/fzf PID preservation in global/window scope and slot/move modes. Final-session detachment must not send resize signals to an unrelated application.
+
+The quick-switch suite exercises the actual popup with collapsed branches, compact
+rows, linked-session targets, pending operations, cancellation, and deleted targets.
+It verifies that sidebar state and the running fzf process survive navigation.
 
 The buffer suite checks encoded identities, preview/paste/delete targeting, Unicode and separator-bearing names. The configuration suite checks binding/monitor restoration and later user overrides.
 
