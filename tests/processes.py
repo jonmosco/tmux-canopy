@@ -82,7 +82,8 @@ exec cat "$PROCESS_FIXTURE/processes"
         assert calls.count('ps') == 1 and calls.count('awk') == 1, calls
         assert calls.count('tmux list-panes') == 1, calls
         assert tokens(run(processes, panes, TEST_THEME='ansi')) == expected
-        assert '\x1b[32mworker\x1b[0m' in run(processes, panes, TEST_THEME='ansi').stdout
+        colored = run(processes, panes, TEST_THEME='ansi').stdout
+        assert 'worker\x1b[0m' in colored and '\x1b[32m' not in colored
         print('ok - descendants, sibling order, indentation, pane attribution, linked duplicates and themes')
 
         assert tokens(run('', pane(1, 100))) == ['Q:%1']

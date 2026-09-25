@@ -19,7 +19,7 @@ minimum_content_width="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>
 zoom_action="$(tmux show-option -gqv @tmux-canopy-zoom-action 2>/dev/null || true)"
 runtime_width="$(tmux show-option -gqv @tmux_canopy_runtime_width 2>/dev/null || true)"
 : "${minimum_width:=24}"
-: "${maximum_width:=48}"
+: "${maximum_width:=0}"
 : "${minimum_content_width:=40}"
 : "${zoom_action:=refuse}"
 if [[ "$transition" == 'slot' && "$width" =~ ^[1-9][0-9]*$ && "$runtime_width" =~ ^[1-9][0-9]*$ ]]; then
@@ -75,8 +75,12 @@ fi
 width="$resolved_width"
 tmux set-option -gq @tmux_canopy_runtime_width "$requested_width"
 
+position="$(tmux show-option -gqv @tmux-canopy-position 2>/dev/null || true)"
+[[ "$position" == right ]] || position=left
+placement=(-b)
+[[ "$position" != right ]] || placement=()
 sidebar_pane="$(
-  tmux split-window -d -h -b -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' \
+  tmux split-window -d -h "${placement[@]}" -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' \
     -e "TMUX_CANOPY_CLIENT=$client" -e "TMUX_CANOPY_WIDTH=$width" \
     -e "TMUX_CANOPY_SCOPE=$scope" -e "TMUX_CANOPY_KEY=$toggle_key" \
     -e "TMUX_CANOPY_LAST_KEY=$last_window_key" -e "TMUX_CANOPY_TRANSITION=$transition" \
@@ -88,6 +92,7 @@ if [[ -n "$sidebar_pane" ]]; then
   # Publish the internal marker only after ownership/target metadata is ready.
   tmux set-option -p -t "$sidebar_pane" @tmux_canopy_client "$client" \; \
     set-option -p -t "$sidebar_pane" @tmux_canopy_target "$target_pane" \; \
+    set-option -p -t "$sidebar_pane" @tmux_canopy_position "$position" \; \
     set-option -p -t "$sidebar_pane" @tmux_canopy 1
   if [[ -n "$restore_zoom_pane" ]]; then
     tmux set-option -p -t "$sidebar_pane" @tmux_canopy_restore_zoom_pane "$restore_zoom_pane"

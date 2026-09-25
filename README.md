@@ -1,491 +1,122 @@
 # tmux-canopy
 
-A stateful tmux object tree that moves one real sidebar pane across sessions and windows. It uses Bash and fzf, stays inside the existing tmux server, and resizes terminal content instead of covering it.
+A persistent sidebar for navigating tmux sessions, windows, panes, processes, and buffers.
 
-> **One tree. One process. Every tmux session.**
+**One tree. One persistent sidebar. Every tmux session.**
 
-## Why this project
+Canopy moves the same sidebar pane as you switch windows and sessions, preserving your selection, search, and collapsed branches. It lives inside tmux and reserves space for your applications.
 
-Most tmux sidebars use one of three designs: a transient popup, one sidebar process per window, or a wrapper that owns the main terminal view. This project deliberately uses a different lifecycle:
+## Features
 
-```text
-window A ─┐
-window B ─┼── one sidebar pane + one long-running fzf process
-window C ─┘                    │
-                        moved with join-pane
-```
+- Sessions → windows → panes tree with application icons and an active-location marker.
+- Left or right placement; **left by default**.
+- Shared-directory grouping, search, previews, and scrollable popup help.
+- Create, rename, move, link, and delete tmux objects with native menus.
+- Process trees attributed to panes, plus tmux buffer browsing.
+- Activity and bell notifications; optional silence monitoring.
+- Live mouse resizing and keyboard width presets.
+- One sidebar owned by the client that opened it; no daemon or agent service.
 
-In global mode, the sidebar is owned by the tmux client that opened it. Selection, new-window, and session hooks move that same pane to the client's newly selected or newly created window. Because the process is moved rather than recreated, its cursor, query, collapsed nodes, preview state, and future operation history can remain local and continuous without synchronization between duplicate instances.
+## Requirements and support
 
-This is the project's focus. It is not intended to become a filesystem browser, terminal emulator, multiplexer replacement, or agent runtime. Agent metadata may eventually be displayed, but tmux sessions, windows, and panes remain the primary object model.
+The tested platform is **Linux**, with:
 
-Projects such as `tmux-pane-tree`, `tmux-oak`, and `tmux-agent-sidebar` provide related tree or sidebar experiences. They generally create or maintain sidebar instances per window. `opensessions` can stash and restore real sidebar panes, but maintains sidebars for active windows. This project instead follows a client by physically moving one stateful pane.
+- tmux **3.7c**
+- fzf **0.74.4**
+- Bash **4.4+** (locally tested with 5.3.9)
+- Standard command-line utilities, including awk and procps `ps`
+- `less` for the optional enlarged preview
 
-## Current features
-
-- Sessions → windows → panes hierarchy
-- Real, fixed-width, full-height pane anchored at the far-left edge
-- Live active session/window/pane markers, independent of the sidebar selection
-- Vim-style collapse and expand controls
-- Normal and fuzzy-filter modes
-- Session/window metadata and live pane previews
-- Context-aware creation of sessions, windows, and pane splits
-- Stateful two-stage movement with source and destination visible in one tree
-- Move windows across sessions; move panes left/right/above/below or into a new window
-- New objects inherit the selected pane's working directory
-- Switching without closing the sidebar
-- Configurable window-local or global-follow scope
-- In global mode, moves the same sidebar pane across windows and sessions
-- Dynamic open and close behavior from the same binding
-- Sidebar panes are excluded from the hierarchy and pane counts
-- Client ownership prevents one client's window changes from pulling another client's sidebar
-- Cached sidebar ownership avoids scanning every pane during normal navigation
-- Optional stable-slot transitions preserve content-pane dimensions across window switches
-- Atomic sidebar-aware next, previous, last, and numeric window selection reduces intermediate redraws
-- Per-client transition guards prevent fallback hooks from moving the sidebar back to a stale source window
-- Cross-session hooks resolve the owning client's live pane and reject stale sidebar/slot targets
-- Provider-neutral notification badges sourced only from live content panes
-- Native activity, bell, and optional silence providers
-- Event-driven, debounced refresh with session/window/pane aggregation
-- Read state clears when the affected window is focused, with selected/all manual clearing
-- Native session/window rename and confirmed pane/window/session deletion
-- Context-sensitive native action menus for sessions, windows, and panes
-- Window reorder, cross-session link/unlink, layouts, pane rotation, and guarded synchronized input
-- Pane zoom, swap, break-to-window, dead-pane respawn, and object information popups
-- Switchable Tree, pane-attributed Processes, and tmux Buffers views
-- ANSI semantic colors, continuous tree guides, density-aware paths, dynamic mode tabs, and adaptive preview
-- Responsive fixed or percentage widths with minimum sidebar/content constraints
-- Staged one-shot mouse resizing and compact/default/wide width presets
-- Geometry-stable window switches with debounced, owner-only active-location refreshes
-- Zoom guards with optional unzoom-and-restore behavior
-- Hook-driven orphan cache, target, and stable-slot cleanup
-- No daemon, background API, database, required agent hooks, or compiled binary
-
-## Requirements
-
-- tmux with the required popup/menu, literal command prompts, full-height split, environment, `run-shell -C`, and numeric-format capabilities (tested with 3.7c; checked before opening)
-- Bash 4.4 or newer
-- fzf with NUL/multiline input, stable IDs, whole-item highlighting and the required actions (tested with 0.74.4; the actual UI options are checked before opening)
-- A procps-compatible `ps` for the Processes view
-- `less` for the optional enlarged preview popup
+Startup checks tmux capabilities and fzf options before splitting an application pane. Older tmux/fzf versions and macOS are not currently part of the tested support matrix. A Nerd Font is optional; use the `unicode` or `ascii` icon theme if glyphs are missing.
 
 ## Install
 
-Load the plugin from your checkout:
+Install the requirements first, then clone the project:
 
-```tmux
-run-shell '~/dev/projects/tmux-canopy/tmux-canopy.tmux'
+```bash
+git clone https://github.com/jonmosco/tmux-canopy.git ~/.tmux/plugins/tmux-canopy
 ```
 
-Reload the tmux configuration afterward.
+Add this to your tmux configuration (usually `~/.tmux.conf` or `~/.config/tmux/tmux.conf`):
 
-### Upgrading from tmux-tree-sidebar
+```tmux
+run-shell '~/.tmux/plugins/tmux-canopy/tmux-canopy.tmux'
+```
 
-Update the startup path to `tmux-canopy/tmux-canopy.tmux` and change configuration
-options from `@tmux-tree-sidebar-*` to `@tmux-canopy-*`. The previous
-`tmux-tree-sidebar.tmux` entrypoint remains as a compatibility launcher. On load,
-legacy settings are copied only when the corresponding Canopy option is unset;
-explicit Canopy settings take precedence. Subsequent configuration changes should
-use the new option names.
+Load it into a running tmux server:
 
-Internal environment variables now use `TMUX_CANOPY_*` and runtime options use
-`@tmux_canopy*`. Close existing sidebars before upgrading, then reload the plugin
-and reopen them. Application panes can remain running throughout the upgrade.
+```bash
+tmux run-shell "$HOME/.tmux/plugins/tmux-canopy/tmux-canopy.tmux"
+```
 
-## Usage
+Press **prefix + T** to open it. With the default prefix, press **Ctrl-b**, release, then **Shift-t**. The same shortcut closes it.
 
-The default binding is `prefix + T`. With the current tmux configuration that is `Ctrl-a`, then `Shift-t`.
+### Defaults
 
-- When no sidebar exists, the binding opens it at the far-left edge and focuses it, regardless of which pane was active.
-- When the sidebar is open, the same binding closes it from any pane.
-- `Ctrl-q` also closes the sidebar from inside it.
-- After focusing a target with `Enter`, use the normal `prefix + h` pane-navigation binding to return to the sidebar.
+Canopy opens on the **left**, follows its client across windows and sessions, and uses stable slots to keep application geometry steady when revisiting windows. It starts at 42 columns. Mouse resizing is live, with no fixed maximum; at least 40 columns are reserved for content.
+
+Place settings **before** the `run-shell` line:
+
+```tmux
+set -g @tmux-canopy-position 'left'       # left or right
+set -g @tmux-canopy-width '42'
+set -g @tmux-canopy-scope 'global'        # global or window
+set -g @tmux-canopy-transition 'slot'     # slot or move
+set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
+set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
+set -g @tmux-canopy-min-content-width '40'
+set -g @tmux-canopy-icon-theme 'unicode'  # unicode, ascii, nerdfont, or auto
+```
+
+Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
+
+## Essential controls
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` | Switch to Tree, Processes, or Buffers view |
-| `j` / `k` or arrows | Move selection |
-| `h` / Left | Collapse the selected node or pane's window |
-| `l` / Right | Expand the selected session or window |
-| `H` / Shift-h | Collapse all sessions and windows in Tree view |
-| `L` / Shift-l | Expand all sessions and windows in Tree view |
-| `Enter` | Focus a tree/process target, paste a buffer, or complete move/link placement |
-| `a` | Open the selected object's native action menu |
-| `p` | Toggle the preview drawer on/off without closing the sidebar |
-| `Shift-p` | Open an enlarged read-only preview popup (`q` closes; arrows scroll) |
-| `prefix + Space` | Cycle content layouts while leaving the sidebar fixed |
-| `m` | Mark the selected window or pane as the move source; press again to cancel |
-| `c` | Cancel move mode |
-| `r` | Rename the selected session or window |
-| `x`, `x` | Arm and confirm deletion of the selected pane, window, or session within five seconds |
-| `u` | Clear notifications for the selected pane/window/session |
-| `U` | Clear all sidebar notifications |
-| `[` / `]` | Select the previous or next width preset |
-| `w` | Cycle width presets |
-| `s` | Create a horizontal split from the selected node |
-| `v` | Create a vertical split from the selected node |
-| `t` | Create a window in the selected node's session |
-| `S` | Create the next available `session-N` session |
-| `/` | Enter fuzzy-filter mode |
-| `Esc` | Leave filter mode and return to tree navigation |
+| `j` / `k`, arrows | Select an object |
+| `Enter` | Focus the selected target |
+| `h` / `l` | Collapse / expand |
+| `H` / `L` | Collapse / expand all |
+| `/`, then `Esc` | Search, then return to the full tree |
+| `1` / `2` / `3` | Tree / Processes / Buffers |
+| `a` | Actions for the selected object |
+| `p` / `P` | Toggle preview / open enlarged preview |
+| `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |
-| `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
-| `Ctrl-q` | Close |
-| `prefix + T` | Toggle the sidebar open or closed |
+| `?` | Scrollable help popup |
+| `Ctrl-q` | Close the sidebar |
 
-Tree navigation starts in a normal mode so navigation and creation keys remain available. Press `/` before typing a fuzzy query; normal-mode letter bindings are temporarily disabled while filtering. Expanded state lasts for the lifetime of each sidebar process.
+Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
 
-`H` collapses every branch, leaving only session rows; `L` opens every branch again. These commands affect the whole tree, including linked windows, and leave move/link/delete state intact. They do nothing in Processes or Buffers view. While searching, uppercase `H` and `L` are ordinary search text.
+See the [configuration and command reference](docs/reference.md) for all controls, appearance settings, notifications, and architecture.
 
-Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use `prefix + h` to return to it.
+## Integration with your tmux configuration
 
-Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use `b` to page back and `g`/`G` for the beginning/end. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
+Canopy wraps `prefix + n`, `p`, `0`–`9`, and `Tab` for smooth window navigation, `prefix + Space` for sidebar-aware layouts, and border mouse bindings for resizing. Set `@tmux-canopy-smooth-navigation 'off'` to opt out of navigation wrappers. Disabled or renamed bindings restore their previous definitions; later user changes are preserved. Notification monitors are also restored when disabled.
 
-### Native object actions
+This restoration applies to settings first installed by the current version. When upgrading an older development checkout that already replaced bindings, start a fresh tmux server to establish clean ownership. Existing sessions can continue using the plugin; schedule that restart when convenient.
 
-Press `a` for a context-sensitive `tmux display-menu`.
+## Current limitations
 
-- **Session:** new window, rename, information, and guarded deletion.
-- **Window:** focus, rename, reorder, move/link marking, unlink, layouts, rotate panes, guarded synchronized input, information, and deletion.
-- **Pane:** focus, zoom, swap, move, break into a window, dead-pane respawn, information, and deletion.
+- Stable slots are optimized for one active sidebar owner per tmux server. Multiple simultaneous owners can affect each other’s window geometry.
+- A directory-only change may need `Ctrl-r`; there is no shell prompt integration or polling loop.
+- Activity means terminal output, not an AI agent’s task status. Continuous logs can be noisy.
+- Closing the sidebar returns its space but may not restore every previous pane proportion.
+- Confirmed deletion has no undo.
 
-Linked window occurrences carry both stable window and session IDs internally, so unlink removes only the selected session occurrence. Linked and synchronized windows display `[linked:N]` and `[SYNC]` badges. Enabling synchronized input requires confirmation; disabling it is immediate. Respawn is limited to panes tmux reports as dead.
+Agent awareness and moving an open sidebar between edges are described in the [roadmap](ROADMAP.md).
 
-### Views
+## Development and release checks
 
-The same long-running fzf process switches among three sources:
-
-1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
-2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
-3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste or delete.
-
-Process signals are revalidated immediately before delivery by walking the current parent chain back to the owning `#{pane_pid}`. Stale or reused PIDs are ignored.
-
-### Moving windows and panes
-
-Press `m` on a window or pane. The source remains visible with a `⇢` marker while you navigate the same stateful hierarchy.
-
-- For a window, select any node in the destination session and press `Enter`. The window is moved to the next free index in that session.
-- For a pane, select a destination pane or window and press `Enter`. A native tmux menu chooses left, right, above, below, or break into a new window.
-- Press `m` on the marked source or `c` anywhere to cancel.
-
-Ordinary `Enter` or double-click navigation does not synchronously reload the list inside the window transition. After focus settles, an owner-only background refresh updates the active markers. Native tmux keyboard, mouse, window creation, and session changes use the same mechanism; structural move operations still reload after completion.
-
-The green `●` identifies the current content pane and its window/session occurrence; the highlighted row/pointer identifies the object you are browsing. These are independent. Focus changes do not select, scroll to, or expand the active branch. A collapsed active window/session still receives its marker. Entering the sidebar retains the last content pane (using native `pane_last` or the remembered target), instead of marking the sidebar as the working pane.
-
-Focus refreshes wait for approximately 75 ms of stable focus before rendering. Repeated events share one short-lived worker per sidebar; unchanged locations do not reload. The worker resolves the owning client's live session/window/pane rather than trusting stale hook targets, waits out guarded transitions, validates ownership again before publishing, and remembers linked-session occurrences. Expiring claims recover after an interrupted worker. This is event-driven, not a permanent polling process.
-
-Use the Window actions menu to mark a window for linking, then select a destination session/object and press `Enter`. Unlike move, link keeps the source occurrence. Use the linked occurrence's action menu to unlink only that session.
-
-The operation uses stable tmux IDs and never overwrites an occupied window index. The same sidebar process remains alive, follows the moved object in global mode, clears move state after success, and reloads the hierarchy.
-
-## Failure diagnostics and launch behavior
-
-Opening performs preflight checks **before unzooming or splitting application panes**: required executables/helper files, tmux capabilities, the actual fzf options/bindings, and private temporary-state creation. Closing an existing sidebar does not depend on those checks succeeding.
-
-- Use **`a`, then `D`** for **Diagnostics** in Tree, Processes, or Buffers. The popup shows versions, dependency/capability results, and the owning client's last recorded failure.
-- If the sidebar cannot open, run `scripts/doctor` from a regular tmux pane. It infers the owner only when one client is using that pane. For an ambiguous context, use `scripts/doctor --report CLIENT_TTY PANE_ID`; `--check` provides a preflight-only exit status.
-- A nonzero data-source exit publishes an informational retry row, not partial source output. **Ctrl-r retries in the same fzf process**. A search query is retained; press Escape to clear it and reveal the error row, then `a` opens diagnostics.
-- Unexpected fzf failures report a fixed exit-code summary to the live owner. Normal Ctrl-q/Ctrl-c aborts, successful acceptance, and handled sidebar termination signals are not reported as failures.
-- Only the most recent fixed, bounded failure summary and timestamp are kept per owner, in `@tmux_canopy_failure_*` tmux options. These are operational records, not secret storage. No raw stderr, environment dumps, buffer samples, previews, or terminal captures are retained as diagnostics. The source dispatcher stages records in memory, never in diagnostic files.
-
-The sidebar deliberately ignores `FZF_DEFAULT_OPTS`, `FZF_DEFAULT_OPTS_FILE`, and `FZF_DEFAULT_COMMAND`. Customize its documented tmux options instead. Actions use `/bin/sh`, and pane/popup startup uses direct argv rather than the user's default-shell command syntax. Script paths are protected across shell quoting, tmux parsing/format expansion, and fzf bindings; spaces, quotes, dollar signs, commas, and literal tmux-format text in installation paths are tested.
-
-Rename prompts preserve commas and treat responses as data, not executable tmux commands or format jobs. A temporary native object option carries the response until it can be applied with literal-format escaping; normal completion, cancellation and handled termination clean it up. Buffer menus use a fixed title so a format-like buffer name is never evaluated as a menu format. Switching views also works when the current view is empty.
-
-After upgrading, reload the plugin/configuration, then **close and reopen an already-running sidebar once** to activate the new fzf environment isolation and bindings. Existing processes continue using their original startup arguments.
-
-### Directory-change refresh investigation
-
-No prompt integration or polling is installed. An isolated tmux 3.7c probe confirmed that `cd` updates `pane_current_path` without changing focus or emitting a dedicated directory hook. OSC 7 updates `pane_path`, but does not trigger `pane-title-changed`; OSC 2 title changes do. The existing focus-location deduplication therefore cannot alone detect a directory-only change. See [the investigation and proposed opt-in design](docs/directory-refresh.md). Ctrl-r remains the explicit refresh mechanism.
-
-## Configuration
-
-Set options before loading the plugin:
-
-```tmux
-set -g @tmux-canopy-key 'T'
-set -g @tmux-canopy-width '42' # or '25%'
-set -g @tmux-canopy-min-width '24'
-set -g @tmux-canopy-max-width '48'
-set -g @tmux-canopy-min-content-width '40'
-set -g @tmux-canopy-resize-mode 'staged'
-set -g @tmux-canopy-width-presets '30,42,48'
-set -g @tmux-canopy-zoom-action 'refuse' # or 'unzoom'
-set -g @tmux-canopy-scope 'global'
-set -g @tmux-canopy-transition 'slot'
-set -g @tmux-canopy-smooth-navigation 'on'
-set -g @tmux-canopy-last-window-key 'Tab'
-set -g @tmux-canopy-notifications 'activity,bell'
-set -g @tmux-canopy-notification-target 'sidebar'
-set -g @tmux-canopy-silence-seconds '30'
-set -g @tmux-canopy-icon-theme 'nerdfont'
-set -g @tmux-canopy-theme 'ansi'
-set -g @tmux-canopy-density 'normal'
-set -g @tmux-canopy-selection-style 'subtle'
-set -g @tmux-canopy-preview 'auto'
-set -g @tmux-canopy-preview-height '35%'
-```
-
-Width may be a terminal-column count or percentage. The result is clamped between `min-width` and `max-width`, while `min-content-width` prevents the sidebar from squeezing the application area below a usable size. If the window cannot satisfy both minimums, opening is refused; an already-open sidebar closes if a later terminal resize makes those constraints impossible. Percentage widths are recalculated after terminal/window resize events; interactive sidebar resizing remains the preferred runtime width for fixed-width configurations. Temporary narrow-window clamps do not overwrite that preference: it is restored when space permits. Each inactive slot is clamped to its own window's available space. When switching to a window too narrow for both minimums, the dock stays parked in its previous window and follows again into a window that fits.
-
-Resize modes control redraw behavior:
-
-| Mode | Behavior |
-|---|---|
-| `staged` | The sidebar border stays still while dragging and commits the final mouse position once on release. This is the default and sends one `SIGWINCH` to applications. |
-| `preset` | Mouse release snaps to the nearest configured width; `[`/`]`/`w` select presets directly. |
-| `live` | Native tmux per-column dragging. This continuously redraws terminal applications and retains the debounced `after-resize-pane` compatibility hook. |
-
-In staged and preset modes, sidebar border drags are intercepted while unrelated tmux borders retain normal live behavior. Release may land inside the sidebar or a content pane; the chosen width is saved and follows the sidebar across windows and sessions. A committed resize updates the active sidebar, runtime width, and inactive stable slots once. This avoids the previous background-shell process storm during mouse movement. Width presets are comma-separated terminal-column values.
-
-Opening on a zoomed pane is refused by default. Set `zoom-action` to `unzoom` to temporarily unzoom, create the sidebar, and restore the original pane's zoom when the sidebar closes.
-
-The scope has two modes:
-
-| Scope | Behavior |
-|---|---|
-| `window` | The sidebar remains attached to the tmux window where it was opened. Switching elsewhere hides it until that window is selected again. |
-| `global` | The same sidebar pane follows its owning client whenever that client changes tmux windows or sessions. |
-
-`global` provides the appearance of a sidebar on every window without launching one fzf process per window. The sidebar records the client that opened it, so another attached tmux client does not pull it to a different window. Reload tmux after changing the scope.
-
-Transition modes:
-
-| Transition | Behavior |
-|---|---|
-| `move` | Move the sidebar with `join-pane`; inactive windows regain full width but applications resize on every switch. |
-| `slot` | Lazily create a fixed-width placeholder in visited windows and exchange it with the one sidebar process using `swap-pane`; content dimensions stay stable after the first visit. |
-
-In slot mode, staged and preset resizing commit the live width and all inactive placeholders once. Legacy `live` mode propagates the final width to inactive placeholders after a 200 ms debounce. Applications in those windows redraw while inactive, so later switching remains resize-free. Closing the sidebar removes all placeholders and restores full-width layouts.
-
-### Navigation fast paths
-
-Keyboard navigation, tree activation, and fallback follow hooks share `scripts/navigation.sh`. Each request batches client, target, and pane metadata into one tmux invocation instead of issuing per-field queries. Relative next/previous/last/index targets are resolved against the owning client's session, even when another client attached more recently.
-
-- An already-current pane with an up-to-date target and width performs no mutations.
-- A same-window pane change only updates the target and selects the pane, unless its sidebar width needs repair.
-- Same-session window changes do not call `switch-client`.
-- Structural changes acquire the per-client transition lock, reread metadata under that lock, and batch layout/selection commands. Nested follow hooks return while the transition guard is set.
-- Window/session selection settles before a fresh destination snapshot and slot exchange. This matters with `aggressive-resize`: hidden windows may retain old terminal dimensions, and tmux's automatic sizing occurs after the selection command queue.
-- Destination slots are reused; width correction is queued with the swap. The preferred width—not a pane width accidentally crushed by automatic sizing—is authoritative. Slot initialization batches its option/title writes. Warm switches remain resize-free when the window dimensions and preferred width have not changed.
-
-These paths do not synchronously reload fzf; a separate debounced worker publishes settled active-location changes without moving the sidebar cursor. Structural navigation suppresses intermediate notification-clear hooks and schedules at most one quiet clear for the final destination when it has unread state. Windows with no unread state do not start notification-clear processes.
-
-### Empty windows and native fallback
-
-When the last regular pane exits (`exit`, Ctrl-D, or `kill-pane`), an internal sidebar or inactive slot no longer keeps that window alive. The existing sidebar is parked without selecting a window or changing window history; internal leftovers are removed, **tmux chooses its normal successor**, and the same sidebar/fzf follows that choice. Confirmed deletion of the last pane from the sidebar uses this path too. No temporary windows or replacement fzf processes are created.
-
-- Background slot-only windows are cleaned without stealing browsing focus.
-- A regular dead pane retained by `remain-on-exit` still counts as content; it is not automatically destroyed.
-- The previous regular pane is preferred over the first pane when an internal slot/dock was active in the destination.
-- `detach-on-destroy` remains tmux-owned. With `off`, the dock can follow native fallback into another session. With `on`, finishing the owning session detaches normally and closes its dock without borrowing space from another session. Existing minimum-width constraints still apply.
-- Native layout notifications are filtered in tmux before starting a worker. There is no polling, and ordinary resizing of windows with content starts no empty-window worker.
-
-This concerns **last-content removal**. An explicit native `kill-window` or `kill-session` deliberately kills all their panes, including any sidebar; a process already killed by tmux cannot be preserved.
-
-### Snapshot rendering and stable selection
-
-The Tree source collects configuration, sessions, window occurrences, panes, and clients in one batched tmux invocation. `lib/tree-render.awk` reads UI state once, builds relationships and notification totals in memory, then emits a complete tree. There are no per-row tmux queries, collapse-state greps, or hostname processes. Control bytes in names, paths, titles and custom icons are replaced before parsing; display text cannot inject snapshot fields or ANSI controls.
-
-The sidebar uses `reload-sync` to replace completed lists rather than displaying partial builds. Each row has an action token, visible text, and a hidden stable identity. `--track --id-nth=3` preserves selection through renames, changing badges, and reloads. Linked pane identities include their session occurrence; Enter and collapse use that occurrence without changing the native pane action token. If the selected object disappears, fzf falls back to a remaining row. Search examines the visible text, not the hidden IDs, and queries survive refreshes.
-
-This is an on-demand snapshot, not a polling daemon or a persistent metadata cache. Standalone source callers retain the legacy two-column, newline-delimited output; `sidebar-source --stable` enables the hidden identity column. Add `--read0` for NUL-delimited records, where visible text may contain a newline. New sidebar processes select this protocol through `TMUX_CANOPY_RECORD_FORMAT=nul` and fzf `--read0`; all views and reloads use it consistently. Old running sidebars retain flattened newline records until reopened, so upgrading scripts does not corrupt their lists. Reopen an existing sidebar after upgrading its fzf bindings.
-
-### Notifications
-
-Notification sources are comma-separated:
-
-| Source | Badge | Trigger |
-|---|---|---|
-| `activity` | `!N` | Output appears in another tmux window |
-| `bell` | `BN` | An application emits a terminal bell |
-| `silence` | `…N` | A monitored window is silent for the configured interval |
-| `none` | — | Disable notification hooks |
-| `all` | all | Enable every native provider |
-
-Choose exactly where native alerts are presented:
-
-| `@tmux-canopy-notification-target` | Behavior |
-|---|---|
-| `sidebar` | Show alerts only in the sidebar and suppress tmux's activity/bell status styles |
-| `status` | Keep tmux status-bar alerts and disable sidebar alert hooks/rendering |
-| `both` | Show alerts in both places |
-
-The default is `sidebar`. Original `window-status-activity-style`, `window-status-bell-style`, and alert-action values are saved and restored when switching modes. The `status` and `both` modes set configured alert actions to `other` so tmux actually marks background windows. Custom status formats that explicitly contain `#F`, `#{window_flags}`, or alert conditionals must omit those expressions if strict sidebar-only display is desired; tmux does not expose a separate hook-only alert flag.
-
-Native tmux alert hooks record provider state only when tmux supplies a live, non-sidebar, non-placeholder pane and its owning window. Events without a valid open terminal pane are ignored. No process scanner, Git poller, agent API, or external desktop event can create a notification in the default model.
-
-The hooks record provider state on the affected pane and window. Press `u` to clear the selected pane's window, window, or whole session; press `U` to clear all unread state. The tree aggregates unread windows into session rows and clears transient state when the owning client focuses that window. Sidebar, placeholder, dead, missing and wrong-window event sources are ignored.
-
-Notification clearing uses one metadata snapshot and one batch of necessary mutations, rather than traversing panes once per provider. Native selection hooks check unread flags before launching a shell and share a window-scoped clear claim. Navigation suppresses intermediate hooks and requests one final quiet clear. Manual sidebar clear actions use their existing single reload rather than scheduling a second refresh.
-
-Changed notifications share one short-lived 120 ms refresh worker. The claim is acquired inside tmux's command queue; duplicate events are rechecked there before changing state. Claims expire after two seconds so a killed worker cannot permanently block future refreshes. Distinct pane-only options (`@tmux_canopy_notice_pane_*`) prevent panes from inheriting a window's aggregate unread badge; the previous pane option names are maintained and cleared for compatibility. Unread state is still server-wide, not per-client.
-
-The option model is provider-neutral: each provider owns a namespaced pane/window state key while rendering and aggregation are centralized. Optional Git and agent adapters can be added later without changing sidebar movement, slots, or tree navigation. Git state will remain persistent metadata rather than clear-on-focus unread state.
-
-### Appearance
-
-`ansi` uses the terminal's standard palette for semantic session, window, pane, path, active, unread, move, link, and deletion roles; `mono` disables source styling. Density may be `compact`, `normal`, or `detailed`:
-
-- **Normal (default):** Tree pane entries have two physical lines: command/icon/active marker and notifications first, then a subdued working directory aligned beneath the command. Useful titles remain secondary on the first line. Paths prefer `…/parent/directory`, falling back to `…/directory` when the parent would crowd out the basename.
-- **Compact:** one line per pane, with the command and shortened directory inline; useful when many panes must fit onscreen.
-- **Detailed:** two lines per pane, retaining the full path plus pane index/useful title. Long lines are clipped; the preview/popup provides more room.
-
-Session/window rows stay single-line. There is no blank padding between entries and no selected-only expansion that would make neighboring entries jump. Both pane lines form one selectable fzf item: `j/k` advances one object, clicking either line selects that pane, and Enter/actions retain the same stable identity. Filtering can match the command or displayed directory. Processes and Buffers keep their existing row layouts.
-
-Paths use the terminal's default foreground with dim styling rather than a fixed light text color. Lines do not wrap or horizontally scroll on selection. fzf handles final ANSI/Unicode cell clipping. To change density at runtime, set `@tmux-canopy-density` and press `Ctrl-r` in the sidebar; this preserves the selected object without restarting fzf.
-
-Selection styles are `subtle`, `solid`, `reverse`, or `pointer`. The default subtle style provides a full-row background while preserving colored state markers. The source header shows the active Tree/Processes/Buffers tab and `NAV`, `MOVE`, `LINK`, or `DELETE` mode. Tree rows use `├─`, `└─`, and `│` guides with Nerd Font structural/application glyphs.
-
-### Preview
-
-Preview may be `auto`, `on`, or `off`. Auto starts hidden below 28 rows so the object list remains useful; `p` toggles it on/off in navigation mode without closing the sidebar. Set `@tmux-canopy-preview 'off'` to start hidden and open it only when needed. While editing a search query, `p`/`P` remain text input, like the other letter shortcuts.
-
-The drawer keeps a consistent configured height (35% by default) while browsing. Output is **clipped, not wrapped**: a source terminal row remains one preview row, with terminal-cell/ANSI handling delegated to fzf rather than byte truncation. Pane previews have a compact two-line heading and use `FZF_PREVIEW_LINES`/`FZF_PREVIEW_COLUMNS` to fit the available drawer. Shell/log snapshots show recent physical rows through the cursor, rather than a fixed 80-line dump or mostly empty screen bottom. Alternate-screen TUIs and common full-screen commands show a cursor-centered slice of the current screen, without shell scrollback. `[recent crop]` or `[screen crop]` identifies a cropped snapshot.
-
-`Shift-p` opens an 85%-wide, 80%-high native tmux popup for the selected object. It uses `less -R -S` in secure mode: arrows scroll vertically/horizontally and `q` closes it. TUI snapshots include the whole current screen; shell snapshots include up to 300 recent physical rows. Popup sizing uses its own PTY dimensions, not the narrow drawer's inherited dimensions. Buffers and session/window/process metadata can also be inspected there.
-
-Previews are on-demand snapshots, not continuously polled terminals. Neither preview mode resizes the real application, moves panes, or replaces the sidebar's fzf process. Reopen an already-running sidebar after upgrading to pick up the new no-wrap setting and `Shift-p` binding.
-
-### Content layouts
-
-`prefix + Space` (currently **Ctrl-a Space**) cycles content-only layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, tiled, and the two mirrored main layouts. The sidebar's width, full height, and far-left position stay fixed. The sidebar's **Layouts** action menu uses the same mechanism. With one content pane, there is nothing to rearrange; without a sidebar/slot, ordinary native layout commands are used.
-
-The implementation generates one checksummed native layout for the existing panes and applies it directly—no temporary windows, pane recreation, or whole-window layout followed by a repair. Stable placeholder slots are protected too. Layouts that cannot fit are skipped during cycling or refused for explicit selection. Zoomed windows are left alone; unzoom before cycling. Multiple docks or a dock already reordered by other commands are refused rather than risking an application's position; reopen a displaced sidebar to restore normal ordering.
-
-This protection covers `prefix + Space` and the sidebar layout menu. Direct native `select-layout`, the native Meta-number preset bindings, and `rotate-window` still operate on the whole window.
-
-### Icons
-
-Application icons use command-aware colors from the terminal's standard ANSI palette: neutral shells/unknown commands, blue editors and Kubernetes tools, yellow Node/Python and Claude, red Git/npm/OpenShift, cyan SSH/Codex/system monitors, and magenta pi/OpenCode. Green remains reserved for active-location markers. Colors apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables them. Command names and paths retain their existing styling.
-
-Icon themes:
-
-| Theme | Behavior |
-|---|---|
-| `nerdfont` | Nerd Font session/window glyphs and command-aware pane icons |
-| `unicode` | Portable Unicode geometric glyphs |
-| `ascii` | Plain ASCII markers |
-| `auto` | Use Nerd Font when Fontconfig finds one; otherwise Unicode |
-
-Pane icons recognize common commands including Neovim, shells, Node.js, Python, Git, SSH, Kubernetes tools, system monitors, and AI coding agents. Unknown commands receive the generic terminal glyph. Override the structural icons with `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, and `@tmux-canopy-icon-pane`.
-
-Generic activity can be noisy for log tails. Use `bell`, `activity,bell`, or `none` according to the desired signal level. Use `notification-target status` to return alert presentation to the normal tmux status bar without collecting sidebar unread state. Silence monitoring is only enabled when `silence` or `all` is configured.
-
-When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, `prefix + 0` through `prefix + 9`, and the configurable last-window key (`prefix + Tab` by default). It resolves the destination, moves the sidebar, updates ownership state, and selects the destination in one tmux command queue. The fallback hooks still handle status-bar clicks, `choose-tree`, external `select-window` calls, and session changes. Set smooth navigation to `off` to retain tmux's original bindings, or set the last-window key to `off` to disable only that binding.
-
-## Architecture
-
-| Component | Responsibility |
-|---|---|
-| `tmux-canopy.tmux` | Configuration, toggle binding, and window/session hooks |
-| `scripts/toggle` | Create or close the invoking client's sidebar |
-| `scripts/follow` | Move an existing sidebar pane to the client's selected or newly created window |
-| `scripts/navigate` | Dispatch next/previous/last/numeric window navigation |
-| `scripts/navigation.sh` | Shared batched navigation, fast paths, and guarded layout/selection transactions |
-| `scripts/sync-width` | Debounce legacy live-mode resizes and synchronize inactive slots |
-| `scripts/resize` | Commit one-shot and preset widths to the sidebar and slots |
-| `scripts/mouse-resize` | Detect sidebar-border drags and commit on mouse release |
-| `scripts/refresh-sidebar` | Remember the live content target and debounce owner-only active-location updates |
-| `scripts/responsive-width` | Re-clamp fixed/percentage widths after terminal resizing |
-| `scripts/cleanup` | Repair stale ownership/targets and remove orphan slots |
-| `scripts/reap-empty` | Finish content-empty windows while preserving the dock and native successor selection |
-| `scripts/notify` | Validate/deduplicate events, batch unread clears, and coalesce refresh workers |
-| `scripts/notification-lib.sh` | Native hook predicates and expiring clear claims |
-| `scripts/view-header` | Render dynamic view tabs and operation mode state |
-| `scripts/sidebar-source` | Publish complete in-memory view snapshots or a recoverable error row |
-| `scripts/launch-lib.sh` | Shell/tmux quoting, preflight checks, and bounded owner-targeted failures |
-| `scripts/ui-options.sh` | Shared preflight and runtime fzf options/bindings |
-| `scripts/doctor` | CLI and contextual-popup diagnostics |
-| `scripts/sidebar-action` | Dispatch view-specific focus, buffer, process, and action-menu operations |
-| `scripts/sidebar-preview` | Dispatch and row-budget object, process, pane, and buffer previews |
-| `scripts/pane-preview` | Capture recent shell rows or the active TUI screen without resizing |
-| `scripts/preview-popup` | Open an owner-targeted enlarged read-only snapshot |
-| `scripts/content-layout` | Cycle/apply content-only layouts with native fallback |
-| `lib/content-layout.awk` | Generate checksummed layouts with a fixed full-height dock |
-| `scripts/process-source` | Index one process snapshot and render descendants for all content panes |
-| `scripts/buffer-source` | List native tmux buffers |
-| `scripts/info` | Render session/window/pane metadata in a native popup |
-| `scripts/sidebar` | Own the long-running fzf process and its temporary state |
-| `scripts/tree-source` | Collect one batched, sanitized metadata snapshot |
-| `lib/tree-render.awk` | Render hierarchy, badges, state and occurrence-aware row identities |
-| `scripts/tree-action` | Navigate, create, rename, delete, move, and manage selected objects |
-| `scripts/tree-preview` | Render metadata and captured pane output |
-| `scripts/help` | Display responsive, scrollable Help in an overlay or the current pane |
-| `scripts/lib.sh` | Shared sidebar ownership and pane helpers |
-
-Stable tmux IDs (`$session`, `@window`, and `%pane`) are used internally. Display names are presentation only and can be renamed without invalidating the selected object.
-
-## Development
-
-Run syntax checks and the isolated tmux integration suite:
+Tests additionally require Python 3, ShellCheck, and procps utilities. Optional zsh/fish launch checks run when those shells are installed.
 
 ```bash
-for file in tmux-canopy.tmux scripts/* tests/*.sh; do bash -n "$file" || break; done
-shellcheck tmux-canopy.tmux scripts/* tests/*.sh
-tests/integration.sh
-python3 tests/navigation.py
-python3 tests/rendering.py
-python3 tests/focus.py
-python3 tests/icons.py
-python3 tests/processes.py
-python3 tests/help.py
-python3 tests/preview.py
-python3 tests/layout.py
-python3 tests/multiline.py
-python3 tests/widths.py
-python3 tests/launch.py
-python3 tests/lifecycle.py
+bash tests/run.sh
 ```
 
-The process suite uses synthetic snapshots without a tmux server. It checks descendant and sibling order, pane attribution, linked-pane deduplication, deep trees and cycles, provider failures, and stable newline/NUL records. It also verifies that 50 panes and 10,000 processes use one process query and one graph renderer.
+The same gate runs in GitHub Actions using pinned tmux/fzf versions. Tests use private tmux servers and do not modify your active sessions. See the [release checklist](docs/releasing.md) and [changelog](CHANGELOG.md).
 
-The integration suite starts a private tmux server and verifies:
+## License
 
-- full-height, far-left placement
-- configured width
-- pane identity preservation while following windows
-- client-scoped ownership and toggling
-- notification destination and manual clearing
-- native rename and confirmed deletion
-- window reorder and link/unlink occurrence behavior
-- pane zoom/swap/layout/synchronization and dead-pane respawn
-- process and buffer source dispatch
-- dynamic view headers and ANSI-styled tree rendering
-- orphan cache and slot cleanup
-- percentage/min/max width behavior
-- staged mouse commits, preset cycling, and live-mode compatibility
-- zoom refusal and unzoom restoration
-
-The width suite reproduces stale 510-column hidden windows with a 211-column attached client and `aggressive-resize on`. It checks native/scripted and cross-session switches, committed widths, narrow-window clamping, terminal shrink/grow, transition guards, percentage widths, numeric format boundaries, and persistent sidebar/fzf process identity.
-
-The additional navigation suite requires Python 3 for its test harness only (not for the sidebar). It starts tmux with `-f /dev/null`, attaches real PTY clients, runs the actual fzf sidebar, and verifies no-op and same-window command counts, next/previous/last navigation, cross-session and linked-window targets, stale hook targets, client-specific relative navigation, native new-window following, window-local scope, navigation with the sidebar closed, fzf PID preservation, and zero application `SIGWINCH` signals during warmed slot switches.
-
-The rendering suite additionally verifies snapshot field safety, linked-row uniqueness, collapse state, real fzf tracking through rename/notification/filter reloads, session-correct linked-pane activation, deleted-selection fallback, notification source validation, a 20-event concurrent burst producing one refresh, one quiet clear per guarded navigation, and expired-worker recovery.
-
-The focus suite uses real client keystrokes and SGR mouse clicks to check live pane/window/session markers, remembered content on sidebar focus, preservation of the selected row and its viewport position, filtered-query preservation, collapsed branches, rapid pane-switch coalescing, stale hook targets, new windows, linked-session occurrences, and refresh isolation between two sidebar owners.
-
-The preview suite checks row budgets, real fzf no-wrap rendering with ANSI/Unicode, the `p` toggle, fixed drawer height, alternate-screen capture, popup safety, and zero application resize signals from previews. It also exercises actual Ctrl-a Space keystrokes against the persistent sidebar. The layout suite covers all presets, reverse cycling, focus/ID preservation, slots, single content panes, zoom refusal, native fallback, and insufficient space.
-
-The multiline suite checks NUL framing and legacy compatibility, one identity per two-line pane, aligned/subdued paths, no spacer rows, real second-line mouse selection, one-object keyboard movement, path filtering, reload/density-change tracking, and Enter targeting a non-first content pane.
-
-The launch suite copies the project to a path containing spaces, quotes, dollar signs, commas, parentheses and literal tmux-format text. It tests missing/incompatible fzf, damaged installations and unusable TMPDIR without geometry/zoom changes; Bash/zsh/fish default shells when installed; hostile ambient fzf defaults; real provider failure/recovery with preserved fzf/query; empty-view switching; diagnostics menus; native hooks/toggle bindings; runtime fzf failures; owner-only failure delivery; and literal buffer names/rename responses, including tmux command/format-job injection attempts. Test-only wrappers inject probe bindings; production does not accept ambient fzf bindings.
-
-The lifecycle suite exercises real shell exit and Ctrl-D, native pane killing and confirmed last-pane deletion, retained-dead panes, background slot-only windows, warm multi-pane destinations, linked-window closure, session fallback/detachment, unrelated client detachment, and sidebar/fzf PID preservation in global/window scope and slot/move modes. Final-session detachment must not send resize signals to an unrelated application.
-
-None of these suites alters the developer's active tmux server.
-
-## Prototype limitations
-
-- tmux pane geometry is column-based rather than animated. Staged mode eliminates intermediate application redraws but the border intentionally jumps to its final position on mouse release.
-- `move` transition mode changes layouts on every switch. `slot` mode incurs one initial resize when a window first receives a placeholder and one final resize when placeholders are removed.
-- Generic `activity` notifications intentionally treat any output as attention; continuous log windows may be noisy.
-- Stable slots are currently optimized for one active sidebar owner per tmux server. Multi-client slot arbitration still needs a formal policy. Detached-client cleanup now uses the actual hook client (and has an unrelated-detach regression test), but this is not a claim of complete multi-client geometry arbitration.
-- Closing the sidebar returns its space to adjacent panes, but tmux may not reproduce every prior pane proportion exactly.
-- Directory-only changes still need an explicit refresh; no prompt notifier or polling is installed. See the directory-refresh investigation above.
-- The hierarchy refreshes after navigation rather than subscribing to tmux control-mode events.
-- Tree expansion is session/window based; panes are leaves.
-- Multi-selection, bulk movement, and undo are not implemented.
-- Deletion is intentionally irreversible after the second `x`; there is no trash or undo layer.
-- New sessions currently use the first available automatic name (`session-1`, `session-2`, and so on); rename it afterward with `r`.
+[Apache License, Version 2.0](LICENSE).

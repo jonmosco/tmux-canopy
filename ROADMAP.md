@@ -1,0 +1,80 @@
+# Roadmap
+
+Planned work for tmux-canopy. Unchecked items are not implemented; this list does
+not promise a release date. The [README](README.md#current-features) describes
+what is available today.
+
+## Agent awareness
+
+Canopy already helps users find agent terminals, preview their output, inspect
+pane processes, and move between projects. Its current activity, bell, and
+silence badges report terminal events. They do not establish whether an agent
+is working, waiting for input, or finished.
+
+The goal is to help users identify which agent needs attention while continuing
+to use their existing tmux sessions, windows, panes, and tools.
+
+### 1. Agent status on panes
+
+- [ ] Define pane metadata for agent identity, status, reporting source, and
+  freshness.
+- [ ] Add optional integrations that report lifecycle events into tmux pane
+  metadata. Select initial integrations based on the events each agent exposes.
+- [ ] Display states such as **working**, **needs input**, **finished**, and
+  **unknown** beside agent panes, with readable text in monochrome mode.
+- [ ] Handle agent exit, restart, stale reports, and pane removal without leaving
+  misleading status behind.
+- [ ] Verify that installations without an integration retain normal sidebar
+  behavior and do not acquire a mandatory daemon or polling loop.
+
+Design requirements:
+
+- Keep agent lifecycle state separate from unread terminal notifications.
+- Focusing a blocked agent may clear its unread badge, but **needs input** must
+  remain until a subsequent lifecycle event changes it.
+- Treat unsupported or stale state as unknown. Output, silence, process
+  existence, and command icons alone do not establish task completion.
+- Report only agents that can be associated with a tmux pane. Do not imply that
+  internal agent subtasks are independently visible or controllable.
+
+### 2. Attention summaries
+
+- [ ] Aggregate agent status on window and session rows, including collapsed
+  branches, so users can see summaries such as **2 need input**.
+- [ ] Give input requests priority over working and finished indicators.
+- [ ] Define counting for linked windows so repeated tree occurrences do not
+  inflate totals within a session.
+- [ ] Preserve row selection, search queries, and collapse state during updates.
+
+### 3. Jump to the next agent needing input
+
+- [ ] Add an action and documented shortcut to focus the next pane reporting
+  **needs input** across sessions and windows.
+- [ ] Define a predictable traversal order, wraparound behavior, and behavior
+  when no agents need input.
+- [ ] Use the existing client-aware navigation and width-preserving transitions.
+- [ ] Test stale targets, agent exits, linked windows, and multiple clients.
+
+## Switch sidebar side without reopening
+
+Left and right placement are supported today. Changing `@tmux-canopy-position`
+currently takes effect when the sidebar is reopened.
+
+- [ ] Add a **Switch sidebar side** action and documented keyboard shortcut to
+  move the open sidebar between the left and right edges.
+- [ ] Keep the same sidebar and fzf processes, preserving width, selection,
+  search query, collapsed branches, and preview state.
+- [ ] Carry the new side through window/session navigation and update stable
+  slots consistently; define how the runtime choice relates to the configured
+  default.
+- [ ] Test both directions, content layouts, mouse resizing, and client
+  ownership. Document the action in the README and built-in help.
+
+## Scope
+
+These features add visibility and navigation. Agent launching, task assignment,
+automatic approval, inter-agent coordination, worktree provisioning, and a
+dedicated orchestration API are outside this initial roadmap.
+
+As work is implemented, check off completed items and document the shipped
+behavior in the README and built-in help.

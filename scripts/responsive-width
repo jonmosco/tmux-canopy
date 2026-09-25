@@ -12,7 +12,7 @@ min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null 
 runtime="$(tmux show-option -gqv @tmux_canopy_runtime_width 2>/dev/null || true)"
 : "${configured:=42}"
 : "${minimum:=24}"
-: "${maximum:=48}"
+: "${maximum:=0}"
 : "${min_content:=40}"
 
 requested="$configured"

@@ -29,6 +29,8 @@ $1 == "P" {
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
     if (sidebar[p] != 1 && slot[p] != 1) {
         panes[$3,++np[$3]]=p
+        if (np[$3] == 1) shared_path[$3]=path[p]
+        else if (shared_path[$3] != path[p]) shared_path[$3]=""
         if ($16 == 1) last_content[$3]=p
     }
 }
@@ -38,7 +40,7 @@ function row(token, value, identity, terminator) {
     else printf "%s\t%s%s", token, value, terminator
 }
 function mark(value, color) {
-    color=(value == "●" ? green : value == "⇢" ? cyan : value == "⇉" ? purple : value == "✕" || value == "×" ? red : yellow)
+    color=(value == "●" ? green : value == "⇢" || value == "⇉" ? accent : attention)
     return value == " " ? value : color value reset
 }
 function notice(a,b,z, value) {
@@ -47,7 +49,7 @@ function notice(a,b,z, value) {
     if (a>0) value=value " !" a
     if (b>0) value=value " B" b
     if (z>0) value=value " …" z
-    return value == "" ? "" : yellow " [" substr(value,2) "]" reset
+    return value == "" ? "" : attention " [" substr(value,2) "]" reset
 }
 function shortpath(value, budget, n, parts, shortened) {
     if (value == home) value="~"
@@ -100,10 +102,11 @@ END {
     if (ns == 0) exit
     if (theme != "mono") {
         reset="\033[0m"; bold="\033[1m"; dim="\033[2m"
-        cyan="\033[1;36m"; blue="\033[34m"; path_color="\033[2m"
+        # Neutral text and guides, with distinct application and active-location colors.
         icon_blue="\033[94m"; icon_yellow="\033[93m"; icon_red="\033[91m"
-        icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[37m"
-        green="\033[1;32m"; yellow="\033[1;33m"; red="\033[1;31m"; purple="\033[1;35m"
+        icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[39m"
+        green="\033[1;32m"
+        accent="\033[1;36m"; attention="\033[1;33m"; path_color=dim
     }
     session_icon=(icons == "nerdfont" ? "󰆍" : icons == "ascii" ? "S" : "◈")
     window_icon=(icons == "nerdfont" ? "󰖯" : icons == "ascii" ? "W" : "▣")
@@ -123,17 +126,21 @@ END {
     }
     move_p=substr(move,3); move_w=(move ~ /^P:/ ? pw[move_p] : "")
     if (header) {
-        tabs="[1 Tree]  2 Processes   3 Buffers "
-        mode=(move != "" ? "MOVE ⇢" : link != "" ? "LINK ⇉" : del != "" ? "DELETE ✕" : "NAV")
-        mode_color=(move != "" ? cyan : link != "" ? purple : del != "" ? red : dim)
-        padding=width-length(tabs)-length(mode)-1; if (padding < 1) padding=1
-        row("H:",cyan tabs reset sprintf("%*s",padding,"") mode_color mode reset,"H:tree")
+        mode=(move != "" ? "MOVE" : link != "" ? "LINK" : del != "" ? "DELETE" : "")
+        mode_color=(del != "" && move == "" && link == "" ? attention : accent)
+        # Reserve fzf's pointer gutter and keep operation warnings visible.
+        available=width-2; reserved=(mode != "" ? length(mode)+1 : 0)
+        tabs="[1 Tree]  2 Proc  3 Buff"
+        if (length(tabs)+reserved>available) tabs="[1 T]  2 P  3 B"
+        padding=available-length(tabs)-length(mode); if (padding<1) padding=1
+        styled_tabs=tabs; sub(/\]/,"]" reset dim,styled_tabs)
+        row("H:",accent styled_tabs reset (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
     }
     for (si=1;si<=ns;si++) {
         s=sessions[si]; st="S:" s
         sm=(st == del ? "✕" : s == current_s ? "●" : " ")
         meta=nw[s] "w"; if (attached[s]>0) meta=meta " · " attached[s] "c"
-        row(st,(collapsed[st] ? "▸" : "▾") " " mark(sm) " " cyan session_icon reset bold " " sname[s] " " dim "[" meta "]" reset notice(sa[s],sb[s],sz[s]),st)
+        row(st,(collapsed[st] ? "▸" : "▾") " " mark(sm) " " dim session_icon reset bold " " sname[s] " " dim "[" meta "]" reset notice(sa[s],sb[s],sz[s]),st)
         if (collapsed[st]) continue
         for (wpos=1;wpos<=nw[s];wpos++) {
             w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
@@ -142,7 +149,13 @@ END {
             meta=(np[w]>1 ? " " np[w] "p" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
-            row(wt,dim branch reset " " mark(wm) " " blue window_icon reset " " (collapsed[wt] ? "▸" : "▾") " " wi[key] ":" wn[key] dim meta reset notice(wa[w],wb[w],wz[w]),wt)
+            grouped=(nul && density == "normal" && np[w]>1 && shared_path[w] != "" && !collapsed[wt])
+            window_text=dim branch reset " " mark(wm) " " dim window_icon reset " " (collapsed[wt] ? "▸" : "▾") " " wi[key] ":" wn[key] dim meta reset notice(wa[w],wb[w],wz[w])
+            if (grouped) {
+                continuation=dim stem stem_mid sprintf("%*s",3+length(window_icon),"")
+                window_text=window_text "\n" continuation shortpath(shared_path[w],width-12-length(window_icon)) reset
+            }
+            row(wt,window_text,wt)
             if (collapsed[wt]) continue
             for (ppos=1;ppos<=np[w];ppos++) {
                 p=panes[w,ppos]; pt="P:" p
@@ -156,12 +169,12 @@ END {
                 icon=appicon(command[p])
                 prefix=dim stem (ppos == np[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(command[p]) icon reset
                 if (nul && density != "compact") {
-                    # Both physical lines are one NUL-delimited fzf item, with
-                    # one action token and one occurrence-aware identity.
+                    # Grouped panes use one line; other panes use two. Both
+                    # retain one action token and occurrence-aware identity.
                     primary=prefix " " command[p] notice(pa[p],pb[p],pz[p]) dim details reset
                     continuation=dim stem (ppos == np[w] ? "   " : stem_mid) reset sprintf("%*s",3+length(icon),"")
                     secondary=continuation path_color (path[p] != "" ? shortpath(path[p],width-12-length(icon)) : "(directory unavailable)") reset
-                    row(pt,primary "\n" secondary,pt ":" s)
+                    row(pt,primary (grouped ? "" : "\n" secondary),pt ":" s)
                 } else {
                     # Compact mode and legacy newline consumers stay one-line.
                     row(pt,prefix sprintf(" %-8s ",command[p]) path_color shortpath(path[p]) reset dim details reset notice(pa[p],pb[p],pz[p]),pt ":" s)

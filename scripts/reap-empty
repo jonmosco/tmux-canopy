@@ -42,7 +42,7 @@ while IFS= read -r window; do
     [[ "$current_window" != "$window" ]] || refocus["$owner"]=1
   done < <(tmux list-clients -F '#{client_tty}|#{window_id}' 2>/dev/null)
 
-  while IFS='|' read -r sidebar owner; do
+  while IFS='|' read -r sidebar owner position; do
     [[ -n "$sidebar" ]] || continue
     key="$(sidebar_client_key "$owner")"
     pending_lock="tmux-canopy-follow-$key"
@@ -80,8 +80,9 @@ while IFS= read -r window; do
           }' | sort -t '|' -k1,1nr)
     fi
     if [[ -n "$destination" ]]; then
-      previous_slot="$(slot_for_window "$destination_window")"
-      slot="$(ensure_slot_for_window "$destination_window" "$destination" "$width")" || slot=''
+      slot_row="$(tmux list-panes -t "$destination_window" -f '#{==:#{@tmux_canopy_slot},1}' -F '#{pane_id}|#{pane_width}' 2>/dev/null)"
+      previous_slot="${slot_row%%|*}"
+      slot="$(ensure_slot_for_window "$destination_window" "$destination" "$width" "$slot_row" "${position:-left}")" || slot=''
       if [[ -n "$slot" ]]; then
         # Recheck atomically before moving. Killing just the exchanged slot
         # closes an empty source, but never kills concurrently created content.
@@ -99,7 +100,7 @@ while IFS= read -r window; do
       tmux if-shell -F -t "$sidebar" "$empty" "kill-pane -t $sidebar" 2>/dev/null || true
     fi
     release_owner
-  done < <(tmux list-panes -t "$window" -f '#{==:#{@tmux_canopy},1}' -F '#{pane_id}|#{@tmux_canopy_client}' 2>/dev/null)
+  done < <(tmux list-panes -t "$window" -f '#{==:#{@tmux_canopy},1}' -F '#{pane_id}|#{@tmux_canopy_client}|#{@tmux_canopy_position}' 2>/dev/null)
 
   # Also reap inactive slot-only windows. Each removal revalidates the live
   # window so a concurrent split or join is never mistaken for empty content.

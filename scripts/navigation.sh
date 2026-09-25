@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/notification-lib.sh"
 # One read transaction supplies target/client context and pane relationships.
 # No titles or paths are collected: only stable IDs and navigation metadata.
 sidebar_navigation_snapshot() {
-  local kind a b c d e f g h i j index current_index='' last_window='' chosen='' wrap=''
+  local kind a b c d e f g h i j k index current_index='' last_window='' chosen='' wrap=''
   local -A relative_windows=()
   local -a query=() prefix=()
   if [[ "$nav_spec" == :* ]]; then
@@ -20,12 +20,12 @@ sidebar_navigation_snapshot() {
     prefix=(wait-for -L "$nav_lock" ';' set-option -gq "$nav_guard" 1 ';')
   fi
   nav_target='' nav_session='' nav_current='' nav_current_session='' nav_current_window=''
-  nav_sidebar='' nav_slot='' nav_slot_width='' nav_first='' nav_active='' nav_last='' nav_guarded=''
+  nav_position=left nav_sidebar='' nav_slot='' nav_slot_width='' nav_first='' nav_active='' nav_last='' nav_guarded=''
   nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=()
-  while IFS='|' read -r kind a b c d e f g h i j; do
+  while IFS='|' read -r kind a b c d e f g h i j k; do
     case "$kind" in
       G)
-        nav_requested="${a:-$nav_width}"; nav_minimum="${b:-24}"; nav_maximum="${c:-48}"; nav_min_content="${d:-40}"
+        nav_requested="${a:-$nav_width}"; nav_minimum="${b:-24}"; nav_maximum="${c:-0}"; nav_min_content="${d:-40}"
         if [[ "$nav_requested" =~ ^[1-9][0-9]*$ && "$e" =~ ^([1-9][0-9]*|[1-9][0-9]?%)$ ]]; then nav_requested="$e"; fi
         ;;
       T) nav_session="$a"; nav_window="$b"; nav_target="$c"; nav_guarded="$d" ;;
@@ -47,11 +47,12 @@ sidebar_navigation_snapshot() {
         nav_widths["$a"]="$g"; nav_targets["$a"]="$h"; nav_totals["$a"]="$i"
         if [[ "$d" == 1 && ( ( -n "$nav_client" && "$f" == "$nav_client" ) || ( -z "$nav_client" && "$a" == "$nav_hint" ) ) ]]; then
           nav_sidebar="$a"
+          [[ "$k" != right ]] || nav_position=right
         fi
         ;;
     esac
   done < <(tmux "${prefix[@]}" list-clients -F "C|#{client_tty}|#{session_id}|#{window_id}|#{pane_id}|#{$nav_guard}" \; \
-    list-panes -a -F 'P|#{pane_id}|#{window_id}|#{pane_active}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_client}|#{pane_width}|#{@tmux_canopy_target}|#{window_width}|#{pane_last}' \; \
+    list-panes -a -F 'P|#{pane_id}|#{window_id}|#{pane_active}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_client}|#{pane_width}|#{@tmux_canopy_target}|#{window_width}|#{pane_last}|#{@tmux_canopy_position}' \; \
     display-message -p 'G|#{@tmux-canopy-width}|#{@tmux-canopy-min-width}|#{@tmux-canopy-max-width}|#{@tmux-canopy-min-content-width}|#{@tmux_canopy_runtime_width}' \; \
     "${query[@]}" 2>/dev/null)
 
@@ -110,11 +111,11 @@ sidebar_navigate() (
   local nav_scope="${4:-window}" nav_transition="${5:-move}" nav_mode="${6:-select}" nav_hint="${7:-}"
   local nav_key nav_guard nav_lock nav_locked=0 nav_notice_window=''
   local nav_target nav_session nav_window nav_current nav_current_session nav_current_window
-  local nav_sidebar nav_slot nav_slot_width nav_first nav_active nav_last nav_guarded
+  local nav_position nav_sidebar nav_slot nav_slot_width nav_first nav_active nav_last nav_guarded
   local nav_requested nav_minimum nav_maximum nav_min_content nav_source_width
   local SIDEBAR_WIDTH_FORMAT SIDEBAR_WIDTH_FITS_FORMAT
   local -A nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=()
-  local -a commands=()
+  local -a commands=() placement=()
   [[ -n "$nav_spec" ]] || exit 0
   nav_key="$(sidebar_client_key "$nav_client")"
   nav_guard="@tmux_canopy_transition_$nav_key"
@@ -208,14 +209,16 @@ sidebar_navigate() (
   if [[ "$nav_scope" == global && -n "$nav_sidebar" && "${nav_windows[$nav_sidebar]}" != "$nav_window" ]]; then
     if [[ "$nav_transition" == slot ]]; then
       if [[ -z "$nav_slot" ]]; then
-        nav_slot="$(ensure_slot_for_window "$nav_window" "$nav_target" "$nav_width" '')" || exit 1
+        nav_slot="$(ensure_slot_for_window "$nav_window" "$nav_target" "$nav_width" '' "$nav_position")" || exit 1
         [[ -n "$nav_slot" ]] || exit 1
       elif [[ "$nav_slot_width" != "$nav_width" ]]; then
         commands+=(resize-pane -t "$nav_slot" -x "$nav_width" ';')
       fi
       commands+=(swap-pane -d -s "$nav_sidebar" -t "$nav_slot" ';')
     else
-      commands+=(join-pane -d -h -b -f -l "$nav_width" -s "$nav_sidebar" -t "$nav_target" ';')
+      placement=(-b)
+      [[ "$nav_position" != right ]] || placement=()
+      commands+=(join-pane -d -h "${placement[@]}" -f -l "$nav_width" -s "$nav_sidebar" -t "$nav_target" ';')
     fi
   fi
   if [[ -n "$nav_sidebar" && "${nav_targets[$nav_sidebar]}" != "$nav_target" ]]; then

@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/buffer-lib.sh"
 
 theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 if [[ "$theme" == 'mono' ]]; then reset='' name_color='' dim=''
-else reset=$'\033[0m'; name_color=$'\033[1;36m'; dim=$'\033[2m'; fi
+else reset=$'\033[0m'; name_color=$'\033[1m'; dim=$'\033[2m'; fi
 
-buffers="$(tmux list-buffers -F '#{buffer_name}|#{buffer_size}|#{t:buffer_created}|#{=/80/...:buffer_sample}' 2>/dev/null)" || exit 1
-while IFS='|' read -r name size _created sample; do
+# tmux rejects control bytes in buffer names; reserve US for snapshot fields.
+# Scrub samples before they enter the newline/tab-framed source records.
+sep=$'\037'
+sample_format=$'#{s/[\001-\037\177]/ /:buffer_sample}'
+buffers="$(tmux list-buffers -F "#{buffer_name}${sep}#{buffer_size}${sep}#{=/80/...:$sample_format}" 2>/dev/null)" || exit 1
+while IFS=$'\037' read -r name size sample; do
   [[ -n "$name" ]] || continue
   sample="${sample//$'\n'/ }"
-  printf 'B:%s\t%s %s%s  %s[%s B]%s  %s\n' "$name" "$name_color" "$name" "$reset" "$dim" "$size" "$reset" "$sample"
+  printf '%s\t%s %s%s  %s[%s B]%s  %s\n' "$(buffer_token "$name")" "$name_color" "$name" "$reset" "$dim" "$size" "$reset" "$sample"
 done <<< "$buffers"
