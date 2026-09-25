@@ -1,10 +1,11 @@
-# Emit one native tmux layout with a fixed full-height dock on the left.
+# Emit one native tmux layout with a fixed full-height dock on either edge.
 # No temporary windows/panes: the server applies the finished layout once.
 BEGIN { FS="|"; for (i=0;i<128;i++) ord[sprintf("%c",i)]=i }
 $1 == "M" { width=$2+0; height=$3+0; main_w=$4; main_h=$5 }
 $1 == "P" {
     if (first_pane == "") first_pane=$2
-    if ($3 == 1 || $4 == 1) { dock=$2; dock_width=$5+0; docks++ }
+    last_pane=$2
+    if ($3 == 1 || $4 == 1) { dock=$2; dock_width=$5+0; dock_left=$7+0; dock_top=$8+0; dock_height=$9+0; docks++ }
     else panes[++count]=$2
 }
 function box(w,h,x,y) { return w "x" h "," x "," y }
@@ -70,9 +71,14 @@ function content(w,h,x,y,   axis,mirror,size,one,rest,cols,rows,r,n,first,rh,bas
 END {
     # select-layout assigns leaves in pane-index order, not by the saved IDs.
     # Refuse an already-reordered dock rather than assigning its cell to an app.
-    if (docks!=1 || dock!=first_pane || count<1 || dock_width<2 || width-dock_width-1<2) exit 1
-    right=content(width-dock_width-1,height,dock_width+1,0)
-    left=leaf(dock,dock_width,height,0,0)
+    if (docks!=1 || count<1 || dock_width<2 || width-dock_width-1<2 || dock_top!=0 || dock_height!=height) exit 1
+    if (dock_left==0 && dock==first_pane) {
+        right=content(width-dock_width-1,height,dock_width+1,0)
+        left=leaf(dock,dock_width,height,0,0)
+    } else if (dock_left+dock_width==width && dock==last_pane) {
+        left=content(width-dock_width-1,height,0,0)
+        right=leaf(dock,dock_width,height,width-dock_width,0)
+    } else exit 1
     if (bad) exit 1
     value=box(width,height,0,0) "{" left "," right "}"
     checksum=0

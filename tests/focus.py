@@ -181,7 +181,7 @@ def main():
             def enter_search():
                 tm('send-keys', '-t', sidebar, '/')
                 time.sleep(.08)
-                return tm('capture-pane', '-p', '-t', sidebar).startswith('search › ')
+                return tm('capture-pane', '-p', '-t', sidebar).startswith('search ›')
             wait(enter_search, 'search mode after rename refresh')
             tm('send-keys', '-t', sidebar, '-l', 'focus-collapse')
             time.sleep(.15)

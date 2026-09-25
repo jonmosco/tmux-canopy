@@ -274,7 +274,8 @@ exec REAL --bind BINDING --bind LOAD "$@"
 
             # Exercise failures inside the actual subordinate providers.
             tm('send-keys', '-t', sidebar, 'Escape')
-            wait(lambda: 'tmux › ' in tm('capture-pane', '-p', '-t', sidebar), 'navigation mode')
+            wait(lambda: '[1 Tree]' in tm('capture-pane', '-p', '-t', sidebar).splitlines()[0], 'navigation header with hidden search input')
+            assert probe().endswith('|'), 'Escape must clear the search query'
             ps_failure = binary_dir / 'ps'
             ps_failure.write_text('#!/bin/bash\necho NOT_FOR_DIAGNOSTICS >&2\nexit 6\n')
             ps_failure.chmod(0o755)
@@ -282,14 +283,14 @@ exec REAL --bind BINDING --bind LOAD "$@"
             wait(lambda: 'data unavailable' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider failure')
             ps_failure.unlink()
             tm('send-keys', '-t', sidebar, 'C-r')
-            wait(lambda: '[2 Processes]' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider recovery')
+            wait(lambda: '[2 Proc]' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider recovery')
             buffer_failure.touch()
             tm('send-keys', '-t', sidebar, '3')
             wait(lambda: 'data unavailable' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider failure')
             assert 'PARTIAL_NOT_A_BUFFER' not in tm('capture-pane', '-p', '-t', sidebar)
             buffer_failure.unlink()
             tm('send-keys', '-t', sidebar, 'C-r')
-            wait(lambda: '[3 Buffers]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider recovery')
+            wait(lambda: '[3 Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider recovery')
             assert sp.check_output(['pgrep', '-P', parent, '-x', 'fzf'], text=True).strip() == ui_pid
             tm('send-keys', '-t', sidebar, '1')
             wait(lambda: '[1 Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored')
@@ -299,7 +300,7 @@ exec REAL --bind BINDING --bind LOAD "$@"
             buffer_name = "buf' quoted, $literal #{version} #(touch " + shlex.quote(str(format_marker)) + ')'
             tm('set-buffer', '-b', buffer_name, 'fixture')
             tm('send-keys', '-t', sidebar, '3')
-            wait(lambda: '[3 Buffers]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer view')
+            wait(lambda: '[3 Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer view')
             terminal_output.clear()
             tm('send-keys', '-t', sidebar, 'a')
             wait(lambda: b'Buffer actions' in terminal_output, 'literal buffer context menu')

@@ -5,6 +5,8 @@ CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$CURRENT_DIR/scripts/notification-lib.sh"
 # shellcheck disable=SC1091
 source "$CURRENT_DIR/scripts/lib.sh"
+# shellcheck disable=SC1091
+source "$CURRENT_DIR/scripts/config-lib.sh"
 
 # Arguments here are internal tmux format templates or validated plugin options.
 # The installation path is literal data, protected from shell and tmux parsing.
@@ -42,25 +44,25 @@ width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 
 : "${sidebar_key:=T}"
 : "${sidebar_width:=42}"
-: "${sidebar_scope:=window}"
+: "${sidebar_scope:=global}"
 : "${smooth_navigation:=on}"
 : "${last_window_key:=Tab}"
-: "${sidebar_transition:=move}"
+: "${sidebar_transition:=slot}"
 : "${notification_sources:=activity,bell}"
 : "${notification_target:=sidebar}"
 : "${silence_seconds:=30}"
 : "${icon_theme:=auto}"
-: "${resize_mode:=staged}"
+: "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
 
 if [[ ! "$sidebar_width" =~ ^[1-9][0-9]*%?$ ]]; then
   sidebar_width=42
 fi
 if [[ "$sidebar_scope" != 'window' && "$sidebar_scope" != 'global' ]]; then
-  sidebar_scope=window
+  sidebar_scope=global
 fi
 if [[ "$sidebar_transition" != 'move' && "$sidebar_transition" != 'slot' ]]; then
-  sidebar_transition=move
+  sidebar_transition=slot
 fi
 if [[ ! "$silence_seconds" =~ ^[1-9][0-9]*$ ]]; then
   silence_seconds=30
@@ -70,7 +72,7 @@ if [[ "$notification_target" != 'sidebar' && "$notification_target" != 'status' 
 fi
 
 if [[ "$resize_mode" != 'staged' && "$resize_mode" != 'preset' && "$resize_mode" != 'live' ]]; then
-  resize_mode=staged
+  resize_mode=live
 fi
 
 if [[ "$icon_theme" == 'auto' ]]; then
@@ -95,75 +97,46 @@ tmux set-option -gq @tmux_canopy_icon_theme "$icon_theme"
 tmux set-option -gq @tmux_canopy_resize_mode "$resize_mode"
 tmux set-option -gq @tmux_canopy_width_presets "$width_presets"
 
-saved_activity_style="$(tmux show-option -gqv @tmux_canopy_saved_activity_style)"
-saved_bell_style="$(tmux show-option -gqv @tmux_canopy_saved_bell_style)"
-if [[ "$notification_sources" != 'none' && "$notification_target" == 'sidebar' ]]; then
-  if [[ -z "$saved_activity_style" ]]; then
-    tmux set-option -gq @tmux_canopy_saved_activity_style "$(tmux show-window-option -gv window-status-activity-style)"
-  fi
-  if [[ -z "$saved_bell_style" ]]; then
-    tmux set-option -gq @tmux_canopy_saved_bell_style "$(tmux show-window-option -gv window-status-bell-style)"
-  fi
-  tmux set-window-option -g window-status-activity-style default
-  tmux set-window-option -g window-status-bell-style default
-else
-  if [[ -n "$saved_activity_style" ]]; then
-    tmux set-window-option -g window-status-activity-style "$saved_activity_style"
-    tmux set-option -gu @tmux_canopy_saved_activity_style
-  fi
-  if [[ -n "$saved_bell_style" ]]; then
-    tmux set-window-option -g window-status-bell-style "$saved_bell_style"
-    tmux set-option -gu @tmux_canopy_saved_bell_style
-  fi
-fi
-
+for alert_source in activity bell; do
+  style=''
+  if [[ "$notification_sources" != none && "$notification_target" == sidebar ]]; then style=default; fi
+  canopy_owned_option window "window-status-${alert_source}-style" "$style"
+done
 for alert_source in activity bell silence; do
-  action_option="$alert_source-action"
-  saved_action_option="@tmux_canopy_saved_${alert_source}_action"
-  saved_action="$(tmux show-option -gqv "$saved_action_option")"
-  source_enabled=false
-  if [[ ",$notification_sources," == *,"$alert_source",* || ",$notification_sources," == *,all,* ]]; then
-    source_enabled=true
+  action_value=''
+  if [[ "$notification_target" != sidebar && ( ",$notification_sources," == *,"$alert_source",* || ",$notification_sources," == *,all,* ) ]]; then
+    action_value=other
   fi
-  if [[ "$notification_target" != 'sidebar' && "$notification_sources" != 'none' && "$source_enabled" == true ]]; then
-    if [[ -z "$saved_action" ]]; then
-      tmux set-option -gq "$saved_action_option" "$(tmux show-option -gv "$action_option")"
-    fi
-    tmux set-option -g "$action_option" other
-  elif [[ -n "$saved_action" ]]; then
-    tmux set-option -g "$action_option" "$saved_action"
-    tmux set-option -gu "$saved_action_option"
-  fi
+  canopy_owned_option session "$alert_source-action" "$action_value"
 done
 
-if [[ ",$notification_sources," == *,activity,* || ",$notification_sources," == *,all,* ]]; then
-  tmux set-window-option -g monitor-activity on
-fi
-if [[ ",$notification_sources," == *,bell,* || ",$notification_sources," == *,all,* ]]; then
-  tmux set-window-option -g monitor-bell on
-fi
-if [[ ",$notification_sources," == *,silence,* || ",$notification_sources," == *,all,* ]]; then
-  tmux set-window-option -g monitor-silence "$silence_seconds"
-fi
+for provider in activity bell silence; do
+  monitor_value=''
+  if [[ ",$notification_sources," == *,"$provider",* || ",$notification_sources," == *,all,* ]]; then
+    monitor_value=on
+    [[ "$provider" != silence ]] || monitor_value="$silence_seconds"
+  fi
+  canopy_owned_option window "monitor-$provider" "$monitor_value"
+done
 
-tmux bind-key "$sidebar_key" run-shell \
+canopy_bind prefix "$sidebar_key" run-shell \
   "$(plugin_command toggle '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_scope" "$sidebar_key" "$last_window_key" "$sidebar_transition")"
 
 # Native next-layout includes every pane, which would shuffle the dock too.
-tmux bind-key Space run-shell \
+canopy_bind prefix Space run-shell \
   "$(plugin_command content-layout '#{pane_id}' next '#{client_tty}')"
 
 if [[ "$smooth_navigation" != 'off' ]]; then
-  tmux bind-key n run-shell \
+  canopy_bind prefix n run-shell \
     "$(plugin_command navigate '#{client_tty}' next "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
-  tmux bind-key p run-shell \
+  canopy_bind prefix p run-shell \
     "$(plugin_command navigate '#{client_tty}' previous "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
   for window_index in {0..9}; do
-    tmux bind-key "$window_index" run-shell \
+    canopy_bind prefix "$window_index" run-shell \
       "$(plugin_command navigate '#{client_tty}' "index:$window_index" "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
   done
   if [[ "$last_window_key" != 'off' ]]; then
-    tmux bind-key "$last_window_key" run-shell \
+    canopy_bind prefix "$last_window_key" run-shell \
       "$(plugin_command navigate '#{client_tty}' last "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
   fi
 fi
@@ -203,40 +176,36 @@ if [[ "$sidebar_transition" == 'slot' && "$resize_mode" == 'live' ]]; then
     "$(plugin_job -b sync-width '#{pane_id}' '#{pane_width}')"
 fi
 
-if [[ "$resize_mode" == 'live' ]]; then
-  tmux bind-key -n MouseDown1Border select-pane -M
-  tmux bind-key -n MouseDrag1Border resize-pane -M
-  tmux unbind-key -n MouseDragEnd1Border 2>/dev/null || true
-else
-  # A staged drag leaves the physical border in place, so subsequent events
-  # arrive over panes as well as borders. A temporary key table handles those
-  # events without replacing the user's normal pane-selection/copy bindings.
-  resize_table=tmux-canopy-resize
-  for event in MouseDrag1Pane MouseDrag1Border MouseDrag1Status; do
-    tmux bind-key -T "$resize_table" "$event" switch-client -T "$resize_table"
-  done
-  # mouse_x is pane-relative and empty on a border. Convert valid release
-  # coordinates to window columns before passing them to the resize helper.
-  release_x='#{?#{!=:#{mouse_x},},#{e|+:#{mouse_x},#{pane_left}},}'
-  for event in MouseDragEnd1Pane MouseDragEnd1Border MouseDragEnd1Status MouseUp1Pane MouseUp1Border MouseUp1Status; do
-    tmux bind-key -T "$resize_table" "$event" run-shell \
-      "$(plugin_command mouse-resize end '#{@tmux_canopy_staged_sidebar}' '#{window_id}' "$release_x" "$resize_mode")"
-  done
-  # tmux can classify motion outside the original pane as an unnamed mouse
-  # event. Keep waiting for release; ordinary keyboard input cancels the drag.
-  tmux bind-key -T "$resize_table" Any if-shell -F '#{mouse_pane}' \
-    "switch-client -T $resize_table" "$(plugin_job '' mouse-resize clear)"
-  tmux bind-key -n MouseDown1Border \
-    if-shell -F '1' \
-      "$(plugin_job '' mouse-resize start '#{mouse_pane}' '#{window_id}' '#{mouse_x}' "$resize_mode") ; if-shell -F '#{@tmux_canopy_staged_sidebar}' 'switch-client -T $resize_table' 'select-pane -M'" \
-      ''
-  tmux bind-key -n MouseDrag1Border \
-    if-shell -F '#{@tmux_canopy_staged_sidebar}' '' 'resize-pane -M'
-  tmux bind-key -n MouseDragEnd1Border \
-    if-shell -F '#{@tmux_canopy_staged_sidebar}' \
-      "$(plugin_job '' mouse-resize end '#{@tmux_canopy_staged_sidebar}' '#{window_id}' '#{mouse_x}' "$resize_mode")" \
-      ''
-fi
+# A staged drag leaves the physical border in place, so subsequent events
+# arrive over panes as well as borders. A temporary key table handles those
+# events without replacing the user's normal pane-selection/copy bindings.
+resize_table=tmux-canopy-resize
+for event in MouseDrag1Pane MouseDrag1Border MouseDrag1Status; do
+  tmux bind-key -T "$resize_table" "$event" \
+    if-shell -F '#{==:#{@tmux_canopy_drag_native},1}' \
+    "resize-pane -M ; switch-client -T $resize_table" "switch-client -T $resize_table"
+done
+# mouse_x is pane-relative and empty on a border. Convert valid release
+# coordinates to window columns before passing them to the resize helper.
+release_x='#{?#{!=:#{mouse_x},},#{e|+:#{mouse_x},#{pane_left}},}'
+for event in MouseDragEnd1Pane MouseDragEnd1Border MouseDragEnd1Status MouseUp1Pane MouseUp1Border MouseUp1Status; do
+  tmux bind-key -T "$resize_table" "$event" run-shell \
+    "$(plugin_command mouse-resize end '#{@tmux_canopy_staged_sidebar}' '#{window_id}' "$release_x" "$resize_mode")"
+done
+# tmux can classify motion outside the original pane as an unnamed mouse
+# event. Keep waiting for release; ordinary keyboard input cancels the drag.
+tmux bind-key -T "$resize_table" Any if-shell -F '#{mouse_pane}' \
+  "switch-client -T $resize_table" "$(plugin_job '' mouse-resize clear)"
+canopy_bind root MouseDown1Border \
+  if-shell -F '1' \
+    "$(plugin_job '' mouse-resize start '#{mouse_pane}' '#{window_id}' '#{mouse_x}' "$resize_mode") ; if-shell -F '#{==:#{@tmux_canopy_drag_native},1}' 'select-pane -M' ; if-shell -F '#{@tmux_canopy_staged_sidebar}' 'switch-client -T $resize_table' 'select-pane -M'" \
+    ''
+canopy_bind root MouseDrag1Border \
+  if-shell -F '#{@tmux_canopy_staged_sidebar}' '' 'resize-pane -M'
+canopy_bind root MouseDragEnd1Border \
+  if-shell -F '#{@tmux_canopy_staged_sidebar}' \
+    "$(plugin_job '' mouse-resize end '#{@tmux_canopy_staged_sidebar}' '#{window_id}' '#{mouse_x}' "$resize_mode")" \
+    ''
 
 # Native exits do not run after-kill-pane. Layout notifications cover exits,
 # kills and moving the last content pane out. Gate in tmux: ordinary resizing
@@ -272,3 +241,5 @@ if [[ "$notification_sources" != 'none' && "$notification_target" != 'status' ]]
     tmux set-hook -g "${hook}[9002]" "$clear_request"
   done
 fi
+
+canopy_restore_unused_bindings

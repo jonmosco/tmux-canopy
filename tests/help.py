@@ -69,7 +69,7 @@ def main():
             try:
                 wait_for(b'q close   1-14')
                 assert b'SIDEBAR HELP' in output and b'[j / Down]' in output
-                assert (b'\x1b[1;33m' in output) == (theme == 'ansi')
+                assert (b'\x1b[1;36m' in output) == (theme == 'ansi')
                 send(b'\x1b[B')
                 wait_for(b'q close   2-15')
                 send(b' ')

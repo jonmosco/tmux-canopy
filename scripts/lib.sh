@@ -97,7 +97,9 @@ slot_for_window() {
 
 ensure_slot_for_window() {
   local window_id="${1:-}" target_pane="${2:-}" width="${3:-42}"
-  local slot_pane slot_width row
+  local slot_pane slot_width row position="${5:-left}"
+  local -a placement=(-b)
+  [[ "$position" != right ]] || placement=()
   # A caller holding the navigation lock may supply an already-read slot
   # record (including an empty record) to avoid querying the window twice.
   if (($# >= 4)); then
@@ -115,9 +117,10 @@ ensure_slot_for_window() {
   fi
   [[ -n "$target_pane" ]] || return 1
 
-  slot_pane="$(tmux split-window -d -h -b -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' 'exec sleep infinity')"
+  slot_pane="$(tmux split-window -d -h "${placement[@]}" -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' 'exec sleep infinity')"
   [[ -n "$slot_pane" ]] || return 1
   tmux set-option -p -t "$slot_pane" @tmux_canopy_slot 1 \; \
+    set-option -p -t "$slot_pane" @tmux_canopy_position "$position" \; \
     set-option -p -t "$slot_pane" allow-set-title off \; \
     select-pane -t "$slot_pane" -T 'tmux-canopy-slot' 2>/dev/null || return 1
   printf '%s\n' "$slot_pane"
@@ -132,7 +135,7 @@ cleanup_sidebar_slots() {
 }
 
 sync_sidebar_slots() {
-  local requested="${1:-}" minimum="${2:-24}" maximum="${3:-48}" min_content="${4:-40}" slot_pane current total width
+  local requested="${1:-}" minimum="${2:-24}" maximum="${3:-0}" min_content="${4:-40}" slot_pane current total width
   [[ "$requested" =~ ^[1-9][0-9]*%?$ ]] || return 1
   while IFS='|' read -r slot_pane current total; do
     [[ -n "$slot_pane" ]] || continue
@@ -175,7 +178,7 @@ pane_window() {
 }
 
 clamp_sidebar_width() {
-  local target_pane="${1:-}" requested="${2:-42}" minimum="${3:-24}" maximum="${4:-48}" min_content="${5:-40}"
+  local target_pane="${1:-}" requested="${2:-42}" minimum="${3:-24}" maximum="${4:-0}" min_content="${5:-40}"
   local total
   [[ -n "$target_pane" ]] || return 1
   total="$(tmux display-message -p -t "$target_pane" '#{window_width}' 2>/dev/null || true)"
@@ -183,13 +186,14 @@ clamp_sidebar_width() {
 }
 
 clamp_sidebar_width_for_total() {
-  local total="${1:-}" requested="${2:-42}" minimum="${3:-24}" maximum="${4:-48}" min_content="${5:-40}"
+  local total="${1:-}" requested="${2:-42}" minimum="${3:-24}" maximum="${4:-0}" min_content="${5:-40}"
+  # A zero maximum leaves only the minimum-content constraint.
   local desired available
   [[ "$total" =~ ^[1-9][0-9]*$ ]] || return 1
   [[ "$minimum" =~ ^[1-9][0-9]*$ ]] || minimum=24
-  [[ "$maximum" =~ ^[1-9][0-9]*$ ]] || maximum=48
+  [[ "$maximum" =~ ^(0|[1-9][0-9]*)$ ]] || maximum=0
   [[ "$min_content" =~ ^[1-9][0-9]*$ ]] || min_content=40
-  ((maximum < minimum)) && maximum="$minimum"
+  ((maximum > 0 && maximum < minimum)) && maximum="$minimum"
 
   if [[ "$requested" =~ ^([1-9][0-9]?)%$ ]]; then
     desired=$((total * BASH_REMATCH[1] / 100))
@@ -200,7 +204,7 @@ clamp_sidebar_width_for_total() {
   fi
 
   ((desired < minimum)) && desired="$minimum"
-  ((desired > maximum)) && desired="$maximum"
+  ((maximum > 0 && desired > maximum)) && desired="$maximum"
   available=$((total - min_content - 1))
   ((available < minimum)) && return 1
   ((desired > available)) && desired="$available"
@@ -211,18 +215,18 @@ clamp_sidebar_width_for_total() {
 # against the destination *after* tmux's automatic window sizing, not a stale
 # shell snapshot. Inputs are strictly numeric or percentage configuration.
 sidebar_width_expression() {
-  local requested="${1:-42}" minimum="${2:-24}" maximum="${3:-48}" min_content="${4:-40}" desired available
+  local requested="${1:-42}" minimum="${2:-24}" maximum="${3:-0}" min_content="${4:-40}" desired available
   [[ "$minimum" =~ ^[1-9][0-9]*$ ]] || minimum=24
-  [[ "$maximum" =~ ^[1-9][0-9]*$ ]] || maximum=48
+  [[ "$maximum" =~ ^(0|[1-9][0-9]*)$ ]] || maximum=0
   [[ "$min_content" =~ ^[1-9][0-9]*$ ]] || min_content=40
-  ((maximum >= minimum)) || maximum="$minimum"
+  ((maximum == 0 || maximum >= minimum)) || maximum="$minimum"
   if [[ "$requested" =~ ^([1-9][0-9]?)%$ ]]; then
     desired="#{e|/:#{e|*:#{window_width},${BASH_REMATCH[1]}},100}"
   elif [[ "$requested" =~ ^[1-9][0-9]*$ ]]; then desired="$requested"
   else desired=42
   fi
   desired="#{?#{e|<:$desired,$minimum},$minimum,$desired}"
-  desired="#{?#{e|>:$desired,$maximum},$maximum,$desired}"
+  if ((maximum > 0)); then desired="#{?#{e|>:$desired,$maximum},$maximum,$desired}"; fi
   available="#{e|-:#{window_width},$((min_content+1))}"
   # shellcheck disable=SC2034 # Output variables consumed by navigation.sh.
   SIDEBAR_WIDTH_FORMAT="#{?#{e|>:$desired,$available},$available,$desired}"

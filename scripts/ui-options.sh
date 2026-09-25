@@ -3,7 +3,7 @@
 # known POSIX shell from environment data, never embedded in fzf bind syntax.
 # shellcheck disable=SC2016 # These variables expand in fzf's action shell.
 sidebar_ui_options() {
-  local pane="${1:-${TMUX_PANE:-}}" preview_mode preview_height selection_style pane_height preview_window fzf_colors
+  local pane="${1:-${TMUX_PANE:-}}" preview_mode preview_height selection_style pane_height preview_window fzf_colors theme selection_background
   local source_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-source"'
   local action_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-action"'
   local preview_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-preview"'
@@ -20,27 +20,38 @@ sidebar_ui_options() {
   if [[ "$preview_mode" == off || ( "$preview_mode" == auto && "$pane_height" =~ ^[0-9]+$ && "$pane_height" -lt 28 ) ]]; then
     preview_window+=',hidden'
   fi
+  selection_background="$(tmux show-option -gqv @tmux-canopy-selection-background 2>/dev/null || true)"
+  if [[ "$selection_background" =~ ^([0-9]|[1-9][0-9]{1,2})$ ]] && ((selection_background <= 255)); then
+    :
+  elif [[ ! "$selection_background" =~ ^#[[:xdigit:]]{6}$ ]]; then
+    selection_background=236
+  fi
+  # Preserve source foreground colors, including application icons and notices.
+  fzf_colors='fg:-1,bg:-1,bg+:-1,gutter:-1,header:-1,info:-1,query:-1,disabled:-1,preview-fg:-1,preview-bg:-1,border:-1:dim,label:-1:dim,scrollbar:-1:dim,preview-scrollbar:-1:dim,spinner:6,prompt:6,pointer:6:bold,marker:6,hl:6:bold,hl+:6:bold'
   case "$selection_style" in
-    solid) fzf_colors='bg+:24,fg+:15,pointer:14,marker:10,hl:11,hl+:11' ;;
-    reverse) fzf_colors='bg+:7,fg+:0,pointer:6,marker:2,hl:3,hl+:3' ;;
-    pointer) fzf_colors='bg+:-1,fg+:-1,pointer:6,marker:2,hl:3,hl+:3' ;;
-    *) fzf_colors='bg+:236,fg+:15,pointer:14,marker:10,hl:11,hl+:11' ;;
+    solid) fzf_colors+=',bg+:6,fg+:0,hl+:0:bold' ;;
+    reverse) fzf_colors+=',fg+:-1:reverse,hl+:6:bold:reverse' ;;
+    pointer) fzf_colors+=',fg+:-1:regular' ;;
+    *) fzf_colors+=",bg+:$selection_background,fg+:-1:regular" ;;
   esac
+  theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
+  [[ "$theme" != mono ]] || fzf_colors='bw'
   # shellcheck disable=SC2034 # Output array consumed by sidebar/preflight.
   SIDEBAR_FZF_ARGS=(
     --ansi --read0 --multi-line --no-wrap --no-hscroll --gap=0 --highlight-line
     --with-shell='/bin/sh -c'
     --color="$fzf_colors" --delimiter=$'\t' --with-nth=2 --nth=1..
     --no-sort --track --id-nth=3 --disabled --layout=reverse --border=none
-    --info=inline-right --prompt='tmux › ' --pointer='›' --marker='●' --header-lines=1
+    --gutter=' ' --scrollbar='│'
+    --no-input --info=hidden --no-separator --prompt='search › ' --pointer='›' --marker='●' --header-lines=1
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     --bind='load:+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:enable-search+clear-query+change-prompt(search › )+unbind(h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
-    --bind='esc:disable-search+clear-query+change-prompt(tmux › )+rebind(h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
+    --bind='/:show-input+enable-search+clear-query+unbind(h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
+    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(h,H,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,[,],s,v,t,S,?)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     # View changes must work even when the current view has no selectable row.

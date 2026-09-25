@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/buffer-lib.sh"
 token="${1:-}"
 rows="${FZF_PREVIEW_LINES:-12}"
 [[ "$rows" =~ ^[1-9][0-9]{0,4}$ ]] || rows=12
@@ -8,8 +10,9 @@ export FZF_PREVIEW_LINES="$rows"
 
 render() {
   case "$token" in
-    B:*)
-      name="${token#B:}"
+    B:*|B2:*)
+      buffer_decode_token "$token" || return 0
+      name="$BUFFER_NAME"
       printf 'Buffer: %s\n\n' "${name//[[:cntrl:]]/ }"
       tmux show-buffer -b "$name" 2>/dev/null || true
       ;;

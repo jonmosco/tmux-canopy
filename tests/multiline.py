@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NUL-framed pane entries: one selectable object across two physical lines."""
+"""NUL-framed entries: shared directories, multiline selection and stable identities."""
 import fcntl
 from support import install_fzf_probe
 import os
@@ -123,6 +123,7 @@ def main():
             tm('send-keys', '-t', sidebar, 'Home', 'j', 'j')
             assert probe()[0] == 'P:' + first
             frame = screen()
+            assert not any(line.startswith('▌') for line in frame), 'gutter must not form a block bar'
             a = next(i for i, line in enumerate(frame) if '…/commercial/hcm-gitops' in line)
             b = next(i for i, line in enumerate(frame) if '…/fedramp/hcm-gitops' in line)
             assert b == a + 2 and 'sleep' in frame[a-1] and 'sleep' in frame[b-1]
@@ -194,6 +195,36 @@ def main():
             tm('send-keys', '-t', sidebar, 'Enter')
             wait(lambda: display(second, '#{pane_active}') == '1', 'pane activation')
             print('ok - multiline Enter activates the correct real content pane')
+
+            # A directory-only refresh may change row heights, but never IDs.
+            identity = probe()[:2]
+            geometry = display(first, '#{pane_width}|#{pane_height}')
+            tm('respawn-pane', '-k', '-t', second, '-c', str(dirs[0]), 'sleep 600')
+            tm('send-keys', '-t', sidebar, 'C-r')
+            wait(lambda: sum('…/commercial/hcm-gitops' in line for line in screen()) == 1
+                 and not any('…/fedramp/hcm-gitops' in line for line in screen()), 'shared directory grouped')
+            assert probe()[:2] == identity
+            rows = records()
+            window = next(row for row in rows if row[0].startswith('W:'))
+            assert window[1].count('\n') == 1
+            assert all('\n' not in row[1] for row in rows if row[0].startswith('P:'))
+            tm('send-keys', '-t', sidebar, '/')
+            tm('send-keys', '-t', sidebar, '-l', 'commercial')
+            wait(lambda: probe()[0] == window[0], 'shared directory search targets its window')
+            tm('send-keys', '-t', sidebar, 'Escape')
+            wait(lambda: sum('sleep' in line for line in screen()) == 2, 'Escape restores all grouped panes')
+            assert probe()[0] == window[0], (probe(), screen())
+            tm('send-keys', '-t', sidebar, 'j')
+            observed = probe()
+            assert observed[0] == 'P:' + first, (observed, screen())
+            tm('send-keys', '-t', sidebar, 'j')
+            assert probe()[0] == 'P:' + second
+            tm('respawn-pane', '-k', '-t', second, '-c', str(dirs[1]), 'sleep 600')
+            tm('send-keys', '-t', sidebar, 'C-r')
+            wait(lambda: any('…/fedramp/hcm-gitops' in line for line in screen()), 'distinct directories restored')
+            assert probe()[:2] == identity
+            assert display(first, '#{pane_width}|#{pane_height}') == geometry
+            print('ok - shared directories group and ungroup with stable selection, search, navigation and geometry')
         finally:
             sp.run([executable, '-L', socket, 'kill-server'], env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
             if attached:

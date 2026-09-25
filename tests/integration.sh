@@ -250,7 +250,7 @@ grep -Fq "Q:$pane_ops" "$view_file" || fail 'process view attributes processes t
 "${TMUX_TEST[@]}" set-buffer -b tree-test-buffer 'buffer payload'
 printf 'VIEW\tbuffers\n' > "$state_file"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/sidebar-source' > '$view_file'"
-grep -Fq 'B:tree-test-buffer' "$view_file" || fail 'buffer view lists native tmux buffers'
+grep -Fq 'B2:747265652d746573742d627566666572' "$view_file" || fail 'buffer view lists native tmux buffers'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/sidebar-action' delete 'B:tree-test-buffer'"
 if "${TMUX_TEST[@]}" list-buffers -F '#{buffer_name}' | grep -Fqx tree-test-buffer; then fail 'buffer delete action removes the native buffer'; fi
 printf 'VIEW\ttree\n' > "$state_file"
@@ -366,5 +366,33 @@ run_in_server "$zoom_target" "'$PROJECT_DIR/scripts/toggle' 'zoom-client' '$zoom
 sleep 0.2
 assert_eq '1' "$("${TMUX_TEST[@]}" display-message -p -t "$zoom_target" '#{window_zoomed_flag}')" 'closing restores the original zoomed pane'
 printf 'ok - guards zoomed layouts and optionally restores zoom on close\n'
+
+# Position is chosen on open and retained across both navigation modes.
+position_target="$("${TMUX_TEST[@]}" new-window -d -t test: -n position-test -P -F '#{pane_id}')"
+position_other="$("${TMUX_TEST[@]}" new-window -d -t test: -n position-other -P -F '#{pane_id}')"
+"${TMUX_TEST[@]}" set-option -g @tmux-canopy-width 42
+"${TMUX_TEST[@]}" set-option -g @tmux-canopy-position invalid
+run_in_server "$position_target" "'$PROJECT_DIR/scripts/toggle' 'position-client' '$position_target' 42 global"
+position_sidebar="$(sidebar_for_owner position-client)"
+assert_eq '0' "$("${TMUX_TEST[@]}" display-message -p -t "$position_sidebar" '#{pane_left}')" 'invalid position falls back to left'
+run_in_server "$position_target" "'$PROJECT_DIR/scripts/toggle' 'position-client' '$position_target' 42 global"
+for transition in slot move; do
+  "${TMUX_TEST[@]}" set-option -g @tmux-canopy-position right
+  run_in_server "$position_target" "'$PROJECT_DIR/scripts/toggle' 'position-client' '$position_target' 42 global T Tab '$transition'"
+  position_sidebar="$(sidebar_for_owner position-client)"
+  "${TMUX_TEST[@]}" set-option -g @tmux-canopy-position left
+  for destination in "$position_other" "$position_target"; do
+    run_in_server "$destination" "'$PROJECT_DIR/scripts/follow' 'position-client' '$destination' 42 '$transition'"
+    assert_eq "$("${TMUX_TEST[@]}" display-message -p -t "$destination" '#{window_width}')" \
+      "$("${TMUX_TEST[@]}" display-message -p -t "$position_sidebar" '#{e|+:#{pane_left},#{pane_width}}')" 'open right sidebar retains its side after a configuration change'
+    assert_eq 'right' "$("${TMUX_TEST[@]}" show-option -pqv -t "$position_sidebar" @tmux_canopy_position)" 'position is retained on the sidebar'
+  done
+  run_in_server "$position_target" "'$PROJECT_DIR/scripts/toggle' 'position-client' '$position_target' 42 global T Tab '$transition'"
+done
+run_in_server "$position_target" "'$PROJECT_DIR/scripts/toggle' 'position-client' '$position_target' 42 global"
+position_sidebar="$(sidebar_for_owner position-client)"
+assert_eq '0' "$("${TMUX_TEST[@]}" display-message -p -t "$position_sidebar" '#{pane_left}')" 'reopening applies the new left position'
+run_in_server "$position_target" "'$PROJECT_DIR/scripts/toggle' 'position-client' '$position_target' 42 global"
+printf 'ok - left default/fallback, right slot/move placement, and close/reopen position changes\n'
 
 printf 'all integration tests passed\n'

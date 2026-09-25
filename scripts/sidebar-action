@@ -3,6 +3,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/buffer-lib.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/launch-lib.sh"
 action="${1:-}"
 token="${2:-}"
@@ -88,9 +90,10 @@ case "$action" in
 
   activate)
     case "$token" in
-      B:*)
+      B:*|B2:*)
+        buffer_decode_token "$token" || exit 0
         target="$(target_pane)"
-        [[ -n "$target" ]] && tmux paste-buffer -b "${token#B:}" -t "$target" 2>/dev/null || true
+        [[ -n "$target" ]] && tmux paste-buffer -b "$BUFFER_NAME" -t "$target" 2>/dev/null || true
         ;;
       X:*)
         rest="${token#X:}"; pane="${rest#*:}"
@@ -104,7 +107,7 @@ case "$action" in
 
   actions)
     case "$token" in
-      B:*) buffer_menu "$token" ;;
+      B:*|B2:*) buffer_menu "$token" ;;
       X:*) process_menu "$token" ;;
       Q:*) "$SCRIPT_DIR/tree-action" actions "P:${token#Q:}" ;;
       V:*) ;;
@@ -114,7 +117,7 @@ case "$action" in
 
   delete)
     case "$token" in
-      B:*) tmux delete-buffer -b "${token#B:}" 2>/dev/null || true ;;
+      B:*|B2:*) buffer_decode_token "$token" || exit 0; tmux delete-buffer -b "$BUFFER_NAME" 2>/dev/null || true ;;
       X:*) process_menu "$token" ;;
       Q:*) "$SCRIPT_DIR/tree-action" delete "P:${token#Q:}" ;;
       *) "$SCRIPT_DIR/tree-action" delete "$token" ;;

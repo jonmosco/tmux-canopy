@@ -54,7 +54,7 @@ help_records() {
   key '[ / ]' 'Previous or next width preset'
   key 'w' 'Cycle width presets'
   key 'Drag border' 'Resize the sidebar; staged mode commits on release'
-  note 'Your chosen width follows the sidebar. Narrow windows temporarily clamp it to leave room for content.'
+  note 'Your chosen width follows the sidebar. Narrow windows temporarily clamp it to leave room for content. For smooth dragging use resize-mode live; max-width 0 removes the fixed width cap.'
 
   section 'Notifications'
   key 'u' 'Clear notifications on the selected object'
@@ -71,9 +71,10 @@ help_records() {
   key '?' 'Open this help'
   key 'Ctrl-q' 'Close the sidebar'
   key "prefix + $toggle_key" 'Toggle the sidebar from any pane'
-  key 'prefix + h' 'Return focus to the sidebar'
+  key 'prefix + h / l' 'Return focus to the left / right sidebar'
 
   section 'Appearance and behavior'
+  note 'Set @tmux-canopy-position to left (default) or right, then close and reopen the sidebar. Right-side mouse resizing is live; release saves the width.'
   note 'Normal density shows the command above its directory. Compact uses one line; detailed includes the full path and pane details.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'Session and window selections use their active content pane. In global mode the sidebar follows its owning client.'
@@ -83,7 +84,7 @@ help_records() {
 render_help() {
   help_records | awk -F '\t' -v width="$1" -v color="${color:-0}" '
     BEGIN {
-      if (color) { reset="\033[0m"; heading="\033[1;36m"; key="\033[1;33m"; dim="\033[2m" }
+      if (color) { reset="\033[0m"; heading="\033[1m"; key="\033[1;36m"; dim="\033[2m" }
       wide=(width >= 60); column=22
     }
     function wrap(text, indent, style, first,    available,piece,cut) {

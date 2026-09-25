@@ -86,7 +86,7 @@ sidebar_preflight() {
       return 1
     fi
   done
-  for helper in lib.sh navigation.sh notification-lib.sh launch-lib.sh ui-options.sh ../lib/tree-render.awk ../lib/content-layout.awk; do
+  for helper in buffer-lib.sh config-lib.sh lib.sh navigation.sh notification-lib.sh launch-lib.sh ui-options.sh ../lib/tree-render.awk ../lib/content-layout.awk; do
     if [[ ! -f "$SCRIPT_DIR/$helper" || ! -r "$SCRIPT_DIR/$helper" ]]; then
       sidebar_failure "$owner" install "Required library is missing or unreadable: $helper. Restore the plugin installation."
       return 1

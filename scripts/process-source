@@ -3,7 +3,7 @@ set -u
 
 theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 if [[ "$theme" == 'mono' ]]; then reset='' heading='' process_color='' dim=''
-else reset=$'\033[0m'; heading=$'\033[1;36m'; process_color=$'\033[32m'; dim=$'\033[2m'; fi
+else reset=$'\033[0m'; heading=$'\033[1m'; process_color=''; dim=$'\033[2m'; fi
 
 snapshot="$(ps -eo pid=,ppid=,user=,stat=,etimes=,comm=,args= 2>/dev/null)" || exit 1
 panes="$(tmux list-panes -a -F '#{session_name}|#{window_index}|#{window_name}|#{pane_id}|#{pane_index}|#{pane_pid}|#{pane_current_command}|#{pane_current_path}|#{@tmux_canopy}|#{@tmux_canopy_slot}' 2>/dev/null)" || exit 1

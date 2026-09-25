@@ -7,6 +7,7 @@ import pty
 import shutil
 import signal
 import struct
+import sys
 import subprocess as sp
 import tempfile
 import termios
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    position = "right" if "--right" in sys.argv else "left"
     executable = shutil.which('tmux')
     socket = f'tree-width-test-{os.getpid()}'
     env = os.environ.copy()
@@ -48,13 +50,14 @@ def main():
                 if predicate():
                     return
                 time.sleep(.03)
-            raise AssertionError((message, tm('list-panes', '-a', '-F', '#{window_id}|#{window_width}|#{window_height}|#{pane_id}|#{pane_width}|#{pane_height}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_dead}|#{pane_dead_status}')))
+            raise AssertionError((message, tm('list-panes', '-a', '-F', '#{window_id}|#{window_width}|#{window_height}|#{pane_id}|#{pane_width}|#{pane_height}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_dead}|#{pane_dead_status}'), [line for line in tm('show-messages').splitlines() if ' key ' in line][:25]))
 
         def check_width(expected):
             actual = display(sidebar, '#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{window_height}')
             left, top, width, height, total = actual.split('|')
             assert display(sidebar, '#{pane_dead}') == '0', tm('capture-pane', '-p', '-t', sidebar)
-            assert (left, top, width, height) == ('0', '0', str(expected), total), actual
+            expected_left = '0' if position == 'left' else str(int(display(sidebar, '#{window_width}')) - expected)
+            assert (left, top, width, height) == (expected_left, '0', str(expected), total), actual
 
         try:
             first = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'one', '-x', '510', '-y', '104', '-P', '-F', '#{pane_id}', 'sleep 600')
@@ -67,7 +70,7 @@ def main():
             tm('split-window', '-d', '-h', '-t', second, 'sleep 600')
             native = tm('new-window', '-d', '-t', 'one:', '-P', '-F', '#{pane_id}', 'sleep 600')
             third = tm('new-session', '-d', '-s', 'two', '-x', '510', '-y', '104', '-P', '-F', '#{pane_id}', 'sleep 600')
-            for option, value in [('width', '42'), ('scope', 'global'), ('transition', 'slot'), ('notifications', 'none')]:
+            for option, value in [('position', position), ('width', '42'), ('scope', 'global'), ('transition', 'slot'), ('notifications', 'none'), ('resize-mode', 'staged'), ('max-width', '48')]:
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env | {'TMUX': display(first, '#{socket_path},#{pid},0'), 'TMUX_PANE': first,
                                 'TMUX_CANOPY_STATE': str(state), 'TMUX_CANOPY_SCOPE': 'global',
@@ -114,18 +117,28 @@ def main():
 
             # Exercise actual border events: calling mouse-resize directly does
             # not verify the pane context used by tmux mouse bindings.
-            def drag_width(desired, expected):
+            def drag_width(desired, expected, pause=.1):
                 previous = int(display(sidebar, '#{pane_width}'))
-                border = previous + 1
+                saved_width = tm('show-option', '-gqv', '@tmux_canopy_runtime_width')
+                total = int(display(sidebar, '#{window_width}'))
+                border = previous + 1 if position == 'left' else total - previous
+                release = desired + 1 if position == 'left' else total - desired
                 os.write(master, f'\x1b[<0;{border};10M'.encode())
                 wait(lambda: display(sidebar, '#{@tmux_canopy_staged_sidebar}') == sidebar,
                      'mouse down stages sidebar')
                 os.write(master, f'\x1b[<32;{border + 1};10M'.encode())
-                time.sleep(.1)
-                os.write(master, f'\x1b[<32;{desired + 1};10M'.encode())
-                time.sleep(.1)
-                check_width(previous)
-                os.write(master, f'\x1b[<0;{desired + 1};10m'.encode())
+                time.sleep(pause)
+                os.write(master, f'\x1b[<32;{release};10M'.encode())
+                time.sleep(pause)
+                if position == "left" and display(sidebar, "#{@tmux_canopy_drag_native}") != "1":
+                    check_width(previous)
+                else:
+                    # An old after-resize hook must not restore an intermediate
+                    # width while tmux is still processing native mouse motion.
+                    run('sync-width', sidebar, str(previous))
+                    check_width(desired)
+                    assert tm('show-option', '-gqv', '@tmux_canopy_runtime_width') == saved_width
+                os.write(master, f'\x1b[<0;{release};10m'.encode())
                 wait(lambda: tm('show-option', '-gqv', '@tmux_canopy_runtime_width') == str(expected),
                      'mouse drag saves the preferred width')
                 wait(lambda: display(sidebar, '#{@tmux_canopy_staged_sidebar}') == '', 'drag marker cleared')
@@ -141,7 +154,7 @@ def main():
                     wait(lambda: display(sidebar, '#{window_id}') == display(pane, '#{window_id}'),
                          'native switch after mouse drag')
                     check_width(width)
-            print('ok - mouse drags in both directions commit on release and persist across windows/sessions')
+            print('ok - mouse drags in both directions save width on release and persist across windows/sessions')
 
             # An unrelated border keeps normal tmux dragging and must not alter
             # the sidebar preference or switch the client into our drag table.
@@ -150,7 +163,8 @@ def main():
             border = left + width + 1
             os.write(master, f'\x1b[<0;{border};10M'.encode())
             time.sleep(.15)
-            assert display(sidebar, '#{@tmux_canopy_staged_sidebar}') == ''
+            if position == 'left':
+                assert display(sidebar, '#{@tmux_canopy_staged_sidebar}') == ''
             os.write(master, f'\x1b[<32;{border + 1};10M'.encode())
             time.sleep(.1)
             os.write(master, f'\x1b[<32;{border + 5};10M'.encode())
@@ -159,6 +173,22 @@ def main():
             wait(lambda: display(second, '#{pane_width}') != str(width), 'ordinary content border resize')
             check_width(46)
             assert tm('show-option', '-gqv', '@tmux_canopy_runtime_width') == '46'
+            # A horizontal content border beside the right dock must remain
+            # a normal content resize, never a sidebar width change.
+            lower = tm('split-window', '-d', '-v', '-t', second, '-P', '-F', '#{pane_id}', 'sleep 600')
+            x, y, w, h = map(int, display(second, '#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}').split('|'))
+            mouse_x, border_y = x + w // 2 + 1, y + h + 1
+            os.write(master, f'\x1b[<0;{mouse_x};{border_y}M'.encode())
+            time.sleep(.15)
+            os.write(master, f'\x1b[<32;{mouse_x};{border_y + 1}M'.encode())
+            time.sleep(.1)
+            os.write(master, f'\x1b[<32;{mouse_x};{border_y + 3}M'.encode())
+            wait(lambda: display(second, '#{pane_height}') != str(h), 'horizontal content border resize')
+            os.write(master, f'\x1b[<0;{mouse_x};{border_y + 3}m'.encode())
+            time.sleep(.2)
+            check_width(46)
+            assert tm('show-option', '-gqv', '@tmux_canopy_runtime_width') == '46'
+            tm('kill-pane', '-t', lower)
             run('sidebar-action', 'activate', 'P:' + first)
             print('ok - ordinary content border drags preserve the sidebar preference')
 
@@ -172,6 +202,38 @@ def main():
             tm('set-option', '-g', '@tmux-canopy-resize-mode', 'staged')
             sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=15)
             print('ok - preset mouse drags snap and retain their width after navigation')
+
+            tm('set-option', '-g', '@tmux-canopy-resize-mode', 'live')
+            sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=15)
+            drag_width(38, 38)
+            run('sidebar-action', 'activate', 'P:' + second)
+            check_width(38)
+            run('sidebar-action', 'activate', 'P:' + first)
+            tm('set-option', '-g', '@tmux-canopy-resize-mode', 'staged')
+            sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=15)
+            print('ok - live mouse resizing saves the final width across navigation')
+            tm('set-option', '-g', '@tmux-canopy-max-width', '0')
+            tm('set-option', '-g', '@tmux-canopy-resize-mode', 'live')
+            sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=15)
+            for width in (85, 120):
+                drag_width(width, width, pause=.35)
+                for target in (second, third, first):
+                    run('sidebar-action', 'activate', 'P:' + target)
+                    check_width(width)
+            limited = tm('new-window', '-d', '-t', 'one:', '-P', '-F', '#{pane_id}', 'sleep 600')
+            tm('set-option', '-w', '-t', limited, 'window-size', 'manual')
+            tm('resize-window', '-t', limited, '-x', '100', '-y', '65')
+            run('sidebar-action', 'activate', 'P:' + limited)
+            check_width(59)
+            assert tm('show-option', '-gqv', '@tmux_canopy_runtime_width') == '120'
+            run('sidebar-action', 'activate', 'P:' + first)
+            check_width(120)
+            tm('kill-window', '-t', limited)
+            tm('set-option', '-g', '@tmux-canopy-max-width', '48')
+            tm('set-option', '-g', '@tmux-canopy-resize-mode', 'staged')
+            sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=15)
+            print('ok - uncapped slow mouse drags retain wide preferences and reserve content space in smaller windows')
+
 
             run('resize', 'commit', sidebar, '48')
             for pane in (second, first, third, first):
@@ -243,7 +305,7 @@ def main():
             code = '''source "$1"
 for total in 60 65 80 100 211 510; do
   for requested in 42 120 20% invalid; do
-    for maximum in 48 128; do
+    for maximum in 0 48 128; do
       expected=$(clamp_sidebar_width_for_total "$total" "$requested" 24 "$maximum" 40) || expected=no-fit
       sidebar_width_expression "$requested" 24 "$maximum" 40
       expression="#{?$SIDEBAR_WIDTH_FITS_FORMAT,$SIDEBAR_WIDTH_FORMAT,no-fit}"
@@ -255,7 +317,7 @@ done'''
             rows = sp.check_output(['bash', '-c', code, '_', str(ROOT / 'scripts/lib.sh')], env=script_env, text=True).splitlines()
             expected, expressions = zip(*(row.split('|', 1) for row in rows))
             assert tm('display-message', '-p', '-t', first, '\n'.join(expressions)).splitlines() == list(expected)
-            print('ok - native width expressions match numeric clamping across 48 boundary/configuration cases')
+            print('ok - native width expressions match numeric clamping across 72 boundary/configuration cases')
 
             tm('set-option', '-g', '@tmux-canopy-width', '42')
             run('toggle', client, first, '42', 'global', 'T', 'Tab', 'slot')

@@ -1,0 +1,44 @@
+name: Test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TMUX_VERSION: 3.7c
+      FZF_VERSION: 0.74.4
+      TERM: xterm-256color
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libevent-dev libncurses-dev bison pkg-config curl python3 shellcheck zsh fish less procps
+      - name: Install tested tmux and fzf versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_dir=$(mktemp -d)
+          cd "$build_dir"
+          curl --fail --location --retry 3 "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" -o tmux.tar.gz
+          echo "7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf  tmux.tar.gz" | sha256sum --check
+          tar -xzf tmux.tar.gz
+          cd "tmux-${TMUX_VERSION}"
+          ./configure --prefix=/usr/local
+          make -j2
+          sudo make install
+          cd "$build_dir"
+          curl --fail --location --retry 3 "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_amd64.tar.gz" -o fzf.tar.gz
+          echo "05e6813a337cc722c3ed07e54a764b75cc5d671e2e60459db0ba696ee5fa7504  fzf.tar.gz" | sha256sum --check
+          tar -xzf fzf.tar.gz
+          sudo install -m755 fzf /usr/local/bin/fzf
+          tmux -V
+          fzf --version
+      - name: Run release checks
+        run: bash tests/run.sh

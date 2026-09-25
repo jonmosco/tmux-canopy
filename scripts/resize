@@ -15,7 +15,7 @@ maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
 min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
 presets="$(tmux show-option -gqv @tmux-canopy-width-presets 2>/dev/null || true)"
 : "${minimum:=24}"
-: "${maximum:=48}"
+: "${maximum:=0}"
 : "${min_content:=40}"
 : "${presets:=30,42,48}"
 

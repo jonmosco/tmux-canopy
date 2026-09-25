@@ -8,9 +8,11 @@ import subprocess as sp
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(position="left"):
+    placement = ["-b"] if position == "left" else []
+    dock_geometry = "0|0|42|44" if position == "left" else "118|0|42|44"
     executable = shutil.which('tmux')
-    socket = f'tree-layout-test-{os.getpid()}'
+    socket = f'tree-layout-test-{os.getpid()}-{position}'
     env = os.environ.copy()
     env.pop('TMUX', None)
     env.pop('TMUX_PANE', None)
@@ -36,7 +38,7 @@ def main():
                   '-P', '-F', '#{pane_id}', 'sleep 600')
         tm('set-option', '-g', 'status', 'off')
         script_env = env | {'TMUX': display(pane, '#{socket_path},#{pid},0'), 'TMUX_PANE': pane}
-        dock = tm('split-window', '-d', '-h', '-b', '-f', '-l', '42', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600')
+        dock = tm('split-window', '-d', '-h', *placement, '-f', '-l', '42', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600')
         tm('set-option', '-p', '-t', dock, '@tmux_canopy', '1')
         extras = [tm('split-window', '-d', '-v', '-l', '6', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600') for _ in range(3)]
         ids = set(tm('list-panes', '-t', pane, '-F', '#{pane_id}').splitlines())
@@ -45,11 +47,14 @@ def main():
                  'main-horizontal-mirrored', 'main-vertical-mirrored')
         for mode in modes:
             layout(pane, mode)
-            assert geometry(dock) == '0|0|42|44', (mode, geometry(dock))
+            assert geometry(dock) == dock_geometry, (mode, geometry(dock))
             assert display(extras[1], '#{pane_active}') == '1'
             assert set(tm('list-panes', '-t', pane, '-F', '#{pane_id}').splitlines()) == ids
             for content in [pane, *extras]:
-                assert int(display(content, '#{pane_left}')) >= 43
+                if position == 'left':
+                    assert int(display(content, '#{pane_left}')) >= 43
+                else:
+                    assert int(display(content, '#{pane_left}')) + int(display(content, '#{pane_width}')) <= 117
         layout(pane, 'previous')
         assert display(pane, '#{@tmux_canopy_content_layout}') == modes[-2]
         print('ok - seven layouts and reverse cycling preserve dock ID/width, content IDs and focus')
@@ -62,13 +67,13 @@ def main():
             tm('kill-pane', '-t', other)
         before = geometry(pane)
         layout(pane, 'next')
-        assert geometry(pane) == before and geometry(dock) == '0|0|42|44'
+        assert geometry(pane) == before and geometry(dock) == dock_geometry
         print('ok - zoom refusal and single-content-pane layouts preserve geometry')
 
         tm('set-option', '-pu', '-t', dock, '@tmux_canopy')
         tm('set-option', '-p', '-t', dock, '@tmux_canopy_slot', '1')
         layout(pane, 'tiled')
-        assert geometry(dock) == '0|0|42|44'
+        assert geometry(dock) == dock_geometry
         tm('kill-pane', '-t', dock)
         tm('split-window', '-d', '-h', '-t', pane, 'sleep 600')
         layout(pane, 'even-vertical')
@@ -79,7 +84,7 @@ def main():
         small = tm('new-window', '-d', '-t', 'layout:', '-P', '-F', '#{pane_id}', 'sleep 600')
         tm('set-option', '-w', '-t', small, 'window-size', 'manual')
         tm('resize-window', '-t', small, '-x', '24', '-y', '20')
-        slot = tm('split-window', '-d', '-h', '-b', '-f', '-l', '12', '-t', small, '-P', '-F', '#{pane_id}', 'sleep 600')
+        slot = tm('split-window', '-d', '-h', *placement, '-f', '-l', '12', '-t', small, '-P', '-F', '#{pane_id}', 'sleep 600')
         tm('set-option', '-p', '-t', slot, '@tmux_canopy_slot', '1')
         for _ in range(4):
             tm('split-window', '-d', '-v', '-l', '3', '-t', small, 'sleep 600')
@@ -88,7 +93,7 @@ def main():
         assert display(small, '#{window_layout}') == before
         layout(small, 'next')
         assert display(small, '#{@tmux_canopy_content_layout}') == 'even-vertical'
-        assert geometry(slot) == '0|0|12|20'
+        assert geometry(slot) == ('0|0|12|20' if position == 'left' else '12|0|12|20')
         print('ok - impossible presets are refused or skipped without disturbing the dock')
         tm('set-option', '-pu', '-t', slot, '@tmux_canopy_slot')
         tm('set-option', '-p', '-t', small, '@tmux_canopy_slot', '1')
@@ -102,4 +107,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    for position in ('left', 'right'):
+        main(position)

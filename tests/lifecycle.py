@@ -2,6 +2,7 @@
 """An internal dock/slot must not prevent native last-content window closure."""
 import fcntl
 import os
+import sys
 from pathlib import Path
 import pty
 import shutil
@@ -15,7 +16,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def scenario(transition='slot', scope='global'):
+def scenario(transition='slot', scope='global', position='left'):
     binary = shutil.which('tmux')
     socket = f'tree-lifetime-{os.getpid()}-{transition}-{scope}'
     env = os.environ.copy()
@@ -59,7 +60,8 @@ def scenario(transition='slot', scope='global'):
             wait(lambda: fmt(sidebar, '#{window_id}') == fmt(target, '#{window_id}') and live() == target and fmt(sidebar, '#{pane_width}') == '42', 'dock follows native successor and focuses content')
             assert fmt(sidebar, '#{pane_pid}') == sidebar_pid
             assert sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip() == fzf_pid
-            assert fmt(sidebar, '#{pane_left}|#{pane_top}|#{pane_height}') == '0|0|' + fmt(sidebar, '#{window_height}')
+            left = '0' if position == 'left' else str(int(fmt(sidebar, '#{window_width}')) - int(fmt(sidebar, '#{pane_width}')))
+            assert fmt(sidebar, '#{pane_left}|#{pane_top}|#{pane_height}') == left + '|0|' + fmt(sidebar, '#{window_height}')
 
         try:
             shell = ['/bin/bash', '--noprofile', '--norc']
@@ -74,7 +76,7 @@ def scenario(transition='slot', scope='global'):
             # Match a native no-sidebar control: return to third, NOT first.
             for pane in (first, third, fourth):
                 tm('select-window', '-t', pane)
-            for key, value in [('scope', scope), ('transition', transition), ('width', '42'), ('preview', 'off'), ('notifications', 'none')]:
+            for key, value in [('position', position), ('scope', scope), ('transition', transition), ('width', '42'), ('preview', 'off'), ('notifications', 'none')]:
                 tm('set-option', '-g', '@tmux-canopy-' + key, value)
             script_env = env | {'TMUX': fmt(first, '#{socket_path},#{pid},0'), 'TMUX_PANE': fourth, 'TMUX_CANOPY_STATE': str(state), 'TMUX_CANOPY_SCOPE': scope, 'TMUX_CANOPY_TRANSITION': transition}
             sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=20)
@@ -224,7 +226,7 @@ def scenario(transition='slot', scope='global'):
 
 def main():
     for transition, scope in [('slot', 'global'), ('move', 'global'), ('slot', 'window')]:
-        scenario(transition, scope)
+        scenario(transition, scope, "right" if "--right" in sys.argv else "left")
     print('all empty-window lifecycle tests passed')
 
 

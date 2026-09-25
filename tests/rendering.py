@@ -63,8 +63,16 @@ def main():
 
         def selection():
             selected.unlink(missing_ok=True)
-            tm('send-keys', '-t', sidebar, 'M-z')
-            wait_for(lambda: selected.exists() and selected.stat().st_size, 'fzf selection probe')
+            # Redraw/reload can overlap the test-only Alt-key injection. Poll
+            # the read-only probe, as the other PTY suites do; mutations and
+            # actual navigation keys are still sent exactly once.
+            def probe_ready():
+                if selected.exists() and selected.stat().st_size:
+                    return True
+                tm('send-keys', '-t', sidebar, 'M-z')
+                time.sleep(.08)
+                return False
+            wait_for(probe_ready, 'fzf selection probe')
             return selected.read_text().strip().split('|')
 
         try:

@@ -7,7 +7,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = [
-    ('bash', 37, ''), ('zsh', 37, ''), ('unknown', 37, ''),
+    ('bash', 39, ''), ('zsh', 39, ''), ('unknown', 39, ''),
     ('nvim', 94, ''), ('vim', 94, ''),
     ('node', 93, ''), ('npm', 91, ''), ('python3', 93, ''),
     ('/usr/bin/git', 91, '󰊢'), ('lazygit', 91, '󰊢'),
