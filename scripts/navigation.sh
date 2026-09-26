@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/notification-lib.sh"
 # One read transaction supplies target/client context and pane relationships.
 # No titles or paths are collected: only stable IDs and navigation metadata.
 sidebar_navigation_snapshot() {
-  local kind a b c d e f g h i j k index current_index='' last_window='' chosen='' wrap=''
+  local kind a b c d e f g h i j k l index current_index='' last_window='' chosen='' wrap=''
   local -A relative_windows=()
   local -a query=() prefix=()
   if [[ "$nav_spec" == :* ]]; then
@@ -21,8 +21,8 @@ sidebar_navigation_snapshot() {
   fi
   nav_target='' nav_session='' nav_current='' nav_current_session='' nav_current_window=''
   nav_position=left nav_sidebar='' nav_slot='' nav_slot_width='' nav_first='' nav_active='' nav_last='' nav_guarded=''
-  nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=()
-  while IFS='|' read -r kind a b c d e f g h i j k; do
+  nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=() nav_heights=()
+  while IFS='|' read -r kind a b c d e f g h i j k l; do
     case "$kind" in
       G)
         nav_requested="${a:-$nav_width}"; nav_minimum="${b:-24}"; nav_maximum="${c:-0}"; nav_min_content="${d:-40}"
@@ -44,7 +44,7 @@ sidebar_navigation_snapshot() {
       P)
         nav_windows["$a"]="$b"; nav_actives["$a"]="$c"; nav_lasts["$a"]="$j"
         nav_sidebars["$a"]="$d"; nav_slots["$a"]="$e"
-        nav_widths["$a"]="$g"; nav_targets["$a"]="$h"; nav_totals["$a"]="$i"
+        nav_widths["$a"]="$g"; nav_targets["$a"]="$h"; nav_totals["$a"]="$i"; nav_heights["$a"]="$l"
         if [[ "$d" == 1 && ( ( -n "$nav_client" && "$f" == "$nav_client" ) || ( -z "$nav_client" && "$a" == "$nav_hint" ) ) ]]; then
           nav_sidebar="$a"
           [[ "$k" != right ]] || nav_position=right
@@ -52,7 +52,7 @@ sidebar_navigation_snapshot() {
         ;;
     esac
   done < <(tmux "${prefix[@]}" list-clients -F "C|#{client_tty}|#{session_id}|#{window_id}|#{pane_id}|#{$nav_guard}" \; \
-    list-panes -a -F 'P|#{pane_id}|#{window_id}|#{pane_active}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_client}|#{pane_width}|#{@tmux_canopy_target}|#{window_width}|#{pane_last}|#{@tmux_canopy_position}' \; \
+    list-panes -a -F 'P|#{pane_id}|#{window_id}|#{pane_active}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_client}|#{pane_width}|#{@tmux_canopy_target}|#{window_width}|#{pane_last}|#{@tmux_canopy_position}|#{window_height}' \; \
     display-message -p 'G|#{@tmux-canopy-width}|#{@tmux-canopy-min-width}|#{@tmux-canopy-max-width}|#{@tmux-canopy-min-content-width}|#{@tmux_canopy_runtime_width}' \; \
     "${query[@]}" 2>/dev/null)
 
@@ -114,7 +114,7 @@ sidebar_navigate() (
   local nav_position nav_sidebar nav_slot nav_slot_width nav_first nav_active nav_last nav_guarded
   local nav_requested nav_minimum nav_maximum nav_min_content nav_source_width nav_saved_layout
   local SIDEBAR_WIDTH_FORMAT SIDEBAR_WIDTH_FITS_FORMAT
-  local -A nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=()
+  local -A nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=() nav_heights=()
   local -a commands=() placement=()
   [[ -n "$nav_spec" ]] || exit 0
   nav_key="$(sidebar_client_key "$nav_client")"
@@ -180,24 +180,42 @@ sidebar_navigate() (
     nav_notice_window="$nav_window"
     commands+=(set-option -wq -t "$nav_window" @tmux_canopy_notice_suppress 1 ';')
     if [[ "$nav_current_window" != "$nav_window" || "$nav_current_session" != "$nav_session" ]]; then
-      # Automatic tmux sizing is deferred past the selection command queue.
-      # Let it settle before measuring/resizing the destination slot. On warm
-      # switches the existing slot preserves content geometry during this step.
       # Freeze relative next/last/index resolution before changing the client.
       nav_spec="$nav_session:.$nav_target"
-      # Native shrinking subtracts columns instead of retaining proportions and
-      # can crush an application pane to one column in a stale, large window.
-      nav_saved_layout="$(tmux display-message -p -t "$nav_target" '#{window_layout}' 2>/dev/null || true)"
-      if [[ "$nav_current_session" != "$nav_session" ]]; then
-        commands+=(switch-client -c "$nav_client" -t "$nav_session:$nav_window" ';')
+      if [[ -n "${nav_totals[$nav_target]:-}" && "${nav_totals[$nav_target]}" == "${nav_totals[$nav_current]:-}" && \
+            -n "${nav_heights[$nav_target]:-}" && "${nav_heights[$nav_target]}" == "${nav_heights[$nav_current]:-}" ]]; then
+        # Fast path: the hidden destination window already reports the exact
+        # total size this client's active window currently has, so selecting
+        # it cannot trigger tmux's automatic resize (aggressive-resize/latest
+        # window-size only resize a window once it becomes current, and it's
+        # already this size). Nothing needs to settle or be remeasured, so
+        # fold the window switch into the same final command batch as the
+        # dock swap below instead of committing it separately: the sidebar
+        # never has to sit on a bare placeholder pane mid-transition.
+        if [[ "$nav_current_session" != "$nav_session" ]]; then
+          commands+=(switch-client -c "$nav_client" -t "$nav_session:$nav_window" ';')
+        else
+          commands+=(select-window -t "$nav_session:$nav_window" ';')
+        fi
+        nav_current_window="$nav_window"; nav_current_session="$nav_session"
       else
-        commands+=(select-window -t "$nav_session:$nav_window" ';')
+        # Automatic tmux sizing is deferred past the selection command queue.
+        # Let it settle before measuring/resizing the destination slot. On warm
+        # switches the existing slot preserves content geometry during this step.
+        # Native shrinking subtracts columns instead of retaining proportions and
+        # can crush an application pane to one column in a stale, large window.
+        nav_saved_layout="$(tmux display-message -p -t "$nav_target" '#{window_layout}' 2>/dev/null || true)"
+        if [[ "$nav_current_session" != "$nav_session" ]]; then
+          commands+=(switch-client -c "$nav_client" -t "$nav_session:$nav_window" ';')
+        else
+          commands+=(select-window -t "$nav_session:$nav_window" ';')
+        fi
+        tmux "${commands[@]}" || exit 0
+        commands=()
+        "$SCRIPT_DIR/restore-window-layout" "$nav_target" "$nav_saved_layout" "$nav_slot" \
+          "$nav_requested" "$nav_minimum" "$nav_maximum" "$nav_min_content"
+        sidebar_navigation_snapshot || exit 0
       fi
-      tmux "${commands[@]}" || exit 0
-      commands=()
-      "$SCRIPT_DIR/restore-window-layout" "$nav_target" "$nav_saved_layout" "$nav_slot" \
-        "$nav_requested" "$nav_minimum" "$nav_maximum" "$nav_min_content"
-      sidebar_navigation_snapshot || exit 0
     fi
   fi
   if [[ "$nav_scope" == global && -n "$nav_sidebar" && "${nav_windows[$nav_sidebar]}" != "$nav_window" ]]; then
