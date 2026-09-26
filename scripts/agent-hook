@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Read-only lifecycle reporter. Hook output must remain empty.
+exec python3 "$(dirname "${BASH_SOURCE[0]}")/../lib/agent-hook.py" "$@"

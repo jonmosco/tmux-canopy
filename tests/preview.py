@@ -190,7 +190,7 @@ while True:
                 wait(lambda: 'ROW079' in capture(), 'drawer reshown')
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
-            wait(lambda: 'No Codex or Claude process found' in capture(), 'agent drawer shown')
+            wait(lambda: 'No supported agent process found' in capture(), 'agent drawer shown')
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
             wait(lambda: 'ROW079' in capture(), 'terminal drawer restored')
@@ -280,7 +280,7 @@ while True:
 
             tm('send-keys', '-t', sidebar, '4')
             wait(lambda: '[4 Agents]' in capture(), 'Agents view header')
-            wait(lambda: 'No Codex or Claude agents detected' in capture(), 'Agents empty view')
+            wait(lambda: 'No supported agent processes detected' in capture(), 'Agents empty view')
             assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
             tm('send-keys', '-t', sidebar, '1')
             wait(lambda: '[1 Tree]' in capture(), 'Tree view restored')

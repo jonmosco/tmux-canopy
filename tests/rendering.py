@@ -104,17 +104,19 @@ def main():
             snapshot = rows()
             assert all(len(row) == 3 for row in snapshot), snapshot
             assert len({row[2] for row in snapshot}) == len(snapshot)
-            # A second visible session has one display-only gap in NUL mode.
+            # The inline boundary keeps the pointer beside text in both modes.
             framed = [record.split('\t', 1) for record in run('sidebar-source', '--read0').strip('\0').split('\0')]
             session_rows = [row for row in framed if row[0].startswith('S:')]
             assert len(session_rows) == 2
-            assert not session_rows[0][1].startswith('\n') and session_rows[1][1].startswith('\n')
-            assert all(not row[1].startswith('\n') for row in framed if not row[0].startswith('S:'))
+            assert '─' not in session_rows[0][1] and '─' not in session_rows[1][1]
+            assert any(icon in session_rows[0][1] for icon in ('', '◈', 'S'))
+            assert any(icon in session_rows[1][1] for icon in ('', '◈', 'S'))
+            assert all(not row[1].startswith('\n') for row in framed)
             assert len(rows()) == len(snapshot), 'legacy record count changed'
             state.write_text('FILTER\tsession\n')
             only_session = [record.split('\t', 1) for record in run('sidebar-source', '--read0').strip('\0').split('\0')
                             if record.startswith('S:')]
-            assert len(only_session) == 1 and not only_session[0][1].startswith('\n')
+            assert len(only_session) == 1 and '─' not in only_session[0][1]
             state.write_text('')
             pane_rows = [row for row in snapshot if row[0] == 'P:' + pane_b]
             assert {row[2] for row in pane_rows} == {f'P:{pane_b}:{sid_a}', f'P:{pane_b}:{sid_b}'}
@@ -184,8 +186,9 @@ def main():
             pane_identity = f'P:{pane_b}:{sid_b}'
             position_w = next(i for i, row in enumerate(snapshot) if row[0] == window_token)
             position_p = next(i for i, row in enumerate(snapshot) if row[2] == pane_identity)
+            position_s = next(i for i, row in enumerate(snapshot) if row[0] == f'S:{sid_b}')
             query = temp / 'query'
-            bindings = [f'alt-a:pos({position_w})', f'alt-b:pos({position_p})',
+            bindings = [f'alt-a:pos({position_w})', f'alt-b:pos({position_p})', f'alt-c:pos({position_s})',
                         f"alt-q:execute-silent(printf '%s' {{q}} > {query})",
                         f"alt-z:execute-silent(printf '%s|%s|%s\\n' {{1}} {{3}} {{q}} > {selected})",
                         f'load:execute-silent(printf x >> {loads})']
@@ -213,8 +216,14 @@ def main():
             script_env['TMUX_PANE'] = sidebar
             wait_for(lambda: tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_focus_location').endswith('|' + pane_a), 'current content location')
             frame = tm('capture-pane', '-p', '-t', sidebar).splitlines()
-            second_session_line = next(i for i, line in enumerate(frame) if '▾ two' in line)
-            assert second_session_line > 0 and not frame[second_session_line - 1].strip(), frame
+            second_session_line = next(i for i, line in enumerate(frame) if '▾' in line and 'two' in line)
+            assert second_session_line > 0 and frame[second_session_line - 1].strip(), frame
+            assert any(icon in frame[second_session_line] for icon in ('', '◈', 'S')), frame
+            tm('send-keys', '-t', sidebar, 'M-c')
+            wait_for(lambda: selection()[0] == f'S:{sid_b}', 'second session selection')
+            frame = tm('capture-pane', '-p', '-t', sidebar).splitlines()
+            second_session_line = next(i for i, line in enumerate(frame) if '▾' in line and 'two' in line)
+            assert '›' in frame[second_session_line] and '›' not in frame[second_session_line - 1], frame
             tm('send-keys', '-t', sidebar, 'M-a')
             assert selection()[0] == window_token
             tm('send-keys', '-t', sidebar, 'C-o')

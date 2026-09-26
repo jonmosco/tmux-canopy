@@ -21,9 +21,8 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus.
 - Process trees attributed to panes, plus tmux buffer browsing.
-- Agents view shows sessions, windows, and panes containing detected Codex or Claude processes, with counts on parent rows.
-- Optional Codex CLI hooks show reported turn state and approval requests in the read-only agent drawer.
-- When those hooks report a live Codex pane, the Tree and Agents views label its current reported state; stale reports show unknown. Reports are tied to the live Codex process, so a restarted agent cannot inherit its predecessor’s state.
+- Agents view detects Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi processes. `[process]` means detection only.
+- Optional lifecycle adapters for these harnesses show recent reported state as `[state·hook]` and identify stale reports as unknown. The drawer labels screen-based input hints as unverified.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets.
 - One sidebar owned by the client that opened it; no daemon or agent service.
@@ -42,7 +41,15 @@ Startup checks tmux capabilities and fzf options before splitting an application
 
 ## Install
 
-Install the requirements first, then clone the project:
+Install the requirements first. If you use [TPM](https://github.com/tmux-plugins/tpm), add this before its `run '~/.tmux/plugins/tpm/tpm'` line:
+
+```tmux
+set -g @plugin 'jonmosco/tmux-canopy'
+```
+
+Press **prefix + I** to install, then **prefix + T** to open Canopy. Canopy's old and current `*.tmux` entrypoints coexist for older manual installations; TPM loads both safely.
+
+For a manual installation, clone the project:
 
 ```bash
 git clone https://github.com/jonmosco/tmux-canopy.git ~/.tmux/plugins/tmux-canopy
@@ -61,6 +68,10 @@ tmux run-shell "$HOME/.tmux/plugins/tmux-canopy/tmux-canopy.tmux"
 ```
 
 Press **prefix + T** to open it. With the default prefix, press **Ctrl-b**, release, then **Shift-t**. The same shortcut closes it.
+
+Run `~/.tmux/plugins/tmux-canopy/canopy doctor` to check requirements and see every active tmux binding, option, and hook Canopy installs. Add the repository root to your `PATH` if you prefer the short `canopy` command. The basic sidebar needs no agent hooks.
+
+For optional reported agent states, run `~/.tmux/plugins/tmux-canopy/canopy setup` for an interactive list of detected CLIs, or `canopy integration install codex` (also `claude`, `gemini`, `pi`, `omp`, `opencode`). Use `canopy integration status` to inspect them, `canopy integration install codex --dry-run` to preview a change, and `canopy integration uninstall codex` to remove only Canopy's entries. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters) for details.
 
 ### Defaults
 
@@ -97,7 +108,7 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
 | `p` / `P` | Toggle preview / open enlarged terminal preview |
-| `i` | Switch the preview drawer between terminal and Codex/Claude summaries |
+| `i` | Switch the preview drawer between terminal and agent summaries |
 | `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |
 | `?` | Scrollable help popup |
@@ -123,7 +134,7 @@ This restoration applies to settings first installed by the current version. Whe
 
 - Stable slots are optimized for one active sidebar owner per tmux server. Multiple simultaneous owners can affect each other’s window geometry.
 - A directory-only change may need `Ctrl-r`; there is no shell prompt integration or polling loop.
-- Activity means terminal output, not an AI agent’s task status. Without [optional Codex hooks](docs/reference.md#codex-hook-setup), the Codex/Claude drawer reads the selected pane’s current terminal screen and labels possible requests as unverified. Claude always uses this fallback. Continuous logs can be noisy.
+- Activity means terminal output, not an AI agent’s task status. Without an [optional lifecycle adapter](docs/reference.md#agent-lifecycle-adapters), the agent drawer reads the selected pane’s current terminal screen and labels possible requests as unverified. Continuous logs can be noisy.
 - Closing the sidebar returns its space but may not restore every previous pane proportion.
 - Confirmed deletion has no undo.
 

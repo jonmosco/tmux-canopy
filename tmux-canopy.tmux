@@ -249,3 +249,6 @@ if [[ "$notification_sources" != 'none' && "$notification_target" != 'status' ]]
 fi
 
 canopy_restore_unused_bindings
+# The legacy compatibility entrypoint is also a *.tmux file. TPM executes
+# both; this marker lets that entrypoint avoid a duplicate load.
+tmux set-option -gq @tmux_canopy_loaded_path "$CURRENT_DIR"

@@ -153,7 +153,11 @@ def main():
 
             calls.write_text('')
             activate(peer)
-            commands = recorded_commands()
+            # A delayed sidebar refresh can collect its read-only snapshot
+            # while the navigation wrapper is recording. It is independent
+            # of the foreground navigation command count.
+            commands = [row for row in recorded_commands()
+                        if not (row[0] == 'display-message' and 'list-sessions' in row)]
             # Returning the sidebar pointer to the active target adds two
             # read-only option lookups before the batched navigation command.
             assert len(commands) == 4, commands

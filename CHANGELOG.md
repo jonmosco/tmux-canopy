@@ -4,6 +4,10 @@
 
 ### Added
 
+- TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.
+- Doctor output lists Canopy-owned tmux bindings, options, hooks, and optional agent integration states.
+- Detect OpenCode, Gemini CLI, Pi, and Oh My Pi in the Agents view and read-only drawer; distinguish process detection, unverified screen hints, and optional lifecycle reports.
+- Optional Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle adapters with example configurations, pane/process identity checks, and source-aware row labels.
 - Reported Codex lifecycle labels on Tree and Agents pane rows, with foreground-command or process-ancestry, pane-PID, and freshness checks; stale reports show unknown.
 - A scrollable symbol and color legend on `g`, with responsive layout and explanations for tree markers, pane labels, notifications, and filters.
 - Codex and Claude Code read-only preview prototype, toggled with `i` in the existing drawer; it summarizes selected pane metadata and labels possible requests inferred from visible terminal text.
@@ -23,7 +27,7 @@
 
 ### Changed
 
-- Separate visible session groups with one blank display line in Tree and Agents views.
+- Show a tmux session glyph instead of the inline dash; retain Unicode, ASCII, and custom-icon fallbacks.
 
 - Bind Codex reports to the live process and refresh expiring reports; accelerate the Agents view process scan on Linux.
 - Stabilize multiline sidebar selection coverage with fzf’s local state API.
@@ -37,6 +41,7 @@
 
 ### Fixed
 
+- TPM loads the legacy compatibility entrypoint without applying Canopy twice.
 - Sidebar navigation preserves split proportions when a hidden window resizes to the active terminal, preventing content panes from collapsing to one column.
 
 - Slot navigation uses native empty panes, fixing new-window follow failures on macOS caused by `sleep infinity`.

@@ -37,6 +37,9 @@ def main():
                                          str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
                                         input=snapshot, text=True, capture_output=True, env=env, check=True)
                 rows = {parts[0]: parts for line in result.stdout.splitlines() if (parts := line.split('\t'))}
+                session_glyph = {'nerdfont': '', 'unicode': '◈', 'ascii': 'S'}[icons]
+                assert session_glyph in rows['S:$0'][1], rows['S:$0']
+                assert '─' not in rows['S:$0'][1], rows['S:$0']
                 for index, (_, color, glyph) in enumerate(CASES):
                     row = rows[f'P:%{index}']
                     assert len(row) == 3 and row[2] == f'P:%{index}:$0'

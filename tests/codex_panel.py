@@ -79,43 +79,43 @@ try:
                         if line.startswith('P:' + pane + '\t'))
 
         hook({'hook_event_name': 'SessionStart', 'session_id': 'codex-session'})
-        assert 'Status: Ready' in report() and 'Source: Codex hook' in report()
-        assert '[ready]' in tree_row(agent)
+        assert 'Status: Ready' in report() and 'Source: Codex lifecycle hook' in report()
+        assert '[ready·hook]' in tree_row(agent)
         hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'codex-session', 'turn_id': 't1'})
         assert 'Status: Working' in report()
-        assert '[working]' in tree_row(agent)
+        assert '[working·hook]' in tree_row(agent)
         tm('set-option', '-g', '@tmux-canopy-theme', 'mono')
-        assert '[working]' in tree_row(agent) and '\x1b' not in tree_row(agent)
+        assert '[working·hook]' in tree_row(agent) and '\x1b' not in tree_row(agent)
         tm('set-option', '-gu', '@tmux-canopy-theme')
         request = {'hook_event_name': 'PermissionRequest', 'session_id': 'codex-session',
                    'turn_id': 't1', 'tool_name': 'shell_command',
                    'tool_input': {'description': 'Install the dependency',
                                   'command': 'npm install example'}}
         hook(request)
-        assert 'Status: Approval requested (reported)' in report()
-        assert '[approval]' in tree_row(agent)
+        assert 'Status: Approval requested (hook report)' in report()
+        assert '[approval·hook]' in tree_row(agent)
         tm('resize-pane', '-t', sidebar, '-x', '30')
-        assert '[req]' in tree_row(agent), 'narrow row lost its approval label'
+        assert '[req·hook]' in tree_row(agent), 'narrow row lost its approval label'
         tm('resize-pane', '-t', sidebar, '-x', '42')
         assert 'Request: Install the dependency' in report()
         assert 'Command: npm install example' in report()
         assert 'Possible input requested' not in report()
         hook({'hook_event_name': 'PostToolUse', 'session_id': 'codex-session',
               'turn_id': 't1', 'tool_name': 'other_tool', 'tool_input': {}})
-        assert 'Status: Approval requested (reported)' in report()
+        assert 'Status: Approval requested (hook report)' in report()
         hook({'hook_event_name': 'PostToolUse', 'session_id': 'codex-session',
               'turn_id': 't1', 'tool_name': 'shell_command',
               'tool_input': request['tool_input']})
         assert 'Status: Working' in report() and 'npm install example' not in report()
-        assert '[working]' in tree_row(agent)
+        assert '[working·hook]' in tree_row(agent)
         hook({'hook_event_name': 'Stop', 'session_id': 'codex-session', 'turn_id': 't1'})
         assert 'Status: Turn ended' in report(), report()
-        assert '[turn ended]' in tree_row(agent)
+        assert '[turn ended·hook]' in tree_row(agent)
         hook(request)
         assert 'Status: Turn ended' in report()
         tm('set-option', '-pq', '-t', agent, '@tmux_canopy_agent_updated', '1')
         assert 'Status: Unknown (report stale)' in report()
-        assert '[unknown]' in tree_row(agent)
+        assert '[unknown·hook]' in tree_row(agent)
         timer = tm('show-option', '-pqv', '-t', agent, '@tmux_canopy_agent_timer')
         result = sp.run([str(ROOT / 'scripts/agent-expiry'), agent, timer],
                         env=script_env, capture_output=True, text=True, timeout=10)
@@ -123,30 +123,30 @@ try:
         assert tm('show-option', '-pqv', '-t', agent, '@tmux_canopy_agent_timer') == ''
         tm('set-option', '-pq', '-t', agent, '@tmux_canopy_agent_pane_pid', '999999')
         assert 'Possible input requested (unverified)' in report()
-        assert '[unknown]' not in tree_row(agent) and '[turn ended]' not in tree_row(agent)
+        assert '[unknown·hook]' not in tree_row(agent) and '[turn ended·hook]' not in tree_row(agent)
         tm('set-option', '-pq', '-t', agent, '@tmux_canopy_agent_pane_pid',
            tm('display-message', '-p', '-t', agent, '#{pane_pid}'))
         tm('set-option', '-pq', '-t', agent, '@tmux_canopy_agent_updated', '1')
         hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'new-session', 'turn_id': 't2'})
         assert 'Status: Working' in report()
-        assert '[working]' in tree_row(agent)
+        assert '[working·hook]' in tree_row(agent)
         for key, value in (('source', 'codex-hook'), ('session', 'old-agent'),
                            ('pane_pid', tm('display-message', '-p', '-t', other, '#{pane_pid}')),
                            ('status', 'working'), ('updated', tm('show-option', '-pqv', '-t', agent,
                                                                '@tmux_canopy_agent_updated'))):
             tm('set-option', '-pq', '-t', other, '@tmux_canopy_agent_' + key, value)
-        assert '[working]' not in tree_row(other), 'old hook state appeared on a non-Codex pane'
+        assert '[working·hook]' not in tree_row(other), 'old hook state appeared on a non-Codex pane'
         hook({'hook_event_name': 'SessionEnd', 'session_id': 'codex-session'})
         assert 'Status: Working' in report()
         assert 'Codex ·' in run('sidebar-preview', 'W:' + window + ':' + session)
         claude_view = run('sidebar-preview', 'P:' + claude)
         assert 'Claude Code ·' in claude_view
-        assert '[working]' not in tree_row(claude) and '[approval]' not in tree_row(claude)
+        assert '[working·hook]' not in tree_row(claude) and '[approval·hook]' not in tree_row(claude)
         assert 'Possible input requested (unverified)' in claude_view
         assert 'Do you want to proceed?' in claude_view
         assert len(claude_view.splitlines()) <= 12
         assert 'Claude Code ·' in run('sidebar-preview', 'W:' + claude_window + ':' + session)
-        assert 'No Codex or Claude process found' in run('sidebar-preview', 'P:' + other)
+        assert 'No supported agent process found' in run('sidebar-preview', 'P:' + other)
         assert 'Session: studio' in run('sidebar-preview', 'S:' + session)
         assert 'no longer available' in run('sidebar-preview', 'P:%999999'), run('sidebar-preview', 'P:%999999')
         assert 'Codex ·' not in run('sidebar-preview', 'P:' + agent,
@@ -187,17 +187,17 @@ try:
         hook({'hook_event_name': 'SessionStart', 'session_id': 'first-process'}, pane=restart)
         assert tm('show-option', '-pqv', '-t', restart,
                   '@tmux_canopy_agent_process_pid') == first
-        assert '[ready]' in tree_row(restart)
+        assert '[ready·hook]' in tree_row(restart)
         sp.run(['kill', '-TERM', first], check=True)
         deadline = time.monotonic() + 3
         while (not child() or child()[0] == first) and time.monotonic() < deadline:
             time.sleep(.05)
         assert child() and child()[0] != first, 'second nested Codex never started'
-        assert '[ready]' not in tree_row(restart), 'old process state leaked to new Codex'
-        assert 'Source: Codex hook' not in run('sidebar-preview', 'P:' + restart), \
+        assert '[ready·hook]' not in tree_row(restart), 'old process state leaked to new Codex'
+        assert 'Source: Codex lifecycle hook' not in run('sidebar-preview', 'P:' + restart), \
             'old process report leaked into drawer'
         hook({'hook_event_name': 'SessionStart', 'session_id': 'second-process'}, pane=restart)
-        assert '[ready]' in tree_row(restart), 'new process report missing'
+        assert '[ready·hook]' in tree_row(restart), 'new process report missing'
         assert tm('show-option', '-pqv', '-t', restart,
                   '@tmux_canopy_agent_process_pid') == child()[0]
         script_env['TMUX_PANE'] = old_pane
@@ -207,7 +207,7 @@ try:
         assert f'P:{claude}:{session}' not in source
         tm('kill-pane', '-t', agent)
         source = run('sidebar-source', '--stable')
-        assert 'V:agents-empty' in source and 'No Codex or Claude agents detected' in source
+        assert 'V:agents-empty' in source and 'No supported agent processes detected' in source
         run('sidebar-action', 'view-tree')
         assert 'V:agents-empty' not in run('sidebar-source', '--stable')
         print('ok - agent preview, Codex hook lifecycle and request freshness, toggle, and agents view')

@@ -11,12 +11,14 @@ pane processes, and move between projects. Its current activity, bell, and
 silence badges report terminal events. They do not establish whether an agent
 is working, waiting for input, or finished.
 
-A Codex/Claude preview prototype is available through `i`. Without an integration,
-it reads current pane metadata and visible screen text and labels possible
-prompts as unverified. An optional Codex CLI hook now reports turn state and
-approval requests to that drawer; Claude still uses the screen summary.
-The Agents view (`4`) lists sessions, windows, and panes with detected Codex or
-Claude processes; its parent counts are process counts, not task status.
+The agent preview is available through `i`. Without an integration, it reads
+current pane metadata and visible screen text and labels possible prompts as
+unverified. Optional Codex, Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi
+adapters report supported lifecycle events. The Agents view (`4`) lists panes
+containing those detected processes; `[process]` means detection only, while
+`·hook` identifies a recent hook report; `·plugin?` marks an OpenCode plugin
+report whose pane/session association needs confirmation. Parent counts are process
+counts, not task status.
 
 The goal is to help users identify which agent needs attention while continuing
 to use their existing tmux sessions, windows, panes, and tools.
@@ -25,11 +27,11 @@ to use their existing tmux sessions, windows, panes, and tools.
 
 - [x] Define pane metadata for agent identity, status, reporting source, and
   freshness.
-- [x] Add an optional Codex integration that reports lifecycle events into tmux
-  pane metadata. Evaluate Claude and other integrations separately.
+- [x] Add optional Codex, Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi
+  lifecycle reporters. Each reports only events its harness actually exposes.
 - [x] Display reported **working**, **approval**, **ready**, **turn ended**, and
-  **unknown** states beside live Codex panes, with readable text in monochrome mode.
-  Claude panes remain unlabeled until a trustworthy integration is available.
+  **unknown** states beside matching live agent panes, with readable text in
+  monochrome mode and a visible source label.
 - [ ] Handle agent exit, restart, stale reports, and pane removal without leaving
   misleading status behind.
 - [ ] Verify that installations without an integration retain normal sidebar
@@ -109,6 +111,32 @@ currently takes effect when the sidebar is reopened.
   default.
 - [ ] Test both directions, content layouts, mouse resizing, and client
   ownership. Document the action in the README and built-in help.
+
+## Appearance and theme sources
+
+Canopy currently uses the terminal's default foreground/background and ANSI
+palette for most of its UI, with a separate `mono` mode and configurable
+selection background. Add an explicit theme source so users can choose how the
+sidebar fits their existing setup:
+
+- [ ] **Terminal:** inherit the terminal's foreground/background and standard
+  ANSI colors. Keep contrast readable on both light and dark palettes without
+  assuming a specific terminal theme.
+- [ ] **tmux:** derive sidebar colors from the active tmux status, pane border,
+  and message styles where available. Define clear fallbacks when those styles
+  use `default` or omit a color.
+- [ ] **Canopy:** allow an independent palette for text, selection, accents,
+  notices, tree guides, preview, help, and the scrollbar. Provide documented
+  defaults and user overrides without changing tmux or terminal settings.
+- [ ] Apply the chosen source consistently across Tree, Processes, Buffers,
+  Agents, previews, help, and popups. Keep agent state and unread notifications
+  distinguishable without relying on color alone.
+- [ ] Define precedence for explicit color overrides, theme-source selection,
+  and `mono`; update a running sidebar when tmux styling changes without losing
+  selection, query, folds, or preview state.
+- [ ] Test light/dark terminal palettes, tmux themes with partial/default
+  colors, 256-color/truecolor terminals, and monochrome output. Document what
+  terminal colors can be inherited rather than queried reliably.
 
 ## Scope
 

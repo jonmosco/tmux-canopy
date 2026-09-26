@@ -80,8 +80,13 @@ def linux_stat(pid):
         return None
 
 
-def process_identity(root):
-    """Find the live Codex process in this pane, including nested shells."""
+def process_identity(root, kind="codex"):
+    """Find a live agent process in this pane, including nested shells."""
+    names = {"codex": {"codex"}, "claude": {"claude", "claude-code"},
+             "opencode": {"opencode"}, "gemini": {"gemini"},
+             "pi": {"pi"}, "omp": {"omp"}}.get(kind, set())
+    if not names:
+        return None
     try:
         root = int(root)
     except ValueError:
@@ -98,7 +103,7 @@ def process_identity(root):
                     continue
                 try:
                     with open(f"{entry.path}/comm", encoding="utf-8") as stream:
-                        if stream.read().strip() != "codex":
+                        if stream.read().strip() not in names:
                             continue
                 except OSError:
                     continue
@@ -119,7 +124,7 @@ def process_identity(root):
             fields = line.split(None, 2)
             if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
                 parents[int(fields[0])] = int(fields[1])
-                if os.path.basename(fields[2]) == "codex":
+                if os.path.basename(fields[2]) in names:
                     candidates.append((int(fields[0]), ""))
         def stat_for(pid):
             return (parents[pid], "") if pid in parents else None
