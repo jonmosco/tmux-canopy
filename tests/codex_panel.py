@@ -3,7 +3,7 @@
 import os
 import json
 from pathlib import Path
-import shutil
+from support import install_agent_fixture
 import subprocess as sp
 import tempfile
 import time
@@ -25,9 +25,9 @@ def tm(*args):
 try:
     with tempfile.TemporaryDirectory(prefix='canopy-codex-panel-') as temp_dir:
         binary = Path(temp_dir) / 'codex'
-        shutil.copy2(shutil.which('sleep'), binary)
+        install_agent_fixture(binary)
         claude_binary = Path(temp_dir) / 'claude'
-        shutil.copy2(shutil.which('sleep'), claude_binary)
+        install_agent_fixture(claude_binary)
         agent = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'studio', '-x', '120', '-y', '35',
                    '-P', '-F', '#{pane_id}',
                    f"/bin/bash -c 'printf \"Do you want to run this command?\\n\"; exec {binary} 600'")

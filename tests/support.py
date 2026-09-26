@@ -1,6 +1,16 @@
 """Test-only instrumentation; production never accepts ambient fzf bindings."""
 import shlex
 import shutil
+import sys
+
+
+def install_agent_fixture(destination):
+    # Apple's protected sleep cannot be copied and renamed into a fake agent.
+    name = 'gsleep' if sys.platform == 'darwin' else 'sleep'
+    binary = shutil.which(name)
+    if binary is None:
+        raise RuntimeError(f'{name} is required for agent fixtures (macOS: brew install coreutils)')
+    shutil.copy(binary, destination)
 
 
 def install_fzf_probe(directory, bindings, env, extra_options=()):

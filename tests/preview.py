@@ -68,7 +68,7 @@ def main():
             pids = {server_pid}
             for _ in range(12):
                 pids.update(int(pid) for pid, parent, _ in rows if int(parent) in pids)
-            return {(int(pid), command) for pid, _, command in rows if int(pid) in pids}
+            return {(int(pid), Path(command).name) for pid, _, command in rows if int(pid) in pids}
 
         fixture = temp / 'terminal.py'
         fixture.write_text('''import os, signal, sys, tty

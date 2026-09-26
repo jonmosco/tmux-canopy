@@ -22,7 +22,7 @@ def main():
     socket = f'canopy-switch-test-{os.getpid()}'
     env = {k: v for k, v in os.environ.items() if k not in ('TMUX', 'TMUX_PANE')}
     env['TERM'] = 'xterm-256color'
-    master = process = None
+    master = process = sidebar = None
     with tempfile.TemporaryDirectory(prefix='canopy-switch-test-') as directory:
         temp = Path(directory)
         selected, state_path, started, loads = (temp / name for name in ('selected', 'state-path', 'started', 'loads'))
@@ -38,18 +38,27 @@ def main():
                 if predicate():
                     return
                 time.sleep(.04)
-            raise AssertionError(description)
+            raise AssertionError((description,
+                                  tm('list-clients', '-F', '#{client_tty}|#{session_id}|#{pane_id}'),
+                                  tm('list-panes', '-a', '-F', '#{session_id}|#{window_id}|#{pane_id}|#{pane_active}|#{@tmux_canopy}'),
+                                  tm('capture-pane', '-p', '-t', sidebar) if sidebar else 'sidebar not created'))
 
         def display(pane, fmt):
             return tm('display-message', '-p', '-t', pane, fmt)
 
         def probe(popup=False):
             selected.unlink(missing_ok=True)
-            if popup:
-                os.write(master, b'\x1bz')
-            else:
-                tm('send-keys', '-t', sidebar, 'M-z')
-            wait(lambda: selected.exists() and selected.stat().st_size, 'selection probe')
+            def ready():
+                if selected.exists() and selected.stat().st_size:
+                    return True
+                # fzf ignores keys during its search wait action. Retry only
+                # this read-only probe, never popup opens or navigation keys.
+                if popup:
+                    os.write(master, b'\x1bz')
+                else:
+                    tm('send-keys', '-t', sidebar, 'M-z')
+                return False
+            wait(ready, 'selection probe')
             return selected.read_text().split('|')
 
         def open_switch():
@@ -145,6 +154,12 @@ def main():
             print('ok - Enter targets the linked session after closing popup, bypasses pending move/link, and retains the sidebar/fzf')
 
             # Stale inventory must not redirect to an unrelated active object.
+            # The client moves before the debounced content-focus refresh has
+            # finished sending Ctrl-o/Ctrl-r. A load marker alone can belong to
+            # an earlier reload, so settle that worker before injecting Ctrl-g.
+            wait(lambda: display(sidebar, '#{@tmux_canopy_focus_location}') == f'{sid}|{target_window}|{target}'
+                 and not display(sidebar, '#{@tmux_canopy_focus_pending}'), 'content focus refresh settled')
+            probe()
             stale = tm('new-window', '-d', '-t', 'two:', '-n', 'ephemeral-target', '-P', '-F', '#{pane_id}', 'sleep 600')
             # Let the structural reload finish before asking fzf to execute a popup.
             count = loads.stat().st_size if loads.exists() else 0
