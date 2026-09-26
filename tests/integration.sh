@@ -180,17 +180,17 @@ sleep 0.3
 content_panes_after="$("${TMUX_TEST[@]}" list-panes -t "$destination_window" -F '#{@tmux_canopy}' | awk '$0 != "1" { count++ } END { print count + 0 }')"
 assert_eq "$((content_panes_before + 1))" "$content_panes_after" 'split action creates a content pane'
 
-window_count_before="$("${TMUX_TEST[@]}" list-windows -t test -F '#{window_id}' | wc -l)"
+window_count_before="$("${TMUX_TEST[@]}" list-windows -t test -F '#{window_id}' | awk 'END { print NR }')"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_CANOPY_WIDTH=42 TMUX_CANOPY_SCOPE=global TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' create-window 'W:$destination_window'"
 sleep 0.3
-window_count_after="$("${TMUX_TEST[@]}" list-windows -t test -F '#{window_id}' | wc -l)"
+window_count_after="$("${TMUX_TEST[@]}" list-windows -t test -F '#{window_id}' | awk 'END { print NR }')"
 assert_eq "$((window_count_before + 1))" "$window_count_after" 'window action creates a window in the selected session'
 
-session_count_before="$("${TMUX_TEST[@]}" list-sessions -F '#{session_id}' | wc -l)"
+session_count_before="$("${TMUX_TEST[@]}" list-sessions -F '#{session_id}' | awk 'END { print NR }')"
 target_after_window="$("${TMUX_TEST[@]}" show-option -pqv -t "$sidebar" @tmux_canopy_target)"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_CANOPY_WIDTH=42 TMUX_CANOPY_SCOPE=global TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' create-session 'P:$target_after_window'"
 sleep 0.3
-session_count_after="$("${TMUX_TEST[@]}" list-sessions -F '#{session_id}' | wc -l)"
+session_count_after="$("${TMUX_TEST[@]}" list-sessions -F '#{session_id}' | awk 'END { print NR }')"
 assert_eq "$((session_count_before + 1))" "$session_count_after" 'session action creates a session'
 tmux_session_name="$("${TMUX_TEST[@]}" display-message -p -t "$sidebar" '#{session_name}')"
 assert_eq 'session-1' "$tmux_session_name" 'new sessions receive the next automatic name'

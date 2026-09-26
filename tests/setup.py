@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import pty
 import subprocess as sp
 import tempfile
 
@@ -37,6 +38,9 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-") as temp:
     claude_link.symlink_to(claude_target)
 
     cli = str(ROOT / "canopy")
+    before = codex.read_text()
+    run(cli, "integration", "install", "codex", "--dry-run", env=env)
+    assert codex.read_text() == before
     run(cli, "integration", "install", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
     first = codex.read_text()
     data = json.loads(first)
@@ -63,6 +67,25 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-") as temp:
     assert not plugin.exists()
     assert list(codex.parent.glob("hooks.json.canopy-backup-*"))
     print("ok - integrations install idempotently, preserve unrelated settings, and uninstall only owned entries")
+
+    for answer in ("", "all"):
+        master, slave = pty.openpty()
+        try:
+            os.write(master, (answer + "\n").encode())
+            result = sp.run([cli, "setup"], env=env, stdin=slave,
+                            capture_output=True, text=True, timeout=30)
+            assert result.returncode == 0, (result.stdout, result.stderr)
+            assert "Agents to install" in result.stdout
+        finally:
+            os.close(slave)
+            os.close(master)
+        if not answer:
+            assert json.loads(codex.read_text()) == restored
+    status = run(cli, "integration", "status", env=env).stdout
+    assert all(f"{kind:9} installed" in status for kind in ("codex", "claude", "gemini", "pi", "omp", "opencode"))
+    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    assert json.loads(codex.read_text()) == restored
+    print("ok - dry-run, interactive setup cancellation, all-agent setup and removal")
 
     codex.write_text("{invalid")
     result = run(cli, "integration", "install", "codex", env=env, ok=False)

@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-import shutil
+from support import install_agent_fixture
 import subprocess as sp
 import tempfile
 
@@ -28,7 +28,7 @@ try:
         state.touch()
         names = ('claude', 'opencode', 'gemini', 'pi', 'omp')
         for name in names:
-            shutil.copy2(shutil.which('sleep'), temp / name)
+            install_agent_fixture(temp / name)
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '100', '-y', '30',
                   '-P', '-F', '#{pane_id}', str(temp / names[0]) + ' 600')
         panes = {names[0]: pane}

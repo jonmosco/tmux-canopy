@@ -89,7 +89,7 @@ def main():
             processes = [line.split(None, 2) for line in rows.splitlines()]
             for _ in range(10):
                 descendants.update(int(pid) for pid, ppid, _ in processes if int(ppid) in descendants)
-            return next(int(pid) for pid, _, command in processes if int(pid) in descendants and command == 'fzf')
+            return next(int(pid) for pid, _, command in processes if int(pid) in descendants and Path(command).name == 'fzf')
 
         try:
             command = lambda log: shlex.join([sys.executable, str(Path(__file__).resolve()), '--probe', str(log)])
