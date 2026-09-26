@@ -34,13 +34,14 @@ if [[ "$agent_view" == 1 && -d /proc/self ]] && command -v python3 >/dev/null 2>
   agent_records="$(python3 "$SCRIPT_DIR/../lib/agent-process.py" <<< "$snapshot")" || exit 1
   [[ -z "$agent_records" ]] || snapshot+=$'\n'"$agent_records"
 else
-  if [[ "$snapshot" == *"${sep}codex-hook${sep}"* ]]; then
+  if [[ "$snapshot" == *"-hook${sep}"* ]]; then
     # shellcheck disable=SC1091
     source "$SCRIPT_DIR/../lib/agent-process.sh"
     while IFS= read -r line; do
-      [[ $line == P$sep* && $line == *"${sep}codex-hook${sep}"* ]] || continue
+      [[ $line == P$sep* && $line == *"-hook${sep}"* ]] || continue
       IFS="$sep" read -ra fields <<< "$line"
-      if canopy_process_identity "${fields[16]:-}" "${fields[22]:-}" "${fields[23]:-}"; then
+      kind=${fields[17]%-hook}
+      if canopy_process_identity "${fields[16]:-}" "${fields[22]:-}" "${fields[23]:-}" "$kind"; then
         snapshot+=$'\n'"V${sep}${fields[1]}"
       fi
     done <<< "$snapshot"

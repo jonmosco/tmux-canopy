@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/ui-options.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/config-lib.sh"
 mode="${1:---report}"
 owner="${2:-${TMUX_CANOPY_CLIENT:-}}"
 target="${3:-${TMUX_PANE:-}}"
@@ -49,6 +51,47 @@ else
   printf 'No unambiguous owner; pass --report CLIENT_TTY PANE_ID.\n'
 fi
 printf '\nInherited fzf defaults are ignored; actions use /bin/sh.\nOnly fixed failure summaries are retained in tmux, one per owner.\nSource failures show a retry row; Ctrl-r retries without restarting fzf.\n'
+printf '\nCanopy-owned tmux configuration (current server):\n'
+loaded_path="$(tmux show-option -gqv @tmux_canopy_loaded_path 2>/dev/null || true)"
+if [[ -z "$loaded_path" ]]; then
+  printf '  Canopy entrypoint has not loaded in this server.\n'
+else
+  printf '  entrypoint: %s\n' "$loaded_path"
+  while read -r option _; do
+    if [[ "$option" =~ ^@tmux_canopy_binding_([0-9]+)_installed$ ]]; then
+      binding_base="@tmux_canopy_binding_${BASH_REMATCH[1]}"
+      binding_table="$(tmux show-option -gqv "${binding_base}_table")"
+      binding_key="$(tmux show-option -gqv "${binding_base}_key")"
+      if [[ -n "$binding_key" ]]; then
+        binding_state=active
+        [[ "$(canopy_binding "$binding_table" "$binding_key")" == "$(tmux show-option -gqv "${binding_base}_installed")" ]] || binding_state='superseded by user'
+        printf '  binding: %s + %s (%s)\n' "$binding_table" "$binding_key" "$binding_state"
+      fi
+    elif [[ "$option" =~ ^@tmux_canopy_owned_(session|window)_(.*)_installed$ ]]; then
+      option_scope="${BASH_REMATCH[1]}"
+      native_option="${BASH_REMATCH[2]//_/-}"
+      option_base="@tmux_canopy_owned_${option_scope}_${BASH_REMATCH[2]}"
+      if [[ "$option_scope" == window ]]; then
+        native_value="$(tmux show-window-option -gv "$native_option" 2>/dev/null || true)"
+      else
+        native_value="$(tmux show-option -gv "$native_option" 2>/dev/null || true)"
+      fi
+      option_state=active
+      [[ "$native_value" == "$(tmux show-option -gqv "${option_base}_installed")" ]] || option_state='superseded by user'
+      printf '  option: %s %s = %s (%s)\n' "$option_scope" "$native_option" "$native_value" "$option_state"
+    fi
+  done < <(tmux show-options -g 2>/dev/null)
+  printf '  hooks: '
+  hook_names="$(tmux show-hooks -g 2>/dev/null | awk '$1 ~ /\[900[1-5]\]/ {printf "%s%s", separator, $1; separator=", "}')"
+  printf '%s\n' "${hook_names:-none}"
+  printf '  monitor: '
+  if tmux show-hooks -B -g 2>/dev/null | grep -Fq '@tmux_canopy_command'; then
+    printf '@tmux_canopy_command (tmux 3.8+)\n'
+  else
+    printf 'none\n'
+  fi
+  printf '  mouse: root border drag; tmux-canopy-resize temporary key table\n'
+fi
 if [[ "$mode" == --render ]]; then
   printf '\nPress any key to close…'
   IFS= read -r -s -n 1 </dev/tty || true

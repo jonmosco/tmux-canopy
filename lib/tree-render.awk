@@ -50,7 +50,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     split(process_line,process_field,/[[:space:]]+/)
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name)
-    if (name=="codex") agent_process[pid]="codex"
+    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp") agent_process[pid]=name
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     next
 }
@@ -173,11 +173,11 @@ function notice(a,b,z,count, glyph) {
 }
 # Hook state is displayed only while a matching agent process still belongs to
 # this live pane. Expired reports say unknown; unsupported agents show no state.
-function agent_label(p, age,status) {
+function agent_label(p, age,status,kind) {
     if (p in agent_labels) return agent_labels[p]
     agent_labels[p]=""
-    if (dead[p] == 1 || (agent_view ? agent_kind[p] != "codex" : command[p] !~ /(^|\/)codex$/) ||
-        report_source[p] != "codex-hook" ||
+    kind=(agent_view ? agent_kind[p] : canonical_agent(command[p]))
+    if (dead[p] == 1 || kind == "" || report_source[p] != kind "-hook" ||
         report_session[p] == "" || pane_pid[p] == "" || report_pid[p] != pane_pid[p] ||
         report_updated[p] !~ /^[0-9]+$/ || length(report_updated[p])>12 || !verified[p]) return ""
     age=now-report_updated[p]
@@ -191,9 +191,24 @@ function agent_label(p, age,status) {
     if (status=="session-ended") return agent_labels[p]="session ended"
     return agent_labels[p]="unknown"
 }
-function agent_badge(p, label,style) {
+function canonical_agent(value) {
+    sub(/^.*\//,"",value)
+    if (value == "claude-code") return "claude"
+    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp") return value
+    return ""
+}
+function agent_name(kind) {
+    if (kind == "codex") return "Codex"
+    if (kind == "claude") return "Claude Code"
+    if (kind == "opencode") return "OpenCode"
+    if (kind == "gemini") return "Gemini CLI"
+    if (kind == "pi") return "Pi"
+    if (kind == "omp") return "Oh My Pi"
+    return kind
+}
+function agent_badge(p, label,style,origin) {
     label=agent_label(p)
-    if (label=="") return ""
+    if (label=="") return agent_view && agent_kind[p] != "" ? " " dim "[process]" reset : ""
     style=(label=="working" ? accent : label=="approval" || label=="interrupted" ? attention : dim)
     if (width<36) {
         if (label=="working") label="wrk"
@@ -203,7 +218,8 @@ function agent_badge(p, label,style) {
         else if (label=="interrupted") label="int"
         else label="?"
     }
-    return " " style "[" label "]" reset
+    origin=(report_source[p] == "opencode-hook" ? "plugin?" : "hook")
+    return " " style "[" label "·" origin "]" reset
 }
 function shortpath(value, budget, n, parts, shortened) {
     if (value == home) value="~"
@@ -276,8 +292,8 @@ function appcolor(value, n, parts) {
     if (value ~ /^(npm|npx|git|lazygit|oc)$/) return icon_red
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
     if (value ~ /^(ssh|codex|top|htop|btop)$/) return icon_cyan
-    if (value ~ /^(pi|opencode)$/) return icon_purple
-    if (value == "claude") return icon_yellow
+    if (value ~ /^(pi|omp|opencode)$/) return icon_purple
+    if (value ~ /^(claude|claude-code|gemini)$/) return icon_yellow
     return icon_neutral
 }
 function appicon(value, n, parts) {
@@ -291,7 +307,7 @@ function appicon(value, n, parts) {
     if (value ~ /^(git|lazygit)$/) return "󰊢"
     if (value == "ssh") return "󰢹"
     if (value ~ /^(kubectl|oc|k9s)$/) return "󱃾"
-    if (value ~ /^(claude|codex|pi|opencode)$/) return "󰚩"
+    if (value ~ /^(claude|claude-code|codex|gemini|pi|omp|opencode)$/) return "󰚩"
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
     return pane_icon
 }
@@ -306,7 +322,7 @@ END {
         green="\033[1;32m"
         accent="\033[1;36m"; attention="\033[1;33m"; path_color=dim
     }
-    session_icon=(icons == "nerdfont" ? "󰆍" : icons == "ascii" ? "S" : "◈")
+    session_icon=(icons == "nerdfont" ? "" : icons == "ascii" ? "S" : "◈")
     window_icon=(icons == "nerdfont" ? "󰖯" : icons == "ascii" ? "W" : "▣")
     pane_icon=(icons == "nerdfont" ? "" : icons == "ascii" ? ">" : "▹")
     activity_badge=(icons == "ascii" ? "*" : "●")
@@ -377,20 +393,16 @@ END {
         }
         exit
     }
-    if (agent_view && !total_visible) row("V:agents-empty","No Codex or Claude agents detected","V:agents-empty")
+    if (agent_view && !total_visible) row("V:agents-empty","No supported agent processes detected","V:agents-empty")
     else if (filtered && !total_visible) row("V:empty","No matches · F filters","V:empty")
-    visible_session_seen=0
     for (si=1;si<=ns;si++) {
         s=sessions[si]; st="S:" s
         if (!visible_s[s]) continue
-        # A leading blank display line separates groups without adding a
-        # selectable item. Legacy newline records remain one line each.
-        session_gap=(nul && visible_session_seen++ ? "\n" : "")
         sm=(st == del ? "✕" : s == current_s && (collapsed[st] || !visible_w[s,current_w]) ? "●" : " ")
         meta=(agent_view ? " [" shown_agents_s[s] " agent" (shown_agents_s[s]==1 ? "" : "s") "]" : filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
-        session_glyph=(custom_s != "" ? dim session_icon reset " " : "")
+        session_glyph=dim session_icon reset " "
         session_style=(s == current_s ? bold : "")
-        row(st,session_gap (collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) : "") dim meta reset,st)
+        row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) : "") dim meta reset,st)
         if (collapsed[st]) continue
         visible_wpos=0
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -435,7 +447,7 @@ END {
                 visible_ppos++
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p]==1 ? "×" : " ")
                 details=title_detail(p)
-                display_command=(agent_view ? agent_kind[p] == "codex" ? "Codex" : "Claude" : command[p])
+                display_command=(agent_view ? agent_name(agent_kind[p]) : command[p])
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
                 prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
                 show_path=(density == "detailed" || density == "compact" || (density == "normal" && width>=32))

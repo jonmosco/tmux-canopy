@@ -2,6 +2,7 @@
 """Read a tmux snapshot and emit live agent and verified-report records."""
 import os
 import sys
+from agent_kinds import KINDS
 
 SEP = '\x1f'
 
@@ -29,8 +30,8 @@ def main():
         except ValueError:
             continue
         owners[root] = fields[1]
-        if fields[17] == 'codex-hook':
-            reports.append((fields[1], root, fields[22], fields[23]))
+        if fields[17].endswith('-hook') and fields[17][:-5] in KINDS.values():
+            reports.append((fields[1], root, fields[17][:-5], fields[22], fields[23]))
     best = {}
     verified = set()
     try:
@@ -46,7 +47,7 @@ def main():
                     name = stream.read().strip()
             except OSError:
                 continue
-            if name not in ('codex', 'claude', 'claude-code'):
+            if name not in KINDS:
                 continue
             pid = int(entry.name)
             birth = stat(pid)
@@ -57,12 +58,11 @@ def main():
                 if current in owners:
                     pane = owners[current]
                     if pane not in best or depth < best[pane][0]:
-                        best[pane] = (depth, 'codex' if name == 'codex' else 'claude')
-                    if name == 'codex':
-                        for report_pane, report_root, report_pid, report_birth in reports:
-                            if report_pane == pane and report_root == current and \
-                                    report_pid == entry.name and report_birth == birth[1]:
-                                verified.add(pane)
+                        best[pane] = (depth, KINDS[name])
+                    for report_pane, report_root, report_kind, report_pid, report_birth in reports:
+                        if report_pane == pane and report_root == current and \
+                                report_kind == KINDS[name] and report_pid == entry.name and report_birth == birth[1]:
+                            verified.add(pane)
                     break
                 parent = stat(current)
                 if parent is None or parent[0] <= 0 or parent[0] == current:

@@ -11,12 +11,12 @@ canopy_proc_stat() {
   CANOPY_BIRTH=${fields[19]}
 }
 canopy_process_identity() {
-  local root=$1 pid=$2 birth=$3 current=$2 depth=0 name
+  local root=$1 pid=$2 birth=$3 kind=${4:-codex} current=$2 depth=0 name
   [[ $root =~ ^[1-9][0-9]*$ && $pid =~ ^[1-9][0-9]*$ ]] || return 1
   if [[ -d /proc/self ]]; then
     [[ -r /proc/$pid/comm ]] || return 1
     IFS= read -r name < "/proc/$pid/comm" 2>/dev/null || return 1
-    [[ $name == codex ]] || return 1
+    canopy_agent_name_matches "$name" "$kind" || return 1
     canopy_proc_stat "$pid" || return 1
     [[ $CANOPY_BIRTH == "$birth" ]] || return 1
     while ((depth++ < 128)); do
@@ -32,7 +32,7 @@ canopy_process_identity() {
   record=$(ps -p "$pid" -o ppid= -o comm= 2>/dev/null) || return 1
   read -r parent cmd <<< "$record"
   parent=${parent//[[:space:]]/}
-  [[ ${cmd##*/} == codex ]] || return 1
+  canopy_agent_name_matches "${cmd##*/}" "$kind" || return 1
   started=$(ps -p "$pid" -o lstart= 2>/dev/null) || return 1
   [[ $started == "$birth" ]] || return 1
   current=$pid
@@ -43,4 +43,10 @@ canopy_process_identity() {
     [[ $current =~ ^[1-9][0-9]*$ ]] || return 1
   done
   return 1
+}
+canopy_agent_name_matches() {
+  case "$2:$1" in
+    codex:codex|claude:claude|claude:claude-code|opencode:opencode|gemini:gemini|pi:pi|omp:omp) return 0 ;;
+    *) return 1 ;;
+  esac
 }

@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""Canopy setup and diagnostics. Run from the repository or add it to PATH."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+from datetime import datetime
+
+ROOT = Path(__file__).resolve().parent
+PLACEHOLDER = "/absolute/path/to/tmux-canopy"
+KINDS = ("codex", "claude", "gemini", "pi", "omp", "opencode")
+EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "pi": "pi", "omp": "omp", "opencode": "opencode"}
+TEMPLATES = {
+    "codex": "codex-hooks.example.json",
+    "claude": "claude-hooks.example.json",
+    "gemini": "gemini-hooks.example.json",
+    "pi": "pi-canopy.extension.ts",
+    "omp": "pi-canopy.extension.ts",
+    "opencode": "opencode-canopy.plugin.js",
+}
+
+
+def config_path(kind):
+    home = Path.home()
+    if kind == "codex":
+        return Path(os.environ.get("CODEX_HOME", home / ".codex")).expanduser() / "hooks.json"
+    if kind == "claude":
+        return Path(os.environ.get("CLAUDE_CONFIG_DIR", home / ".claude")).expanduser() / "settings.json"
+    if kind == "gemini":
+        return home / ".gemini" / "settings.json"
+    if kind == "pi":
+        return Path(os.environ.get("PI_CODING_AGENT_DIR", home / ".pi" / "agent")).expanduser() / "extensions" / "canopy-agent-state.ts"
+    if kind == "omp":
+        return home / ".omp" / "agent" / "extensions" / "canopy-agent-state.ts"
+    return Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")).expanduser() / "opencode" / "plugins" / "canopy-agent-state.js"
+
+
+def template(kind):
+    content = (ROOT / "docs" / TEMPLATES[kind]).read_text()
+    if kind in ("codex", "claude", "gemini"):
+        return json.loads(content.replace(PLACEHOLDER, shlex.quote(str(ROOT))))
+    content = content.replace("'" + PLACEHOLDER + "/scripts/agent-hook'", json.dumps(str(ROOT / "scripts" / "agent-hook")))
+    if kind == "omp":
+        content = content.replace("const kind = 'pi';", "const kind = 'omp';")
+    return content
+
+
+def read_json(path):
+    if not path.exists():
+        return {}
+    value = json.loads(path.read_text())
+    if not isinstance(value, dict):
+        raise ValueError(f"{path}: expected a JSON object")
+    if "hooks" in value and not isinstance(value["hooks"], dict):
+        raise ValueError(f"{path}: hooks must be an object")
+    return value
+
+
+def is_ours(command, kind):
+    if not isinstance(command, str):
+        return False
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return False
+    script = "codex-hook" if kind == "codex" else "agent-hook"
+    expected = 1 if kind == "codex" else 2
+    return len(parts) == expected and parts[0].endswith("/scripts/" + script) and (expected == 1 or parts[1] == kind)
+
+
+def count_hooks(data, kind):
+    return sum(1 for groups in data.get("hooks", {}).values() for group in groups if isinstance(group, dict)
+               for action in group.get("hooks", []) if isinstance(action, dict) and is_ours(action.get("command"), kind))
+
+
+def merge_hooks(data, kind):
+    hooks = data.setdefault("hooks", {})
+    for event, groups in template(kind)["hooks"].items():
+        existing = hooks.setdefault(event, [])
+        if not isinstance(existing, list):
+            raise ValueError(f"{event}: expected a hook list")
+        for group in groups:
+            matcher = group.get("matcher")
+            found = False
+            for item in existing:
+                if not isinstance(item, dict) or item.get("matcher") != matcher:
+                    continue
+                for action in item.get("hooks", []):
+                    if isinstance(action, dict) and is_ours(action.get("command"), kind):
+                        action.update(group["hooks"][0])
+                        found = True
+                        break
+                if found:
+                    break
+            if not found:
+                existing.append(group)
+
+
+def remove_hooks(data, kind):
+    for event, groups in list(data.get("hooks", {}).items()):
+        if not isinstance(groups, list):
+            continue
+        kept = []
+        for group in groups:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                kept.append(group)
+                continue
+            actions = [action for action in group["hooks"] if not
+                       (isinstance(action, dict) and is_ours(action.get("command"), kind))]
+            if actions:
+                group["hooks"] = actions
+                kept.append(group)
+        if kept:
+            data["hooks"][event] = kept
+        else:
+            del data["hooks"][event]
+    if not data.get("hooks"):
+        data.pop("hooks", None)
+
+
+def write_safely(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        backup = path.with_name(path.name + ".canopy-backup-" + stamp)
+        if backup.exists():
+            raise ValueError(f"backup already exists: {backup}")
+        shutil.copy2(path, backup)
+        print(f"backup: {backup}")
+    fd, tmp = tempfile.mkstemp(prefix=".canopy-", dir=path.parent)
+    try:
+        if path.exists():
+            os.fchmod(fd, path.stat().st_mode & 0o777)
+        else:
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            stream.write(content)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def status(kind):
+    path = config_path(kind)
+    if kind in ("codex", "claude", "gemini"):
+        data = read_json(path)
+        expected = template(kind)["hooks"]
+        present = [event for event in expected if any(
+            isinstance(group, dict) and any(isinstance(action, dict) and is_ours(action.get("command"), kind)
+                                            for action in group.get("hooks", []))
+            for group in data.get("hooks", {}).get(event, []))]
+        current = [event for event, groups in expected.items() if any(
+            isinstance(group, dict) and any(isinstance(action, dict) and action.get("command") == required["command"]
+                                            for action in group.get("hooks", []))
+            for group in data.get("hooks", {}).get(event, []) for required in groups[0]["hooks"])]
+        state = ("installed" if len(current) == len(expected) else
+                 "outdated path" if len(present) == len(expected) else
+                 "partial" if count_hooks(data, kind) else "absent")
+    elif not path.exists():
+        state = "absent"
+    else:
+        state = "installed" if path.read_text() == template(kind) else "modified (review manually)"
+    available = "found" if shutil.which(EXECUTABLES[kind]) else "not on PATH"
+    return f"{kind:9} {state:26} CLI {available:11} {path}"
+
+
+def change(kind, action, dry_run=False):
+    path = config_path(kind)
+    if path.is_symlink():
+        path = path.resolve()
+    if kind in ("codex", "claude", "gemini"):
+        data = read_json(path)
+        before = json.dumps(data, sort_keys=True)
+        if action == "install":
+            merge_hooks(data, kind)
+        else:
+            remove_hooks(data, kind)
+        after = json.dumps(data, sort_keys=True)
+        if before == after:
+            print(f"{kind}: already {'installed' if action == 'install' else 'absent'}")
+            return
+        content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    else:
+        wanted = template(kind)
+        current = path.read_text() if path.exists() else None
+        if current is not None and current != wanted:
+            raise ValueError(f"{path}: existing file was modified; review it manually")
+        if action == "install" and current == wanted or action == "uninstall" and current is None:
+            print(f"{kind}: already {'installed' if action == 'install' else 'absent'}")
+            return
+        content = wanted if action == "install" else None
+    if dry_run:
+        print(f"would {action}: {kind} -> {path}")
+    elif content is None:
+        path.unlink()
+        print(f"removed: {path}")
+    else:
+        write_safely(path, content)
+        print(f"{action}ed: {kind} -> {path}")
+
+
+def show_status(kinds):
+    result = 0
+    for kind in kinds:
+        try:
+            print(status(kind))
+        except (OSError, ValueError, TypeError) as error:
+            print(f"{kind:9} error: {error}", file=sys.stderr)
+            result = 1
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Canopy tmux diagnostics and agent integrations")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("doctor", help="check Canopy and show tmux ownership")
+    commands.add_parser("setup", help="choose optional agent integrations")
+    integrations = commands.add_parser("integration", help="manage agent lifecycle reporters")
+    integrations.add_argument("action", choices=("status", "install", "uninstall"))
+    integrations.add_argument("kinds", nargs="*", choices=KINDS)
+    integrations.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    if args.command == "doctor":
+        result = subprocess.call([str(ROOT / "scripts" / "doctor"), "--report"])
+        print("\nAgent integrations:")
+        integration_result = show_status(KINDS)
+        return result or integration_result
+    if args.command == "setup":
+        args.action, args.kinds, args.dry_run = "install", [], False
+    if args.action == "status":
+        return show_status(args.kinds or KINDS)
+    if not args.kinds:
+        if not sys.stdin.isatty():
+            parser.error("specify one or more agents in noninteractive mode")
+        print("Optional agent lifecycle integrations (Python 3 required):")
+        show_status(KINDS)
+        chosen = input("Agents to " + args.action + " (comma separated, 'detected', or 'all'; empty cancels): ").strip().lower()
+        if not chosen:
+            return 0
+        args.kinds = (KINDS if chosen == "all" else
+                      [kind for kind in KINDS if shutil.which(EXECUTABLES[kind])] if chosen == "detected" else
+                      [part.strip() for part in chosen.split(",")])
+        if not args.kinds:
+            print("No supported agent CLIs found on PATH.")
+            return 0
+    if any(kind not in KINDS for kind in args.kinds):
+        parser.error("unknown agent; choose from " + ", ".join(KINDS))
+    result = 0
+    for kind in dict.fromkeys(args.kinds):
+        try:
+            change(kind, args.action, args.dry_run)
+        except (OSError, ValueError, TypeError) as error:
+            print(f"{kind}: {error}", file=sys.stderr)
+            result = 1
+    return result
+
+
+if __name__ == "__main__":
+    sys.exit(main())
