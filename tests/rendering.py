@@ -104,6 +104,18 @@ def main():
             snapshot = rows()
             assert all(len(row) == 3 for row in snapshot), snapshot
             assert len({row[2] for row in snapshot}) == len(snapshot)
+            # A second visible session has one display-only gap in NUL mode.
+            framed = [record.split('\t', 1) for record in run('sidebar-source', '--read0').strip('\0').split('\0')]
+            session_rows = [row for row in framed if row[0].startswith('S:')]
+            assert len(session_rows) == 2
+            assert not session_rows[0][1].startswith('\n') and session_rows[1][1].startswith('\n')
+            assert all(not row[1].startswith('\n') for row in framed if not row[0].startswith('S:'))
+            assert len(rows()) == len(snapshot), 'legacy record count changed'
+            state.write_text('FILTER\tsession\n')
+            only_session = [record.split('\t', 1) for record in run('sidebar-source', '--read0').strip('\0').split('\0')
+                            if record.startswith('S:')]
+            assert len(only_session) == 1 and not only_session[0][1].startswith('\n')
+            state.write_text('')
             pane_rows = [row for row in snapshot if row[0] == 'P:' + pane_b]
             assert {row[2] for row in pane_rows} == {f'P:{pane_b}:{sid_a}', f'P:{pane_b}:{sid_b}'}
             assert all('title|with spaces' in row[1] and 'icon line  ' in row[1] for row in pane_rows), pane_rows
@@ -112,6 +124,19 @@ def main():
             assert [row[2] for row in rows() if row[0] == 'P:' + pane_b] == [f'P:{pane_b}:{sid_a}']
             state.write_text('')
             tm('set-option', '-gu', '@tmux-canopy-icon-pane')
+            active_window = tm('display-message', '-p', '-t', pane_a, '#{window_id}')
+            state.write_text(f'S:{sid_a}\n')
+            folded_session = rows()
+            assert '●' in next(row[1] for row in folded_session if row[0] == f'S:{sid_a}')
+            assert sum('●' in row[1] for row in folded_session) == 1
+            state.write_text(f'W:{active_window}:{sid_a}\n')
+            folded_window = rows()
+            assert '●' in next(row[1] for row in folded_window if row[0] == f'W:{active_window}:{sid_a}')
+            assert sum('●' in row[1] for row in folded_window) == 1
+            state.write_text('')
+            expanded = rows()
+            assert '●' in next(row[1] for row in expanded if row[0] == f'P:{pane_a}')
+            assert sum('●' in row[1] for row in expanded) == 1
             print('ok - snapshot identities, linked occurrences, control-byte sanitization and collapse state')
 
             preserved = f'VIEW\ttree\nMOVE\tP:{pane_a}\nLINK\tW:{window_b}:{sid_a}\nDELETE\tP:{pane_c}\t1\n'
@@ -185,6 +210,16 @@ def main():
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             wait_for(lambda: loads.stat().st_size > 0, 'initial sidebar load')
             time.sleep(.3)
+            script_env['TMUX_PANE'] = sidebar
+            wait_for(lambda: tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_focus_location').endswith('|' + pane_a), 'current content location')
+            frame = tm('capture-pane', '-p', '-t', sidebar).splitlines()
+            second_session_line = next(i for i, line in enumerate(frame) if '▾ two' in line)
+            assert second_session_line > 0 and not frame[second_session_line - 1].strip(), frame
+            tm('send-keys', '-t', sidebar, 'M-a')
+            assert selection()[0] == window_token
+            tm('send-keys', '-t', sidebar, 'C-o')
+            assert selection()[1] == f'P:{pane_a}:{sid_a}'
+            print('ok - Ctrl-o returns the pointer to the current content pane')
             sidebar_pid = tm('display-message', '-p', '-t', sidebar, '#{pane_pid}')
             fzf_pid = sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip()
             geometry = tm('list-panes', '-a', '-F', '#{pane_id}|#{window_id}|#{pane_width}|#{pane_height}')
@@ -212,6 +247,37 @@ def main():
             assert tm('list-panes', '-a', '-F', '#{pane_id}|#{window_id}|#{pane_width}|#{pane_height}') == geometry
             assert sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip() == fzf_pid
             print('ok - H/L fold the live tree, behave as search text, and preserve fzf and geometry')
+            # Expanded panes sharing a directory show its path once, without
+            # a count. Folding hides them and puts the count at the edge.
+            shared_dir = temp / 'shared'
+            shared_dir.mkdir()
+            count_pane = tm('new-window', '-d', '-t', 'one:', '-n', 'shared-count',
+                            '-c', str(shared_dir), '-P', '-F', '#{pane_id}', 'sleep 600')
+            count_peer = tm('split-window', '-d', '-h', '-t', count_pane, '-c', str(shared_dir),
+                            '-P', '-F', '#{pane_id}', 'sleep 600')
+            count_window = tm('display-message', '-p', '-t', count_pane, '#{window_id}')
+            count_token = f'W:{count_window}:{sid_a}'
+            tm('set-option', '-g', '@tmux-canopy-density', 'normal')
+            state.write_text('')
+            expanded_rows = rows()
+            assert '2p' not in next(row[1] for row in expanded_rows if row[0] == count_token)
+            shared_rows = [row[1] for row in expanded_rows if row[0] in ('P:' + count_pane, 'P:' + count_peer)]
+            assert len(shared_rows) == 2 and all('2p' not in value for value in shared_rows)
+            assert sum('shared' in value for value in shared_rows) == 1, shared_rows
+            state.write_text('FILTER_WINDOW\tshared-count\n')
+            filtered_row = next(row[1] for row in rows() if row[0] == count_token)
+            assert '2p' not in filtered_row, filtered_row
+            state.write_text('FILTER_WINDOW\tshared-count\n' + count_token + '\n')
+            assert '[2/2p]' in next(row[1] for row in rows() if row[0] == count_token)
+            state.write_text(count_token + '\n')
+            folded_row = next(row[1] for row in rows() if row[0] == count_token)
+            assert folded_row.endswith('2p'), folded_row
+            width = int(tm('display-message', '-p', '-t', sidebar, '#{pane_width}'))
+            assert len(folded_row) == width - 3, (len(folded_row), width, folded_row)
+            tm('kill-window', '-t', count_window)
+            tm('set-option', '-g', '@tmux-canopy-density', 'detailed')
+            state.write_text('')
+            print('ok - pane count appears only on collapsed windows')
             if '--folding-only' in sys.argv:
                 return
             tm('send-keys', '-t', sidebar, 'M-a')

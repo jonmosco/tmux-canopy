@@ -21,6 +21,10 @@ render_source() {
   while IFS=$'\t' read -r kind value _rest; do
     if [[ "$kind" == VIEW ]]; then view="$value"; break; fi
   done < "$state_file"
+  if [[ "$view" == agents ]]; then
+    export TMUX_CANOPY_HEADER=1
+    exec "$SCRIPT_DIR/tree-source" --agents
+  fi
   if [[ "$view" != processes && "$view" != buffers ]]; then
     export TMUX_CANOPY_HEADER=1
     exec "$SCRIPT_DIR/tree-source"

@@ -5,10 +5,15 @@ toggle_key="${TMUX_CANOPY_KEY:-T}"
 last_window_key="${TMUX_CANOPY_LAST_KEY:-Tab}"
 toggle_key="${toggle_key//[[:cntrl:]]/ }"
 last_window_key="${last_window_key//[[:cntrl:]]/ }"
+legend_mode=0
+if [[ "${1:-}" == --legend ]]; then legend_mode=1; shift; fi
+legend_args=()
+if ((legend_mode)); then legend_args=(--legend); fi
 
 section() { printf 'S\t%s\n' "$1"; }
 key() { printf 'K\t%s\t%s\n' "$1" "$2"; }
 note() { printf 'N\t%s\n' "$1"; }
+legend_item() { printf 'L\t%s\t%s\t%s\n' "$1" "$2" "${3:-}"; }
 help_records() {
   section 'Navigation'
   key 'j / Down' 'Move down'
@@ -32,7 +37,10 @@ help_records() {
   key '1' 'Tree: sessions, windows and panes'
   key '2' 'Processes grouped by their pane'
   key '3' 'Paste buffers; Enter pastes into the target pane'
+  key '4' 'Detected Codex and Claude panes, grouped by session and window'
+  key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
   key 'p' 'Show or hide the preview drawer'
+  key 'i' 'Switch the drawer between terminal and Codex/Claude summaries; show it if hidden'
   key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'
 
   section 'Manage'
@@ -40,6 +48,9 @@ help_records() {
   key 'r' 'Rename a session or window'
   key 'x, then x' 'Confirm deletion of a pane, window or session'
   key 'a, then D' 'Open diagnostics'
+  note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'
+  note 'Optional Codex hooks report turn state and approval requests. Without hooks, screen-based request hints remain unverified.'
+  note 'Reported Codex state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale reports show unknown.'
   note 'The actions menu also has reorder, link, unlink, layout, zoom, swap, synchronization and dead-pane respawn.'
 
   section 'Create'
@@ -75,6 +86,7 @@ help_records() {
 
   section 'Sidebar'
   key '?' 'Open this help'
+  key 'g' 'Open the symbol and color legend'
   key 'Ctrl-q' 'Close the sidebar'
   key "prefix + $toggle_key" 'Toggle the sidebar from any pane'
   key 'prefix + h / l' 'Return focus to the left / right sidebar'
@@ -88,10 +100,62 @@ help_records() {
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
 
+legend_records() {
+  section 'Location and selection'
+  legend_item '›' 'Selected row and highlight. Move with j/k; Enter focuses it. It may differ from the active pane.' cyan
+  legend_item '● green' 'Current content pane. On a folded branch, the dot moves to its window or session.' green
+  legend_item 'bold name' 'Current session or window.'
+  legend_item '▾ / ▸' 'Expanded / collapsed session or window.'
+  legend_item '├─ └─ │' 'Tree guides show which pane belongs to which window and session.' dim
+  legend_item '1:dotfiles' 'Tmux window index and name.'
+  legend_item '2p' 'Two content panes hidden in a collapsed window. Sidebar and reserve panes are excluded.' dim
+  legend_item '[11w]' 'Eleven windows inside a collapsed session.' dim
+  legend_item '[1/2p]' 'With a filter, one of two panes matches inside a collapsed window.' dim
+  legend_item '[1/2w]' 'With a filter, one of two windows matches in a session.' dim
+
+  section 'Pane labels'
+  legend_item 'icon + codex' 'Foreground command and its app icon. Icon color identifies the app, not its state.' cyan
+  legend_item 'dim title' 'Pane title, shortened to fit the available width.' dim
+  legend_item 'dim path' 'Working directory, inline or below the command depending on width. Adjacent panes sharing it can show it once.' dim
+  legend_item '×' 'Retained pane whose command exited.' amber
+
+  section 'Notifications'
+  legend_item '● amber' 'Unread terminal output. This does not mean an agent needs input.' amber
+  legend_item 'bell / B' 'Unread bell. B is the ASCII icon.' amber
+  legend_item '◷ / ~' 'Silence alert. ~ is the ASCII icon.' amber
+  legend_item '●2' 'Two unread descendants on a folded branch; counts panes on windows and windows on sessions.' amber
+  note 'A pane shows its highest-priority badge: bell, activity, then silence. Preview lists every notice. Focusing its window clears notices.'
+
+  section 'Agent state labels'
+  legend_item '[working]' 'A live Codex pane recently reported a running turn.' cyan
+  legend_item '[approval]' 'Codex reported an approval request. Another reviewer may handle it.' amber
+  legend_item '[ready]' 'Codex reported session start and is ready for a prompt.' dim
+  legend_item '[turn ended]' 'Codex reported a turn end; task completion is not implied.' dim
+  legend_item '[interrupted]' 'Codex reported an interrupted turn.' amber
+  legend_item '[unknown]' 'The last hook report is stale. Current agent state is unknown.' dim
+  note 'Below 36 columns, rows use [wrk], [req], [rdy], [end], [int], and [?] for these labels.'
+  note 'These labels require foreground Codex in Tree view (or a verified descendant in Agents view), matching pane PID, and a recent hook report. Claude and screen-based hints do not produce tree state labels.'
+
+  section 'Other tree markers'
+  legend_item '⇢ / ⇉' 'Object marked for move / link.' cyan
+  legend_item '✕' 'Deletion waiting for confirmation.' amber
+  legend_item 'linked:2' 'Window is linked into two sessions.' dim
+  legend_item 'SYNC' 'Synchronized input is on for this window.' dim
+  legend_item '[2 agents]' 'Two detected agent panes in this window, shown in Agents view.' dim
+  note 'Agent icons, unread badges, and Agents view do not establish whether an agent is working or waiting. Press i for the agent drawer; optional hooks can report Codex turn state.'
+
+  section 'Views and filters'
+  legend_item '[All]' 'All sessions and panes. F changes Tree filters.' dim
+  legend_item '[Session]' 'Only the current session.' dim
+  legend_item '[Unread]' 'Only panes with unread notices and their parents.' dim
+  legend_item '+W / +T' 'Window-name / pane-title text filter is active.' dim
+  note 'Press ? for command help. Press g for this legend. q or Esc closes either popup.'
+}
+
 render_help() {
-  help_records | awk -F '\t' -v width="$1" -v color="${color:-0}" '
+  { if ((legend_mode)); then legend_records; else help_records; fi; } | awk -F '\t' -v width="$1" -v color="${color:-0}" '
     BEGIN {
-      if (color) { reset="\033[0m"; heading="\033[1m"; key="\033[1;36m"; dim="\033[2m" }
+      if (color) { reset="\033[0m"; heading="\033[1m"; key="\033[1;36m"; dim="\033[2m"; green="\033[1;32m"; amber="\033[1;33m" }
       wide=(width >= 60); column=22
     }
     function wrap(text, indent, style, first,    available,piece,cut) {
@@ -124,6 +188,18 @@ render_help() {
         wrap($3,"    ","","    ")
       }
     }
+    $1=="L" {
+      label=$2
+      style=(color ? ($4=="green" ? green : $4=="amber" ? amber : $4=="dim" ? dim : $4=="cyan" ? key : "") : "")
+      if (wide && length(label)<column-2) {
+        indent=sprintf("%*s",column,"")
+        first=style label reset sprintf("%*s",column-length(label),"")
+        wrap($3,indent,"",first)
+      } else {
+        wrap(label,"  ",style,"  ")
+        wrap($3,"    ","","    ")
+      }
+    }
     $1=="N" { wrap($2,"  ",dim,"  ") }
   '
 }
@@ -134,7 +210,11 @@ if [[ "${TMUX_CANOPY_HELP_TEST:-0}" == 1 || "${1:-}" == --print ]]; then
   [[ "$columns" =~ ^[1-9][0-9]{0,3}$ ]] || columns=80
   ((columns >= 12)) || columns=12
   color=0
-  printf 'Sidebar help\n\n'
+  if ((legend_mode)); then
+    if ((columns < 14)); then printf 'Legend\n\n'; else printf 'Sidebar legend\n\n'; fi
+  else
+    printf 'Sidebar help\n\n'
+  fi
   render_help "$columns"
   exit 0
 fi
@@ -148,10 +228,12 @@ if [[ "${1:-}" != --render ]]; then
       if [[ "$columns" =~ ^[0-9]+$ && "$rows" =~ ^[0-9]+$ ]] && ((columns >= 20 && rows >= 10)); then
         popup_width=$((columns - 2)); ((popup_width <= 90)) || popup_width=90
         popup_height=$((rows - 2)); ((popup_height <= 40)) || popup_height=40
+        popup_title=' Help '
+        if ((legend_mode)); then popup_title=' Legend '; fi
         tmux display-popup -c "$owner" -t "$TMUX_PANE" -w "$popup_width" -h "$popup_height" \
-          -T ' Help ' -E -e "TMUX_CANOPY_KEY=$toggle_key" \
+          -T "$popup_title" -E -e "TMUX_CANOPY_KEY=$toggle_key" \
           -e "TMUX_CANOPY_LAST_KEY=$last_window_key" \
-          "$BASH" "$SCRIPT_DIR/help" --render && exit 0
+          "$BASH" "$SCRIPT_DIR/help" "${legend_args[@]}" --render && exit 0
       fi
       break
     done < <(tmux list-clients -F '#{client_tty}|#{client_width}|#{client_height}' 2>/dev/null)
@@ -192,6 +274,7 @@ while :; do
   ((offset <= maximum)) || offset=$maximum
   ((offset >= 0)) || offset=0
   title='SIDEBAR HELP'
+  if ((legend_mode)); then title='SIDEBAR LEGEND'; fi
   controls='j/k scroll  Space page  q/Esc close'
   ((width >= ${#controls})) || controls='j/k scroll  q close'
   printf '\033[H%s%s%s\033[K\r\n%s\033[K\r\n\033[K\r\n' "$bold" "${title:0:width}" "$reset" "${controls:0:width}"

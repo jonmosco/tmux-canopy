@@ -226,10 +226,16 @@ done
 for hook in after-rename-session after-rename-window; do
   tmux set-hook -g "${hook}[9003]" "$(plugin_job -b cleanup refresh)"
 done
+# tmux 3.8+ monitors pane command changes once per second. The monitor
+# belongs to Canopy; older tmux versions simply retain focus and manual reloads.
+if tmux set-hook -B -g '@tmux_canopy_command:%*:#{pane_current_command}' \
+    "$(plugin_job -b agent-refresh)" 2>/dev/null; then
+  :
+fi
 # Mouse and keyboard changes use the same debounced, state-preserving refresh.
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
   tmux set-hook -g "${focus_hook}[9004]" \
-    "$(plugin_job -b refresh-sidebar '#{pane_id}' '#{client_tty}')"
+    "$(plugin_job -b refresh-sidebar '#{pane_id}' '#{client_tty}' "$focus_hook")"
 done
 
 if [[ "$notification_sources" != 'none' && "$notification_target" != 'status' ]]; then

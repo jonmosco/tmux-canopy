@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Sidebar-local drawer choice. The existing p binding still hides/shows it.
+set -u
+sidebar="${TMUX_PANE:-}"
+[[ "$sidebar" =~ ^%[0-9]+$ ]] || exit 0
+[[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0
+mode="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_preview_mode 2>/dev/null || true)"
+if [[ "$mode" == agent || "$mode" == codex ]]; then mode=terminal; else mode=agent; fi
+tmux set-option -pq -t "$sidebar" @tmux_canopy_preview_mode "$mode" 2>/dev/null || true

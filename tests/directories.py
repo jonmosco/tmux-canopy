@@ -86,7 +86,7 @@ def main():
             assert [row[2] for row in pane_rows] == [f'P:%{i}:$0' for i in range(4)]
             assert sum('repo' in row[1] for row in rows) == (0 if width < 32 else 2), (width, rows)
             if width >= 32:
-                assert '2 panes' in pane_rows[0][1] and 'repo' not in pane_rows[1][1]
+                assert '2 panes' not in pane_rows[0][1] and 'repo' not in pane_rows[1][1]
                 assert 'alpha/repo' in pane_rows[0][1] and 'beta/repo' in pane_rows[2][1]
             if width >= 56:
                 assert pane_rows[0][1].count('\n') == 1

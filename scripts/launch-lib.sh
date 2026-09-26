@@ -79,14 +79,14 @@ sidebar_preflight() {
   done
   SIDEBAR_FZF_BINARY="$(command -v fzf)"
   for helper in sidebar sidebar-source tree-source sidebar-action tree-action sidebar-preview tree-preview \
-    view-header doctor help tree-filter quick-switch preview-popup pane-preview info process-source buffer-source navigate follow \
+    view-header doctor help tree-filter quick-switch preview-popup pane-preview agent-preview codex-preview agent-refresh agent-expiry preview-mode info process-source buffer-source navigate follow \
     refresh-sidebar cleanup reap-empty resize sync-width responsive-width mouse-resize notify content-layout restore-window-layout; do
     if [[ ! -f "$SCRIPT_DIR/$helper" || ! -r "$SCRIPT_DIR/$helper" || ! -x "$SCRIPT_DIR/$helper" ]]; then
       sidebar_failure "$owner" install "Required helper is missing or not executable: $helper. Restore the plugin installation."
       return 1
     fi
   done
-  for helper in buffer-lib.sh config-lib.sh lib.sh navigation.sh notification-lib.sh launch-lib.sh ui-options.sh ../lib/tree-render.awk ../lib/content-layout.awk ../lib/scale-layout.awk; do
+  for helper in buffer-lib.sh config-lib.sh lib.sh navigation.sh notification-lib.sh launch-lib.sh ui-options.sh ../lib/tree-render.awk ../lib/agent-process.sh ../lib/agent-process.py ../lib/content-layout.awk ../lib/scale-layout.awk; do
     if [[ ! -f "$SCRIPT_DIR/$helper" || ! -r "$SCRIPT_DIR/$helper" ]]; then
       sidebar_failure "$owner" install "Required library is missing or unreadable: $helper. Restore the plugin installation."
       return 1

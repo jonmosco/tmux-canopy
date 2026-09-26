@@ -21,6 +21,9 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus.
 - Process trees attributed to panes, plus tmux buffer browsing.
+- Agents view shows sessions, windows, and panes containing detected Codex or Claude processes, with counts on parent rows.
+- Optional Codex CLI hooks show reported turn state and approval requests in the read-only agent drawer.
+- When those hooks report a live Codex pane, the Tree and Agents views label its current reported state; stale reports show unknown. Reports are tied to the live Codex process, so a restarted agent cannot inherit its predecessor’s state.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets.
 - One sidebar owned by the client that opened it; no daemon or agent service.
@@ -88,17 +91,21 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `h` / `l` | Collapse / expand |
 | `H` / `L` | Collapse / expand all |
 | `/`, then `Esc` | Search, then clear the search query |
-| `1` / `2` / `3` | Tree / Processes / Buffers |
+| `1` / `2` / `3` / `4` | Tree / Processes / Buffers / Agents |
 | `a` | Actions for the selected object |
 | `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
-| `p` / `P` | Toggle preview / open enlarged preview |
+| `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
+| `p` / `P` | Toggle preview / open enlarged terminal preview |
+| `i` | Switch the preview drawer between terminal and Codex/Claude summaries |
 | `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |
 | `?` | Scrollable help popup |
+| `g` | Scrollable symbol and color legend |
 | `Ctrl-q` | Close the sidebar |
 
 Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
+When you leave the sidebar for a content pane, its selection pointer follows the active pane automatically.
 
 The default Tree view uses one active-pane dot, shorter branch prefixes, and
 directory labels that adapt to sidebar width. For the leanest view, set
@@ -116,7 +123,7 @@ This restoration applies to settings first installed by the current version. Whe
 
 - Stable slots are optimized for one active sidebar owner per tmux server. Multiple simultaneous owners can affect each other’s window geometry.
 - A directory-only change may need `Ctrl-r`; there is no shell prompt integration or polling loop.
-- Activity means terminal output, not an AI agent’s task status. Continuous logs can be noisy.
+- Activity means terminal output, not an AI agent’s task status. Without [optional Codex hooks](docs/reference.md#codex-hook-setup), the Codex/Claude drawer reads the selected pane’s current terminal screen and labels possible requests as unverified. Claude always uses this fallback. Continuous logs can be noisy.
 - Closing the sidebar returns its space but may not restore every previous pane proportion.
 - Confirmed deletion has no undo.
 

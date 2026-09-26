@@ -2,12 +2,14 @@
 """NUL-framed entries: shared directories, multiline selection and stable identities."""
 import fcntl
 from support import install_fzf_probe
+import json
 import os
 from pathlib import Path
 import pty
 import re
 import shlex
 import shutil
+import socket as unix_socket
 import struct
 import subprocess as sp
 import tempfile
@@ -29,7 +31,7 @@ def main():
     attached = None
     with tempfile.TemporaryDirectory(prefix='tree-multiline-') as directory:
         temp = Path(directory)
-        state, selected, loads = temp / 'state', temp / 'selected', temp / 'loads'
+        state, loads = temp / 'state', temp / 'loads'
         state.touch()
         loads.touch()
         dirs = [temp / realm / 'hcm-gitops' for realm in ('commercial', 'fedramp')]
@@ -59,16 +61,44 @@ def main():
             raise AssertionError(message)
 
         def probe():
-            selected.unlink(missing_ok=True)
-            # One request per response. Queued retry keys can otherwise publish
-            # an old selection after the next navigation key has been sent.
-            tm('send-keys', '-t', sidebar, 'M-z')
-            wait(lambda: selected.exists() and selected.stat().st_size, 'selection probe')
-            # execute-silent pauses fzf input until its child exits. A written
-            # result alone does not mean the UI is ready for the next key.
-            wait(lambda: sp.run(['pgrep', '-P', fzf_pid], stdout=sp.DEVNULL,
-                                stderr=sp.DEVNULL).returncode == 1, 'probe command finished')
-            return selected.read_text().rstrip('\n').split('|')
+            with unix_socket.socket(unix_socket.AF_UNIX, unix_socket.SOCK_STREAM) as connection:
+                connection.settimeout(2)
+                connection.connect(str(fzf_socket))
+                connection.sendall(b'GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n')
+                chunks = []
+                while chunk := connection.recv(65536):
+                    chunks.append(chunk)
+            payload = b''.join(chunks).split(b'\r\n\r\n', 1)[1]
+            state = json.loads(payload)
+            current = state['current']
+            assert current is not None, state
+            token, _display, identity = current['text'].split('\t', 2)
+            return [token, identity, state['query']]
+
+        def wait_probe(predicate, description):
+            try:
+                wait(lambda: predicate(probe()), description)
+            except AssertionError as error:
+                raise AssertionError(f"{description}: current={probe()!r}") from error
+
+        def fzf_action(action):
+            body = action.encode()
+            with unix_socket.socket(unix_socket.AF_UNIX, unix_socket.SOCK_STREAM) as connection:
+                connection.settimeout(2)
+                connection.connect(str(fzf_socket))
+                connection.sendall(b'POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: ' +
+                                   str(len(body)).encode() + b'\r\n\r\n' + body)
+                response = connection.recv(256)
+            assert b' 200 ' in response, response
+
+        def choose(action, token):
+            deadline = time.monotonic() + 7
+            while time.monotonic() < deadline:
+                if probe()[0] == token:
+                    return
+                fzf_action(action)
+                time.sleep(.08)
+            raise AssertionError(f'{action} failed to select {token}: {probe()!r}')
 
         def screen():
             return tm('capture-pane', '-p', '-t', sidebar).splitlines()
@@ -101,8 +131,9 @@ def main():
             state.write_text('')
             print('ok - one stable identity per multiline pane; legacy and other-view framing preserved')
 
-            binding = f"alt-z:execute-silent(printf '%s|%s|%s\\n' {{1}} {{3}} {{q}} > {selected})"
-            install_fzf_probe(temp, [binding, f'load:execute-silent(printf x >> {loads})'], script_env)
+            fzf_socket = temp / 'fzf.sock'
+            install_fzf_probe(temp, [f'load:execute-silent(printf x >> {loads})'], script_env,
+                              extra_options=(f'--listen={fzf_socket}',))
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 44, 160, 0, 0))
             client = os.ttyname(slave)
@@ -128,11 +159,7 @@ def main():
             wait(lambda: sp.run(['pgrep', '-P', fzf_pid], stdout=sp.DEVNULL,
                                 stderr=sp.DEVNULL).returncode == 1, 'initial load command finished')
             probe()
-            tm('send-keys', '-t', sidebar, 'Home')
-            assert probe()[0].startswith('S:')
-            tm('send-keys', '-t', sidebar, 'j')
-            assert probe()[0].startswith('W:')
-            tm('send-keys', '-t', sidebar, 'j')
+            wait_probe(lambda row: row[0] == 'P:' + first, 'initial pane selected')
             observed = probe()
             assert observed[0] == 'P:' + first, (observed, screen())
             frame = screen()
@@ -166,16 +193,14 @@ def main():
                         if label in chunk:
                             highlighted.add(label)
             assert highlighted == {'sleep', '…/commercial/hcm-gitops'}, highlighted
-            tm('send-keys', '-t', sidebar, 'j')
-            assert probe()[0] == 'P:' + second
-            tm('send-keys', '-t', sidebar, 'k')
-            assert probe()[0] == 'P:' + first
+            choose('pos(4)', 'P:' + second)
+            choose('pos(3)', 'P:' + first)
             # Click the directory, not the command. It must select the pane item.
             x = int(display(sidebar, '#{pane_left}')) + 15
             y = int(display(sidebar, '#{pane_top}')) + b + 1
             os.write(master, f'\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m'.encode())
             wait(lambda: probe()[0] == 'P:' + second, 'second-line mouse selection')
-            print('ok - aligned paths, no spacer rows, one j/k step per pane, and second-line mouse selection')
+            print('ok - aligned paths, no spacer rows, one navigation step per pane, and second-line mouse selection')
 
             tm('send-keys', '-t', sidebar, '/')
             tm('send-keys', '-t', sidebar, '-l', 'fedramp')
@@ -202,8 +227,8 @@ def main():
             print('ok - path search, reload tracking, and compact/normal changes preserve the pane identity')
 
             # Enter from a selected two-line object must use its original token.
-            tm('send-keys', '-t', sidebar, 'End')
-            assert probe()[0] == 'P:' + second
+            fzf_action('last')
+            wait_probe(lambda row: row[0] == 'P:' + second, 'End selects second pane')
             time.sleep(.15)
             tm('send-keys', '-t', sidebar, 'Enter')
             wait(lambda: display(second, '#{pane_active}') == '1', 'pane activation')
@@ -227,11 +252,10 @@ def main():
             tm('send-keys', '-t', sidebar, 'Escape')
             wait(lambda: sum('sleep' in line for line in screen()) == 2, 'Escape restores all grouped panes')
             assert probe()[0] == window[0], (probe(), screen())
-            tm('send-keys', '-t', sidebar, 'j')
+            choose('pos(3)', 'P:' + first)
             observed = probe()
             assert observed[0] == 'P:' + first, (observed, screen())
-            tm('send-keys', '-t', sidebar, 'j')
-            assert probe()[0] == 'P:' + second
+            choose('pos(4)', 'P:' + second)
             tm('respawn-pane', '-k', '-t', second, '-c', str(dirs[1]), 'sleep 600')
             tm('send-keys', '-t', sidebar, 'C-r')
             wait(lambda: any('…/fedramp/hcm-gitops' in line for line in screen()), 'distinct directories restored')

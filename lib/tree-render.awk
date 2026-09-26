@@ -34,6 +34,7 @@ $1 == "P" {
     p=$2; if (seen_p[p]++) next
     pw[p]=$3; pi[p]=$4; command[p]=$5; title[p]=$6; path[p]=$7; dead[p]=$8
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
+    pane_pid[p]=$17; report_source[p]=$18; report_session[p]=$19; report_pid[p]=$20; report_status[p]=$21; report_updated[p]=$22
     if (sidebar[p] != 1 && slot[p] != 1) {
         panes[$3,++np[$3]]=p
         if (pa[p] || pb[p] || pz[p]) unread_panes[$3]++
@@ -42,23 +43,55 @@ $1 == "P" {
         if ($16 == 1) last_content[$3]=p
     }
 }
+$1 == "A" { agent_kind[$2]=$3 }
+$1 == "V" { verified[$2]=1 }
+agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
+    process_line=$0; sub(/^[[:space:]]+/,"",process_line)
+    split(process_line,process_field,/[[:space:]]+/)
+    pid=process_field[1]; parent[pid]=process_field[2]
+    name=process_field[3]; sub(/^.*\//,"",name)
+    if (name=="codex") agent_process[pid]="codex"
+    else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
+    next
+}
+function find_agents( pid,current,depth,p,root) {
+    for (p in pane_pid) {
+        root=pane_pid[p]
+        if (sidebar[p]!=1 && slot[p]!=1 && root ~ /^[1-9][0-9]*$/) owner[root]=p
+    }
+    for (pid in agent_process) {
+        current=pid
+        for (depth=0;depth<128 && current>0;depth++) {
+            if (current in owner) {
+                p=owner[current]
+                if (!(p in best_agent) || depth<best_agent[p]) {
+                    best_agent[p]=depth; agent_kind[p]=agent_process[pid]; agent_process_id[p]=pid
+                }
+                break
+            }
+            if (seen_ancestor[pid,current]++) break
+            current=parent[current]
+        }
+    }
+}
 # Build visibility before folding. Counts and compact eligibility still use the
 # full content inventory; text constraints are literal, case-insensitive substrings.
 function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first) {
     if (filter != "session" && filter != "unread") filter="all"
-    filtered=(!switcher && (filter != "all" || window_filter != "" || title_filter != ""))
+    filtered=(!switcher && (agent_view || filter != "all" || window_filter != "" || title_filter != ""))
     for (si=1;si<=ns;si++) {
         s=sessions[si]
         for (wpos=1;wpos<=nw[s];wpos++) {
             w=windows[s,wpos]; key=s SUBSEP w
-            if (filtered && filter == "session" && s != filter_session) continue
-            if (filtered && window_filter != "" && !index(tolower(wn[key]),tolower(window_filter))) continue
+            if (!agent_view && filtered && filter == "session" && s != filter_session) continue
+            if (!agent_view && filtered && window_filter != "" && !index(tolower(wn[key]),tolower(window_filter))) continue
             first=""
             if (!(w in counted)) {
                 counted[w]=1
                 for (ppos=1;ppos<=np[w];ppos++) {
                     p=panes[w,ppos]
-                    keep=(!filtered || ((title_filter == "" || index(tolower(title[p]),tolower(title_filter))) &&
+                    keep=(agent_view ? agent_kind[p] != "" : !filtered ||
+                        ((title_filter == "" || index(tolower(title[p]),tolower(title_filter))) &&
                         (filter != "unread" || (notices != "none" && (pa[p] || pb[p] || pz[p])))))
                     if (!keep) continue
                     visible_p[p]=1; shown_p[w]++
@@ -81,13 +114,15 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first) {
                 }
                 # Retain a window-only alert when its original reporting pane
                 # has gone away, but do not invent a pane matching a title rule.
-                if (!filtered || (!unread_panes[w] && title_filter == "")) {
+                if (!agent_view && (!filtered || (!unread_panes[w] && title_filter == ""))) {
                     vwa[w]=wa[w]; vwb[w]=wb[w]; vwz[w]=wz[w]
                 }
             }
             alert=(notices != "none" && (vwa[w] || vwb[w] || vwz[w]))
-            if (filtered && !shown_p[w] && !(filter == "unread" && title_filter == "" && alert)) continue
+            if (agent_view && !shown_p[w]) continue
+            if (!agent_view && filtered && !shown_p[w] && !(filter == "unread" && title_filter == "" && alert)) continue
             visible_w[key]=1; shown_w[s]++; total_visible++
+            if (agent_view) shown_agents_s[s]+=shown_p[w]
             if (first_w[s] == "") first_w[s]=w
             vsa[s]+=vwa[w]; vsb[s]+=vwb[w]; vsz[s]+=vwz[w]
             if (alert) shown_unread_w[s]++
@@ -119,12 +154,56 @@ function mark(value, color) {
     color=(value == "●" ? green : value == "⇢" || value == "⇉" ? accent : attention)
     return value == " " ? value : color value reset
 }
+# Keep an ordinary collapsed count at the edge, leaving a spare cell for fzf's
+# gutter/scrollbar and wide terminal glyphs. Skip it if the name needs the room.
+function edge_count(value,count,budget, plain,padding) {
+    if (count == "") return value
+    plain=value
+    gsub(/\033\[[0-9;]*m/,"",plain)
+    padding=budget-length(plain)-length(count)
+    if (padding<2) return value
+    return value sprintf("%*s",padding,"") dim count reset
+}
 # One badge per visible target. Counts describe unread descendants, not events
 # or provider totals; multiple providers on one target never inflate the count.
 function notice(a,b,z,count, glyph) {
     if (notices == "none" || !(a || b || z)) return ""
     glyph=(b ? bell_badge : a ? activity_badge : silence_badge)
     return " " attention glyph (count>1 ? count : "") reset
+}
+# Hook state is displayed only while a matching agent process still belongs to
+# this live pane. Expired reports say unknown; unsupported agents show no state.
+function agent_label(p, age,status) {
+    if (p in agent_labels) return agent_labels[p]
+    agent_labels[p]=""
+    if (dead[p] == 1 || (agent_view ? agent_kind[p] != "codex" : command[p] !~ /(^|\/)codex$/) ||
+        report_source[p] != "codex-hook" ||
+        report_session[p] == "" || pane_pid[p] == "" || report_pid[p] != pane_pid[p] ||
+        report_updated[p] !~ /^[0-9]+$/ || length(report_updated[p])>12 || !verified[p]) return ""
+    age=now-report_updated[p]
+    if (age<0 || age>900) return agent_labels[p]="unknown"
+    status=report_status[p]
+    if (status=="working") return agent_labels[p]="working"
+    if (status=="needs-input") return agent_labels[p]="approval"
+    if (status=="ready") return agent_labels[p]="ready"
+    if (status=="turn-ended") return agent_labels[p]="turn ended"
+    if (status=="interrupted") return agent_labels[p]="interrupted"
+    if (status=="session-ended") return agent_labels[p]="session ended"
+    return agent_labels[p]="unknown"
+}
+function agent_badge(p, label,style) {
+    label=agent_label(p)
+    if (label=="") return ""
+    style=(label=="working" ? accent : label=="approval" || label=="interrupted" ? attention : dim)
+    if (width<36) {
+        if (label=="working") label="wrk"
+        else if (label=="approval") label="req"
+        else if (label=="ready") label="rdy"
+        else if (label=="turn ended" || label=="session ended") label="end"
+        else if (label=="interrupted") label="int"
+        else label="?"
+    }
+    return " " style "[" label "]" reset
 }
 function shortpath(value, budget, n, parts, shortened) {
     if (value == home) value="~"
@@ -168,12 +247,14 @@ function pathlabel(p,w,budget,    value,parts,n,depth,candidate,q,other,matches,
     if (budget>0 && length(need)>budget && depth>1) return "…/" parts[n]
     return need
 }
-function title_detail(p,    value,limit) {
+function title_detail(p,    value,limit,label) {
     if (density == "compact" || width<38) return ""
     value=useful_title(p)
     if (density == "detailed") return " " pi[p] (value != "" ? " " value : "")
     if (value == "") return ""
     limit=width-25-length(command[p])
+    label=agent_label(p)
+    if (label!="") limit-=length(label)+3
     if (density == "normal" && width<56 && width>=32)
         limit-=length(pathlabel(p,pw[p],width-16))+3
     if (limit<8) return ""
@@ -216,6 +297,7 @@ function appicon(value, n, parts) {
 }
 END {
     if (ns == 0) exit
+    if (agent_view) find_agents()
     if (theme != "mono") {
         reset="\033[0m"; bold="\033[1m"; dim="\033[2m"
         # Neutral text and guides, with distinct application and active-location colors.
@@ -259,11 +341,20 @@ END {
         if (window_filter != "") filter_label=filter_label "+W"
         if (title_filter != "") filter_label=filter_label "+T"
         reserved=length(filter_label)+3+(mode != "" ? length(mode)+1 : 0)
-        tabs="[1 Tree]  2 Proc  3 Buff"
-        if (length(tabs)+reserved>available) tabs="[1 T]  2 P  3 B"
-        if (length(tabs)+reserved>available) tabs="[1] 2 3"
-        if (length(tabs)+reserved>available) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
-        tabs=tabs " [" filter_label "]"
+        if (agent_view) {
+            tabs="1 Tree  2 Proc  3 Buff  [4 Agents]"
+            if (length(tabs)>available) tabs="1 T  2 P  3 B  [4 Agt]"
+            if (length(tabs)>available) tabs="1 2 3 [4]"
+        } else {
+            tabs="[1 Tree]  2 Proc  3 Buff  4 Agents"
+            # Leave room for fzf's right edge; an exact fit can clip [All].
+            if (length(tabs)+reserved>available-2) tabs="[1 Tree]  2 Proc  3 Buff  4 Agt"
+            if (length(tabs)+reserved>available-2) tabs="[1 T]  2 P  3 B  4 Agt"
+            if (length(tabs)+reserved>available) tabs="[1] 2 3 4"
+            if (length(tabs)+reserved>available) tabs="[1]234"
+            if (length(tabs)+reserved>available) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
+            tabs=tabs " [" filter_label "]"
+        }
         padding=available-length(tabs)-length(mode); if (padding<1) padding=1
         styled_tabs=tabs; sub(/\]/,"]" reset dim,styled_tabs)
         row("H:",accent styled_tabs reset (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
@@ -286,15 +377,20 @@ END {
         }
         exit
     }
-    if (filtered && !total_visible) row("V:empty","No matches · F filters","V:empty")
+    if (agent_view && !total_visible) row("V:agents-empty","No Codex or Claude agents detected","V:agents-empty")
+    else if (filtered && !total_visible) row("V:empty","No matches · F filters","V:empty")
+    visible_session_seen=0
     for (si=1;si<=ns;si++) {
         s=sessions[si]; st="S:" s
         if (!visible_s[s]) continue
-        sm=(st == del ? "✕" : " ")
-        meta=(filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
+        # A leading blank display line separates groups without adding a
+        # selectable item. Legacy newline records remain one line each.
+        session_gap=(nul && visible_session_seen++ ? "\n" : "")
+        sm=(st == del ? "✕" : s == current_s && (collapsed[st] || !visible_w[s,current_w]) ? "●" : " ")
+        meta=(agent_view ? " [" shown_agents_s[s] " agent" (shown_agents_s[s]==1 ? "" : "s") "]" : filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
         session_glyph=(custom_s != "" ? dim session_icon reset " " : "")
         session_style=(s == current_s ? bold : "")
-        row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) : "") dim meta reset,st)
+        row(st,session_gap (collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) : "") dim meta reset,st)
         if (collapsed[st]) continue
         visible_wpos=0
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -302,13 +398,15 @@ END {
             if (!visible_w[key]) continue
             visible_wpos++
             branch=(visible_wpos == shown_w[s] ? branch_end : branch_mid); stem=(visible_wpos == shown_w[s] ? "   " : stem_mid)
-            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : " ")
-            meta=(filtered ? " [" shown_p[w] "/" np[w] "p]" : collapsed[wt] && np[w]>1 ? " [" np[w] "p]" : "")
+            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" :
+                s == current_s && w == current_w && (collapsed[wt] || !visible_p[current_p]) ? "●" : " ")
+            meta=(agent_view ? " [" shown_p[w] " agent" (shown_p[w]==1 ? "" : "s") "]" : filtered && collapsed[wt] ? " [" shown_p[w] "/" np[w] "p]" : "")
+            collapsed_count=(!agent_view && !filtered && collapsed[wt] && np[w]>1 ? np[w] "p" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
             window_glyph=(custom_w != "" ? dim window_icon reset " " : "")
             window_style=(w == current_w && s == current_s ? bold : "")
-            if (compact_single && np[w] == 1 && shown_p[w] == 1) {
+            if (!agent_view && compact_single && np[w] == 1 && shown_p[w] == 1) {
                 p=panes[w,1]; pt="P:" p
                 if (pt == del) wm="✕"
                 else if (wm == " " && dead[p] == 1) wm="×"
@@ -317,12 +415,13 @@ END {
                 # Its active content target is necessarily this sole pane.
                 compact_path=(density == "minimal" || width<56 ? "" : " " pathlabel(p,w,width-24))
                 if (p == current_p && s == current_s && wm == " ") wm="●"
-                row(wt,dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] badge dim meta compact_path reset,wt)
+                row(wt,dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] agent_badge(p) badge dim meta compact_path reset,wt)
                 continue
             }
             grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
                 group_count[first_p[w]] == shown_p[w] && path[first_p[w]] != "" && !collapsed[wt])
             window_text=dim branch reset " " (collapsed[wt] ? "▸ " : "▾ ") (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") dim meta reset
+            window_text=edge_count(window_text,collapsed_count,width-3)
             if (grouped) {
                 continuation=dim stem stem_mid "   "
                 window_text=window_text "\n" continuation pathlabel(panes[w,1],w,width-12) reset
@@ -336,22 +435,21 @@ END {
                 visible_ppos++
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p]==1 ? "×" : " ")
                 details=title_detail(p)
-                icon=appicon(command[p])
-                prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(command[p]) icon reset
+                display_command=(agent_view ? agent_kind[p] == "codex" ? "Codex" : "Claude" : command[p])
+                icon=appicon(agent_view ? agent_kind[p] : command[p])
+                prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
                 show_path=(density == "detailed" || density == "compact" || (density == "normal" && width>=32))
-                first_group=(group_count[p]>1 && !group_member[p] && density == "normal")
                 pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-length(icon)) : "")
-                if (first_group && pane_path != "") pane_path=pane_path " · " group_count[p] " panes"
                 if (nul && density != "compact") {
                     inline_path=(density == "normal" && width<56 && pane_path != "" ? " " path_color pane_path reset : "")
-                    primary=prefix " " command[p] notice(pa[p],pb[p],pz[p]) dim details reset inline_path
+                    primary=prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) dim details reset inline_path
                     continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+length(icon),"")
                     secondary=continuation path_color pane_path reset
                     row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : ""),pt ":" s)
                 } else {
                     # Legacy newline consumers stay one line per object.
                     path_text=(show_path && pane_path != "" ? " " path_color pane_path reset : "")
-                    row(pt,prefix " " command[p] notice(pa[p],pb[p],pz[p]) path_text dim details reset,pt ":" s)
+                    row(pt,prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) path_text dim details reset,pt ":" s)
                 }
             }
         }

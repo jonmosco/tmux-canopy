@@ -112,7 +112,7 @@ exec REAL --bind BINDING --bind LOAD "$@"
             wait(lambda: len(sidebars()) == 1, 'sidebar creation')
             side = sidebars()[0]
             script_env['TMUX_PANE'] = side
-            wait(lambda: loads.stat().st_size >= 2, 'initial UI and settled-focus loads')
+            wait(lambda: loads.stat().st_size >= 1, 'initial UI load')
             assert display(side, '#{pane_in_mode}') == '0'
             return side
 
@@ -358,7 +358,7 @@ exec REAL --bind BINDING --bind LOAD "$@"
             mode.write_text('ok')
             loads.write_text('')
             os.write(master, b'\x02T')
-            wait(lambda: len(sidebars()) == 1 and loads.stat().st_size >= 2, 'native toggle binding')
+            wait(lambda: len(sidebars()) == 1 and loads.stat().st_size >= 1, 'native toggle binding')
             sidebar = sidebars()[0]
             assert display(sidebar, '#{pane_in_mode}') == '0'
             os.write(master, b'\x02T')

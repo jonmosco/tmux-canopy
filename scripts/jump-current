@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# fzf transform action: position the pointer on the live content location.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sidebar="${TMUX_PANE:-}"
+[[ "$sidebar" =~ ^%[0-9]+$ ]] || { printf 'bell\n'; exit 0; }
+[[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || { printf 'bell\n'; exit 0; }
+location="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)"
+IFS='|' read -r session window pane <<< "$location"
+if [[ ! "$session" =~ ^\$[0-9]+$ || ! "$window" =~ ^@[0-9]+$ || ! "$pane" =~ ^%[0-9]+$ ]]; then
+  printf 'bell\n'
+  exit 0
+fi
+position=0 pane_position='' window_position='' session_position=''
+while IFS= read -r -d '' record; do
+  token="${record%%$'\t'*}"
+  [[ "$token" == H:* ]] && continue
+  ((position+=1))
+  identity="${record##*$'\t'}"
+  case "$identity" in
+    "P:$pane:$session") pane_position="$position" ;;
+    "W:$window:$session") window_position="$position" ;;
+    "S:$session") session_position="$position" ;;
+  esac
+done < <("$SCRIPT_DIR/sidebar-source" --stable --read0)
+target="${pane_position:-${window_position:-$session_position}}"
+if [[ "$target" =~ ^[1-9][0-9]*$ ]]; then
+  # If a search hides the target, clear the query before moving the pointer.
+  # Query changes search asynchronously; wait before applying an absolute row
+  # position or fzf may clamp it to the old, filtered result set.
+  printf 'change-query()+wait+pos(%s)\n' "$target"
+else
+  printf 'bell\n'
+fi
