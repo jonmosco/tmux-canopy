@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Read-only Codex/Claude pane summary from tmux metadata and visible terminal text.
+set -u
+token="${1:-}"
+case "$token" in
+  P:%[0-9]*) pane="${token#P:}" ;;
+  Q:%[0-9]*) pane="${token#Q:}" ;;
+  X:*:%[0-9]*) pane="${token##*:}" ;;
+  W:@[0-9]*:\$[0-9]*)
+    window="${token#W:}"; window="${window%%:*}"
+    panes="$(tmux list-panes -t "$window" -f '#{&&:#{!=:#{@tmux_canopy},1},#{!=:#{@tmux_canopy_slot},1}}' -F '#{pane_id}' 2>/dev/null)"
+    if [[ "$panes" =~ ^%[0-9]+$ ]]; then pane="$panes"; else pane=''; fi
+    ;;
+  *) pane='' ;;
+esac
+if [[ ! "$pane" =~ ^%[0-9]+$ ]]; then
+  printf 'Select a Codex or Claude pane to see its terminal summary.\n'
+  exit 0
+fi
+sep=$'\037'
+clean=$'s/[\001-\037\177]/ /'
+format="#{pane_id}$sep#{pane_pid}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_title}$sep#{${clean}:pane_current_path}$sep#{${clean}:session_name}$sep#{window_index}$sep#{${clean}:window_name}$sep#{@tmux_canopy}$sep#{@tmux_canopy_slot}"
+metadata="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || metadata=''
+if [[ -z "$metadata" ]]; then printf 'Pane %s is no longer available.\n' "$pane"; exit 0; fi
+IFS="$sep" read -r actual pid command title directory session index window sidebar slot <<< "$metadata"
+if [[ "$actual" != "$pane" ]]; then
+  printf 'Pane %s is no longer available.\n' "$pane"; exit 0
+fi
+if [[ "$sidebar" == 1 || "$slot" == 1 ]]; then
+  printf 'Select a content pane to inspect an agent.\n'; exit 0
+fi
+agent=''
+case "${command##*/}" in
+  codex) agent='Codex' ;;
+  claude|claude-code) agent='Claude Code' ;;
+esac
+if [[ -z "$agent" && "$pid" =~ ^[0-9]+$ ]]; then
+  # Agents can be children of a pane shell. Resolve only descendants of that
+  # pane, and prefer the closest matching process when there is more than one.
+  agent="$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$pid" '
+    { parent[$1]=$2; name=$3; sub(/^.*\//,"",name)
+      if (name=="codex") kind[$1]="Codex"
+      else if (name=="claude" || name=="claude-code") kind[$1]="Claude Code" }
+    END { best=129; for (p in kind) { q=p; for (depth=0;depth<128 && q>0;depth++) {
+      if (q==root) { if (depth<best) { best=depth; result=kind[p] }; break }
+      if (seen[p,q]++) break; q=parent[q] }
+    } if (result!="") print result }')"
+fi
+if [[ -z "$agent" ]]; then
+  printf 'No Codex or Claude process found in pane %s.\n' "$pane"
+  printf 'Select a pane running an agent, or press i for terminal preview.\n'
+  exit 0
+fi
+columns="${FZF_PREVIEW_COLUMNS:-42}"
+[[ "$columns" =~ ^[1-9][0-9]{0,3}$ ]] || columns=42
+printf '%s · %s:%s %s · %s\n' "$agent" "$session" "$index" "$window" "$pane"
+[[ -z "$title" || "$title" == "$command" ]] || printf 'Title: %s\n' "$title"
+printf 'Directory: %s\n' "$directory"
+if [[ "$agent" == Codex && "$pid" =~ ^[0-9]+$ ]]; then
+  # shellcheck disable=SC1091
+  source "$(dirname "$0")/../lib/agent-process.sh"
+  agent_option() { tmux show-option -pqv -t "$pane" "@tmux_canopy_agent_$1" 2>/dev/null; }
+  report_source="$(agent_option source)"
+  report_pid="$(agent_option pane_pid)"
+  report_session="$(agent_option session)"
+  report_updated="$(agent_option updated)"
+  report_process="$(agent_option process_pid)"
+  report_birth="$(agent_option process_birth)"
+  if [[ "$report_source" == codex-hook && "$report_pid" == "$pid" && -n "$report_session" && "$report_updated" =~ ^[0-9]{1,12}$ ]] &&
+     canopy_process_identity "$pid" "$report_process" "$report_birth"; then
+    now="$(date +%s)"
+    age=$((now - 10#$report_updated))
+    if ((age >= 0 && age <= 900)); then
+      report_status="$(agent_option status)"
+      report_tool="$(agent_option tool)"
+      report_summary="$(agent_option summary)"
+      report_command="$(agent_option command)"
+      case "$report_status" in
+        ready) label='Ready' ;;
+        working) label='Working' ;;
+        needs-input) label='Approval requested (reported)' ;;
+        turn-ended) label='Turn ended' ;;
+        interrupted) label='Interrupted' ;;
+        session-ended) label='Session ended' ;;
+        *) label='Unknown' ;;
+      esac
+      printf 'Source: Codex hook · reported %ss ago\n' "$age"
+      printf 'Status: %s\n' "$label"
+      if [[ "$report_status" == needs-input ]]; then
+        [[ -z "$report_tool" ]] || printf 'Tool: %s\n' "$report_tool"
+        [[ -z "$report_summary" ]] || printf 'Request: %s\n' "$report_summary"
+        [[ -z "$report_command" ]] || printf 'Command: %s\n' "$report_command"
+      fi
+      exit 0
+    fi
+    printf 'Source: Codex hook · last report %ss ago\n' "$age"
+    printf 'Status: Unknown (report stale)\n'
+    exit 0
+  fi
+fi
+printf 'Source: visible terminal text · snapshot only\n\n'
+# Capture the current screen only. History can contain prompts already answered.
+# The label is deliberately tentative: terminal text cannot prove request state.
+tmux capture-pane -p -t "$pane" 2>/dev/null | awk -v width="$columns" '
+  function wrap(value,    take,part) {
+    gsub(/^[ \t]+|[ \t]+$/, "", value)
+    if (value=="") return
+    while (length(value)>width-2) {
+      take=width-2; part=substr(value,1,take)
+      if (part ~ / /) { sub(/ [^ ]*$/, "", part); if (part!="") take=length(part) }
+      print "  " substr(value,1,take)
+      value=substr(value,take+1); sub(/^[ \t]+/, "", value)
+    }
+    print "  " value
+  }
+  { line[++n]=$0 }
+  END {
+    while (n>0 && line[n] ~ /^[ \t]*$/) n--
+    first=n-11; if (first<1) first=1
+    request=""
+    for (i=first;i<=n;i++) {
+      value=tolower(line[i])
+      if (value ~ /(permission needed|needs your (approval|permission)|do you want to (run|allow|approve|proceed|trust)|would you like to (run|allow|approve|proceed)|press (enter|y) to (approve|confirm)|allow (once|always)|yes, allow|trust the files in this folder)/) request=line[i]
+    }
+    if (request!="") { print "Possible input requested (unverified):"; wrap(request) }
+    else print "No clear request visible in the current screen."
+    print ""; print "Recent screen:"
+    first=n-5; if (first<1) first=1
+    for (i=first;i<=n;i++) if (line[i] !~ /^[ \t]*$/) wrap(line[i])
+  }
+'

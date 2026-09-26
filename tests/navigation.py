@@ -154,7 +154,11 @@ def main():
             calls.write_text('')
             activate(peer)
             commands = recorded_commands()
-            assert len(commands) == 2, commands
+            # Returning the sidebar pointer to the active target adds two
+            # read-only option lookups before the batched navigation command.
+            assert len(commands) == 4, commands
+            assert all(row[:2] == ['show-option', '-pqv'] for row in commands[:2]), commands
+            assert commands[2][0] == 'list-clients' and commands[3][0] == 'set-option', commands
             assert current()[2] == peer
             assert display(sidebar, '#{@tmux_canopy_target}') == peer
             assert not any('select-window' in row or 'switch-client' in row or 'swap-pane' in row for row in commands)

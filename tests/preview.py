@@ -189,7 +189,13 @@ while True:
                 tm('send-keys', '-t', sidebar, 'p')
                 wait(lambda: 'ROW079' in capture(), 'drawer reshown')
             assert probe() == before
-            print('ok - real fzf clips wide rows, keeps drawer height steady, and toggles with p')
+            tm('send-keys', '-t', sidebar, 'i')
+            wait(lambda: 'No Codex or Claude process found' in capture(), 'agent drawer shown')
+            assert probe() == before
+            tm('send-keys', '-t', sidebar, 'i')
+            wait(lambda: 'ROW079' in capture(), 'terminal drawer restored')
+            assert probe() == before
+            print('ok - real fzf clips wide rows, keeps drawer height steady, and toggles with p and i')
 
             tm('send-keys', '-t', pane, '-l', 't')
             wait(lambda: display(pane, '#{alternate_on}') == '1', 'alternate screen')
@@ -243,6 +249,17 @@ while True:
             assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
             print('ok - readable scrollable Help preserves selection, fzf, pane sizes and application SIGWINCH count')
 
+            terminal_output.clear()
+            tm('send-keys', '-t', sidebar, 'g')
+            wait(lambda: b'SIDEBAR LEGEND' in terminal_output, 'legend popup opens')
+            assert capture() == sidebar_screen, 'Legend replaced the sidebar display'
+            assert display(sidebar, '#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}') == dock_geometry
+            os.write(master, b'q')
+            assert probe() == before
+            assert capture() == sidebar_screen, 'Legend changed the sidebar display on exit'
+            assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
+            print('ok - Legend opens with g and preserves the sidebar and pane geometry')
+
             # Exercise the actual prefix binding with the same persistent fzf.
             for _ in range(3):
                 tm('split-window', '-d', '-v', '-l', '6', '-t', pane, 'sleep 600')
@@ -260,6 +277,15 @@ while True:
             assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
             assert probe() == before
             print('ok - real Ctrl-a Space cycles seven content layouts without moving/restarting the sidebar')
+
+            tm('send-keys', '-t', sidebar, '4')
+            wait(lambda: '[4 Agents]' in capture(), 'Agents view header')
+            wait(lambda: 'No Codex or Claude agents detected' in capture(), 'Agents empty view')
+            assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
+            tm('send-keys', '-t', sidebar, '1')
+            wait(lambda: '[1 Tree]' in capture(), 'Tree view restored')
+            assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
+            print('ok - 4 opens Agents view and 1 returns to Tree in the same fzf process')
         finally:
             sp.run([executable, '-L', socket, 'kill-server'], env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
             if client_process:

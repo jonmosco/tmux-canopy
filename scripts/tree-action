@@ -35,11 +35,11 @@ add_state() {
 
 set_all_branches() {
   local kind view rest snapshot='' tmp
-  # These bindings are tree operations, including when there is no selection.
-  # Do not change saved tree expansion while browsing processes or buffers.
+  # These bindings operate on both hierarchical views, including when there
+  # is no selection. Other views leave saved expansion unchanged.
   while IFS=$'\t' read -r kind view rest; do
     [[ "$kind" == VIEW ]] || continue
-    [[ "$view" == tree ]] || return 0
+    [[ "$view" == tree || "$view" == agents ]] || return 0
     break
   done < "$state_file"
   if [[ "$action" == collapse-all ]]; then
@@ -581,7 +581,11 @@ focus_token() {
   if [[ "${2:-}" == filtered && ( "$token" == S:* || "$token" == W:* ) ]]; then
     # Resolve a matching descendant before normal parent-row navigation. Folds
     # do not remove candidates; a notification cleared since rendering can.
-    resolved="$("$SCRIPT_DIR/tree-source" --focus-target "$token")" || return 0
+    if grep -Fqx $'VIEW\tagents' "$state_file"; then
+      resolved="$("$SCRIPT_DIR/tree-source" --agents --focus-target "$token")" || return 0
+    else
+      resolved="$("$SCRIPT_DIR/tree-source" --focus-target "$token")" || return 0
+    fi
     [[ -n "$resolved" ]] || return 0
     IFS=$'\t' read -r token occurrence <<< "$resolved"
     if [[ "$token" == P:* && -n "$occurrence" ]]; then export TMUX_CANOPY_OCCURRENCE="$occurrence"; fi

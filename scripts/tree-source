@@ -9,7 +9,7 @@ text() { printf '#{s/[\001-\037\177]/ /:%s}' "$1"; }
 config="D${sep}#{@tmux_canopy_icon_theme}${sep}#{@tmux_canopy_notifications}${sep}#{@tmux-canopy-theme}${sep}#{@tmux-canopy-density}${sep}$(text @tmux-canopy-icon-session)${sep}$(text @tmux-canopy-icon-window)${sep}$(text @tmux-canopy-icon-pane)${sep}#{pane_id}${sep}#{window_id}${sep}#{session_id}${sep}#{pane_width}${sep}$(text host)${sep}#{@tmux-canopy-compact-single-panes}${sep}$(text @tmux-canopy-filter)${sep}$(text @tmux-canopy-filter-window)${sep}$(text @tmux-canopy-filter-title)"
 sessions="S${sep}#{session_id}${sep}$(text session_name)${sep}#{session_attached}"
 windows="W${sep}#{session_id}${sep}#{window_id}${sep}#{window_index}${sep}$(text window_name)${sep}#{window_linked_sessions}${sep}#{synchronize-panes}${sep}#{@tmux_canopy_notice_activity}${sep}#{@tmux_canopy_notice_bell}${sep}#{@tmux_canopy_notice_silence}"
-panes="P${sep}#{pane_id}${sep}#{window_id}${sep}#{pane_index}${sep}$(text pane_current_command)${sep}$(text pane_title)${sep}$(text pane_current_path)${sep}#{pane_dead}${sep}#{@tmux_canopy}${sep}#{@tmux_canopy_slot}${sep}#{@tmux_canopy_notice_pane_activity}${sep}#{@tmux_canopy_notice_pane_bell}${sep}#{@tmux_canopy_notice_pane_silence}${sep}#{@tmux_canopy_target}${sep}#{@tmux_canopy_target_session}${sep}#{pane_last}"
+panes="P${sep}#{pane_id}${sep}#{window_id}${sep}#{pane_index}${sep}$(text pane_current_command)${sep}$(text pane_title)${sep}$(text pane_current_path)${sep}#{pane_dead}${sep}#{@tmux_canopy}${sep}#{@tmux_canopy_slot}${sep}#{@tmux_canopy_notice_pane_activity}${sep}#{@tmux_canopy_notice_pane_bell}${sep}#{@tmux_canopy_notice_pane_silence}${sep}#{@tmux_canopy_target}${sep}#{@tmux_canopy_target_session}${sep}#{pane_last}${sep}#{pane_pid}${sep}#{@tmux_canopy_agent_source}${sep}$(text @tmux_canopy_agent_session)${sep}#{@tmux_canopy_agent_pane_pid}${sep}#{@tmux_canopy_agent_status}${sep}#{@tmux_canopy_agent_updated}${sep}#{@tmux_canopy_agent_process_pid}${sep}$(text @tmux_canopy_agent_process_birth)"
 clients="C${sep}#{client_tty}${sep}#{session_id}${sep}#{window_id}${sep}#{pane_id}"
 printf -v now '%(%s)T' -1
 # Collect completely before publishing any rows. One tmux connection, no
@@ -19,12 +19,38 @@ snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
   list-panes -a -F "$panes" \; list-clients -F "$clients" 2>/dev/null)" || exit 1
 export TMUX_CANOPY_RENDER_CLIENT="${TMUX_CANOPY_CLIENT:-}"
 export TMUX_CANOPY_RENDER_HOME="$HOME"
-switcher=0
+switcher=0 agent_view=0
 export TMUX_CANOPY_FILTER_TARGET=""
-if [[ "${1:-}" == --focus-target ]]; then
-  export TMUX_CANOPY_FILTER_TARGET="${2:-}"
+while (($#)); do
+  case "$1" in
+    --focus-target) export TMUX_CANOPY_FILTER_TARGET="${2:-}"; shift ;;
+    --switcher) switcher=1 ;;
+    --agents) agent_view=1 ;;
+  esac
+  shift
+done
+if [[ "$agent_view" == 1 && -d /proc/self ]] && command -v python3 >/dev/null 2>&1; then
+  # Python is optional; its /proc walk avoids a full-system ps invocation.
+  agent_records="$(python3 "$SCRIPT_DIR/../lib/agent-process.py" <<< "$snapshot")" || exit 1
+  [[ -z "$agent_records" ]] || snapshot+=$'\n'"$agent_records"
+else
+  if [[ "$snapshot" == *"${sep}codex-hook${sep}"* ]]; then
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/../lib/agent-process.sh"
+    while IFS= read -r line; do
+      [[ $line == P$sep* && $line == *"${sep}codex-hook${sep}"* ]] || continue
+      IFS="$sep" read -ra fields <<< "$line"
+      if canopy_process_identity "${fields[16]:-}" "${fields[22]:-}" "${fields[23]:-}"; then
+        snapshot+=$'\n'"V${sep}${fields[1]}"
+      fi
+    done <<< "$snapshot"
+  fi
+  if [[ "$agent_view" == 1 ]]; then
+    # Portable fallback for macOS/BSD and minimal Linux installations.
+    processes="$(ps -eo pid=,ppid=,comm= 2>/dev/null)" || exit 1
+    [[ -z "$processes" ]] || snapshot+=$'\n'"$processes"
+  fi
 fi
-[[ "${1:-}" != --switcher ]] || switcher=1
-awk -v switcher="$switcher" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
+awk -v switcher="$switcher" -v agent_view="$agent_view" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
   -v nul="${TMUX_CANOPY_NUL:-0}" -v header="${TMUX_CANOPY_HEADER:-0}" -f "$SCRIPT_DIR/../lib/tree-render.awk" \
   "$state_file" - <<< "$snapshot"

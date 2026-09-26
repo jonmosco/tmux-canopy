@@ -33,7 +33,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - Context-sensitive native action menus for sessions, windows, and panes
 - Window reorder, cross-session link/unlink, layouts, pane rotation, and guarded synchronized input
 - Pane zoom, swap, break-to-window, dead-pane respawn, and object information popups
-- Switchable Tree, pane-attributed Processes, and tmux Buffers views
+- Switchable Tree, pane-attributed Processes, tmux Buffers, and detected Agents views
 - ANSI semantic colors, compact tree guides, width-aware paths, dynamic mode tabs, and adaptive preview
 - Responsive fixed or percentage widths with minimum sidebar/content constraints
 - Staged one-shot mouse resizing and compact/default/wide width presets
@@ -74,15 +74,16 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` | Switch to Tree, Processes, or Buffers view |
+| `1` / `2` / `3` / `4` | Switch to Tree, Processes, Buffers, or Agents view |
 | `j` / `k` or arrows | Move selection |
 | `h` / Left | Collapse the selected node or pane's window |
 | `l` / Right | Expand the selected session or window |
-| `H` / Shift-h | Collapse all sessions and windows in Tree view |
-| `L` / Shift-l | Expand all sessions and windows in Tree view |
+| `H` / Shift-h | Collapse all sessions and windows in Tree or Agents view |
+| `L` / Shift-l | Expand all sessions and windows in Tree or Agents view |
 | `Enter` | Focus a tree/process target, paste a buffer, or complete move/link placement |
 | `a` | Open the selected object's native action menu |
 | `p` | Toggle the preview drawer on/off without closing the sidebar |
+| `i` | Toggle the drawer between terminal and Codex/Claude summaries; show it if hidden |
 | `Shift-p` | Open an enlarged read-only preview popup (`q` closes; arrows scroll) |
 | `prefix + Space` | Cycle content layouts while leaving the sidebar fixed |
 | `m` | Mark the selected window or pane as the move source; press again to cancel |
@@ -103,6 +104,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
 | `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
+| `g` | Open the scrollable legend of tree symbols, colors, badges, and labels |
 | `Ctrl-q` | Close |
 | `prefix + T` | Toggle the sidebar open or closed |
 
@@ -113,6 +115,8 @@ Tree navigation starts in a normal mode so navigation and creation keys remain a
 Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use `prefix + h` to return to it.
 
 Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use `b` to page back and `g`/`G` for the beginning/end. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
+
+Press `g` in the sidebar to open the same responsive overlay as a legend. It explains the selection pointer, active-location dot, unread badges, tree guides, pane command/title/directory, and filter markers. An amber dot means unread terminal output, not that an agent needs input. Run `scripts/help --legend --print 80` to read the legend outside tmux.
 
 ### Tree filters
 
@@ -198,11 +202,12 @@ Linked window occurrences carry both stable window and session IDs internally, s
 
 ### Views
 
-The same long-running fzf process switches among three sources:
+The same long-running fzf process switches among four sources:
 
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
 3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste or delete.
+4. **Agents** — only sessions, windows, and panes containing a live `codex`, `claude`, or `claude-code` process. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. Ctrl-r refreshes the process inventory.
 
 Process signals are revalidated immediately before delivery by walking the current parent chain back to the owning `#{pane_pid}`. Stale or reused PIDs are ignored.
 
@@ -216,7 +221,7 @@ Press `m` on a window or pane. The source remains visible with a `⇢` marker wh
 
 Ordinary `Enter` or double-click navigation does not synchronously reload the list inside the window transition. After focus settles, an owner-only background refresh updates the active markers. Native tmux keyboard, mouse, window creation, and session changes use the same mechanism; structural move operations still reload after completion.
 
-The green `●` identifies the current content pane and its window/session occurrence; the highlighted row/pointer identifies the object you are browsing. These are independent. Focus changes do not select, scroll to, or expand the active branch. A collapsed active window/session still receives its marker. Entering the sidebar retains the last content pane (using native `pane_last` or the remembered target), instead of marking the sidebar as the working pane.
+The green `●` identifies the current content pane and its window/session occurrence; the highlighted row/pointer identifies the object you are browsing. These are independent while you browse in the sidebar. When you leave it for a content pane, switch panes, or return focus to the sidebar, its pointer jumps to the current content pane, or its nearest visible window/session row when folded. Press `Ctrl-o` to do the same at any time. This clears an active search query but leaves folds and tree filters intact. If filters hide the location entirely, it rings the bell. A collapsed active window/session retains its green marker. Entering the sidebar retains the last content pane (using native `pane_last` or the remembered target), instead of marking the sidebar as the working pane.
 
 Focus refreshes wait for approximately 75 ms of stable focus before rendering. Repeated events share one short-lived worker per sidebar; unchanged locations do not reload. The worker resolves the owning client's live session/window/pane rather than trusting stale hook targets, waits out guarded transitions, validates ownership again before publishing, and remembers linked-session occurrences. Expiring claims recover after an interrupted worker. This is event-driven, not a permanent polling process.
 
@@ -400,7 +405,8 @@ may be `minimal`, `normal`, `compact`, or `detailed`:
   wide views also show one parent for context. Titles appear when room permits.
 - **Minimal:** Single content pane windows combine window and pane into one row.
   Multi-pane windows keep one row per pane; directory lines and ordinary
-  pane counts are hidden. Filtered counts remain visible. Titles appear only when they fit. This preset includes the effect of
+  pane counts are hidden. Filtered pane counts appear on collapsed windows.
+  Titles appear only when they fit. This preset includes the effect of
   `@tmux-canopy-compact-single-panes on`.
 - **Compact:** One line per pane, retaining each shortened directory inline.
 - **Detailed:** Two lines per pane, retaining the full path, pane index, and
@@ -411,6 +417,10 @@ highlight and cyan pointer identify the selected row. A minimal combined window
 row carries the dot when it contains the active pane. Default session and window
 icons are omitted to leave room for names; explicitly configured icons remain.
 Expanded branches omit pane/client totals unless a Tree filter is active.
+An ordinary collapsed window shows a muted pane count at the right edge when
+it hides more than one pane. Expanded windows, including adjacent panes that
+share one directory label, show no pane count. A collapsed filtered window
+shows matched and total panes beside its name.
 Collapsed branches keep counts that explain hidden children and notifications.
 Linked and synchronized state remains visible. Every displayed object keeps its
 stable action identity. The full directory is available in pane preview and
@@ -428,8 +438,8 @@ notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palett
 index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
 `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
 uses a cyan background. Monochrome mode also disables fzf UI colors. The compact
-header shows `1 Tree`, `2 Proc`, and `3 Buff`, with brackets around the active
-view. At narrow widths, labels shorten to `1 T`, `2 P`, and `3 B`. Pending
+header shows `1 Tree`, `2 Proc`, `3 Buff`, and `4 Agents`, with brackets around the active
+view. At narrow widths, labels shorten to `1 T`, `2 P`, `3 B`, and `4 Agt`. Pending
 `MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
 hidden. Tree rows use `├─`, `└─`, and `│` guides with colored application icons.
@@ -441,6 +451,20 @@ Preview may be `auto`, `on`, or `off`. Auto starts hidden below 28 rows so the o
 The drawer keeps a consistent configured height (35% by default) while browsing. Output is **clipped, not wrapped**: a source terminal row remains one preview row, with terminal-cell/ANSI handling delegated to fzf rather than byte truncation. Pane previews have a compact two-line heading and use `FZF_PREVIEW_LINES`/`FZF_PREVIEW_COLUMNS` to fit the available drawer. Shell/log snapshots show recent physical rows through the cursor, rather than a fixed 80-line dump or mostly empty screen bottom. Alternate-screen TUIs and common full-screen commands show a cursor-centered slice of the current screen, without shell scrollback. `[recent crop]` or `[screen crop]` identifies a cropped snapshot.
 
 `Shift-p` opens an 85%-wide, 80%-high native tmux popup for the selected object. It uses `less -R -S` in secure mode: arrows scroll vertically/horizontally and `q` closes it. TUI snapshots include the whole current screen; shell snapshots include up to 300 recent physical rows. Popup sizing uses its own PTY dimensions, not the narrow drawer's inherited dimensions. Buffers and session/window/process metadata can also be inspected there.
+
+The **agent summary** is a read-only prototype for Codex and Claude Code. Press `i` while selecting a pane to switch the existing drawer from terminal preview to an agent summary; press `i` again to return. The summary automatically follows whichever supported agent is in the selected pane. Press `p` to hide or show the drawer. The choice belongs to the sidebar pane and lasts until it closes. A single-content-pane window also resolves to its pane. `Shift-p` continues to open the enlarged terminal preview.
+
+The summary detects a `codex`, `claude`, or `claude-code` command in the pane or its process descendants and shows its title and directory. Without an integration, it checks the visible screen for likely approval wording and labels any match **possible input requested (unverified)**. It does not inspect transcripts, agent configuration, or hidden terminal history. Without a supported agent process, the drawer explains that no agent was found.
+
+### Codex hook setup
+
+Codex CLI can optionally report lifecycle events to the selected pane's agent drawer. Copy [the example hook configuration](codex-hooks.example.json) to `~/.codex/hooks.json`, replace every `/absolute/path/to/tmux-canopy` with your installation's absolute path, and merge its `hooks` object with any hooks you already use. Python 3 is required for this optional script. In Codex, use `/hooks` to review and trust the new definition. The hook runs only for Codex processes launched within tmux; Canopy does not install it or edit Codex settings. See [OpenAI's hook documentation](https://learn.chatgpt.com/docs/hooks) for the event contract and trust flow.
+
+The reporter stores only bounded status, tool name, optional approval description and command, session/turn identity, pane PID, Codex process PID/start time, and update time in tmux pane options. It never approves, denies, sends input, or changes agent permissions. A `PermissionRequest` appears as **Approval requested (reported)**: the event does not prove a person must respond, because another reviewer may approve automatically. A matching `PostToolUse`, a new prompt, turn end, interruption, or session end clears that request. A report older than 15 minutes becomes **Unknown (report stale)**. If the pane or Codex process changes, the report is ignored. `Stop` means **Turn ended**, not task finished. Claude Code and Codex without hooks continue to show the unverified screen summary.
+
+Tree and Agents pane rows show compact Codex labels: `[ready]`, `[working]`, `[approval]`, `[turn ended]`, `[interrupted]`, `[session ended]`, or `[unknown]`. A row label requires matching pane and Codex process identities, session metadata, and a valid hook timestamp. The reported Codex process must still be a live descendant of the pane. Reports older than 15 minutes display `[unknown]`; reports from a different pane PID, a dead pane, or a pane without a live Codex process are omitted. These labels are readable in monochrome mode. Claude and screen-inferred requests do not produce row labels. Hook events refresh the sidebar rows without switching views; a bounded expiry worker refreshes once when a report becomes stale. tmux 3.8 and later also monitor pane command changes once per second; tmux 3.7c continues to refresh on focus changes and Ctrl-r. Expanding the drawer with `i` shows the request detail and reporting source. On Linux, the Agents view uses an optional Python 3 `/proc` scan to avoid full-system `ps`; it falls back to `ps` when Python or `/proc` is unavailable.
+
+Below 36 columns, the row labels shorten to `[rdy]`, `[wrk]`, `[req]`, `[end]`, `[int]`, and `[?]`, respectively. `req` still means a reported approval request, not proof that your response is needed.
 
 Previews are on-demand snapshots, not continuously polled terminals. Neither preview mode resizes the real application, moves panes, or replaces the sidebar's fzf process. Reopen an already-running sidebar after upgrading to pick up the new no-wrap setting and `Shift-p` binding.
 
@@ -547,7 +571,7 @@ The additional navigation suite requires Python 3 for its test harness only (not
 
 The rendering suite additionally verifies snapshot field safety, linked-row uniqueness, collapse state, real fzf tracking through rename/notification/filter reloads, session-correct linked-pane activation, deleted-selection fallback, notification source validation, a 20-event concurrent burst producing one refresh, one quiet clear per guarded navigation, and expired-worker recovery.
 
-The focus suite uses real client keystrokes and SGR mouse clicks to check live pane/window/session markers, remembered content on sidebar focus, preservation of the selected row and its viewport position, filtered-query preservation, collapsed branches, rapid pane-switch coalescing, stale hook targets, new windows, linked-session occurrences, and refresh isolation between two sidebar owners.
+The focus suite uses real client keystrokes and SGR mouse clicks to check live pane/window/session markers, remembered content on sidebar focus, pointer return on same-pane departure and pane switches, clearing a search when jumping to the active pane, collapsed branches, rapid pane-switch coalescing, stale hook targets, new windows, linked-session occurrences, and refresh isolation between two sidebar owners.
 
 The preview suite checks row budgets, real fzf no-wrap rendering with ANSI/Unicode, the `p` toggle, fixed drawer height, alternate-screen capture, popup safety, and zero application resize signals from previews. It also exercises actual Ctrl-a Space keystrokes against the persistent sidebar. The layout suite covers all presets, reverse cycling, focus/ID preservation, slots, single content panes, zoom refusal, native fallback, and insufficient space.
 

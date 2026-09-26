@@ -11,17 +11,25 @@ pane processes, and move between projects. Its current activity, bell, and
 silence badges report terminal events. They do not establish whether an agent
 is working, waiting for input, or finished.
 
+A Codex/Claude preview prototype is available through `i`. Without an integration,
+it reads current pane metadata and visible screen text and labels possible
+prompts as unverified. An optional Codex CLI hook now reports turn state and
+approval requests to that drawer; Claude still uses the screen summary.
+The Agents view (`4`) lists sessions, windows, and panes with detected Codex or
+Claude processes; its parent counts are process counts, not task status.
+
 The goal is to help users identify which agent needs attention while continuing
 to use their existing tmux sessions, windows, panes, and tools.
 
 ### 1. Agent status on panes
 
-- [ ] Define pane metadata for agent identity, status, reporting source, and
+- [x] Define pane metadata for agent identity, status, reporting source, and
   freshness.
-- [ ] Add optional integrations that report lifecycle events into tmux pane
-  metadata. Select initial integrations based on the events each agent exposes.
-- [ ] Display states such as **working**, **needs input**, **finished**, and
-  **unknown** beside agent panes, with readable text in monochrome mode.
+- [x] Add an optional Codex integration that reports lifecycle events into tmux
+  pane metadata. Evaluate Claude and other integrations separately.
+- [x] Display reported **working**, **approval**, **ready**, **turn ended**, and
+  **unknown** states beside live Codex panes, with readable text in monochrome mode.
+  Claude panes remain unlabeled until a trustworthy integration is available.
 - [ ] Handle agent exit, restart, stale reports, and pane removal without leaving
   misleading status behind.
 - [ ] Verify that installations without an integration retain normal sidebar
@@ -59,11 +67,12 @@ Design requirements:
 
 Explore a preview-like panel that shows what an agent needs and, for supported
 integrations, lets the user respond without switching to the agent's window or
-pane. Depends on the agent identity and lifecycle metadata above; not implemented.
+pane. The Codex hook supplies a first read-only request summary; response
+controls still depend on a verified request and response contract.
 
-- [ ] Start with a read-only request panel showing the agent, session/window/pane,
+- [ ] Expand the read-only Codex request panel showing the agent, session/window/pane,
   request text, relevant context (including a proposed command when supplied),
-  available choices, and freshness. Support wrapping and scrolling at narrow widths.
+  and freshness. Available choices and narrow-width scrolling remain future work.
 - [ ] Define an optional integration contract for request identity, agent-session
   identity, target pane, request state, and supported response types. Distinguish
   structured requests from an ordinary terminal-output preview; do not infer

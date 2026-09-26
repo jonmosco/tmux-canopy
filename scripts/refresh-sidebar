@@ -10,7 +10,7 @@ mode=request
 if [[ "${1:-}" == worker ]]; then
   mode=worker; expected_sidebar="${2:-}"; client="${3:-}"; token="${4:-}"; previous="${5:-}"
 else
-  client="${2:-}"
+  client="${2:-}"; hook="${3:-}"
 fi
 [[ -n "$client" ]] || exit 0
 key="$(sidebar_client_key "$client")"
@@ -19,6 +19,7 @@ guard="@tmux_canopy_transition_$key"
 snapshot() {
   local kind a b c d e f g h j
   sidebar='' current='' session='' window='' location='' target='' valid='' guarded=''
+  returned=''
   local saved='' saved_session='' last=''
   local -A windows=() internal=() last_panes=()
   while IFS='|' read -r kind a b c d e f g h j; do
@@ -53,6 +54,7 @@ snapshot() {
   valid="#{&&:#{==:$live,#{session_name}},#{&&:#{window_active},#{pane_active}}}"
   owner="#{&&:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_client},$client}}"
   if [[ "$current" == "$sidebar" ]]; then
+    returned=1
     # pane_last survives even a content->sidebar click faster than a worker
     # could run. Never mistake another sidebar or a placeholder for content.
     last="${last_panes[$window]:-}"
@@ -104,7 +106,7 @@ if [[ "$mode" == worker ]]; then
       continue
     fi
     commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
-    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-r\" ; "
+    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o ; send-keys -t $sidebar C-r\" ; "
     commands+="set-option -pu -t $sidebar @tmux_canopy_focus_pending ; set-option -pu -t $sidebar @tmux_canopy_focus_deadline"
     committed="$(commit "#{&&:#{==:#{@tmux_canopy_focus_pending},$token},#{!=:#{$guard},1}}" "$commands ; display-message -p focus-committed")"
     if [[ "$committed" == focus-committed ]]; then
@@ -124,6 +126,21 @@ snapshot || exit 0
 # A transition's last selection hook will schedule the settled destination.
 # Requests already in flight may read intermediate geometry: don't publish it.
 [[ "$guarded" != 1 ]] || exit 0
+if [[ "$hook" == after-select-pane && "$returned" == 1 ]]; then
+  # A deliberate return to the sidebar selects the live content row. The
+  # location is settled at this point, so publish it before the fzf jump.
+  commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
+  commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o ; send-keys -t $sidebar C-r"
+  commit "#{!=:#{$guard},1}" "$commands"
+  exit 0
+fi
+if [[ "$hook" == after-select-pane && "$location" == "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)" ]]; then
+  # The user may browse elsewhere in the tree and then return to the *same*
+  # content pane. There is no location change to refresh, but its row still
+  # needs the pointer. A changed location takes the debounced worker below.
+  commit "#{!=:#{$guard},1}" "send-keys -t $sidebar C-o"
+  exit 0
+fi
 printf -v now '%(%s)T' -1
 token="$now.$$.$RANDOM"
 expired="#{||:#{!:#{@tmux_canopy_focus_pending}},#{<:#{@tmux_canopy_focus_deadline},$now}}"

@@ -15,7 +15,7 @@ if [[ "$action" == diagnostics || ( "$token" == V:failure && "$action" == action
   exec "$SCRIPT_DIR/doctor" --popup
 fi
 # The retry row is informational, never a target for object mutations.
-if [[ ( "$token" == V:failure || "$token" == V:empty ) && "$action" != view-* ]]; then exit 0; fi
+if [[ ( "$token" == V:failure || "$token" == V:empty || "$token" == V:agents-empty ) && "$action" != view-* ]]; then exit 0; fi
 unset TMUX_CANOPY_OCCURRENCE
 if [[ "$token" == P:* && "$row_identity" == "$token:"* && "${row_identity##*:}" =~ ^\$[0-9]+$ ]]; then
   export TMUX_CANOPY_OCCURRENCE="${row_identity##*:}"
@@ -88,6 +88,7 @@ case "$action" in
   view-tree) set_view tree ;;
   view-processes) set_view processes ;;
   view-buffers) set_view buffers ;;
+  view-agents) set_view agents ;;
 
   activate)
     case "$token" in

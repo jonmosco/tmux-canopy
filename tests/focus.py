@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real-client active-location, debounce and viewport preservation regressions."""
+"""Real-client active-location, pointer return, and debounce regressions."""
 import fcntl
 from support import install_fzf_probe
 import os
@@ -76,7 +76,9 @@ def main():
             return tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_focus_location')
 
         def active_rows():
-            return [line.split('\t')[0] for line in run('sidebar-source', '--stable').splitlines() if '●' in line.split('\t')[1]]
+            # The pane has the single green dot; its session and window are bold.
+            return [line.split('\t')[0] for line in run('sidebar-source', '--stable').splitlines()
+                    if '●' in line.split('\t')[1] or '\x1b[1m' in line.split('\t')[1]]
 
         def probe(sidebar):
             selected.unlink(missing_ok=True)
@@ -107,7 +109,7 @@ def main():
             tm('set-option', '-g', 'status', 'off')
             tm('set-option', '-g', 'mouse', 'on')
             tm('set-option', '-g', 'escape-time', '10')
-            for option, value in [('scope', 'global'), ('transition', 'slot'), ('theme', 'mono'),
+            for option, value in [('scope', 'global'), ('transition', 'slot'), ('theme', 'ansi'),
                                   ('preview', 'off'), ('notifications', 'none')]:
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env.copy()
@@ -128,7 +130,7 @@ def main():
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             script_env['TMUX_PANE'] = sidebar
             wait(lambda: location(sidebar) == f'{session}|{wa}|{pane_a}', 'initial remembered content')
-            time.sleep(.15)
+            time.sleep(.3)
             tm('send-keys', '-t', sidebar, 'M-a')
             before, row_before = probe(sidebar), pointer_line(sidebar)
             assert before.startswith('P:' + last + '|')
@@ -139,26 +141,33 @@ def main():
             tm('bind-key', '-n', 'F6', 'select-pane', '-t', peer)
             tm('bind-key', '-n', 'F7', 'select-window', '-t', wb)
             tm('bind-key', '-n', 'F8', 'select-window', '-t', wa)
+            tm('bind-key', '-n', 'F9', 'select-pane', '-t', sidebar)
+            # Browse to a distant row, then leave the sidebar for the pane
+            # already active beneath it. The arrow must follow that pane even
+            # though the active-location value itself has not changed.
+            os.write(master, b'\x1b[15~')
+            wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'same-pane departure selects active row')
+            assert pointer_line(sidebar) != row_before
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'native pane focus marker')
             assert display(sidebar, '#{@tmux_canopy_target}') == peer
             assert set(active_rows()) == {'S:' + session, f'W:{wa}:{session}', 'P:' + peer}
-            assert probe(sidebar) == before and pointer_line(sidebar) == row_before
-            print('ok - native pane focus updates hierarchy while preserving selected row and viewport')
+            wait(lambda: probe(sidebar).startswith('P:' + peer + '|'), 'native pane focus selects active row')
+            print('ok - native pane focus updates hierarchy and selects active row')
 
             # Real SGR mouse click selects the other content pane.
             x, y = map(int, display(pane_a, '#{pane_left}|#{pane_top}').split('|'))
             os.write(master, f'\x1b[<0;{x+2};{y+2}M\x1b[<0;{x+2};{y+2}m'.encode())
             wait(lambda: location(sidebar) == f'{session}|{wa}|{pane_a}', 'mouse pane focus marker')
-            assert probe(sidebar) == before and pointer_line(sidebar) == row_before
+            wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'mouse pane focus selects active row')
             # Entering the sidebar remembers content and causes no extra reload.
             time.sleep(.2)
             count = len(deliveries.read_text().splitlines())
-            tm('select-pane', '-t', sidebar)
-            time.sleep(.3)
+            os.write(master, b'\x1b[20~')
+            wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'return selects current pane')
             assert location(sidebar) == f'{session}|{wa}|{pane_a}'
             assert len(deliveries.read_text().splitlines()) == count
-            print('ok - mouse focus works and entering the sidebar retains content without a redundant refresh')
+            print('ok - mouse focus and returning to sidebar selects the current content pane')
 
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'prepare pane burst')
@@ -189,8 +198,13 @@ def main():
             assert filtered.split('|')[2] == 'focus-collapse', filtered
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'filtered focus refresh')
-            assert probe(sidebar) == filtered
-            print('ok - active-marker refresh preserves the search query and filtered selection')
+            wait(lambda: probe(sidebar).startswith('P:' + peer + '|'), 'filtered focus selects active pane')
+            assert probe(sidebar).split('|')[-1] == ''
+            print('ok - leaving a filtered sidebar clears search and selects the active pane')
+            wait(enter_search, 'search mode before collapsing active window')
+            tm('send-keys', '-t', sidebar, '-l', 'focus-collapse')
+            time.sleep(.15)
+            assert probe(sidebar).split('|')[2] == 'focus-collapse'
             tm('send-keys', '-t', sidebar, 'Escape')
             time.sleep(.3)
             tm('send-keys', '-t', sidebar, 'h')
@@ -200,7 +214,7 @@ def main():
             os.write(master, b'\x1b[19~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'return to collapsed window')
             capture = tm('capture-pane', '-p', '-t', sidebar)
-            assert '▸ 0:focus-collapse' in capture, capture
+            assert '▸ ● 0:focus-collapse' in capture, capture
             print('ok - window switches update markers without expanding collapsed branches')
 
             # Coalesce concurrent duplicate/stale requests and ignore a stale

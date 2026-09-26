@@ -1,0 +1,12 @@
+{
+  "description": "Report Codex pane activity to tmux-canopy",
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}],
+    "PermissionRequest": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}],
+    "PostToolUse": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}],
+    "Interrupt": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}],
+    "SessionEnd": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/codex-hook", "timeout": 3}]}]
+  }
+}

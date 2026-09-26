@@ -14,18 +14,19 @@ fi
 width="$(tmux display-message -p -t "${TMUX_PANE:-}" '#{pane_width}' 2>/dev/null || printf '42')"
 [[ "$width" =~ ^[1-9][0-9]*$ ]] || width=42
 # Match the tree renderer, including fzf's two-column pointer gutter.
-labels=('1 Tree' '2 Proc' '3 Buff')
-case "$view" in processes) selected=1 ;; buffers) selected=2 ;; *) selected=0 ;; esac
+labels=('1 Tree' '2 Proc' '3 Buff' '4 Agents')
+case "$view" in processes) selected=1 ;; buffers) selected=2 ;; agents) selected=3 ;; *) selected=0 ;; esac
 reserved=0
 [[ -z "$mode" ]] || reserved=$((${#mode}+1))
-if ((24 + reserved > width - 2)); then labels=('1 T' '2 P' '3 B'); fi
+if ((34 + reserved > width - 2)); then labels=('1 T' '2 P' '3 B' '4 Agt'); fi
+if ((22 + reserved > width - 2)); then labels=('1' '2' '3' '4'); fi
 labels[selected]="[${labels[selected]}]"
-tabs="${labels[0]}  ${labels[1]}  ${labels[2]}"
+tabs="${labels[0]}  ${labels[1]}  ${labels[2]}  ${labels[3]}"
 theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 accent=$'\033[1;36m'; reset=$'\033[0m'; dim=$'\033[2m'
 if [[ "$theme" == mono ]]; then accent=''; reset=''; dim=''; mode_color=''; fi
 printf 'H:\t'
-for index in 0 1 2; do
+for index in 0 1 2 3; do
   ((index == 0)) || printf '  '
   style="$dim"; ((index != selected)) || style="$accent"
   printf '%s%s%s' "$style" "${labels[index]}" "$reset"

@@ -4,6 +4,15 @@
 
 ### Added
 
+- Reported Codex lifecycle labels on Tree and Agents pane rows, with foreground-command or process-ancestry, pane-PID, and freshness checks; stale reports show unknown.
+- A scrollable symbol and color legend on `g`, with responsive layout and explanations for tree markers, pane labels, notifications, and filters.
+- Codex and Claude Code read-only preview prototype, toggled with `i` in the existing drawer; it summarizes selected pane metadata and labels possible requests inferred from visible terminal text.
+- Optional Codex CLI lifecycle hook reports turn state and approval requests to the drawer, with pane/session checks and stale-report handling.
+- The active-location dot stays visible on the nearest collapsed window or session and returns to the pane row when expanded.
+- Leaving or returning focus to the sidebar, or pressing `Ctrl-o`, moves the pointer to the current pane or its visible parent without activating a different pane.
+- Agents view (`4`) groups panes with detected Codex or Claude processes beneath their sessions and windows, with agent counts on parent rows.
+
+
 - Tree filters for All, Current session, and Unread, with optional window-name and pane-title filters, native controls, and matching-pane navigation.
 - Ctrl-g global quick switcher searches sessions, windows, and panes inside collapsed branches without changing tree state.
 - Optional compact rows for single-pane windows via `@tmux-canopy-compact-single-panes`.
@@ -14,8 +23,14 @@
 
 ### Changed
 
+- Separate visible session groups with one blank display line in Tree and Agents views.
+
+- Bind Codex reports to the live process and refresh expiring reports; accelerate the Agents view process scan on Linux.
+- Stabilize multiline sidebar selection coverage with fzf’s local state API.
+
 - Simplified Tree rows with one active marker, emphasized parent names, shorter prefixes, compact counts, adaptive directory labels, and grouping for adjacent panes sharing a directory.
 - Added a `minimal` density preset that combines single-pane windows and keeps multi-pane windows to one line per pane.
+- Show ordinary pane counts only on collapsed windows, aligned to the right edge; expanded shared-directory groups have no count.
 
 
 - Notifications use one amber badge beside each affected pane, with counts on collapsed branches and full types in previews.

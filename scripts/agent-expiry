@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# One bounded expiry worker per reported process; exits when its tmux pane vanishes.
+set -u
+pane=${1:-}; expected=${2:-}
+[[ $pane =~ ^%[0-9]+$ && $expected =~ ^[0-9]+:[0-9]+$ ]] || exit 0
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+while :; do
+  token=$(tmux show-option -pqv -t "$pane" @tmux_canopy_agent_timer 2>/dev/null) || exit 0
+  [[ $token == "$expected" ]] || exit 0
+  updated=$(tmux show-option -pqv -t "$pane" @tmux_canopy_agent_updated 2>/dev/null) || exit 0
+  [[ $updated =~ ^[0-9]{1,12}$ ]] || exit 0
+  printf -v now '%(%s)T' -1
+  remaining=$((10#$updated + 901 - now))
+  if ((remaining > 0)); then
+    ((remaining > 60)) && remaining=60
+    sleep "$remaining"
+    continue
+  fi
+  # A hook may have arrived between the read and the deadline.
+  latest=$(tmux show-option -pqv -t "$pane" @tmux_canopy_agent_updated 2>/dev/null) || exit 0
+  [[ $latest == "$updated" ]] || continue
+  tmux set-option -puq -t "$pane" @tmux_canopy_agent_timer 2>/dev/null || true
+  "$script_dir/agent-refresh"
+  exit 0
+done

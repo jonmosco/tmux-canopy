@@ -63,10 +63,11 @@ def snapshots():
         unread = render('FILTER\tunread\n')
         assert [r[0] for r in unread if r[0].startswith('P:')] == ['P:%1', 'P:%1']
         assert 'W:@2:$1' in ids(unread) and 'P:%3:$1' not in ids(unread)
-        assert any('1/2p' in r[1] for r in unread), 'filtered multi-pane window must not become compact'
+        assert all('p]' not in r[1] for r in unread if r[0].startswith('W:'))
         folded = 'FILTER\tunread\nS:$0\nW:@0:$1\n'
         rows = render(folded)
         assert not any(r[0].startswith('P:') for r in rows)
+        assert '1/2p' in next(r[1] for r in rows if r[0] == 'W:@0:$1')
         assert 'P:%1\t$0\n' == render(folded, target='S:$0')
         assert 'P:%1\t$1\n' == render(folded, target='W:@0:$1')
         assert render(folded, target='W:@1:$0') == ''
