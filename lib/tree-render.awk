@@ -145,10 +145,12 @@ function resolve_focus(token, kind,s,w,p,parts) {
     if (p != "") printf "P:%s\t%s\n",p,s
     else printf "W:%s:%s\t\n",w,s
 }
-function row(token, value, identity, terminator) {
-    terminator=(nul ? sprintf("%c",0) : "\n")
-    if (stable) printf "%s\t%s\t%s%s", token, value, identity, terminator
-    else printf "%s\t%s%s", token, value, terminator
+function row(token, value, identity) {
+    if (stable) printf "%s\t%s\t%s", token, value, identity
+    else printf "%s\t%s", token, value
+    # BSD awk cannot retain NUL in strings; emit it directly.
+    if (nul) printf "%c", 0
+    else printf "\n"
 }
 function mark(value, color) {
     color=(value == "●" ? green : value == "⇢" || value == "⇉" ? accent : attention)
@@ -410,7 +412,7 @@ END {
             if (!visible_w[key]) continue
             visible_wpos++
             branch=(visible_wpos == shown_w[s] ? branch_end : branch_mid); stem=(visible_wpos == shown_w[s] ? "   " : stem_mid)
-            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" :
+            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : \
                 s == current_s && w == current_w && (collapsed[wt] || !visible_p[current_p]) ? "●" : " ")
             meta=(agent_view ? " [" shown_p[w] " agent" (shown_p[w]==1 ? "" : "s") "]" : filtered && collapsed[wt] ? " [" shown_p[w] "/" np[w] "p]" : "")
             collapsed_count=(!agent_view && !filtered && collapsed[wt] && np[w]>1 ? np[w] "p" : "")

@@ -36,8 +36,11 @@ render_source() {
       buffers) "$SCRIPT_DIR/buffer-source" ;;
     esac
   } | awk -F '\t' -v stable="$TMUX_CANOPY_STABLE" -v nul="$TMUX_CANOPY_NUL" '
-    BEGIN { OFS="\t"; ORS=(nul ? sprintf("%c",0) : "\n") }
-    !seen[$1]++ { if (stable) print $1,$2,$1; else print }
+    !seen[$1]++ {
+      if (stable) printf "%s\t%s\t%s", $1,$2,$1; else printf "%s", $0
+      # BSD awk cannot retain NUL in strings; emit it directly.
+      if (nul) printf "%c",0; else printf "\n"
+    }
   '
 }
 
