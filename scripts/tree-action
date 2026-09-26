@@ -177,14 +177,18 @@ create_window() {
 }
 
 create_session() {
-  local token="$1" target_pane cwd number=1 name new_pane
+  local token="$1" target_pane cwd number name new_pane existing
   target_pane="$(pane_for_token "$token")"
   [[ -n "$target_pane" ]] || return 0
   cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
 
-  while tmux has-session -t "=session-$number" 2>/dev/null; do
-    ((number++))
-  done
+  # One list-sessions call plus an in-memory scan, instead of one
+  # has-session subprocess per already-numbered session.
+  existing="$(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
+  number="$(awk '
+    /^session-[0-9]+$/ { sub(/^session-/, "", $0); used[$0 + 0]=1 }
+    END { for (i = 1; ; i++) if (!(i in used)) { print i; break } }
+  ' <<< "$existing")"
   name="session-$number"
   new_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -c "$cwd")"
   [[ -n "$new_pane" ]] && show_target "$new_pane"

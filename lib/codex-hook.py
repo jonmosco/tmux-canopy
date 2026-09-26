@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 
+SEP = "\x1f"
 PANE = os.environ.get("TMUX_PANE", "")
 EVENTS = {"SessionStart", "UserPromptSubmit", "PermissionRequest",
           "PostToolUse", "Stop", "Interrupt", "SessionEnd"}
@@ -33,9 +34,18 @@ def field(value, limit=300):
     return value[:limit] + ("…" if len(value) > limit else "")
 
 
-def option(key):
-    result = tmux("show-option", "-pqv", "-t", PANE, PREFIX + key)
-    return result.stdout.rstrip("\n") if result.returncode == 0 else ""
+def read_options(keys):
+    # One display-message call reads every field, instead of one
+    # show-option subprocess per field. Stored values already run through
+    # field(), which strips control bytes (including 0x1f) from anything
+    # user-controlled, so \x1f is a safe field separator here.
+    fmt = SEP.join(f"#{{{PREFIX}{key}}}" for key in keys)
+    result = tmux("display-message", "-p", "-t", PANE, fmt)
+    if result.returncode:
+        return {key: "" for key in keys}
+    values = result.stdout.rstrip("\n").split(SEP)
+    values += [""] * (len(keys) - len(values))
+    return dict(zip(keys, values))
 
 
 def fingerprint(event):
@@ -59,11 +69,11 @@ def refresh():
                    capture_output=True, timeout=3, check=False)
 
 
-def schedule_expiry(process_pid, process_birth):
+def schedule_expiry(process_pid, process_birth, current_timer):
     if not process_birth.isdigit():
         return  # Portable platforms retain manual refresh on report expiry.
     token = f"{process_pid}:{process_birth}"
-    if option("timer") == token:
+    if current_timer == token:
         return
     tmux("set-option", "-pq", "-t", PANE, PREFIX + "timer", token)
     worker = Path(__file__).resolve().parents[1] / "scripts" / "agent-expiry"
@@ -187,7 +197,9 @@ def report(event):
     if identity is None:
         return
     process_pid, process_birth = identity
-    current = {key: option(key) for key in FIELDS}
+    combined = read_options(FIELDS + ("timer",))
+    current_timer = combined.pop("timer")
+    current = combined
     if current["pane_pid"] != pid or current["process_pid"] != process_pid or current["process_birth"] != process_birth:
         current = {key: "" for key in FIELDS}
     if kind not in ("SessionStart", "UserPromptSubmit") and current["session"] not in ("", session):
@@ -226,7 +238,7 @@ def report(event):
     else:
         values.update(tool="", summary="", command="", request="")
     if write(values):
-        schedule_expiry(process_pid, process_birth)
+        schedule_expiry(process_pid, process_birth, current_timer)
         refresh()
 
 

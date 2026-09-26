@@ -295,7 +295,8 @@ function appcolor(value, n, parts) {
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
     if (value ~ /^(ssh|codex|top|htop|btop)$/) return icon_cyan
     if (value ~ /^(pi|omp|opencode)$/) return icon_purple
-    if (value ~ /^(claude|claude-code|gemini)$/) return icon_yellow
+    if (value ~ /^(claude|claude-code)$/) return icon_yellow
+    if (value == "gemini") return icon_white
     return icon_neutral
 }
 function appicon(value, n, parts) {
@@ -309,7 +310,10 @@ function appicon(value, n, parts) {
     if (value ~ /^(git|lazygit)$/) return "󰊢"
     if (value == "ssh") return "󰢹"
     if (value ~ /^(kubectl|oc|k9s)$/) return "󱃾"
-    if (value ~ /^(claude|claude-code|codex|gemini|pi|omp|opencode)$/) return "󰚩"
+    if (value ~ /^(claude|claude-code)$/) return ""
+    if (value == "codex") return ""
+    if (value == "gemini") return "󰊭"
+    if (value ~ /^(pi|omp|opencode)$/) return "󰚩"
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
     return pane_icon
 }
@@ -321,6 +325,7 @@ END {
         # Neutral text and guides, with distinct application and active-location colors.
         icon_blue="\033[94m"; icon_yellow="\033[93m"; icon_red="\033[91m"
         icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[39m"
+        icon_white="\033[97m"
         green="\033[1;32m"
         accent="\033[1;36m"; attention="\033[1;33m"; path_color=dim
     }

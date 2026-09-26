@@ -159,8 +159,11 @@ sidebar_navigate() (
       finish+=(wait-for -U "$nav_lock")
       if [[ "$nav_mode" == select && -n "$nav_sidebar" && -n "$nav_current" ]]; then
         # Selection hooks can run while guarded. Schedule one final owner-only
-        # marker update after the transaction, not an intermediate layout.
-        finish+=(';' run-shell -b "$(tmux_shell "$SCRIPT_DIR/refresh-sidebar" "$nav_target" "$nav_client")")
+        # marker update after the transaction, not an intermediate layout. The
+        # transition already serialized and completed under this lock, so the
+        # destination is provably settled; "settled" skips the general
+        # stability debounce instead of paying its ~75ms+ minimum latency.
+        finish+=(';' run-shell -b "$(tmux_shell "$SCRIPT_DIR/refresh-sidebar" "$nav_target" "$nav_client" settled)")
       fi
       tmux "${finish[@]}" 2>/dev/null || tmux wait-for -U "$nav_lock" 2>/dev/null || true
     fi
