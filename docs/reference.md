@@ -488,7 +488,7 @@ This protection covers `prefix + Space` and the sidebar layout menu. Direct nati
 
 ### Icons
 
-Application icons retain command-aware colors: blue editors and Kubernetes tools, yellow Node/Python and Claude, red Git/npm/OpenShift, cyan SSH/Codex/system monitors, and magenta pi/OpenCode. Shells and unknown commands use the terminal foreground. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
+Application icons retain command-aware colors: blue editors and Kubernetes tools, yellow Node/Python and Claude, red Git/npm/OpenShift, cyan SSH/Codex/system monitors, white Gemini, and magenta pi/OpenCode. Shells and unknown commands use the terminal foreground. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
 
 Icon themes:
 
@@ -499,7 +499,7 @@ Icon themes:
 | `ascii` | Plain ASCII markers |
 | `auto` | Use Nerd Font when Fontconfig finds one; otherwise Unicode |
 
-Session rows show a tmux icon in the Nerd Font theme, `◈` in Unicode, or `S` in ASCII. Pane icons recognize common commands including Neovim, shells, Node.js, Python, Git, SSH, Kubernetes tools, system monitors, and AI coding agents. Unknown commands receive the generic terminal glyph. Override the structural icons with `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, and `@tmux-canopy-icon-pane`.
+Session rows show a tmux icon in the Nerd Font theme, `◈` in Unicode, or `S` in ASCII. Pane icons recognize common commands including Neovim, shells, Node.js, Python, Git, SSH, Kubernetes tools, system monitors, and AI coding agents. In the Nerd Font theme, Claude Code and Codex use their own brand glyphs and Gemini uses the Google glyph; Pi, Oh My Pi, and OpenCode share a generic robot glyph. Unknown commands receive the generic terminal glyph. Override the structural icons with `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, and `@tmux-canopy-icon-pane`.
 
 Generic activity can be noisy for log tails. Use `bell`, `activity,bell`, or `none` according to the desired signal level. Use `notification-target status` to return alert presentation to the normal tmux status bar without collecting sidebar unread state. Silence monitoring is only enabled when `silence` or `all` is configured.
 

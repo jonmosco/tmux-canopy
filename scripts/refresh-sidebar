@@ -126,6 +126,20 @@ snapshot || exit 0
 # A transition's last selection hook will schedule the settled destination.
 # Requests already in flight may read intermediate geometry: don't publish it.
 [[ "$guarded" != 1 ]] || exit 0
+if [[ "$hook" == settled ]]; then
+  # sidebar_navigate already serialized and completed this transition under
+  # its per-client lock before scheduling this call: the destination is
+  # provably final, so commit immediately instead of the general debounce
+  # below, which exists to wait out focus that may still be settling.
+  commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
+  if [[ "$location" != "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)" ]]; then
+    commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o ; send-keys -t $sidebar C-r"
+  else
+    commands+="send-keys -t $sidebar C-o"
+  fi
+  commit "#{!=:#{$guard},1}" "$commands"
+  exit 0
+fi
 if [[ "$hook" == after-select-pane && "$returned" == 1 ]]; then
   # A deliberate return to the sidebar selects the live content row. The
   # location is settled at this point, so publish it before the fzf jump.

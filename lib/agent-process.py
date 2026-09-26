@@ -34,6 +34,13 @@ def main():
             reports.append((fields[1], root, fields[17][:-5], fields[22], fields[23]))
     best = {}
     verified = set()
+    stat_cache = {}
+
+    def cached_stat(pid):
+        if pid not in stat_cache:
+            stat_cache[pid] = stat(pid)
+        return stat_cache[pid]
+
     try:
         entries = os.scandir('/proc')
     except OSError:
@@ -50,7 +57,7 @@ def main():
             if name not in KINDS:
                 continue
             pid = int(entry.name)
-            birth = stat(pid)
+            birth = cached_stat(pid)
             if birth is None:
                 continue
             current = pid
@@ -64,7 +71,10 @@ def main():
                                 report_kind == KINDS[name] and report_pid == entry.name and report_birth == birth[1]:
                             verified.add(pane)
                     break
-                parent = stat(current)
+                # Ancestor chains are frequently shared across candidates
+                # (siblings under the same shell), so cache stat() lookups
+                # instead of reopening /proc/<pid>/stat for the same pid.
+                parent = cached_stat(current)
                 if parent is None or parent[0] <= 0 or parent[0] == current:
                     break
                 current = parent[0]

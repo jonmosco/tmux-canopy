@@ -47,8 +47,14 @@ else
     done <<< "$snapshot"
   fi
   if [[ "$agent_view" == 1 ]]; then
-    # Portable fallback for macOS/BSD and minimal Linux installations.
-    processes="$(ps -eo pid=,ppid=,comm= 2>/dev/null)" || exit 1
+    # Portable fallback for macOS/BSD and minimal Linux installations. Reuse
+    # the cached snapshot from the hook-verification loop above when it ran;
+    # otherwise this is the only ps invocation for this refresh.
+    if ! declare -F canopy_ps_snapshot_lines >/dev/null 2>&1; then
+      # shellcheck disable=SC1091
+      source "$SCRIPT_DIR/../lib/agent-process.sh"
+    fi
+    processes="$(canopy_ps_snapshot_lines)" || exit 1
     [[ -z "$processes" ]] || snapshot+=$'\n'"$processes"
   fi
 fi
