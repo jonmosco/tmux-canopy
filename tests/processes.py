@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def process(pid, parent, command='worker', args=None):
-    return f'{pid:6} {parent:6} tester S 12 {command} {args or command}\n'
+    return f'{pid:6} {parent:6} tester S 00:12 {command} {args or command}\n'
 
 
 def pane(number, root, sidebar=0, slot=0, path='/fixture/project'):
@@ -40,6 +40,7 @@ esac
 ''',
             'ps': '''#!/bin/bash
 printf 'ps\\n' >> "$PROCESS_FIXTURE/calls"
+[[ "$*" == '-eo pid=,ppid=,user=,stat=,etime=,comm=,args=' ]] || exit 2
 [[ "${FAIL_PS:-0}" != 1 ]] || exit 1
 exec cat "$PROCESS_FIXTURE/processes"
 ''',
@@ -85,6 +86,13 @@ exec cat "$PROCESS_FIXTURE/processes"
         colored = run(processes, panes, TEST_THEME='ansi').stdout
         assert 'worker\x1b[0m' in colored and '\x1b[32m' not in colored
         print('ok - descendants, sibling order, indentation, pane attribution, linked duplicates and themes')
+
+        for elapsed, seconds in [('00:12', 12), ('02:03', 123),
+                                 ('01:02:03', 3723), ('2-01:02:03', 176523)]:
+            result = run(process(110, 100).replace('00:12', elapsed), pane(1, 100))
+            assert tokens(result) == ['Q:%1', 'X:110:%1']
+            assert f' {seconds}s ' in result.stdout, result.stdout
+        print('ok - portable ps elapsed times retain seconds display')
 
         assert tokens(run('', pane(1, 100))) == ['Q:%1']
         assert tokens(run(processes, '')) == []
