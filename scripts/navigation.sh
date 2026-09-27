@@ -184,20 +184,11 @@ sidebar_navigate() (
       nav_spec="$nav_session:.$nav_target"
       if [[ -n "${nav_totals[$nav_target]:-}" && "${nav_totals[$nav_target]}" == "${nav_totals[$nav_current]:-}" && \
             -n "${nav_heights[$nav_target]:-}" && "${nav_heights[$nav_target]}" == "${nav_heights[$nav_current]:-}" ]]; then
-        # Fast path: the hidden destination window already reports the exact
-        # total size this client's active window currently has, so selecting
-        # it cannot trigger tmux's automatic resize (aggressive-resize/latest
-        # window-size only resize a window once it becomes current, and it's
-        # already this size). Nothing needs to settle or be remeasured, so
-        # fold the window switch into the same final command batch as the
-        # dock swap below instead of committing it separately: the sidebar
-        # never has to sit on a bare placeholder pane mid-transition.
-        if [[ "$nav_current_session" != "$nav_session" ]]; then
-          commands+=(switch-client -c "$nav_client" -t "$nav_session:$nav_window" ';')
-        else
-          commands+=(select-window -t "$nav_session:$nav_window" ';')
-        fi
-        nav_current_window="$nav_window"; nav_current_session="$nav_session"
+        # Fast path: the hidden destination window already matches client dimensions.
+        # Defer window selection to the final batch after swap-pane below so the sidebar
+        # is already in the destination window when it becomes visible, eliminating the
+        # empty-slot flash.
+        :
       else
         # Automatic tmux sizing is deferred past the selection command queue.
         # Let it settle before measuring/resizing the destination slot. On warm
