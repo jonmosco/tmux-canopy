@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""Claude Code subagents reported as read-only children of their parent pane."""
+import json
+import os
+from pathlib import Path
+from support import install_agent_fixture
+import subprocess as sp
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+socket = f'canopy-subagents-{os.getpid()}'
+env = os.environ.copy()
+env.pop('TMUX', None)
+env.pop('TMUX_PANE', None)
+
+
+def tm(*args):
+    result = sp.run(['tmux', '-L', socket, *args], env=env, text=True,
+                    capture_output=True, timeout=10)
+    assert result.returncode == 0, (args, result.stderr)
+    return result.stdout.strip()
+
+
+try:
+    with tempfile.TemporaryDirectory(prefix='canopy-subagents-', ignore_cleanup_errors=True) as directory:
+        temp = Path(directory)
+        state = temp / 'state'
+        state.touch()
+        install_agent_fixture(temp / 'claude')
+        pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '120', '-y', '30',
+                  '-P', '-F', '#{pane_id}', str(temp / 'claude') + ' 600')
+        other = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}', 'sleep 600')
+        tmux_env = tm('display-message', '-p', '-t', pane, '#{socket_path},#{pid},0')
+        base = env | {'TMUX': tmux_env, 'TMUX_CANOPY_STATE': str(state)}
+
+        def event(payload):
+            result = sp.run([str(ROOT / 'scripts/agent-hook'), 'claude'], input=json.dumps(payload),
+                            env=base | {'TMUX_PANE': pane}, text=True, capture_output=True, timeout=10)
+            assert result.returncode == 0 and result.stdout == '', result.stderr
+
+        def rows(*args):
+            # Multi-line pane rows (and so subagent lines) need NUL framing.
+            result = sp.run([str(ROOT / 'scripts/tree-source'), *args], env=base | {
+                'TMUX_PANE': other, 'TMUX_CANOPY_NUL': '1'}, capture_output=True, text=True, timeout=10)
+            assert result.returncode == 0, result.stderr
+            return {record.split('\t', 1)[0]: record.split('\t', 1)[1]
+                    for record in result.stdout.split('\0') if '\t' in record}
+
+        def pane_row(*args):
+            return rows(*args)['P:' + pane]
+
+        def needs_input():
+            result = sp.run([str(ROOT / 'scripts/tree-source'), '--needs-input'], env=base | {'TMUX_PANE': other},
+                            capture_output=True, text=True, timeout=10)
+            return result.stdout
+
+        def option(name):
+            return tm('display-message', '-p', '-t', pane, '#{@tmux_canopy_agent_' + name + '}')
+
+        def preview():
+            result = sp.run([str(ROOT / 'scripts/agent-preview'), 'P:' + pane], env=base | {'TMUX_PANE': other},
+                            capture_output=True, text=True, timeout=10)
+            return result.stdout
+
+        session = {'session_id': 'main'}
+        event(session | {'hook_event_name': 'SessionStart'})
+        event(session | {'hook_event_name': 'UserPromptSubmit'})
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a1', 'agent_type': 'Explore'})
+        # A tool event can be the first sign of a subagent (hooks installed mid-run).
+        event(session | {'hook_event_name': 'PostToolUse', 'agent_id': 'a2', 'agent_type': 'general-purpose',
+                         'tool_name': 'Read'})
+        for view in ((), ('--agents',)):
+            lines = pane_row(*view).split('\n')
+            assert any('Explore' in line and 'WORKING' in line for line in lines[1:]), (view, lines)
+            assert any('general-purpose' in line and 'WORKING' in line for line in lines[1:]), (view, lines)
+        assert option('status') == 'working'
+        print('ok - subagents appear as child lines of their pane in Tree and Agents views')
+
+        # A subagent's permission request is attributed to it and marks the pane.
+        event(session | {'hook_event_name': 'PermissionRequest', 'agent_id': 'a2', 'agent_type': 'general-purpose',
+                         'tool_name': 'Bash', 'tool_input': {'command': 'make'}})
+        lines = pane_row('--agents').split('\n')
+        assert any('general-purpose' in line and 'NEEDS INPUT' in line for line in lines[1:]), lines
+        assert any('Explore' in line and 'WORKING' in line for line in lines[1:]), lines
+        assert 'Request: general-purpose: Approval requested' in preview()
+        assert f'P:{pane}\t' in needs_input()
+        # Neither the main thread nor another subagent may clear it.
+        event(session | {'hook_event_name': 'PostToolUse', 'tool_name': 'Bash'})
+        event(session | {'hook_event_name': 'PostToolUse', 'agent_id': 'a1', 'agent_type': 'Explore',
+                         'tool_name': 'Bash'})
+        assert option('status') == 'needs-input' and option('request_agent') == 'a2'
+        print('ok - a subagent request is attributed to that subagent and only it can clear the pane request')
+
+        # Its own tool completion clears it; the pane goes back to working.
+        event(session | {'hook_event_name': 'PostToolUse', 'agent_id': 'a2', 'agent_type': 'general-purpose',
+                         'tool_name': 'Bash'})
+        assert option('status') == 'working' and option('request_agent') == ''
+        assert f'P:{pane}\t' not in needs_input()
+        event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a1', 'agent_type': 'Explore'})
+        lines = pane_row().split('\n')
+        assert any('Explore' in line and 'DONE' in line for line in lines[1:]), lines
+        print('ok - subagent completion shows DONE without changing the main thread status')
+
+        # A subagent still waiting on input keeps the pane actionable even after
+        # the main thread reports something else.
+        event(session | {'hook_event_name': 'PermissionRequest', 'agent_id': 'a2', 'agent_type': 'general-purpose',
+                         'tool_name': 'Edit'})
+        event(session | {'hook_event_name': 'Stop'})
+        assert option('status') == 'turn-ended'
+        assert f'P:{pane}\t' in needs_input()
+        session_token = 'S:' + tm('display-message', '-p', '-t', pane, '#{session_id}')
+        state.write_text(session_token + '\n')
+        assert '◆' in rows()[session_token], rows()[session_token]
+        state.write_text('')
+        print('ok - a waiting subagent rolls up as needs-input and is a jump target')
+
+        # A background subagent's result arrives as a new turn right after it
+        # stops: the new prompt must not hide its DONE line.
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a3', 'agent_type': 'Research'})
+        event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a3', 'agent_type': 'Research'})
+        event(session | {'hook_event_name': 'UserPromptSubmit'})
+        lines = pane_row().split('\n')
+        assert any('Research' in line and 'DONE' in line for line in lines[1:]), lines
+        assert any('Explore' in line and 'DONE' in line for line in lines[1:]), lines
+        print('ok - a just-finished subagent stays DONE across the turn that delivers its result')
+
+        # Once finished long enough ago, the next prompt forgets it; running ones stay.
+        # Session end clears all.
+        aged = ';'.join(entry if ',done,' not in entry else
+                        ','.join(part if index != 3 else str(int(part) - 600)
+                                 for index, part in enumerate(entry.split(',')))
+                        for entry in option('subagents').split(';'))
+        tm('set-option', '-p', '-t', pane, '@tmux_canopy_agent_subagents', aged)
+        event(session | {'hook_event_name': 'UserPromptSubmit'})
+        lines = pane_row().split('\n')
+        assert not any('Explore' in line or 'Research' in line for line in lines), lines
+        assert any('general-purpose' in line for line in lines[1:]), lines
+        for index in range(12):
+            event(session | {'hook_event_name': 'SubagentStart', 'agent_id': f'b{index}', 'agent_type': 'Plan'})
+        assert len(option('subagents').split(';')) == 8
+        event(session | {'hook_event_name': 'SessionEnd'})
+        assert option('subagents') == ''
+        print('ok - finished subagents clear on the next prompt, the list is capped, and session end clears it')
+
+        # Delimiters and control bytes in agent_type cannot forge extra entries.
+        event(session | {'hook_event_name': 'SessionStart'})
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'c1',
+                         'agent_type': 'evil;x,done,1,\x1b[31m'})
+        entries = option('subagents').split(';')
+        assert len(entries) == 1 and entries[0].startswith('c1,') and '\x1b' not in entries[0], entries
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': '../bad id'})
+        assert len(option('subagents').split(';')) == 1
+        print('ok - subagent fields are sanitized and malformed ids are ignored')
+finally:
+    sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

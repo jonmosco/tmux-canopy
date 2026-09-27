@@ -65,7 +65,7 @@ while IFS= read -r window; do
       # With native detachment enabled, do not borrow space from an unrelated
       # session just to park a dock whose owning session is about to disappear.
       cross_session=1
-      [[ "$(tmux show-option -v -t "$live_session" detach-on-destroy 2>/dev/null)" != on ]] || cross_session=0
+      [[ "$(tmux display-message -p -t "$live_session" '#{detach-on-destroy}' 2>/dev/null)" != on ]] || cross_session=0
       # Prefer the owner's live window, then its last window. This is only a
       # parking choice: no select-window/switch-client changes native history.
       # Once the old window actually dies, tmux chooses the successor itself.

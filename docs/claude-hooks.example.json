@@ -7,6 +7,8 @@
     "PostToolUse": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}],
     "Stop": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}],
     "StopFailure": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}],
-    "SessionEnd": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}]
+    "SessionEnd": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}],
+    "SubagentStart": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}],
+    "SubagentStop": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook claude", "timeout": 3}]}]
   }
 }

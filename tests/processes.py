@@ -19,7 +19,7 @@ def pane(number, root, sidebar=0, slot=0, path='/fixture/project'):
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='tree-processes-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-processes-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         env = dict(os.environ, PATH=str(temp) + ':' + os.environ['PATH'],
                    PROCESS_FIXTURE=str(temp), HOME='/fixture', TEST_THEME='mono',

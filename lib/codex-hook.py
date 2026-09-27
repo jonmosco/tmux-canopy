@@ -19,7 +19,8 @@ EVENTS = {"SessionStart", "UserPromptSubmit", "PermissionRequest",
           "PostToolUse", "Stop", "Interrupt", "SessionEnd"}
 PREFIX = "@tmux_canopy_agent_"
 FIELDS = ("source", "session", "turn", "pane_pid", "status", "tool",
-          "summary", "command", "request", "updated", "process_pid", "process_birth")
+          "summary", "command", "request", "updated", "process_pid", "process_birth",
+          "request_agent", "subagents")
 
 
 def tmux(*args):

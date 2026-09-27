@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Canopy setup and diagnostics. Run from the repository or add it to PATH."""
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -146,7 +147,7 @@ def write_safely(path, content):
             os.unlink(tmp)
 
 
-def status(kind):
+def integration_state(kind):
     path = config_path(kind)
     if kind in ("codex", "claude", "gemini"):
         data = read_json(path)
@@ -166,8 +167,71 @@ def status(kind):
         state = "absent"
     else:
         state = "installed" if path.read_text() == template(kind) else "modified (review manually)"
+    return state
+
+
+def status(kind):
     available = "found" if shutil.which(EXECUTABLES[kind]) else "not on PATH"
-    return f"{kind:9} {state:26} CLI {available:11} {path}"
+    return f"{kind:9} {integration_state(kind):26} CLI {available:11} {config_path(kind)}"
+
+
+def load_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# Representative events that each reporter must turn into a pane status.
+SELF_TEST_EVENTS = {
+    "codex": ({"hook_event_name": "PermissionRequest", "session_id": "self-test",
+               "tool_name": "Bash", "tool_input": {"command": "true"}}, "needs-input"),
+    "claude": ({"hook_event_name": "PermissionRequest", "session_id": "self-test",
+                "tool_name": "Bash", "tool_input": {"command": "true"}}, "needs-input"),
+    "gemini": ({"hook_event_name": "Notification", "session_id": "self-test",
+                "notification_type": "ToolPermission"}, "needs-input"),
+    "opencode": ({"type": "permission.asked", "properties": {"sessionID": "self-test"}}, "needs-input"),
+    "pi": ({"type": "agent_start", "session_id": "self-test"}, "working"),
+    "omp": ({"type": "agent_start", "session_id": "self-test"}, "working"),
+}
+
+
+def reporter_self_test():
+    """Run each reporter's real report path with only tmux and ps stubbed out.
+
+    This catches reporters drifting from the shared codex-hook helpers, which
+    otherwise fail silently because hooks must never print or exit nonzero.
+    """
+    failures = []
+    for kind, (event, expected) in SELF_TEST_EVENTS.items():
+        written = {}
+
+        def fake_tmux(*args):
+            output = ""
+            if args[:1] == ("display-message",) and args[-1].startswith("#{pane_id}|"):
+                output = "%0|4000|0||\n"
+            # write() chains: set-option -pq -t PANE KEY VALUE ; ...
+            for i, arg in enumerate(args[:-5]):
+                if arg == "set-option":
+                    written[args[i + 4]] = args[i + 5]
+            return subprocess.CompletedProcess(args, 0, output, "")
+        try:
+            hook = load_module("canopy_agent_hook", ROOT / "lib" / "agent-hook.py")
+            core = hook.core
+            core.PANE = "%0"
+            core.tmux = fake_tmux
+            core.process_identity = lambda root, kind="codex": ("4001", "123")
+            core.refresh = lambda: None
+            if kind == "codex":
+                core.report(event)
+            else:
+                hook.report(kind, event)
+        except Exception as error:  # Any exception here is a silent failure in a real hook.
+            failures.append(f"{kind}: {type(error).__name__}: {error}")
+            continue
+        if written.get(core.PREFIX + "status") != expected:
+            failures.append(f"{kind}: event did not record status {expected!r}")
+    return failures
 
 
 def change(kind, action, dry_run=False):
@@ -205,6 +269,70 @@ def change(kind, action, dry_run=False):
         print(f"{action}ed: {kind} -> {path}")
 
 
+def live_agents():
+    """Yield (pane, kind, source, updated) for agent processes running in panes."""
+    sys.path.insert(0, str(ROOT / "lib"))
+    from agent_kinds import KINDS as PROCESS_KINDS
+    fields = "#{pane_id}|#{pane_pid}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_updated}"
+    panes = subprocess.run(("tmux", "list-panes", "-a", "-F", fields), text=True,
+                           capture_output=True, timeout=5, check=False)
+    if panes.returncode:
+        return None
+    owners = {}
+    for line in panes.stdout.splitlines():
+        pane, pid, sidebar, slot, source, updated = (line.split("|") + [""] * 6)[:6]
+        if pid.isdigit() and sidebar != "1" and slot != "1":
+            owners[int(pid)] = (pane, source, updated)
+    parents, found = {}, {}
+    records = subprocess.run(("ps", "-eo", "pid=,ppid=,comm="), text=True,
+                             capture_output=True, timeout=5, check=False).stdout
+    candidates = []
+    for line in records.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            parents[int(parts[0])] = int(parts[1])
+            kind = PROCESS_KINDS.get(os.path.basename(parts[2]).removesuffix(".exe"))
+            if kind:
+                candidates.append((int(parts[0]), kind))
+    for pid, kind in candidates:
+        current = pid
+        for _ in range(128):
+            if current in owners:
+                found.setdefault(owners[current][0], (kind,) + owners[current][1:])
+                break
+            current = parents.get(current, 0)
+            if current <= 1:
+                break
+    return sorted((pane,) + value for pane, value in found.items())
+
+
+def show_live_agents():
+    agents = live_agents()
+    if agents is None:
+        print("  No tmux server reachable.")
+        return
+    if not agents:
+        print("  No supported agent processes found in tmux panes.")
+        return
+    now = int(datetime.now().timestamp())
+    for pane, kind, source, updated in agents:
+        if source == kind + "-hook" and updated.isdigit():
+            age = now - int(updated)
+            note = f"last report {age}s ago" + (" (stale; shown as unknown after 900s)" if age > 900 else "")
+        else:
+            try:
+                state = integration_state(kind)
+            except (OSError, ValueError, TypeError):
+                state = "unreadable"
+            if state == "installed":
+                note = "no report yet; hooks load at startup, so restart this agent if it predates the install"
+                if kind == "codex":
+                    note += "; Codex also requires trusting new hooks via /hooks"
+            else:
+                note = f"no report; integration {state} (canopy integration install {kind})"
+        print(f"  {pane:6} {kind:9} {note}")
+
+
 def show_status(kinds):
     result = 0
     for kind in kinds:
@@ -230,7 +358,12 @@ def main():
         result = subprocess.call([str(ROOT / "scripts" / "doctor"), "--report"])
         print("\nAgent integrations:")
         integration_result = show_status(KINDS)
-        return result or integration_result
+        print("\nReporter self-test (stubbed tmux, real report path):")
+        failures = reporter_self_test()
+        print("  OK" if not failures else "\n".join("  FAILED " + failure for failure in failures))
+        print("\nAgents running in tmux panes:")
+        show_live_agents()
+        return result or integration_result or (1 if failures else 0)
     if args.command == "setup":
         args.action, args.kinds, args.dry_run = "install", [], False
     if args.action == "status":

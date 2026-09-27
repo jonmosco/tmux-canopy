@@ -26,7 +26,7 @@ def main():
     env['TERM'] = 'xterm-256color'
     master = None
     client_process = None
-    with tempfile.TemporaryDirectory(prefix='tree-preview-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-preview-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         signals, selected, state = (temp / name for name in ('signals', 'selected', 'state'))
         for path in (signals, state):

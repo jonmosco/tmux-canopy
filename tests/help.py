@@ -53,7 +53,7 @@ def main():
                 assert phrase in compact, (width, phrase)
     print('ok - responsive legend explains selection, location, pane details, notices and filters')
 
-    with tempfile.TemporaryDirectory(prefix='tree-help-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-help-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         wrapper = temp / 'tmux'
         wrapper.write_text('#!/bin/sh\nprintf "%s\\n" "$HELP_THEME"\n')

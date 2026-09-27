@@ -37,7 +37,7 @@ def main():
     env['TERM'] = 'xterm-256color'
     client_process = other_process = None
     master = other_master = None
-    with tempfile.TemporaryDirectory(prefix='tree-navigation-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-navigation-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         calls = temp / 'calls'
         state = temp / 'state'

@@ -23,7 +23,7 @@ def main():
     env = {k: v for k, v in os.environ.items() if k not in ('TMUX', 'TMUX_PANE')}
     env['TERM'] = 'xterm-256color'
     master = process = sidebar = None
-    with tempfile.TemporaryDirectory(prefix='canopy-switch-test-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-switch-test-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         selected, state_path, started, loads = (temp / name for name in ('selected', 'state-path', 'started', 'loads'))
 
@@ -133,7 +133,7 @@ def main():
             wait(lambda: probe(True)[1] == f'P:{target}:{sid}', 'collapsed linked pane found')
             os.write(master, b'\x1b')
             time.sleep(.7)
-            assert probe() == before
+            wait(lambda: probe() == before, 'sidebar query, selection and folds settle unchanged')
             assert state.read_bytes() == folds
             assert tm('list-panes', '-a', '-F', '#{pane_id}|#{window_id}|#{pane_width}|#{pane_height}') == geometry
             print('ok - Ctrl-g searches collapsed panes in compact mode; cancel preserves query, selection, folds and geometry')
@@ -150,7 +150,10 @@ def main():
             assert display(first, '#{window_id}') == first_window
             assert state.read_bytes() == saved
             assert sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip() == ui_pid
-            assert probe() == before
+            # The live location changed, so the pointer follows it like Ctrl-o:
+            # the hiding query clears and the collapsed destination session is selected.
+            wait(lambda: probe()[1:] == [f'S:{sid}', ''], 'sidebar pointer follows the new location')
+            assert state.read_bytes() == saved
             print('ok - Enter targets the linked session after closing popup, bypasses pending move/link, and retains the sidebar/fzf')
 
             # Stale inventory must not redirect to an unrelated active object.

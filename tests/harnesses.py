@@ -22,7 +22,7 @@ def tm(*args):
 
 
 try:
-    with tempfile.TemporaryDirectory(prefix='canopy-harnesses-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-harnesses-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         state = temp / 'state'
         state.touch()
@@ -35,6 +35,10 @@ try:
         for name in names[1:]:
             panes[name] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
                              str(temp / name) + ' 600')
+        # Native Claude Code installs run as claude.exe, including on macOS.
+        install_agent_fixture(temp / 'claude.exe')
+        panes['claude.exe'] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
+                                 str(temp / 'claude.exe') + ' 600')
         tmux_env = tm('display-message', '-p', '-t', pane, '#{socket_path},#{pid},0')
 
         def run(name, pane_id, payload=None):
@@ -69,6 +73,11 @@ try:
         event('claude', panes['claude'], {'hook_event_name': 'PostToolUse', 'session_id': 'c1',
                                          'tool_name': 'Bash'})
         assert 'Status: Working' in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
+
+        event('claude', panes['claude.exe'], {'hook_event_name': 'SessionStart', 'session_id': 'n1'})
+        event('claude', panes['claude.exe'], {'hook_event_name': 'PermissionRequest', 'session_id': 'n1',
+                                             'tool_name': 'Bash', 'tool_input': {'command': 'date'}})
+        assert 'Status: Approval requested (hook report)' in run('agent-preview', panes['claude.exe'], ['P:' + panes['claude.exe']])
 
         event('gemini', panes['gemini'], {'hook_event_name': 'SessionStart', 'session_id': 'g1'})
         event('gemini', panes['gemini'], {'hook_event_name': 'Notification', 'session_id': 'g1',

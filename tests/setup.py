@@ -17,7 +17,7 @@ def run(*args, env, ok=True):
     return result
 
 
-with tempfile.TemporaryDirectory(prefix="canopy-setup-") as temp:
+with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=True) as temp:
     home = Path(temp)
     env = os.environ.copy()
     env["HOME"] = temp
@@ -106,6 +106,8 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-") as temp:
         doctor = run(cli, "doctor", env=env, ok=False)
         assert "Canopy-owned tmux configuration" in doctor.stdout
         assert "Agent integrations:" in doctor.stdout
+        assert "Reporter self-test (stubbed tmux, real report path):\n  OK" in doctor.stdout, doctor.stdout
+        assert "Agents running in tmux panes:" in doctor.stdout
         assert "binding: prefix + T" in doctor.stdout
         assert "monitor-activity" in doctor.stdout
         print("ok - TPM-style loading uses one Canopy entrypoint and doctor reports owned tmux settings")

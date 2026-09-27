@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='canopy-directories-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-directories-', ignore_cleanup_errors=True) as directory:
         state_file = Path(directory) / 'state'
 
         def render(paths, *, density='normal', nul=True, collapsed=False, linked=False,

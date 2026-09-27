@@ -35,6 +35,7 @@ $1 == "P" {
     pw[p]=$3; pi[p]=$4; command[p]=$5; title[p]=$6; path[p]=$7; dead[p]=$8
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
     pane_pid[p]=$17; report_source[p]=$18; report_session[p]=$19; report_pid[p]=$20; report_status[p]=$21; report_updated[p]=$22
+    subagent_list[p]=$25
     if (sidebar[p] != 1 && slot[p] != 1) {
         panes[$3,++np[$3]]=p
         if (pa[p] || pb[p] || pz[p]) unread_panes[$3]++
@@ -104,8 +105,9 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first,label) {
                     # interrupted), working, and finished. "unknown" is not
                     # actionable and is left out of the rollup entirely.
                     label=agent_label(p)
-                    if (label=="approval" || label=="interrupted") { w_need[w]++; w_agent_shown[w]++ }
-                    else if (label=="working") { w_work[w]++; w_agent_shown[w]++ }
+                    load_subagents(p)
+                    if (label=="approval" || label=="interrupted" || sub_need[p]) { w_need[w]++; w_agent_shown[w]++ }
+                    else if (label=="working" || sub_work[p]) { w_work[w]++; w_agent_shown[w]++ }
                     else if (label=="ready" || label=="turn ended" || label=="session ended") { w_done[w]++; w_agent_shown[w]++ }
                 }
                 first_p[w]=first
@@ -168,11 +170,14 @@ function mark(value, color) {
 }
 # Keep an ordinary collapsed count at the edge, leaving a spare cell for fzf's
 # gutter/scrollbar and wide terminal glyphs. Skip it if the name needs the room.
+# Display columns, not bytes: macOS awk's length() counts UTF-8 bytes, but its
+# regex engine (like gawk's) matches whole characters.
+function text_width(value) { return gsub(/./,"",value) }
 function edge_count(value,count,budget, plain,padding) {
     if (count == "") return value
     plain=value
     gsub(/\033\[[0-9;]*m/,"",plain)
-    padding=budget-length(plain)-length(count)
+    padding=budget-text_width(plain)-length(count)
     if (padding<2) return value
     return value sprintf("%*s",padding,"") dim count reset
 }
@@ -261,6 +266,45 @@ function agent_status_word(label, narrow) {
     if (label=="session ended") return "SESSION ENDED"
     if (label=="interrupted") return "INTERRUPTED"
     return "UNKNOWN"
+}
+# Claude Code subagents reported on their parent pane as id,type,status,updated,tool
+# entries. They are shown, and counted, only while the parent's report is.
+function load_subagents(p, n,i,items,parts,age,state) {
+    if (p in sub_count) return sub_count[p]
+    sub_count[p]=0; sub_need[p]=0; sub_work[p]=0
+    if (subagent_list[p] == "" || agent_label(p) == "") return 0
+    n=split(subagent_list[p],items,";")
+    for (i=1;i<=n;i++) {
+        if (split(items[i],parts,",") != 5 || parts[4] !~ /^[0-9]+$/) continue
+        age=now-parts[4]
+        state=(parts[3] == "done" ? "done" : age<0 || age>900 ? "unknown" : parts[3])
+        sub_count[p]++
+        sub_type[p,sub_count[p]]=parts[2]; sub_state[p,sub_count[p]]=state
+        sub_age[p,sub_count[p]]=age
+        if (state == "needs-input") sub_need[p]++
+        else if (state == "working") sub_work[p]++
+    }
+    return sub_count[p]
+}
+function subagent_word(state, narrow) {
+    if (state == "working") return narrow ? "wrk" : "WORKING"
+    if (state == "needs-input") return narrow ? "req" : "NEEDS INPUT"
+    if (state == "done") return narrow ? "end" : "DONE"
+    return narrow ? "?" : "UNKNOWN"
+}
+# One continuation line per subagent, drawn as children of the pane row.
+function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
+    n=load_subagents(p)
+    lines=""
+    for (i=1;i<=n;i++) {
+        state=sub_state[p,i]
+        style=(state == "working" ? bold accent : state == "needs-input" ? bold attention : dim)
+        elapsed=sub_age[p,i]
+        elapsed=(elapsed<0 ? "" : elapsed<60 ? "<1m" : elapsed<3600 ? int(elapsed/60) "m" : int(elapsed/3600) "h")
+        text=continuation dim (i == n ? branch_end : branch_mid) reset " " sub_type[p,i] " " style subagent_word(state,width<36) reset
+        lines=lines "\n" edge_count(text,elapsed,width-3)
+    }
+    return lines
 }
 # The status word itself carries the color (no bracket tag): bold for the two
 # actionable tiers (needs-input, working), plain dim for finished/unknown so
@@ -422,7 +466,7 @@ END {
                 for (ppos=1;ppos<=np[w];ppos++) {
                     p=panes[w,ppos]
                     label=agent_label(p)
-                    if (label=="approval" || label=="interrupted") printf "P:%s\t%s\n",p,s
+                    if (label=="approval" || label=="interrupted" || (load_subagents(p) && sub_need[p])) printf "P:%s\t%s\n",p,s
                 }
             }
         }
@@ -534,13 +578,13 @@ END {
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
                 prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
                 show_path=(density == "detailed" || density == "compact" || (density == "normal" && width>=32))
-                pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-length(icon)) : "")
+                pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-text_width(icon)) : "")
                 if (nul && density != "compact") {
                     inline_path=(density == "normal" && width<56 && pane_path != "" ? " " path_color pane_path reset : "")
                     primary=edge_count(prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) dim details reset inline_path,duration,width-3)
-                    continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+length(icon),"")
+                    continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+text_width(icon),"")
                     secondary=continuation path_color pane_path reset
-                    row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : ""),pt ":" s)
+                    row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : "") subagent_lines(p,continuation),pt ":" s)
                 } else {
                     # Legacy newline consumers stay one line per object.
                     path_text=(show_path && pane_path != "" ? " " path_color pane_path reset : "")

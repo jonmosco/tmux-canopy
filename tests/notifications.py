@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='canopy-notifications-test-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-notifications-test-', ignore_cleanup_errors=True) as directory:
         state = Path(directory) / 'state'
 
         def render(*, collapsed='', icons='nerdfont', theme='ansi', density='normal',

@@ -463,7 +463,7 @@ layout_menu() {
 sync_window_toggle() {
   local token="$1" window_id enabled yes
   window_id="$(window_id_for_token "$token")"
-  enabled="$(tmux show-window-option -v -t "$window_id" synchronize-panes 2>/dev/null || true)"
+  enabled="$(tmux display-message -p -t "$window_id" '#{?synchronize-panes,on,off}' 2>/dev/null || true)"
   if [[ "$enabled" == 'on' ]]; then
     tmux set-window-option -t "$window_id" synchronize-panes off
   else

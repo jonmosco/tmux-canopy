@@ -25,7 +25,7 @@ def main():
     env.pop('TMUX_PANE', None)
     env['TERM'] = 'xterm-256color'
     processes, terminals = [], []
-    with tempfile.TemporaryDirectory(prefix='tree-focus-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-focus-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         selected, deliveries, state = (temp / name for name in ('selected', 'deliveries', 'state'))
         deliveries.touch()

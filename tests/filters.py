@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def snapshots():
-    with tempfile.TemporaryDirectory(prefix='canopy-filter-snapshot-') as folder:
+    with tempfile.TemporaryDirectory(prefix='canopy-filter-snapshot-', ignore_cleanup_errors=True) as folder:
         state = Path(folder) / 'state'
         def render(saved='', *, default='all', window='', title='', width=42, notices='all',
                    switcher=False, target='', owner='owner'):
@@ -100,7 +100,7 @@ def live():
     env = {k: v for k, v in os.environ.items() if k not in ('TMUX', 'TMUX_PANE')}
     env['TERM'] = 'xterm-256color'
     process = master = None
-    with tempfile.TemporaryDirectory(prefix='canopy-filters-live-') as folder:
+    with tempfile.TemporaryDirectory(prefix='canopy-filters-live-', ignore_cleanup_errors=True) as folder:
         temp = Path(folder)
         selected, state_path = temp/'selected', temp/'state-path'
         output = bytearray()

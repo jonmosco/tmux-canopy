@@ -6,6 +6,8 @@
 
 - TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.
 - Doctor output lists Canopy-owned tmux bindings, options, hooks, and optional agent integration states.
+- Claude Code subagents appear as read-only child lines of their pane with type, status (working, needs input, done), and age; a waiting subagent counts toward attention roll-ups and `n`, and its approval request is attributed to it. Requires reinstalling the Claude integration for the new `SubagentStart`/`SubagentStop` hooks.
+- Doctor runs a reporter self-test and lists agent processes in tmux panes with the age of their last report, explaining missing reports.
 - Detect OpenCode, Gemini CLI, Pi, and Oh My Pi in the Agents view and read-only drawer; distinguish process detection, unverified screen hints, and optional lifecycle reports.
 - Optional Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle adapters with example configurations, pane/process identity checks, and source-aware row labels.
 - Reported Codex lifecycle labels on Tree and Agents pane rows, with foreground-command or process-ancestry, pane-PID, and freshness checks; stale reports show unknown.
@@ -40,6 +42,13 @@
 - Notifications use one amber badge beside each affected pane, with counts on collapsed branches and full types in previews.
 
 ### Fixed
+
+- A finished background subagent no longer disappears the moment its result is delivered: the turn that delivers it no longer drops its **DONE** line, which now stays until the next prompt at least 30 seconds later.
+- A subagent's permission request can no longer be cleared by an unrelated tool completion with the same tool name from the main thread or another subagent.
+- Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle reports were silently dropped after the Codex reporter's helpers changed; `canopy doctor` now exercises every reporter's real report path so such drift fails loudly.
+- Native Claude Code installs (`claude.exe`) are recognized as Claude agents on macOS.
+- A global `detach-on-destroy on` is honored when the last session ends, so the dock is no longer briefly parked in an unrelated session (which resized its applications). The synchronize-panes toggle likewise reads an inherited global value.
+- Right-aligned counts and pane continuation lines align correctly on macOS, whose awk measures UTF-8 text in bytes.
 
 - TPM loads the legacy compatibility entrypoint without applying Canopy twice.
 - Sidebar navigation preserves split proportions when a hidden window resizes to the active terminal, preventing content panes from collapsing to one column.

@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     tpm_source = Path(sys.argv[1]).resolve()
     assert (tpm_source / 'tpm').is_file(), 'Pass an existing TPM checkout'
-    with tempfile.TemporaryDirectory(prefix='canopy-tpm-install-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-tpm-install-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         env = dict(os.environ, HOME=str(temp / 'home'),
                    XDG_CONFIG_HOME=str(temp / 'home/.config'),

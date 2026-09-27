@@ -29,7 +29,7 @@ def main():
     env['TERM'] = 'xterm-256color'
     master = None
     attached = None
-    with tempfile.TemporaryDirectory(prefix='tree-multiline-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-multiline-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         state, loads = temp / 'state', temp / 'loads'
         state.touch()

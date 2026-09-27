@@ -22,7 +22,7 @@ CASES = [
 def main():
     env = os.environ.copy()
     env.update(TMUX_CANOPY_RENDER_CLIENT='', TMUX_CANOPY_RENDER_HOME='/test')
-    with tempfile.TemporaryDirectory(prefix='tree-icons-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-icons-', ignore_cleanup_errors=True) as directory:
         state = Path(directory) / 'state'
         state.touch()
         for theme in ('ansi', 'mono'):
