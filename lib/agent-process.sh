@@ -16,7 +16,8 @@ canopy_load_ps_snapshot() {
     [[ $pid =~ ^[1-9][0-9]*$ ]] || continue
     CANOPY_PPID[$pid]=$ppid
     CANOPY_LSTART[$pid]="$w1 $w2 $w3 $w4 $w5"
-    CANOPY_COMM[$pid]=${comm##*/}
+    comm=${comm##*/}
+    CANOPY_COMM[$pid]=${comm%.exe}
   done <<< "$raw"
   return "$canopy_ps_status"
 }

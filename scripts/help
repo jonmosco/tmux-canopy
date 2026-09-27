@@ -39,6 +39,7 @@ help_records() {
   key '3' 'Paste buffers; Enter pastes into the target pane'
   key '4' 'Detected agent panes, grouped by session and window'
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
+  key 'n' 'Jump to the next agent needing input, across all sessions and windows'
   key 'p' 'Show or hide the preview drawer'
   key 'i' 'Switch the drawer between terminal and agent summaries; show it if hidden'
   key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'

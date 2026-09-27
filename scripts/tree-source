@@ -20,12 +20,15 @@ snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
 export TMUX_CANOPY_RENDER_CLIENT="${TMUX_CANOPY_CLIENT:-}"
 export TMUX_CANOPY_RENDER_HOME="$HOME"
 switcher=0 agent_view=0
-export TMUX_CANOPY_FILTER_TARGET=""
+export TMUX_CANOPY_FILTER_TARGET="" TMUX_CANOPY_NEEDS_INPUT=""
 while (($#)); do
   case "$1" in
     --focus-target) export TMUX_CANOPY_FILTER_TARGET="${2:-}"; shift ;;
     --switcher) switcher=1 ;;
     --agents) agent_view=1 ;;
+    # Always at agent_view detection strength: a wrapper-shell agent must
+    # still be found, regardless of which view is currently on screen.
+    --needs-input) agent_view=1; export TMUX_CANOPY_NEEDS_INPUT=1 ;;
   esac
   shift
 done

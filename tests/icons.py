@@ -15,6 +15,7 @@ CASES = [
     ('ssh', 96, '󰢹'), ('pi', 95, '󰚩'), ('claude', 93, ''),
     ('codex', 96, ''), ('opencode', 95, '󰚩'), ('btop', 96, '󰍛'),
     ('gemini', 97, '󰊭'),
+    ('claude.exe', 93, '\uec82'), ('codex.exe', 96, '\uec81'),
 ]
 
 

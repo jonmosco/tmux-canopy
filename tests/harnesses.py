@@ -88,10 +88,11 @@ try:
         assert 'Status: Working' in run('agent-preview', panes['opencode'], ['P:' + panes['opencode']])
 
         agent_view = run('tree-source', pane, ['--agents'])
-        assert '[working·hook]' in agent_view and '[approval·hook]' in agent_view
-        assert '[working·plugin?]' in agent_view and '[turn ended·hook]' in agent_view
+        assert 'WORKING' in agent_view and 'NEEDS INPUT' in agent_view and '·hook' in agent_view
+        assert 'WORKING' in agent_view and '·plugin?' in agent_view and 'TURN ENDED' in agent_view
         tm('set-option', '-pq', '-t', panes['pi'], '@tmux_canopy_agent_updated', '1')
-        assert '[unknown·hook]' in run('tree-source', pane, ['--agents'])
+        stale_view = run('tree-source', pane, ['--agents'])
+        assert 'UNKNOWN' in stale_view and '·hook' in stale_view
         print('ok - harness rows distinguish process-only, unverified screen, and reported lifecycle states')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

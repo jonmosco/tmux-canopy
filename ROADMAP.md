@@ -49,12 +49,12 @@ Design requirements:
 
 ### 2. Attention summaries
 
-- [ ] Aggregate agent status on window and session rows, including collapsed
+- [x] Aggregate agent status on window and session rows, including collapsed
   branches, so users can see summaries such as **2 need input**.
-- [ ] Give input requests priority over working and finished indicators.
-- [ ] Define counting for linked windows so repeated tree occurrences do not
+- [x] Give input requests priority over working and finished indicators.
+- [x] Define counting for linked windows so repeated tree occurrences do not
   inflate totals within a session.
-- [ ] Preserve row selection, search queries, and collapse state during updates.
+- [x] Preserve row selection, search queries, and collapse state during updates.
 
 ### 3. Jump to the next agent needing input
 

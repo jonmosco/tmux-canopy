@@ -113,7 +113,7 @@ def process_identity(root, kind="codex"):
                     continue
                 try:
                     with open(f"{entry.path}/comm", encoding="utf-8") as stream:
-                        if stream.read().strip() not in names:
+                        if stream.read().strip().removesuffix(".exe") not in names:
                             continue
                 except OSError:
                     continue
@@ -134,7 +134,7 @@ def process_identity(root, kind="codex"):
             fields = line.split(None, 2)
             if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
                 parents[int(fields[0])] = int(fields[1])
-                if os.path.basename(fields[2]) in names:
+                if os.path.basename(fields[2]).removesuffix(".exe") in names:
                     candidates.append((int(fields[0]), ""))
         def stat_for(pid):
             return (parents[pid], "") if pid in parents else None

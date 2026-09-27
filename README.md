@@ -20,7 +20,7 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 - Global quick switching, including panes inside collapsed branches.
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus.
-- Process trees attributed to panes, plus tmux buffer browsing.
+- Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
 - Agents view detects Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi processes. `[process]` means detection only.
 - Optional lifecycle adapters for these harnesses show recent reported state as `[state·hook]` and identify stale reports as unknown. The drawer labels screen-based input hints as unverified.
 - Activity and bell notifications; optional silence monitoring.
@@ -107,6 +107,7 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
+| `n` | Jump to the next agent reporting needs-input, across all sessions and windows |
 | `p` / `P` | Toggle preview / open enlarged terminal preview |
 | `i` | Switch the preview drawer between terminal and agent summaries |
 | `[` / `]` | Previous / next width preset |

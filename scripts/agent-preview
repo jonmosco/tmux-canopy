@@ -30,16 +30,17 @@ if [[ "$sidebar" == 1 || "$slot" == 1 ]]; then
   printf 'Select a content pane to inspect an agent.\n'; exit 0
 fi
 agent=''; kind=''
-case "${command##*/}" in
+base=${command##*/}; base=${base%.exe}
+case "$base" in
   codex) kind=codex ;;
   claude|claude-code) kind=claude ;;
-  opencode|gemini|pi|omp) kind=${command##*/} ;;
+  opencode|gemini|pi|omp) kind=$base ;;
 esac
 if [[ -z "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
   # Agents can be children of a pane shell. Resolve only descendants of that
   # pane, and prefer the closest matching process when there is more than one.
   kind="$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$pid" '
-    { parent[$1]=$2; name=$3; sub(/^.*\//,"",name)
+    { parent[$1]=$2; name=$3; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
       if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp") kind[$1]=name
       else if (name=="claude" || name=="claude-code") kind[$1]="claude" }
     END { best=129; for (p in kind) { q=p; for (depth=0;depth<128 && q>0;depth++) {

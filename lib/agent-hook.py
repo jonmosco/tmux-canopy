@@ -89,7 +89,8 @@ def report(kind, event):
     if identity is None:
         return
     process_pid, process_birth = identity
-    current = {key: core.option(key) for key in core.FIELDS}
+    current = core.read_options(core.FIELDS + ('timer',))
+    current_timer = current.pop('timer')
     if (current['source'] != kind + '-hook' or current['pane_pid'] != pid or
             current['process_pid'] != process_pid or current['process_birth'] != process_birth):
         current = {key: '' for key in core.FIELDS}
@@ -130,7 +131,7 @@ def report(kind, event):
     else:
         values.update(tool='', summary='', command='', request='')
     if core.write(values):
-        core.schedule_expiry(process_pid, process_birth)
+        core.schedule_expiry(process_pid, process_birth, current_timer)
         core.refresh()
 
 
