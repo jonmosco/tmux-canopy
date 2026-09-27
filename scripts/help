@@ -136,6 +136,7 @@ legend_records() {
   legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
   legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
   legend_item '[unknown·hook]' 'The last hook report is stale. Current agent state is unknown.' dim
+  legend_item '├─ Explore WORKING' 'A Claude Code subagent of the pane above: WORKING, NEEDS INPUT or DONE. Read-only; its prompts appear in that pane.' cyan
   legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
   note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
   note 'Hook labels require a matching live agent process, pane PID, session, and recent report. Screen hints appear only in the drawer and say unverified.'

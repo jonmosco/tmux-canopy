@@ -16,7 +16,7 @@ def agent_pane(pane_id, window_id, index, command, pane_pid, status, dead='0'):
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix='canopy-attention-test-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-attention-test-', ignore_cleanup_errors=True) as directory:
         state = Path(directory) / 'state'
 
         def render(*, collapsed='', icons='nerdfont', theme='ansi', extra_rows=()):

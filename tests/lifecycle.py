@@ -25,7 +25,7 @@ def scenario(transition='slot', scope='global', position='left'):
     env['TERM'] = 'xterm-256color'
     process = None
     master = None
-    with tempfile.TemporaryDirectory(prefix='tree-lifetime-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-lifetime-', ignore_cleanup_errors=True) as directory:
         state = Path(directory) / 'state'
         state.touch()
 

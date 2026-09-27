@@ -27,7 +27,7 @@ def main():
     env['TERM'] = 'xterm-256color'
     master = None
     attached = None
-    with tempfile.TemporaryDirectory(prefix='tree-width-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-width-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         state = temp / 'state'
         state.touch()

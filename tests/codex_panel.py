@@ -23,7 +23,7 @@ def tm(*args):
 
 
 try:
-    with tempfile.TemporaryDirectory(prefix='canopy-codex-panel-') as temp_dir:
+    with tempfile.TemporaryDirectory(prefix='canopy-codex-panel-', ignore_cleanup_errors=True) as temp_dir:
         binary = Path(temp_dir) / 'codex'
         install_agent_fixture(binary)
         claude_binary = Path(temp_dir) / 'claude'

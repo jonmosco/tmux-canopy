@@ -24,7 +24,7 @@ def main():
     def run(script, *args):
         return sp.check_output([str(ROOT/'scripts'/script), *args], env=env, text=True, timeout=10)
 
-    with tempfile.TemporaryDirectory(prefix='canopy-buffers-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-buffers-', ignore_cleanup_errors=True) as directory:
         try:
             pane = tm('-f', '/dev/null', 'new-session', '-d', '-P', '-F', '#{pane_id}', 'cat').strip()
             env['TMUX'] = tm('display-message', '-p', '-t', pane, '#{socket_path},#{pid},0').strip()

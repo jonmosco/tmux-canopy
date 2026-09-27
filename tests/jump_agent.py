@@ -22,7 +22,7 @@ def tm(*args):
 
 
 try:
-    with tempfile.TemporaryDirectory(prefix='canopy-jump-agent-') as directory:
+    with tempfile.TemporaryDirectory(prefix='canopy-jump-agent-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         binary = temp / 'codex'
         install_agent_fixture(binary)

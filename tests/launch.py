@@ -25,7 +25,7 @@ def main():
     env['TERM'] = 'xterm-256color'
     attached = None
     master = None
-    with tempfile.TemporaryDirectory(prefix='tree-launch-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-launch-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         project = temp / 'project \'quoted\', $literal #{version} (test)'
         shutil.copytree(ROOT, project, ignore=shutil.ignore_patterns('.git', 'tests', '__pycache__'))
@@ -318,8 +318,9 @@ exec REAL --bind BINDING --bind LOAD "$@"
             wait(lambda: '[1 Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored after buffer menu')
             print('ok - buffer context actions and diagnostics treat format-like buffer names as data')
 
+            terminal_output.clear()
             tm('send-keys', '-t', sidebar, 'a')
-            time.sleep(.15)
+            wait(lambda: b'Session actions' in terminal_output, 'session context menu')
             os.write(master, b'D')
             wait(lambda: str(project / 'scripts/doctor') + ' --render' in sp.check_output(['ps', '-eo', 'args='], text=True), 'diagnostics popup')
             time.sleep(.3)

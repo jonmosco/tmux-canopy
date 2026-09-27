@@ -44,8 +44,10 @@ Design requirements:
   remain until a subsequent lifecycle event changes it.
 - Treat unsupported or stale state as unknown. Output, silence, process
   existence, and command icons alone do not establish task completion.
-- Report only agents that can be associated with a tmux pane. Do not imply that
-  internal agent subtasks are independently visible or controllable.
+- Report only agents that can be associated with a tmux pane. Internal agent
+  subtasks (such as Claude Code subagents) may be shown as read-only children of
+  their pane when the harness reports them, but must not imply that they are
+  independently focusable or controllable.
 
 ### 2. Attention summaries
 
@@ -58,14 +60,27 @@ Design requirements:
 
 ### 3. Jump to the next agent needing input
 
-- [ ] Add an action and documented shortcut to focus the next pane reporting
+- [x] Add an action and documented shortcut to focus the next pane reporting
   **needs input** across sessions and windows.
-- [ ] Define a predictable traversal order, wraparound behavior, and behavior
+- [x] Define a predictable traversal order, wraparound behavior, and behavior
   when no agents need input.
-- [ ] Use the existing client-aware navigation and width-preserving transitions.
+- [x] Use the existing client-aware navigation and width-preserving transitions.
 - [ ] Test stale targets, agent exits, linked windows, and multiple clients.
 
-### 4. Agent request panel and responses (backlog)
+### 4. Subagents
+
+- [x] Show Claude Code subagents as read-only child lines of their pane, with
+  type, **working**/**needs input**/**done** status, and age.
+- [x] Attribute a subagent's approval request to it, clear it only on that
+  subagent's own tool completion, and count waiting subagents in roll-ups and
+  jump-to-next-agent.
+- [x] Bound the list per pane, drop finished subagents at the next prompt once
+  they have shown **done** for 30 seconds, and
+  sanitize reported fields.
+- [ ] Report subagents from other harnesses (Codex, Gemini CLI, OpenCode) where
+  their integrations expose them.
+
+### 5. Agent request panel and responses (backlog)
 
 Explore a preview-like panel that shows what an agent needs and, for supported
 integrations, lets the user respond without switching to the agent's window or
@@ -96,6 +111,18 @@ controls still depend on a verified request and response contract.
   current content window/pane and sidebar geometry throughout.
 - [ ] Test stale requests, focus and cancellation, literal response text, duplicate
   submissions, concurrent clients, acknowledgement failures, and narrow terminals.
+
+## Working-state animation (backlog)
+
+- [ ] Animate the **WORKING** status word with a moving highlight band while an
+  agent works, opt-in via `@tmux-canopy-animate`.
+- [ ] Redraw frames from a cached snapshot (awk only, measured ~2–3ms) instead
+  of a full source reload (~60ms), driven by a bounded worker that starts only
+  when a working row is drawn and exits when none remain, the sidebar is not
+  visible, or its pane closes. Target 5–8 frames per second at a few percent of
+  one core.
+- [ ] Keep the no-daemon rule: no ticker without a visible working agent, and
+  static output (and all tests) when the option is off or the theme is `mono`.
 
 ## Switch sidebar side without reopening
 

@@ -27,7 +27,7 @@ def main():
     env['TERM'] = 'xterm-256color'
     client_process = None
     master = None
-    with tempfile.TemporaryDirectory(prefix='tree-rendering-') as directory:
+    with tempfile.TemporaryDirectory(prefix='tree-rendering-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         state = temp / 'state'
         selected = temp / 'selected'
