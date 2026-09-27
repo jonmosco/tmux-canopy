@@ -2,6 +2,7 @@
 """Lossless buffer identities across source, preview, paste and deletion."""
 import os
 from pathlib import Path
+import shlex
 import subprocess as sp
 import tempfile
 import time
@@ -65,6 +66,23 @@ def main():
                 run('sidebar-action','delete',tokens[name])
                 assert name not in tm('list-buffers','-F','#{buffer_name}').splitlines()
             assert not marker.exists()
+            # Yank pipes buffer bytes through the configured clipboard command,
+            # bypassing the OS clipboard cascade so the test is deterministic.
+            clip_marker = Path(directory)/'clipboard-output'
+            tm('set-option', '-g', '@tmux-canopy-copy-command', f'cat > {shlex.quote(str(clip_marker))}')
+            tm('set-buffer', '-b', 'clip-source', 'yanked-payload')
+            rows = [row.split('\t') for row in run('sidebar-source','--stable','--read0').rstrip('\0').split('\0')]
+            clip_token = next(row[0] for row in rows
+                               if row[0].startswith('B2:') and bytes.fromhex(row[0][3:]).decode() == 'clip-source')
+            run('sidebar-action', 'yank', clip_token)
+            deadline = time.monotonic()+3
+            while not clip_marker.exists():
+                assert time.monotonic()<deadline, 'yank did not run the configured clipboard command'
+                time.sleep(.03)
+            assert clip_marker.read_text() == 'yanked-payload'
+            run('sidebar-action', 'delete', clip_token)
+            tm('set-option', '-gu', '@tmux-canopy-copy-command')
+            print('ok - yank pipes a buffer through the configured clipboard command')
             # Samples cannot forge extra source records or ANSI styling.
             tm('set-buffer','-b','sample','tab\tnewline\nB:forged\x1b[31m')
             rows = [r.split('\t') for r in run('sidebar-source','--stable','--read0').rstrip('\0').split('\0')]

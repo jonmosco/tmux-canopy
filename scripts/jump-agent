@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Jump to the next agent reporting needs-input, across all sessions/windows,
+# in natural tree order, wrapping around. A no-op when nothing needs input.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sidebar="${TMUX_PANE:-}"
+[[ "$sidebar" =~ ^%[0-9]+$ ]] || exit 0
+[[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0
+
+location="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)"
+IFS='|' read -r _cur_session _cur_window cur_pane <<< "$location"
+
+mapfile -t entries < <("$SCRIPT_DIR/tree-source" --needs-input 2>/dev/null)
+((${#entries[@]})) || exit 0
+
+# If the current pane is itself one of the matches, advance past it
+# (wrapping to the first); otherwise land on the first match.
+index=0
+if [[ -n "$cur_pane" ]]; then
+  for i in "${!entries[@]}"; do
+    pane="${entries[$i]%%$'\t'*}"
+    if [[ "${pane#P:}" == "$cur_pane" ]]; then
+      index=$(( (i + 1) % ${#entries[@]} ))
+      break
+    fi
+  done
+fi
+
+entry="${entries[$index]}"
+pane="${entry%%$'\t'*}"
+session="${entry#*$'\t'}"
+"$SCRIPT_DIR/sidebar-action" focus "$pane" "$pane:$session"

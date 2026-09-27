@@ -72,12 +72,14 @@ process_menu() {
 }
 
 buffer_menu() {
-  local buffer_token="$1" paste delete
+  local buffer_token="$1" paste delete yank
   paste="$(menu_command activate "$buffer_token")"
   delete="$(menu_command delete "$buffer_token")"
+  yank="$(menu_command yank "$buffer_token")"
   # A buffer name can contain tmux format jobs; never use it as a menu format.
   sidebar_display_menu "${TMUX_CANOPY_CLIENT:-}" "$sidebar" -x C -y C -T ' Buffer actions ' \
     'Paste into target pane' p "$paste" \
+    'Yank to system clipboard' y "$yank" \
     'Delete buffer' x "$delete" \
     'Diagnostics' D "$(menu_command diagnostics "$buffer_token")" \
     'Cancel' q ''
@@ -125,6 +127,20 @@ case "$action" in
       X:*) process_menu "$token" ;;
       Q:*) "$SCRIPT_DIR/tree-action" delete "P:${token#Q:}" ;;
       *) "$SCRIPT_DIR/tree-action" delete "$token" ;;
+    esac
+    ;;
+
+  yank)
+    case "$token" in
+      B:*|B2:*)
+        buffer_decode_token "$token" || exit 0
+        if clip_command="$(buffer_clipboard_command)"; then
+          tmux show-buffer -b "$BUFFER_NAME" 2>/dev/null | /bin/sh -c "$clip_command" >/dev/null 2>&1 || true
+        else
+          tmux display-message -c "${TMUX_CANOPY_CLIENT:-}" -d 4000 \
+            'tmux-canopy: no clipboard tool found (pbcopy/wl-copy/xclip/xsel/clip.exe)' 2>/dev/null || true
+        fi
+        ;;
     esac
     ;;
 

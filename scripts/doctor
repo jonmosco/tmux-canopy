@@ -92,6 +92,25 @@ else
   fi
   printf '  mouse: root border drag; tmux-canopy-resize temporary key table\n'
 fi
+printf '\nRecommended tmux settings for Canopy (informational; nothing is changed):\n'
+mouse_value="$(tmux show-option -gqv mouse 2>/dev/null || true)"
+if [[ "$mouse_value" == on ]]; then
+  printf '  mouse: on\n'
+else
+  printf '  mouse: %s (mouse resizing and click-to-select need "set -g mouse on")\n' "${mouse_value:-off}"
+fi
+escape_value="$(tmux show-option -gqv escape-time 2>/dev/null || true)"
+if [[ "$escape_value" =~ ^[0-9]+$ && "$escape_value" -gt 50 ]]; then
+  printf '  escape-time: %sms (single-key bindings and Escape-to-clear-search may feel laggy; consider "set -sg escape-time 10")\n' "$escape_value"
+else
+  printf '  escape-time: %sms\n' "${escape_value:-0}"
+fi
+terminal_value="$(tmux show-option -gqv default-terminal 2>/dev/null || true)"
+if [[ "$terminal_value" == *256color* || "$terminal_value" == tmux* ]]; then
+  printf '  default-terminal: %s\n' "$terminal_value"
+else
+  printf '  default-terminal: %s (ANSI icon and notification colors may render incorrectly; consider "set -g default-terminal screen-256color")\n' "${terminal_value:-unset}"
+fi
 if [[ "$mode" == --render ]]; then
   printf '\nPress any key to close…'
   IFS= read -r -s -n 1 </dev/tty || true

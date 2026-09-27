@@ -49,7 +49,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     process_line=$0; sub(/^[[:space:]]+/,"",process_line)
     split(process_line,process_field,/[[:space:]]+/)
     pid=process_field[1]; parent[pid]=process_field[2]
-    name=process_field[3]; sub(/^.*\//,"",name)
+    name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
     if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp") agent_process[pid]=name
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     next
@@ -76,7 +76,7 @@ function find_agents( pid,current,depth,p,root) {
 }
 # Build visibility before folding. Counts and compact eligibility still use the
 # full content inventory; text constraints are literal, case-insensitive substrings.
-function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first) {
+function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first,label) {
     if (filter != "session" && filter != "unread") filter="all"
     filtered=(!switcher && (agent_view || filter != "all" || window_filter != "" || title_filter != ""))
     for (si=1;si<=ns;si++) {
@@ -98,6 +98,15 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first) {
                     if (first == "") first=p
                     if (pa[p] || pb[p] || pz[p]) shown_unread[w]++
                     vwa[w]+=pa[p]; vwb[w]+=pb[p]; vwz[w]+=pz[p]
+                    # Agent lifecycle state is aggregated separately from unread
+                    # terminal notifications, grouped into the same three tiers
+                    # the per-pane badge already colors: needs-input (including
+                    # interrupted), working, and finished. "unknown" is not
+                    # actionable and is left out of the rollup entirely.
+                    label=agent_label(p)
+                    if (label=="approval" || label=="interrupted") { w_need[w]++; w_agent_shown[w]++ }
+                    else if (label=="working") { w_work[w]++; w_agent_shown[w]++ }
+                    else if (label=="ready" || label=="turn ended" || label=="session ended") { w_done[w]++; w_agent_shown[w]++ }
                 }
                 first_p[w]=first
                 # Consecutive panes with one directory share one visible path.
@@ -125,6 +134,7 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first) {
             if (agent_view) shown_agents_s[s]+=shown_p[w]
             if (first_w[s] == "") first_w[s]=w
             vsa[s]+=vwa[w]; vsb[s]+=vwb[w]; vsz[s]+=vwz[w]
+            s_need[s]+=w_need[w]; s_work[s]+=w_work[w]; s_done[s]+=w_done[w]
             if (alert) shown_unread_w[s]++
         }
         visible_s[s]=(!filtered || shown_w[s]>0)
@@ -173,6 +183,30 @@ function notice(a,b,z,count, glyph) {
     glyph=(b ? bell_badge : a ? activity_badge : silence_badge)
     return " " attention glyph (count>1 ? count : "") reset
 }
+# Rolled-up agent lifecycle state for a collapsed session/window: how many
+# descendant panes need input, are working, or have finished. This is
+# separate from unread terminal notifications and never affects their
+# clear-on-focus behavior. Needs-input outranks working outranks finished,
+# matching the three color tiers the per-pane badge already uses.
+function agent_summary(need,work,done, glyph,color,count) {
+    if (need>0) { glyph=agent_need_badge; color=attention; count=need }
+    else if (work>0) { glyph=agent_work_badge; color=accent; count=work }
+    else if (done>0) { glyph=agent_done_badge; color=dim; count=done }
+    else return ""
+    return " " color glyph (count>1 ? count : "") reset
+}
+# How long since the current report, for the row's right-aligned edge_count.
+# Independent of agent_badge()'s own text so it never competes for the same
+# inline width budget; edge_count already omits it gracefully when tight.
+function agent_duration_text(p, age) {
+    if (report_updated[p] !~ /^[0-9]+$/) return ""
+    age=now-report_updated[p]
+    if (age<0) return ""
+    if (age<60) return "<1m"
+    if (age<3600) return int(age/60) "m"
+    if (age<86400) return int(age/3600) "h" (int(age/60)%60) "m"
+    return int(age/86400) "d"
+}
 # Hook state is displayed only while a matching agent process still belongs to
 # this live pane. Expired reports say unknown; unsupported agents show no state.
 function agent_label(p, age,status,kind) {
@@ -195,6 +229,7 @@ function agent_label(p, age,status,kind) {
 }
 function canonical_agent(value) {
     sub(/^.*\//,"",value)
+    sub(/\.exe$/,"",value)
     if (value == "claude-code") return "claude"
     if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp") return value
     return ""
@@ -208,20 +243,36 @@ function agent_name(kind) {
     if (kind == "omp") return "Oh My Pi"
     return kind
 }
-function agent_badge(p, label,style,origin) {
+# The displayed status word, shared with title_detail()'s width budgeting so
+# the two never disagree about how much space the badge actually takes.
+function agent_status_word(label, narrow) {
+    if (narrow) {
+        if (label=="working") return "wrk"
+        if (label=="approval") return "req"
+        if (label=="ready") return "rdy"
+        if (label=="turn ended" || label=="session ended") return "end"
+        if (label=="interrupted") return "int"
+        return "?"
+    }
+    if (label=="working") return "WORKING"
+    if (label=="approval") return "NEEDS INPUT"
+    if (label=="ready") return "READY"
+    if (label=="turn ended") return "TURN ENDED"
+    if (label=="session ended") return "SESSION ENDED"
+    if (label=="interrupted") return "INTERRUPTED"
+    return "UNKNOWN"
+}
+# The status word itself carries the color (no bracket tag): bold for the two
+# actionable tiers (needs-input, working), plain dim for finished/unknown so
+# it recedes instead of competing for attention. Origin stays a small dim
+# suffix since ·plugin? still meaningfully flags an unconfirmed association.
+function agent_badge(p, label,style,origin,word) {
     label=agent_label(p)
     if (label=="") return agent_view && agent_kind[p] != "" ? " " dim "[process]" reset : ""
     style=(label=="working" ? accent : label=="approval" || label=="interrupted" ? attention : dim)
-    if (width<36) {
-        if (label=="working") label="wrk"
-        else if (label=="approval") label="req"
-        else if (label=="ready") label="rdy"
-        else if (label=="turn ended" || label=="session ended") label="end"
-        else if (label=="interrupted") label="int"
-        else label="?"
-    }
+    word=agent_status_word(label,width<36)
     origin=(report_source[p] == "opencode-hook" ? "plugin?" : "hook")
-    return " " style "[" label "·" origin "]" reset
+    return " " (style==dim ? "" : bold) style word reset dim " ·" origin reset
 }
 function shortpath(value, budget, n, parts, shortened) {
     if (value == home) value="~"
@@ -272,7 +323,7 @@ function title_detail(p,    value,limit,label) {
     if (value == "") return ""
     limit=width-25-length(command[p])
     label=agent_label(p)
-    if (label!="") limit-=length(label)+3
+    if (label!="") limit-=length(agent_status_word(label,width<36))+3
     if (density == "normal" && width<56 && width>=32)
         limit-=length(pathlabel(p,pw[p],width-16))+3
     if (limit<8) return ""
@@ -289,6 +340,7 @@ function useful_title(p, value) {
 function appcolor(value, n, parts) {
     if (theme == "mono") return ""
     n=split(value,parts,"/"); value=parts[n]
+    sub(/\.exe$/,"",value)
     if (value ~ /^(nvim|vim|vi)$/) return icon_blue
     if (value ~ /^(node|python|python3)$/) return icon_yellow
     if (value ~ /^(npm|npx|git|lazygit|oc)$/) return icon_red
@@ -302,6 +354,7 @@ function appcolor(value, n, parts) {
 function appicon(value, n, parts) {
     if (icons != "nerdfont") return pane_icon
     n=split(value,parts,"/"); value=parts[n]
+    sub(/\.exe$/,"",value)
     if (value == "nvim") return ""
     if (value ~ /^(vim|vi)$/) return ""
     if (value ~ /^(bash|zsh|fish|sh)$/) return ""
@@ -335,6 +388,9 @@ END {
     activity_badge=(icons == "ascii" ? "*" : "●")
     bell_badge=(icons == "nerdfont" ? "" : icons == "ascii" ? "B" : "🔔")
     silence_badge=(icons == "ascii" ? "~" : "◷")
+    agent_need_badge=(icons == "ascii" ? "!" : "◆")
+    agent_work_badge=(icons == "ascii" ? "+" : "▷")
+    agent_done_badge=(icons == "ascii" ? "d" : "✓")
     if (custom_s != "") session_icon=custom_s
     if (custom_w != "") window_icon=custom_w
     if (custom_p != "") pane_icon=custom_p
@@ -352,6 +408,24 @@ END {
     prepare_filter()
     if (ENVIRON["TMUX_CANOPY_FILTER_TARGET"] != "") {
         resolve_focus(ENVIRON["TMUX_CANOPY_FILTER_TARGET"])
+        exit
+    }
+    # Unfiltered, like the switcher: a pane needing input must never be
+    # hidden by an active Tree filter. Caller forces agent_view so detection
+    # includes agents running under a wrapper shell, not just the foreground
+    # command. One entry per linked-session occurrence, natural tree order.
+    if (ENVIRON["TMUX_CANOPY_NEEDS_INPUT"] != "") {
+        for (si=1;si<=ns;si++) {
+            s=sessions[si]
+            for (wpos=1;wpos<=nw[s];wpos++) {
+                w=windows[s,wpos]
+                for (ppos=1;ppos<=np[w];ppos++) {
+                    p=panes[w,ppos]
+                    label=agent_label(p)
+                    if (label=="approval" || label=="interrupted") printf "P:%s\t%s\n",p,s
+                }
+            }
+        }
         exit
     }
     move_p=substr(move,3); move_w=(move ~ /^P:/ ? pw[move_p] : "")
@@ -409,7 +483,7 @@ END {
         meta=(agent_view ? " [" shown_agents_s[s] " agent" (shown_agents_s[s]==1 ? "" : "s") "]" : filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
         session_glyph=dim session_icon reset " "
         session_style=(s == current_s ? bold : "")
-        row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) : "") dim meta reset,st)
+        row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset,st)
         if (collapsed[st]) continue
         visible_wpos=0
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -434,12 +508,13 @@ END {
                 # Its active content target is necessarily this sole pane.
                 compact_path=(density == "minimal" || width<56 ? "" : " " pathlabel(p,w,width-24))
                 if (p == current_p && s == current_s && wm == " ") wm="●"
-                row(wt,dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] agent_badge(p) badge dim meta compact_path reset,wt)
+                compact_duration=(agent_label(p) != "" ? agent_duration_text(p) : "")
+                row(wt,edge_count(dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] agent_badge(p) badge dim meta compact_path reset,compact_duration,width-3),wt)
                 continue
             }
             grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
                 group_count[first_p[w]] == shown_p[w] && path[first_p[w]] != "" && !collapsed[wt])
-            window_text=dim branch reset " " (collapsed[wt] ? "▸ " : "▾ ") (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") dim meta reset
+            window_text=dim branch reset " " (collapsed[wt] ? "▸ " : "▾ ") (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_work[w],w_done[w]) : "") dim meta reset
             window_text=edge_count(window_text,collapsed_count,width-3)
             if (grouped) {
                 continuation=dim stem stem_mid "   "
@@ -454,6 +529,7 @@ END {
                 visible_ppos++
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p]==1 ? "×" : " ")
                 details=title_detail(p)
+                duration=(agent_label(p) != "" ? agent_duration_text(p) : "")
                 display_command=(agent_view ? agent_name(agent_kind[p]) : command[p])
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
                 prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
@@ -461,14 +537,14 @@ END {
                 pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-length(icon)) : "")
                 if (nul && density != "compact") {
                     inline_path=(density == "normal" && width<56 && pane_path != "" ? " " path_color pane_path reset : "")
-                    primary=prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) dim details reset inline_path
+                    primary=edge_count(prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) dim details reset inline_path,duration,width-3)
                     continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+length(icon),"")
                     secondary=continuation path_color pane_path reset
                     row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : ""),pt ":" s)
                 } else {
                     # Legacy newline consumers stay one line per object.
                     path_text=(show_path && pane_path != "" ? " " path_color pane_path reset : "")
-                    row(pt,prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) path_text dim details reset,pt ":" s)
+                    row(pt,edge_count(prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) path_text dim details reset,duration,width-3),pt ":" s)
                 }
             }
         }

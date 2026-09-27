@@ -101,6 +101,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `/` | Enter fuzzy-filter mode |
 | `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
+| `n` | Jump to the next agent reporting needs-input, across all sessions and windows |
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
 | `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
@@ -206,10 +207,12 @@ The same long-running fzf process switches among four sources:
 
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
-3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste or delete.
+3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste, yank to the system clipboard, or delete.
 4. **Agents** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Pi, or Oh My Pi process. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. Ctrl-r refreshes the process inventory.
 
 Process signals are revalidated immediately before delivery by walking the current parent chain back to the owning `#{pane_pid}`. Stale or reused PIDs are ignored.
+
+Yanking a buffer pipes its bytes to the system clipboard through the first available tool: `pbcopy` (macOS; wrapped in `reattach-to-user-namespace` if present), `clip.exe` (WSL), `wl-copy` (Wayland), `xsel`/`xclip` (X11), or `putclip` (Cygwin). Set `@tmux-canopy-copy-command` to override the detected command entirely. If no tool is found, the sidebar reports it rather than failing silently.
 
 ### Moving windows and panes
 
@@ -235,6 +238,7 @@ Opening performs preflight checks **before unzooming or splitting application pa
 
 - Use **`a`, then `D`** for **Diagnostics** in Tree, Processes, or Buffers. The popup shows versions, dependency/capability results, and the owning client's last recorded failure.
 - If the sidebar cannot open, run `./canopy doctor` from the repository root or `scripts/doctor` from a regular tmux pane. It infers the owner only when one client is using that pane. For an ambiguous context, use `scripts/doctor --report CLIENT_TTY PANE_ID`; `--check` provides a preflight-only exit status.
+- `canopy doctor` also reports whether `mouse`, `escape-time`, and `default-terminal` are set in a way that could degrade Canopy's mouse resizing, single-key bindings, or ANSI colors. This is informational only: it never changes a setting, and prints nothing when a value is already fine.
 - A nonzero data-source exit publishes an informational retry row, not partial source output. **Ctrl-r retries in the same fzf process**. A search query is retained; press Escape to clear it and reveal the error row, then `a` opens diagnostics.
 - Unexpected fzf failures report a fixed exit-code summary to the live owner. Normal Ctrl-q/Ctrl-c aborts, successful acceptance, and handled sidebar termination signals are not reported as failures.
 - Only the most recent fixed, bounded failure summary and timestamp are kept per owner, in `@tmux_canopy_failure_*` tmux options. These are operational records, not secret storage. No raw stderr, environment dumps, buffer samples, previews, or terminal captures are retained as diagnostics. The source dispatcher stages records in memory, never in diagnostic files.
@@ -277,6 +281,7 @@ set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane r
 set -g @tmux-canopy-selection-style 'subtle'
 set -g @tmux-canopy-preview 'auto'
 set -g @tmux-canopy-preview-height '35%'
+set -g @tmux-canopy-copy-command ''        # override the detected clipboard command
 ```
 
 Position defaults to `left`; set `@tmux-canopy-position 'right'` for the right
@@ -458,7 +463,11 @@ The summary detects a supported agent command in the pane or its process descend
 
 ### Agent lifecycle adapters
 
-Adapters are optional and observational. Agent rows distinguish `[process]` (executable detected) from `[working·hook]`, `[approval·hook]`, and other fresh lifecycle reports. OpenCode uses `·plugin?` because its server plugin may see sessions other than the one displayed in a pane. The drawer labels visible-screen request hints **unverified**. A hook report is tied to the pane PID, live agent process PID and start time, and agent session; a stale report becomes **unknown** after 15 minutes. Approval means a request was reported, not that a human still needs to act. Turn ended does not establish task completion.
+Adapters are optional and observational. Agent rows distinguish `[process]` (executable detected) from a colored status word — `WORKING`, `NEEDS INPUT`, `READY`, `TURN ENDED`, `SESSION ENDED`, `INTERRUPTED`, or `UNKNOWN` — followed by a dim `·hook` origin marker for fresh lifecycle reports. Below 36 columns the word abbreviates to `wrk`, `req`, `rdy`, `end`, `int`, or `?`. OpenCode uses `·plugin?` because its server plugin may see sessions other than the one displayed in a pane. A pane with a live status also shows how long it's been since that report — `<1m`, `2m`, `1h4m`, and so on — right-aligned at the row's edge, the same way a collapsed window's hidden pane count is shown; it's simply omitted on narrower terminals instead of crowding out the status word. The drawer labels visible-screen request hints **unverified**. A hook report is tied to the pane PID, live agent process PID and start time, and agent session; a stale report becomes **unknown** after 15 minutes. Approval means a request was reported, not that a human still needs to act. Turn ended does not establish task completion.
+
+A collapsed window or session rolls up its descendants' hook-reported agent state into one badge, separate from unread terminal notifications, in priority order: an amber `◆` (`!` in ASCII) with a count means at least one descendant needs input (approval requested or interrupted); otherwise a cyan `▷` (`+` in ASCII) means descendants are working; otherwise a dim `✓` (`d` in ASCII) means descendants finished (ready, turn ended, or session ended). Reports the drawer calls unknown are not counted. This summary appears in both Tree and Agents views, disappears once every affected pane is expanded into view (each pane already carries its own `NEEDS INPUT`/`WORKING` status word there), and is unaffected by clearing unread notifications.
+
+Press `n` from any view to jump straight to the next pane reporting needs-input (approval requested or interrupted), across every session and window, ignoring active Tree filters — the same "search everything" scope `Ctrl-g` already uses. Detection always runs at Agents-view strength, so an agent running under a wrapper shell is found even from the Tree view. Order follows the tree's own natural session/window/pane order; a linked window contributes one entry per session it's linked into. Repeated presses wrap back to the first match after the last, and `n` does nothing when no agent currently needs input.
 
 From the repository root, run `./canopy setup` to choose optional integrations from detected CLIs; enter `detected` to install all found CLIs. `./canopy doctor` checks tmux and shows installed integration states. `./canopy integration status` shows each executable, config path, and installation state. Explicit commands work without a prompt: `./canopy integration install codex claude`, `./canopy integration install gemini --dry-run`, and `./canopy integration uninstall codex`. Add the repository root to `PATH` to use `canopy` without `./`. Python 3 is required for the integration manager and reporters.
 
@@ -474,7 +483,7 @@ Codex CLI can optionally report lifecycle events to the selected pane's agent dr
 
 The reporter stores only bounded status, tool name, optional approval description and command, session/turn identity, pane PID, Codex process PID/start time, and update time in tmux pane options. It never approves, denies, sends input, or changes agent permissions. A `PermissionRequest` appears as **Approval requested (hook report)**: the event does not prove a person must respond, because another reviewer may approve automatically. A matching `PostToolUse`, a new prompt, turn end, interruption, or session end clears that request. A report older than 15 minutes becomes **Unknown (report stale)**. If the pane or Codex process changes, the report is ignored. `Stop` means **Turn ended**, not task finished. Claude Code and Codex without hooks continue to show the unverified screen summary.
 
-Tree and Agents pane rows show compact reported labels such as `[working·hook]` and `[approval·hook]`. In the Agents view, `[process]` means executable detection only. Labels require matching pane and process identities plus a recent hook report; screen hints never become row status. Hook events refresh rows without switching views; a bounded expiry worker refreshes when a report becomes stale. tmux 3.8 and later also monitor pane command changes once per second; tmux 3.7c refreshes on focus changes and Ctrl-r. The drawer shows the report source, request details when available, and unverified screen hints otherwise. On Linux, the Agents view uses an optional Python 3 `/proc` scan; it falls back to `ps` when Python or `/proc` is unavailable.
+Tree and Agents pane rows show a bold colored status word for fresh reports, such as `WORKING` or `NEEDS INPUT`, with a dim `·hook` origin marker; finished/unknown states render dim and unbolded so they recede visually. In the Agents view, `[process]` means executable detection only. Labels require matching pane and process identities plus a recent hook report; screen hints never become row status. Hook events refresh rows without switching views; a bounded expiry worker refreshes when a report becomes stale. tmux 3.8 and later also monitor pane command changes once per second; tmux 3.7c refreshes on focus changes and Ctrl-r. The drawer shows the report source, request details when available, and unverified screen hints otherwise. On Linux, the Agents view uses an optional Python 3 `/proc` scan; it falls back to `ps` when Python or `/proc` is unavailable.
 
 Previews are on-demand snapshots, not continuously polled terminals. Neither preview mode resizes the real application, moves panes, or replaces the sidebar's fzf process. Reopen an already-running sidebar after upgrading to pick up the new no-wrap setting and `Shift-p` binding.
 
@@ -537,6 +546,7 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `lib/content-layout.awk` | Generate checksummed layouts with a fixed full-height dock |
 | `scripts/process-source` | Index one process snapshot and render descendants for all content panes |
 | `scripts/buffer-source` | List native tmux buffers |
+| `scripts/buffer-lib.sh` | Buffer identity tokens and system-clipboard command detection |
 | `scripts/info` | Render session/window/pane metadata in a native popup |
 | `scripts/sidebar` | Own the long-running fzf process and its temporary state |
 | `scripts/tree-source` | Collect one batched, sanitized metadata snapshot |

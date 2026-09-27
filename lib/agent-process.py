@@ -51,7 +51,7 @@ def main():
                 continue
             try:
                 with open(f'{entry.path}/comm', encoding='utf-8') as stream:
-                    name = stream.read().strip()
+                    name = stream.read().strip().removesuffix('.exe')
             except OSError:
                 continue
             if name not in KINDS:
