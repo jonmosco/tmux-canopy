@@ -69,22 +69,14 @@ printf 'Directory: %s\n' "$directory"
 if [[ "$pid" =~ ^[0-9]+$ ]]; then
   # shellcheck disable=SC1091
   source "$(dirname "$0")/../lib/agent-process.sh"
-  agent_option() { tmux show-option -pqv -t "$pane" "@tmux_canopy_agent_$1" 2>/dev/null; }
-  report_source="$(agent_option source)"
-  report_pid="$(agent_option pane_pid)"
-  report_session="$(agent_option session)"
-  report_updated="$(agent_option updated)"
-  report_process="$(agent_option process_pid)"
-  report_birth="$(agent_option process_birth)"
+  format="#{@tmux_canopy_agent_source}$sep#{@tmux_canopy_agent_pane_pid}$sep#{@tmux_canopy_agent_session}$sep#{@tmux_canopy_agent_updated}$sep#{@tmux_canopy_agent_process_pid}$sep#{@tmux_canopy_agent_process_birth}$sep#{@tmux_canopy_agent_status}$sep#{@tmux_canopy_agent_tool}$sep#{@tmux_canopy_agent_summary}$sep#{@tmux_canopy_agent_command}"
+  report_raw="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || report_raw=''
+  IFS="$sep" read -r report_source report_pid report_session report_updated report_process report_birth report_status report_tool report_summary report_command <<< "$report_raw"
   if [[ "$report_source" == "$kind-hook" && "$report_pid" == "$pid" && -n "$report_session" && "$report_updated" =~ ^[0-9]{1,12}$ ]] &&
      canopy_process_identity "$pid" "$report_process" "$report_birth" "$kind"; then
     now="$(date +%s)"
     age=$((now - 10#$report_updated))
     if ((age >= 0 && age <= 900)); then
-      report_status="$(agent_option status)"
-      report_tool="$(agent_option tool)"
-      report_summary="$(agent_option summary)"
-      report_command="$(agent_option command)"
       case "$report_status" in
         ready) label='Ready' ;;
         working) label='Working' ;;

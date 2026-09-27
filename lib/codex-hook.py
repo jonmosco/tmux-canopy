@@ -103,6 +103,31 @@ def process_identity(root, kind="codex"):
     except ValueError:
         return None
     if os.path.isdir("/proc/self"):
+        # Fast path: in normal hook execution, this process is a direct descendant
+        # of the agent and the pane root shell. Walk up parents before scanning /proc.
+        current = os.getppid()
+        chain = []
+        for _ in range(128):
+            if current <= 1:
+                break
+            stat = linux_stat(current)
+            if not stat:
+                break
+            try:
+                with open(f"/proc/{current}/comm", encoding="utf-8") as stream:
+                    pname = stream.read().strip().removesuffix(".exe")
+            except OSError:
+                pname = ""
+            chain.append((current, pname, stat[1]))
+            if current == root:
+                for pid, name, birth in chain:
+                    if name in names:
+                        return pid, str(birth)
+                break
+            if stat[0] <= 0 or stat[0] == current:
+                break
+            current = stat[0]
+
         candidates = []
         try:
             entries = os.scandir("/proc")
