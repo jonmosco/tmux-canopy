@@ -15,7 +15,7 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
-    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top",icon_keys," ")
+    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
     appearance=($35 == "lazygit" ? "lazygit" : "classic")
     agents_enabled=($36 == "on")
@@ -58,6 +58,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
     if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy") agent_process[pid]=name
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
+    else if (name=="agent") agent_process[pid]="cursor-agent"
     next
 }
 function find_agents( pid,current,depth,p,root) {
@@ -279,7 +280,7 @@ function canonical_agent(value) {
     sub(/^.*\//,"",value)
     sub(/\.exe$/,"",value)
     if (value == "claude-code") return "claude"
-    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy") return value
+    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent") return value
     return ""
 }
 function agent_name(kind) {
@@ -290,6 +291,7 @@ function agent_name(kind) {
     if (kind == "pi") return "Pi"
     if (kind == "omp") return "Oh My Pi"
     if (kind == "agy") return "Antigravity"
+    if (kind == "cursor-agent") return "cursor-agent"
     return kind
 }
 # The displayed status word, shared with title_detail()'s width budgeting so
@@ -437,7 +439,7 @@ function appcolor(value, n, parts) {
     if (value ~ /^(npm|npx|git|lazygit|oc|hunk)$/) return icon_red
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
     if (value ~ /^(ssh|codex|top|htop|btop|agy)$/) return icon_cyan
-    if (value ~ /^(pi|omp|opencode)$/) return icon_purple
+    if (value ~ /^(pi|omp|opencode|agent|cursor-agent)$/) return icon_purple
     if (value ~ /^(claude|claude-code)$/) return icon_yellow
     if (value == "gemini") return icon_white
     return icon_neutral
@@ -457,6 +459,7 @@ function app_key(value) {
     if (value == "pi") return "pi"
     if (value == "omp") return "omp"
     if (value == "opencode") return "opencode"
+    if (value == "agent" || value == "cursor-agent") return "agent"
     if (value ~ /^(agy|antigravity)$/) return "antigravity"
     if (value ~ /^(make|cmake|ninja)$/) return "make"
     if (value ~ /^(top|htop|btop)$/) return "top"
@@ -479,7 +482,7 @@ function appicon(value, n, parts,key,override) {
         if (value ~ /^(claude|claude-code)$/) return "✦"
         if (value == "codex") return "◈"
         if (value == "gemini") return "✧"
-        if (value ~ /^(pi|omp|opencode)$/) return "◎"
+        if (value ~ /^(pi|omp|opencode|agent|cursor-agent)$/) return "◎"
         if (value ~ /^(agy|antigravity)$/) return "○"
         if (value ~ /^(make|cmake|ninja)$/) return "✱"
         if (value ~ /^(top|htop|btop)$/) return "▥"
@@ -496,7 +499,7 @@ function appicon(value, n, parts,key,override) {
     if (value ~ /^(claude|claude-code)$/) return "◇"
     if (value == "codex") return "◈"
     if (value == "gemini") return "󰊭"
-    if (value ~ /^(pi|omp|opencode)$/) return "󰚩"
+    if (value ~ /^(pi|omp|opencode|agent|cursor-agent)$/) return "󰚩"
     if (value ~ /^(agy|antigravity)$/) return "󰀘"
     if (value ~ /^(make|cmake|ninja)$/) return ""
     if (value ~ /^(top|htop|btop)$/) return "󰍛"

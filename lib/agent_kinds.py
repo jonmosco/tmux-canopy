@@ -7,10 +7,11 @@ KINDS = {
     'gemini': 'gemini',
     'pi': 'pi', 'omp': 'omp',
     'agy': 'agy',
+    'agent': 'cursor-agent',
 }
 
 NAMES = {
     'codex': 'Codex', 'claude': 'Claude Code', 'opencode': 'OpenCode',
     'gemini': 'Gemini CLI', 'pi': 'Pi', 'omp': 'Oh My Pi',
-    'agy': 'Antigravity',
+    'agy': 'Antigravity', 'cursor-agent': 'cursor-agent',
 }

@@ -13,8 +13,8 @@ CASES = [
     ('node', 93, ''), ('npm', 91, ''), ('python3', 93, ''),
     ('/usr/bin/git', 91, '󰊢'), ('lazygit', 91, '󰊢'),
     ('kubectl', 94, '󱃾'), ('k9s', 94, '󱃾'), ('oc', 91, '󱃾'),
-    ('ssh', 96, '󰢹'), ('pi', 95, '󰚩'), ('claude', 93, '◇'),
-    ('codex', 96, '◈'), ('opencode', 95, '󰚩'), ('btop', 96, '󰍛'),
+    ('ssh', 96, '󰢹'),     ('pi', 95, '󰚩'), ('claude', 93, '◇'),
+    ('codex', 96, '◈'), ('opencode', 95, '󰚩'), ('agent', 95, '󰚩'), ('btop', 96, '󰍛'),
     ('gemini', 97, '󰊭'), ('agy', 96, '󰀘'),
     ('claude.exe', 93, '◇'), ('codex.exe', 96, '◈'), ('agy.exe', 96, '\U000f0018'),
 ]
@@ -22,7 +22,7 @@ UNICODE_ICONS = {
     'nvim': '✎', 'vim': '✎', 'node': '◆', 'npm': '◆',
     'python3': '◉', '/usr/bin/git': '◇', 'lazygit': '◇',
     'kubectl': '✣', 'k9s': '✣', 'oc': '✣', 'ssh': '⇄',
-    'pi': '◎', 'claude': '✦', 'codex': '◈', 'opencode': '◎',
+    'pi': '◎', 'claude': '✦', 'codex': '◈', 'opencode': '◎', 'agent': '◎',
     'btop': '▥', 'gemini': '✧', 'agy': '○',
     'claude.exe': '✦', 'codex.exe': '◈', 'agy.exe': '○',
 }
@@ -66,7 +66,7 @@ def main():
                     assert '\x1b' not in result.stdout
 
                 if theme == 'ansi' and icons == 'nerdfont':
-                    keys = 'nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top'.split()
+                    keys = 'nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top'.split()
                     overrides = {'shell': 'S', 'python': 'P', 'claude': 'C', 'codex': 'none'}
                     records[0].extend([''] * (17 - len(records[0])))
                     records[0].extend(overrides.get(key, '') for key in keys)
