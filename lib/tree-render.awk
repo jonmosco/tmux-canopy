@@ -17,8 +17,8 @@ $1 == "D" {
     custom_s=$6; custom_w=$7; custom_p=$8
     nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
-    appearance=($35 == "lazygit" ? "lazygit" : "classic")
-    agents_enabled=($36 == "on")
+    appearance=($36 == "lazygit" ? "lazygit" : "classic")
+    agents_enabled=($37 == "on")
     if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
@@ -280,6 +280,7 @@ function canonical_agent(value) {
     sub(/^.*\//,"",value)
     sub(/\.exe$/,"",value)
     if (value == "claude-code") return "claude"
+    if (value == "agent") return "cursor-agent"
     if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent") return value
     return ""
 }

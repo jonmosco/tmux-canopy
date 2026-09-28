@@ -90,8 +90,8 @@ def main():
             ('ascii', 'S', 'W'),
         ):
             d = ['D', icons, 'none', 'ansi', 'compact', '', '', '', '%0', '@0', '$0', '42', 'host']
-            d.extend([''] * (34 - len(d)))
-            d.append('lazygit')  # $35 appearance; agents stay unset/$36 empty
+            d.extend([''] * (35 - len(d)))
+            d.append('lazygit')  # $36 appearance; agents stay unset/$37 empty
             records = [
                 d,
                 ['S', '$0', 'test', '0'],
