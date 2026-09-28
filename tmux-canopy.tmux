@@ -39,6 +39,7 @@ notification_sources="$(tmux show-option -gqv @tmux-canopy-notifications)"
 notification_target="$(tmux show-option -gqv @tmux-canopy-notification-target)"
 silence_seconds="$(tmux show-option -gqv @tmux-canopy-silence-seconds)"
 icon_theme="$(tmux show-option -gqv @tmux-canopy-icon-theme)"
+appearance="$(tmux show-option -gqv @tmux-canopy-appearance)"
 resize_mode="$(tmux show-option -gqv @tmux-canopy-resize-mode)"
 width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 
@@ -52,6 +53,7 @@ width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 : "${notification_target:=sidebar}"
 : "${silence_seconds:=30}"
 : "${icon_theme:=auto}"
+: "${appearance:=classic}"
 : "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
 
@@ -83,6 +85,9 @@ fi
 if [[ "$icon_theme" != 'nerdfont' && "$icon_theme" != 'unicode' && "$icon_theme" != 'ascii' ]]; then
   icon_theme=unicode
 fi
+if [[ "$appearance" != 'lazygit' && "$appearance" != 'classic' ]]; then
+  appearance=classic
+fi
 
 sidebar_notification_sources="$notification_sources"
 if [[ "$notification_target" == 'status' ]]; then
@@ -92,6 +97,7 @@ fi
 tmux set-option -gq @tmux_canopy_notifications "$sidebar_notification_sources"
 tmux set-option -gq @tmux_canopy_notification_target "$notification_target"
 tmux set-option -gq @tmux_canopy_icon_theme "$icon_theme"
+tmux set-option -gq @tmux_canopy_appearance "$appearance"
 tmux set-option -gq @tmux_canopy_resize_mode "$resize_mode"
 tmux set-option -gq @tmux_canopy_width_presets "$width_presets"
 
@@ -153,6 +159,7 @@ tmux set-hook -gu 'after-select-window[9002]' 2>/dev/null || true
 tmux set-hook -gu 'after-select-pane[9002]' 2>/dev/null || true
 tmux set-hook -gu 'client-session-changed[9002]' 2>/dev/null || true
 tmux set-hook -gu 'after-kill-pane[9003]' 2>/dev/null || true
+tmux set-hook -gu 'after-split-window[9003]' 2>/dev/null || true
 tmux set-hook -gu 'client-detached[9003]' 2>/dev/null || true
 tmux set-hook -gu 'client-resized[9003]' 2>/dev/null || true
 tmux set-hook -gu 'after-resize-window[9003]' 2>/dev/null || true
@@ -216,6 +223,11 @@ tmux set-hook -g 'window-layout-changed[9005]' \
   "if-shell -F $(tmux_quote "$empty_event") $(tmux_quote "$(plugin_job -b reap-empty)")"
 tmux set-hook -g 'window-unlinked[9005]' "$(plugin_job -b reap-empty)"
 tmux set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
+# Native and Canopy splits must repaint the tree immediately; waiting for a
+# later select-pane leaves the new pane missing until focus moves again.
+# Run synchronously so a slot split still sees the navigation transition guard
+# and skips the reload (background -b can outlive the guard).
+tmux set-hook -g 'after-split-window[9003]' "$(plugin_job '' cleanup refresh)"
 # client_tty may already resolve to a surviving client after a detach.
 tmux set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook_client}')"
 for hook in client-resized after-resize-window; do

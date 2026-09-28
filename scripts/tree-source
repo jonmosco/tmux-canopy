@@ -12,6 +12,8 @@ config="D${sep}#{@tmux_canopy_icon_theme}${sep}#{@tmux_canopy_notifications}${se
 for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top; do
   config+="${sep}$(text "@tmux-canopy-icon-$app")"
 done
+# Appearance before agents so agents remains the final D field for tree-source.
+config+="${sep}#{@tmux_canopy_appearance}"
 config+="${sep}#{@tmux-canopy-agents}"
 sessions="S${sep}#{session_id}${sep}$(text session_name)${sep}#{session_attached}"
 windows="W${sep}#{session_id}${sep}#{window_id}${sep}#{window_index}${sep}$(text window_name)${sep}#{window_linked_sessions}${sep}#{synchronize-panes}${sep}#{@tmux_canopy_notice_activity}${sep}#{@tmux_canopy_notice_bell}${sep}#{@tmux_canopy_notice_silence}"

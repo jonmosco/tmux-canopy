@@ -256,11 +256,15 @@ sidebar_width_expression() {
 }
 
 refresh_sidebars() {
-  local pane
-  while IFS= read -r pane; do
-    if [[ -n "$pane" ]]; then
-      tmux send-keys -t "$pane" C-r 2>/dev/null || true
+  local pane client
+  while IFS=$'\t' read -r pane client; do
+    [[ -n "$pane" ]] || continue
+    # Slot creation during a guarded window transition must not flash a
+    # mid-swap tree reload; the settled focus refresh publishes afterward.
+    if [[ -n "$client" ]] && sidebar_transition_active "$client"; then
+      continue
     fi
-  done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}' 2>/dev/null |
-    awk -F '\t' '$2 == "1" { print $1 }')
+    tmux send-keys -t "$pane" C-r 2>/dev/null || true
+  done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy_client}\t#{@tmux_canopy}' 2>/dev/null |
+    awk -F '\t' '$3 == "1" { print $1 "\t" $2 }')
 }

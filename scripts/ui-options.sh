@@ -41,14 +41,20 @@ sidebar_ui_options() {
   esac
   theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
   [[ "$theme" != mono ]] || fzf_colors='bw'
+  appearance="$(tmux show-option -gqv @tmux_canopy_appearance 2>/dev/null || true)"
+  : "${appearance:=classic}"
+  pointer='›'; prompt='search › '; marker='●'; scrollbar='│'
+  if [[ "$appearance" == lazygit ]]; then
+    pointer='›'; prompt='search › '; marker='●'; scrollbar='│'
+  fi
   # shellcheck disable=SC2034 # Output array consumed by sidebar/preflight.
   SIDEBAR_FZF_ARGS=(
     --ansi --read0 --multi-line --no-wrap --no-hscroll --gap=0 --highlight-line
     --with-shell='/bin/sh -c'
     --color="$fzf_colors" --delimiter=$'\t' --with-nth=2 --nth=1..
     --no-sort --track --id-nth=3 --disabled --layout=reverse --border=none
-    --gutter=' ' --scrollbar='│'
-    --no-input --info=hidden --no-separator --prompt='search › ' --pointer='›' --marker='●' --header-lines=1
+    --gutter=' ' --scrollbar="$scrollbar"
+    --no-input --info=hidden --no-separator --prompt="$prompt" --pointer="$pointer" --marker="$marker" --header-lines=1
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'

@@ -78,6 +78,13 @@ def main():
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'auto')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'classic'
+        tm('set-option', '-g', '@tmux-canopy-appearance', 'lazygit')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'lazygit'
+        tm('set-option', '-g', '@tmux-canopy-appearance', 'nope')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'classic'
         assert 'navigate' in binding('n') and 'toggle' in binding('T')
         assert 'global' in binding('T') and 'slot' in binding('T')
         installed = binding('n')
