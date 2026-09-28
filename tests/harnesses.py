@@ -55,7 +55,8 @@ try:
             result = sp.run([str(ROOT / 'scripts/agent-hook'), kind],
                             input=json.dumps(payload), env=script_env, text=True,
                             capture_output=True, timeout=10)
-            assert result.returncode == 0 and result.stdout == '', result.stderr
+            expected_out = ('{}\n', '{"decision": "allow"}\n') if kind == 'agy' else ('',)
+            assert result.returncode == 0 and result.stdout in expected_out, result.stderr
 
         agent_view = run('tree-source', pane, ['--agents'])
         for name, pane_id in panes.items():
@@ -87,6 +88,14 @@ try:
         assert 'Status: Approval requested' in run('agent-preview', panes['gemini'], ['P:' + panes['gemini']])
 
         event('agy', panes['agy'], {'hook_event_name': 'SessionStart', 'session_id': 'a1'})
+        event('agy', panes['agy'], {'hook_event_name': 'UserPromptSubmit', 'session_id': 'a1'})
+        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], {'hook_event_name': 'PermissionRequest', 'session_id': 'a1',
+                                    'tool_name': 'Bash', 'tool_input': {'command': 'date'}})
+        assert 'Status: Approval requested (hook report)' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], {'hook_event_name': 'PostToolUse', 'session_id': 'a1',
+                                    'tool_name': 'Bash'})
+        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
         event('agy', panes['agy'], {'hook_event_name': 'BeforeAgent', 'session_id': 'a1'})
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
 

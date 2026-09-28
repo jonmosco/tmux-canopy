@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     env["HOME"] = temp
     env["CODEX_HOME"] = str(home / "custom codex")
     env["CLAUDE_CONFIG_DIR"] = str(home / "custom claude")
+    env["AGY_CONFIG_DIR"] = str(home / "custom agy")
     env["PI_CODING_AGENT_DIR"] = str(home / "custom pi")
     env["XDG_CONFIG_HOME"] = str(home / "config")
     env.pop("TMUX", None)
@@ -41,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     before = codex.read_text()
     run(cli, "integration", "install", "codex", "--dry-run", env=env)
     assert codex.read_text() == before
-    installed = run(cli, "integration", "install", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    installed = run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
     assert "set -g @tmux-canopy-agents on" in installed.stdout
     first = codex.read_text()
     data = json.loads(first)
@@ -52,16 +53,16 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert "SubagentStart" in data["hooks"] and "SubagentStop" in data["hooks"]
     codex.write_text(first.replace(str(ROOT), "/previous/install"))
     assert "outdated path" in run(cli, "integration", "status", "codex", env=env).stdout
-    run(cli, "integration", "install", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
     assert codex.read_text() == first
     result = run(cli, "integration", "status", env=env)
-    assert all(f"{kind:9} installed" in result.stdout for kind in ("codex", "claude", "gemini", "pi", "omp", "opencode"))
+    assert all(f"{kind:9} installed" in result.stdout for kind in ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode"))
     plugin = Path(env["XDG_CONFIG_HOME"]) / "opencode/plugins/canopy-agent-state.js"
     plugin.write_text(plugin.read_text() + "\n// user change\n")
     result = run(cli, "integration", "uninstall", "opencode", env=env, ok=False)
     assert result.returncode != 0 and "review it manually" in result.stderr
     plugin.write_text(plugin.read_text().removesuffix("\n// user change\n"))
-    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
     restored = json.loads(codex.read_text())
     assert restored["notify"] == ["user"]
     assert restored["hooks"] == {"Stop": [{"hooks": [{"command": "/usr/bin/other", "type": "command"}]}]}
@@ -84,8 +85,8 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
         if not answer:
             assert json.loads(codex.read_text()) == restored
     status = run(cli, "integration", "status", env=env).stdout
-    assert all(f"{kind:9} installed" in status for kind in ("codex", "claude", "gemini", "pi", "omp", "opencode"))
-    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    assert all(f"{kind:9} installed" in status for kind in ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode"))
+    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
     assert json.loads(codex.read_text()) == restored
     print("ok - dry-run, interactive setup cancellation, all-agent setup and removal")
 
