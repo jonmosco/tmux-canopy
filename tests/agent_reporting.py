@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Lifecycle semantics and the optional normalized agent-report contract."""
 import importlib.util
+import json
+import os
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("canopy_agent_hook", ROOT / "lib" / "agent-hook.py")
@@ -169,5 +172,34 @@ check(state.get("session") == "c2" and state.get("status") == "ready",
 state = harness("cursor-agent")
 send("cursor-agent", {"hook_event_name": "sessionStart", "session_id": "legacy-1"})
 check(state.get("session") == "legacy-1", "cursor-agent session_id fallback")
+
+# main() must decide the Cursor Agent permission response by parsing stdin
+# before any TMUX/pane gating, since Cursor can treat a missing allow as a
+# block. Exercise the real entry point (not hook.report()) as a subprocess.
+AGENT_HOOK = ROOT / "lib" / "agent-hook.py"
+
+
+def run_hook(kind, event, tmux=None, tmux_pane=None):
+    env = dict(os.environ)
+    env.pop("TMUX", None)
+    env.pop("TMUX_PANE", None)
+    if tmux is not None:
+        env["TMUX"] = tmux
+    if tmux_pane is not None:
+        env["TMUX_PANE"] = tmux_pane
+    result = subprocess.run([sys.executable, str(AGENT_HOOK), kind], input=json.dumps(event),
+                             capture_output=True, text=True, env=env, timeout=10)
+    check(result.returncode == 0, f"agent-hook {kind} exits cleanly: {result.stderr}")
+    return result.stdout
+
+
+check(run_hook("cursor-agent", {"hook_event_name": "subagentStart", "conversation_id": "c1"}) ==
+      '{"permission":"allow"}\n',
+      "main() allows cursor-agent subagentStart with TMUX/TMUX_PANE unset")
+check(run_hook("cursor-agent", {"hook_event_name": "subagentStart", "conversation_id": "c1"},
+               tmux="", tmux_pane="not-a-pane") == '{"permission":"allow"}\n',
+      "main() allows cursor-agent subagentStart with invalid TMUX/TMUX_PANE")
+check(run_hook("cursor-agent", {"hook_event_name": "sessionStart", "conversation_id": "c1"}) == '{}\n',
+      "main() prints inert default for other cursor-agent events (e.g. sessionStart)")
 
 print("ok - Gemini, Pi/OMP, OpenCode lifecycle edges and common report contract")

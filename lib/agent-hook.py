@@ -271,51 +271,46 @@ def main():
     response = '{"decision": ""}' if agy_event == 'Stop' else '{}'
     # Cursor Agent requires an explicit allow response for subagentStart (and
     # only that event); every other reply is the inert default below.
+    # Cursor can treat a missing allow as a block, so stdin is read/parsed
+    # (bounded, same as always) and this decision is made before any
+    # TMUX/pane gating below, ensuring every exit path for a subagentStart
+    # event — including missing TMUX or an invalid pane — prints allow.
     cursor_response = '{}'
-    if (kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent') or
-            not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE)):
+
+    def emit():
         if kind == 'agy':
             print(response)
         elif kind == 'cursor-agent':
             print(cursor_response)
-        return
+
     try:
         raw = sys.stdin.buffer.read(131073)
-        if len(raw) > 131072:
-            if kind == 'agy':
-                print(response)
-            elif kind == 'cursor-agent':
-                print(cursor_response)
-            return
-        event = json.loads(raw) if raw.strip() else {}
-        if not isinstance(event, dict):
-            if kind == 'agy':
-                print(response)
-            elif kind == 'cursor-agent':
-                print(cursor_response)
-            return
-        if kind == 'cursor-agent' and event.get('hook_event_name') == 'subagentStart':
-            cursor_response = '{"permission":"allow"}'
+        oversized = len(raw) > 131072
+        event = {} if oversized else (json.loads(raw) if raw.strip() else {})
+    except (OSError, ValueError):
+        oversized, event = False, None
+    if not isinstance(event, dict):
+        emit()
+        return
+    if kind == 'cursor-agent' and event.get('hook_event_name') == 'subagentStart':
+        cursor_response = '{"permission":"allow"}'
+    if (oversized or
+            kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent') or
+            not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE)):
+        emit()
+        return
+    try:
         lock = 'tmux-canopy-agent-' + core.PANE[1:]
         if core.tmux('wait-for', '-L', lock).returncode:
-            if kind == 'agy':
-                print(response)
-            elif kind == 'cursor-agent':
-                print(cursor_response)
+            emit()
             return
         try:
             report(kind, event, agy_event)
         finally:
             core.tmux('wait-for', '-U', lock)
-            if kind == 'agy':
-                print(response)
-            elif kind == 'cursor-agent':
-                print(cursor_response)
+            emit()
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
-        if kind == 'agy':
-            print(response)
-        elif kind == 'cursor-agent':
-            print(cursor_response)
+        emit()
         return
 
 
