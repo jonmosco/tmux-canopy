@@ -87,7 +87,7 @@ For Antigravity, install or update Canopy's adapter from the installation direct
 ./canopy integration status
 ```
 
-The installer adds a named Canopy entry to `~/.gemini/config/hooks.json` and removes older Canopy `agy` hooks from `~/.gemini/antigravity-cli/settings.json`. Restart `agy` inside tmux, check its `/hooks` view, and press `4` in Canopy to see the Agents view. Antigravity's current CLI hooks report working and turn-end state; they do not expose permission requests or subagent start/stop events to Canopy.
+The installer adds a named Canopy entry to `~/.gemini/config/hooks.json` and removes older Canopy `agy` hooks from `~/.gemini/antigravity-cli/settings.json`. Restart `agy` inside tmux, check its `/hooks` view, and press `4` in Canopy to see the Agents view. Antigravity's hooks report active invocations, tool activity, clean turn ends, and interruptions; they do not expose dedicated permission-request or subagent lifecycle events to Canopy.
 
 ### Defaults
 

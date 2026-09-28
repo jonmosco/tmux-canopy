@@ -123,8 +123,8 @@ try:
         hook(request)
         assert 'Status: Turn ended' in report()
         tm('set-option', '-pq', '-t', agent, '@tmux_canopy_agent_updated', '1')
-        assert 'Status: Unknown (report stale)' in report()
-        assert 'UNKNOWN' in tree_row(agent) and '·hook' in tree_row(agent)
+        assert 'last report' in report() and 'Status: Unknown' not in report()
+        assert 'UNKNOWN' not in tree_row(agent) and '·hook' not in tree_row(agent)
         timer = tm('show-option', '-pqv', '-t', agent, '@tmux_canopy_agent_timer')
         result = sp.run([str(ROOT / 'scripts/agent-expiry'), agent, timer],
                         env=script_env, capture_output=True, text=True, timeout=10)

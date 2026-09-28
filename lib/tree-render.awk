@@ -255,7 +255,7 @@ function agent_duration_text(p, age) {
     return int(age/86400) "d"
 }
 # Hook state is displayed only while a matching agent process still belongs to
-# this live pane. Expired reports say unknown; unsupported agents show no state.
+# this live pane. Expired reports clear the row state; unsupported agents show none.
 function agent_label(p, age,status,kind) {
     if (!agents_enabled) return ""
     if (p in agent_labels) return agent_labels[p]
@@ -265,7 +265,7 @@ function agent_label(p, age,status,kind) {
         report_session[p] == "" || pane_pid[p] == "" || report_pid[p] != pane_pid[p] ||
         report_updated[p] !~ /^[0-9]+$/ || length(report_updated[p])>12 || !verified[p]) return ""
     age=now-report_updated[p]
-    if (age<0 || age>900) return agent_labels[p]="unknown"
+    if (age<0 || age>900) return agent_labels[p]="stale"
     status=report_status[p]
     if (status=="working") return agent_labels[p]="working"
     if (status=="needs-input") return agent_labels[p]="approval"
@@ -346,7 +346,7 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
         style=(state == "working" ? bold accent : state == "needs-input" ? bold attention : dim)
         elapsed=sub_age[p,i]
         elapsed=(elapsed<0 ? "" : elapsed<60 ? "<1m" : elapsed<3600 ? int(elapsed/60) "m" : int(elapsed/3600) "h")
-        text=continuation dim (i == n ? branch_end : branch_mid) reset " " sub_type[p,i] " " style subagent_word(state,width<36) reset
+        text=continuation dim (i == n ? branch_end : branch_mid) reset " " sub_type[p,i] (state == "unknown" ? "" : " " style subagent_word(state,width<36) reset)
         lines=lines "\n" edge_count(text,elapsed,width-3)
     }
     return lines
@@ -358,6 +358,7 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
 function agent_badge(p, label,style,origin,word) {
     if (!agents_enabled) return ""
     label=agent_label(p)
+    if (label=="stale") return agent_view ? " " dim "[process]" reset : ""
     if (label=="") return agent_view && agent_kind[p] != "" ? " " dim "[process]" reset : ""
     style=(label=="working" ? accent : label=="approval" || label=="interrupted" ? attention : dim)
     word=agent_status_word(label,width<36)
@@ -413,7 +414,7 @@ function title_detail(p,    value,limit,label) {
     if (value == "") return ""
     limit=width-25-length(command[p])
     label=agent_label(p)
-    if (label!="") limit-=length(agent_status_word(label,width<36))+3
+    if (label!="" && label!="stale") limit-=length(agent_status_word(label,width<36))+3
     if (density == "normal" && width<56 && width>=32)
         limit-=length(pathlabel(p,pw[p],width-16))+3
     if (limit<8) return ""
@@ -678,7 +679,8 @@ END {
                 # Its active content target is necessarily this sole pane.
                 compact_path=(density == "minimal" || width<56 ? "" : " " pathlabel(p,w,width-24))
                 if (p == current_p && s == current_s && wm == " ") wm="●"
-                compact_duration=(agent_label(p) != "" ? agent_duration_text(p) : "")
+                compact_label=agent_label(p)
+                compact_duration=(compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
                 row(wt,edge_count(dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] agent_badge(p) badge dim meta compact_path reset,compact_duration,width-3),wt)
                 continue
             }
@@ -699,7 +701,8 @@ END {
                 visible_ppos++
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p]==1 ? "×" : " ")
                 details=title_detail(p)
-                duration=(agent_label(p) != "" ? agent_duration_text(p) : "")
+                compact_label=agent_label(p)
+                duration=(compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
                 display_command=(agent_view ? agent_name(agent_kind[p]) : command[p])
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
                 prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset

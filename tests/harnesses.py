@@ -96,6 +96,8 @@ try:
         event('agy', panes['agy'], agy | {'toolCall': {'name': 'run_command', 'args': {'CommandLine': 'date'}},
                                           'stepIdx': 1, 'error': ''}, 'PostToolUse')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], agy | {'invocationNum': 0, 'initialNumSteps': 1}, 'PostInvocation')
+        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
         event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
                                           'error': '', 'fullyIdle': False}, 'Stop')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
@@ -104,13 +106,18 @@ try:
         assert 'Status: Turn ended' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
         event('agy', panes['agy'], agy | {'invocationNum': 1, 'initialNumSteps': 4}, 'PreInvocation')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], agy | {'executionNum': 2, 'terminationReason': 'error',
+                                          'error': 'request failed', 'fullyIdle': True}, 'Stop')
+        assert 'Status: Interrupted' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
 
         event('pi', panes['pi'], {'type': 'session_start', 'session_id': 'p1'})
         event('pi', panes['pi'], {'type': 'agent_start', 'session_id': 'p1'})
         event('omp', panes['omp'], {'type': 'session_start', 'session_id': 'o1'})
         event('omp', panes['omp'], {'type': 'agent_end', 'session_id': 'o1'})
 
-        event('opencode', panes['opencode'], {'type': 'session.created', 'properties': {'info': {'id': 'oc1'}}})
+        opencode_dir = tm('display-message', '-p', '-t', panes['opencode'], '#{pane_current_path}')
+        event('opencode', panes['opencode'], {'type': 'session.created', 'properties': {
+            'sessionID': 'oc1', 'info': {'id': 'oc1', 'directory': opencode_dir}}})
         event('opencode', panes['opencode'], {'type': 'session.status', 'properties': {'sessionID': 'oc1',
                                                'status': {'type': 'busy'}}})
         event('opencode', panes['opencode'], {'type': 'permission.asked', 'properties': {'sessionID': 'other'}})
@@ -121,7 +128,8 @@ try:
         assert 'WORKING' in agent_view and '·plugin?' in agent_view and 'TURN ENDED' in agent_view
         tm('set-option', '-pq', '-t', panes['pi'], '@tmux_canopy_agent_updated', '1')
         stale_view = run('tree-source', pane, ['--agents'])
-        assert 'UNKNOWN' in stale_view and '·hook' in stale_view
+        stale_row = next(line for line in stale_view.splitlines() if line.startswith('P:' + panes['pi'] + '\t'))
+        assert 'UNKNOWN' not in stale_row and '·hook' not in stale_row and '[process]' in stale_row
         print('ok - harness rows distinguish process-only, unverified screen, and reported lifecycle states')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

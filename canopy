@@ -180,7 +180,10 @@ def agy_state():
     if actual is not None:
         commands = agy_commands(data)
         if commands and all(is_ours(command, "agy") for command in commands):
-            return "outdated path" if len(commands) == 3 else "partial"
+            current_root = str(ROOT)
+            if not all(current_root in command for command in commands):
+                return "outdated path"
+            return "partial"
         return "modified (review manually)"
     return "legacy install" if has_legacy else "absent"
 
@@ -232,7 +235,8 @@ SELF_TEST_EVENTS = {
                 "notification_type": "ToolPermission"}, "needs-input"),
     "agy": ({"conversationId": "self-test", "invocationNum": 0,
              "initialNumSteps": 0}, "working"),
-    "opencode": ({"type": "permission.asked", "properties": {"sessionID": "self-test"}}, "needs-input"),
+    "opencode": ({"type": "session.created", "properties": {"sessionID": "self-test",
+                  "info": {"id": "self-test", "directory": "/tmp"}}}, "ready"),
     "pi": ({"type": "agent_start", "session_id": "self-test"}, "working"),
     "omp": ({"type": "agent_start", "session_id": "self-test"}, "working"),
 }
@@ -252,6 +256,8 @@ def reporter_self_test():
             output = ""
             if args[:1] == ("display-message",) and args[-1].startswith("#{pane_id}|"):
                 output = "%0|4000|0||\n"
+            elif args[:2] == ("list-panes", "-a"):
+                output = "%0|4000|0||0|/tmp|||||\n"
             # write() chains: set-option -pq -t PANE KEY VALUE ; ...
             for i, arg in enumerate(args[:-5]):
                 if arg == "set-option":
@@ -402,7 +408,7 @@ def show_live_agents():
     for pane, kind, source, updated in agents:
         if source == kind + "-hook" and updated.isdigit():
             age = now - int(updated)
-            note = f"last report {age}s ago" + (" (stale; shown as unknown after 900s)" if age > 900 else "")
+            note = f"last report {age}s ago" + (" (stale; status clears after 900s)" if age > 900 else "")
         else:
             try:
                 state = integration_state(kind)

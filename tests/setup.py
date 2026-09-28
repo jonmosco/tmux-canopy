@@ -61,9 +61,10 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert "SubagentStart" in data["hooks"] and "SubagentStop" in data["hooks"]
     agy_data = json.loads(agy_hooks.read_text())
     agy_block = agy_data["tmux-canopy"]
-    assert set(agy_block) == {"PreInvocation", "PostToolUse", "Stop"}
+    assert set(agy_block) == {"PreInvocation", "PostInvocation", "PostToolUse", "Stop"}
     assert agy_block["PreInvocation"][0]["command"].endswith(" agy PreInvocation")
     assert "hooks" not in agy_block["PreInvocation"][0]
+    assert agy_block["PostInvocation"][0]["command"].endswith(" agy PostInvocation")
     assert agy_block["PostToolUse"][0]["matcher"] == "*"
     assert agy_block["Stop"][0]["command"].endswith(" agy Stop")
     assert agy_data["other-hook"]["Stop"][0]["command"] == "/usr/bin/other"

@@ -1,6 +1,7 @@
 {
   "tmux-canopy": {
     "PreInvocation": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy PreInvocation", "timeout": 3}],
+    "PostInvocation": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy PostInvocation", "timeout": 3}],
     "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy PostToolUse", "timeout": 3}]}],
     "Stop": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy Stop", "timeout": 3}]
   }
