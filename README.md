@@ -78,9 +78,16 @@ Agent awareness is off by default. To show the Agents view, inline status, summa
 set -g @tmux-canopy-agents 'on'
 ```
 
-Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. Use `canopy integration status` to inspect them or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
+Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
-Antigravity's current CLI hooks report working and turn-end state, but do not expose permission requests or subagent start/stop events to Canopy. Reinstall an older Canopy Antigravity integration with `canopy integration install agy` to replace its unsupported hooks.
+For Antigravity, install or update Canopy's adapter from the installation directory:
+
+```bash
+./canopy integration install agy
+./canopy integration status
+```
+
+The installer adds a named Canopy entry to `~/.gemini/config/hooks.json` and removes older Canopy `agy` hooks from `~/.gemini/antigravity-cli/settings.json`. Restart `agy` inside tmux, check its `/hooks` view, and press `4` in Canopy to see the Agents view. Antigravity's current CLI hooks report working and turn-end state; they do not expose permission requests or subagent start/stop events to Canopy.
 
 ### Defaults
 
