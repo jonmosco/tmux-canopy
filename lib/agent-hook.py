@@ -18,24 +18,44 @@ spec.loader.exec_module(core)
 
 
 def normalized(kind, event):
-    name = event.get('hook_event_name') if kind in ('claude', 'gemini', 'agy') else event.get('type')
+    name = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+    if not name:
+        name = event.get('hook_event_name') if kind in ('claude', 'gemini', 'agy') else event.get('type')
+    if not name and kind == 'agy':
+        if 'invocationNum' in event:
+            name = 'PreInvocation'
+        elif 'toolCall' in event:
+            name = 'PreToolUse'
+        elif 'terminationReason' in event:
+            name = 'Stop'
+        elif 'error' in event or 'stepIdx' in event:
+            name = 'PostToolUse'
     if not isinstance(name, str):
         return None
-    if kind == 'claude':
+    if kind in ('claude', 'agy'):
         mapping = {'SessionStart': 'ready', 'UserPromptSubmit': 'working',
+                   'PreInvocation': 'working',
                    'PermissionRequest': 'needs-input', 'Stop': 'turn-ended',
                    'StopFailure': 'interrupted', 'SessionEnd': 'session-ended',
-                   'SubagentStart': 'subagent-start', 'SubagentStop': 'subagent-stop'}
-        if name == 'Notification' and event.get('notification_type') == 'permission_prompt':
+                   'SubagentStart': 'subagent-start', 'SubagentStop': 'subagent-stop',
+                   'BeforeAgent': 'working', 'AfterAgent': 'turn-ended'}
+        if name == 'Notification' and event.get('notification_type') in ('permission_prompt', 'ToolPermission'):
             return 'needs-input', name
-        if name == 'PostToolUse':
+        if name == 'PreToolUse':
+            tool_name = (event.get('toolCall') or {}).get('name') or event.get('tool_name')
+            if tool_name == 'ask_question':
+                return 'needs-input', name
             return 'clear-request', name
-    elif kind in ('gemini', 'agy'):
+        if name in ('PostToolUse', 'AfterTool'):
+            return 'clear-request', name
+    elif kind == 'gemini':
         mapping = {'SessionStart': 'ready', 'BeforeAgent': 'working',
-                   'AfterAgent': 'turn-ended', 'SessionEnd': 'session-ended'}
-        if name == 'Notification' and event.get('notification_type') == 'ToolPermission':
+                   'PermissionRequest': 'needs-input',
+                   'AfterAgent': 'turn-ended', 'SessionEnd': 'session-ended',
+                   'SubagentStart': 'subagent-start', 'SubagentStop': 'subagent-stop'}
+        if name == 'Notification' and event.get('notification_type') in ('ToolPermission', 'permission_prompt'):
             return 'needs-input', name
-        if name == 'AfterTool':
+        if name in ('AfterTool', 'PostToolUse', 'PreToolUse'):
             return 'clear-request', name
     elif kind in ('pi', 'omp'):
         mapping = {'session_start': 'ready', 'agent_start': 'working',
@@ -70,11 +90,13 @@ def session_id(kind, event):
         return core.field(props.get('sessionID') or info.get('id'), 128)
     if kind in ('pi', 'omp'):
         return core.field(event.get('session_id'), 128)
+    if kind == 'agy':
+        return core.field(event.get('conversationId') or event.get('session_id'), 128)
     return core.field(event.get('session_id'), 128)
 
 
 def subagent_id(kind, event):
-    return agent_id(event) if kind == 'claude' else ''
+    return agent_id(event) if kind in ('claude', 'agy', 'gemini') else ''
 
 
 def report(kind, event):
@@ -83,7 +105,7 @@ def report(kind, event):
     if not result or not session:
         return
     state, name = result
-    if kind == 'claude' and name == 'SessionStart' and event.get('source') == 'compact':
+    if kind in ('claude', 'agy') and name == 'SessionStart' and event.get('source') == 'compact':
         return
     meta = core.tmux('display-message', '-p', '-t', core.PANE,
                      '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}')
@@ -103,7 +125,7 @@ def report(kind, event):
         current = {key: '' for key in core.FIELDS}
     # OpenCode server plugins can receive events for other sessions. Once a
     # session is associated with a pane, never accept a different session.
-    start = name in ('SessionStart', 'session_start', 'session.created')
+    start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation')
     if current['session'] and current['session'] != session and not start:
         return
     if current['session'] != session and start:
@@ -120,7 +142,7 @@ def report(kind, event):
         state = 'working'
     elif state == 'clear-request' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent and \
-            (kind not in ('claude', 'gemini', 'agy') or core.field(event.get('tool_name'), 80) == current['tool']):
+            (kind not in ('claude', 'gemini', 'agy') or not current['tool'] or core.field(event.get('tool_name'), 80) == current['tool']):
         state = 'working'
     elif (agent and state != 'needs-input') or state in ('clear-request', 'subagent-start', 'subagent-stop'):
         # Subagent progress leaves the main thread's status and its age alone.
@@ -133,7 +155,10 @@ def report(kind, event):
     values.update(status=state, updated=now, request_agent=agent if state == 'needs-input' else '')
     if state == 'needs-input':
         tool = core.field(event.get('tool_name'), 80)
-        detail = event.get('tool_input') or event.get('details') or {}
+        tool_call = event.get('toolCall') or {}
+        if not tool and isinstance(tool_call, dict):
+            tool = core.field(tool_call.get('name'), 80)
+        detail = event.get('tool_input') or event.get('details') or (tool_call.get('args') if isinstance(tool_call, dict) else {}) or {}
         if not isinstance(detail, dict):
             detail = {}
         props = event.get('properties') or {}
@@ -142,10 +167,11 @@ def report(kind, event):
         values['tool'] = tool
         values['summary'] = (core.field(event.get('message'), 300) or
                              core.field(detail.get('description'), 300) or
+                             core.field(detail.get('Prompt'), 300) or
                              ('Approval requested' if tool else 'Input requested'))
         if agent:
             values['summary'] = core.field(f"{list_field(event.get('agent_type'), 40) or 'Subagent'}: {values['summary']}", 300)
-        values['command'] = core.field(detail.get('command'), 500)
+        values['command'] = core.field(detail.get('command') or detail.get('CommandLine'), 500)
         values['request'] = hashlib.sha256(json.dumps([session, name, tool, detail],
                                                         sort_keys=True, default=str).encode()).hexdigest()[:24]
     else:
@@ -157,23 +183,38 @@ def report(kind, event):
 
 def main():
     kind = sys.argv[1] if len(sys.argv) > 1 else ''
+    is_pre_tool = (len(sys.argv) > 2 and sys.argv[2] == 'PreToolUse')
     if kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy') or not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE):
+        if kind == 'agy':
+            print('{"decision": "allow"}' if is_pre_tool else '{}')
         return
     try:
         raw = sys.stdin.buffer.read(131073)
         if len(raw) > 131072:
+            if kind == 'agy':
+                print('{"decision": "allow"}' if is_pre_tool else '{}')
             return
-        event = json.loads(raw)
+        event = json.loads(raw) if raw.strip() else {}
         if not isinstance(event, dict):
+            if kind == 'agy':
+                print('{"decision": "allow"}' if is_pre_tool else '{}')
             return
+        if not is_pre_tool and 'toolCall' in event:
+            is_pre_tool = True
         lock = 'tmux-canopy-agent-' + core.PANE[1:]
         if core.tmux('wait-for', '-L', lock).returncode:
+            if kind == 'agy':
+                print('{"decision": "allow"}' if is_pre_tool else '{}')
             return
         try:
             report(kind, event)
         finally:
             core.tmux('wait-for', '-U', lock)
+            if kind == 'agy':
+                print('{"decision": "allow"}' if is_pre_tool else '{}')
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
+        if kind == 'agy':
+            print('{"decision": "allow"}' if is_pre_tool else '{}')
         return
 
 

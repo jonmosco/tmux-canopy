@@ -1,10 +1,14 @@
 {
   "hooks": {
-    "SessionStart": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
-    "BeforeAgent": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
-    "Notification": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
-    "AfterTool": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
-    "AfterAgent": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
-    "SessionEnd": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}]
+    "SessionStart": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "PermissionRequest": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "Notification": [{"matcher": "permission_prompt", "hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "PostToolUse": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "StopFailure": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "SessionEnd": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "SubagentStart": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}],
+    "SubagentStop": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3}]}]
   }
 }
