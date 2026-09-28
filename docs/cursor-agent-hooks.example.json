@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {"command": "/absolute/path/to/tmux-canopy/scripts/agent-hook cursor-agent", "timeout": 3}
+    ],
+    "beforeSubmitPrompt": [
+      {"command": "/absolute/path/to/tmux-canopy/scripts/agent-hook cursor-agent", "timeout": 3}
+    ],
+    "stop": [
+      {"command": "/absolute/path/to/tmux-canopy/scripts/agent-hook cursor-agent", "timeout": 3, "loop_limit": null}
+    ],
+    "sessionEnd": [
+      {"command": "/absolute/path/to/tmux-canopy/scripts/agent-hook cursor-agent", "timeout": 3}
+    ],
+    "subagentStart": [
+      {"command": "/absolute/path/to/tmux-canopy/scripts/agent-hook cursor-agent", "timeout": 3}
+    ],
+    "subagentStop": [
+      {"command": "/absolute/path/to/tmux-canopy/scripts/agent-hook cursor-agent", "timeout": 3, "loop_limit": null}
+    ]
+  }
+}
