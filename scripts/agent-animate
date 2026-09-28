@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Bounded WORKING-status animator. Starts only when a tree cache has WORKING,
+# and exits when animation is off, the theme is mono, the sidebar closes, the
+# view leaves Tree/Agents, or no working rows remain.
+set -u
+sidebar="${1:-}"
+token="${2:-}"
+state_file="${3:-}"
+[[ "$sidebar" =~ ^%[0-9]+$ && -n "$token" && -n "$state_file" ]] || exit 0
+cache="${state_file}.animate"
+frame_file="${state_file}.animate.frame"
+frame=0
+printf '%s\n' "$frame" > "$frame_file"
+
+while sleep 0.15; do
+  [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0
+  [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true)" == "$token" ]] || exit 0
+  [[ "$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)" == on ]] || exit 0
+  [[ "$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)" != mono ]] || exit 0
+  view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null || true)"
+  [[ "$view" == tree || "$view" == agents || -z "$view" ]] || exit 0
+  [[ -r "$cache" ]] || exit 0
+  # NUL-framed cache; -a keeps GNU grep from treating it as binary.
+  grep -aEq 'WORKING|wrk' "$cache" 2>/dev/null || exit 0
+  frame=$(( (frame + 1) % 8 ))
+  printf '%s\n' "$frame" > "$frame_file"
+  tmux send-keys -t "$sidebar" C-t 2>/dev/null || exit 0
+done

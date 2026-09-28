@@ -4,6 +4,7 @@
 
 ### Added
 
+- Opt-in `@tmux-canopy-animate` moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
 - `@tmux-canopy-appearance` with `classic` (default) and `lazygit` presets for sidebar chrome, structural glyphs, and tree guides.
 - Tree reload on `after-split-window` so newly created panes appear without waiting for another focus change.
 - TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.

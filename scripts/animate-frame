@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Emit one animated frame from the cached tree snapshot (no tmux rescan).
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+state_file="${TMUX_CANOPY_STATE:-}"
+cache="${state_file}.animate"
+frame_file="${state_file}.animate.frame"
+[[ -n "$state_file" && -r "$cache" ]] || exec "$SCRIPT_DIR/sidebar-source" --stable --read0
+frame=0
+[[ -r "$frame_file" ]] && frame="$(<"$frame_file")"
+[[ "$frame" =~ ^[0-9]+$ ]] || frame=0
+export TMUX_CANOPY_STABLE=1 TMUX_CANOPY_NUL=1
+awk -v frame="$frame" -f "$SCRIPT_DIR/../lib/animate.awk" "$cache"

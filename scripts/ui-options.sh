@@ -13,6 +13,7 @@ sidebar_ui_options() {
   local jump_cmd='"$TMUX_CANOPY_ROOT/scripts/jump-current"'
   local jump_agent_cmd='"$TMUX_CANOPY_ROOT/scripts/jump-agent"'
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
+  local animate_cmd='"$TMUX_CANOPY_ROOT/scripts/animate-frame"'
   local mode_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-mode"'
   preview_mode="$(tmux show-option -gqv @tmux-canopy-preview 2>/dev/null || true)"
   preview_height="$(tmux show-option -gqv @tmux-canopy-preview-height 2>/dev/null || true)"
@@ -65,8 +66,8 @@ sidebar_ui_options() {
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     --bind='load:+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?)'
-    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?)'
+    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
+    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     --bind="g:execute-silent($help_cmd --legend)"
@@ -99,6 +100,7 @@ sidebar_ui_options() {
     --bind="t:execute-silent($action_cmd create-window {1})+reload-sync($source_cmd --stable)"
     --bind="S:execute-silent($action_cmd create-session {1})+reload-sync($source_cmd --stable)"
     --bind="ctrl-r:reload-sync($source_cmd --stable)"
+    --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'
   )
   if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]; then
