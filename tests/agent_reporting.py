@@ -138,4 +138,36 @@ check(state["status"] == "working" and not state["request"], "contract clears re
 send("contract", {"agent": "unknown", "session_id": "x", "state": "working"})
 check(state["session"] == "custom-1", "contract rejects unknown process kind")
 
+# Cursor Agent: conversation_id session key, camelCase events, no needs-input.
+state = harness("cursor-agent")
+send("cursor-agent", {"hook_event_name": "sessionStart", "conversation_id": "c1"})
+check(state.get("status") == "ready" and state.get("session") == "c1", "cursor-agent sessionStart")
+send("cursor-agent", {"hook_event_name": "beforeSubmitPrompt", "conversation_id": "c1"})
+check(state.get("status") == "working", "cursor-agent beforeSubmitPrompt")
+send("cursor-agent", {"hook_event_name": "subagentStart", "conversation_id": "c1",
+                      "subagent_id": "s1", "subagent_type": "explore"})
+check("s1," in state.get("subagents", "") and "explore" in state.get("subagents", ""),
+      f"cursor-agent subagentStart: {state}")
+send("cursor-agent", {"hook_event_name": "subagentStop", "conversation_id": "c1",
+                      "subagent_id": "s1", "subagent_type": "explore"})
+check("s1," not in state.get("subagents", ""), f"cursor-agent subagentStop by id: {state}")
+send("cursor-agent", {"hook_event_name": "subagentStart", "conversation_id": "c1",
+                      "subagent_id": "s2", "subagent_type": "shell"})
+send("cursor-agent", {"hook_event_name": "subagentStop", "conversation_id": "c1",
+                      "subagent_type": "shell"})  # id omitted — unique type fallback
+check("s2," not in state.get("subagents", ""), f"cursor-agent subagentStop by type: {state}")
+send("cursor-agent", {"hook_event_name": "stop", "conversation_id": "c1"})
+check(state.get("status") == "turn-ended", "cursor-agent stop")
+send("cursor-agent", {"hook_event_name": "sessionEnd", "conversation_id": "c1"})
+check(state.get("status") == "session-ended" and not state.get("subagents"),
+      "cursor-agent sessionEnd clears subagents")
+send("cursor-agent", {"hook_event_name": "sessionStart", "conversation_id": "c2"})
+send("cursor-agent", {"hook_event_name": "stop", "conversation_id": "c1"})
+check(state.get("session") == "c2" and state.get("status") == "ready",
+      "late cursor-agent event cannot overwrite new session")
+# session_id fallback when conversation_id absent
+state = harness("cursor-agent")
+send("cursor-agent", {"hook_event_name": "sessionStart", "session_id": "legacy-1"})
+check(state.get("session") == "legacy-1", "cursor-agent session_id fallback")
+
 print("ok - Gemini, Pi/OMP, OpenCode lifecycle edges and common report contract")

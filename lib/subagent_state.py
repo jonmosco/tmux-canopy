@@ -52,6 +52,32 @@ def update_subagent(entries, agent, event, state, now):
         entry[3] = now
 
 
+def cursor_agent_id(event):
+    value = event.get('subagent_id') or event.get('agent_id')
+    return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', value) else ''
+
+
+def with_cursor_subagent_fields(event):
+    """Copy Cursor field names into the Claude-shaped keys update_subagent expects."""
+    out = dict(event)
+    if not out.get('agent_type') and isinstance(out.get('subagent_type'), str):
+        out['agent_type'] = out['subagent_type']
+    return out
+
+
+def resolve_cursor_stop_id(event, current_text):
+    """Prefer subagent_id; else unique live child matching subagent_type."""
+    direct = cursor_agent_id(event)
+    if direct:
+        return direct
+    wanted = list_field(event.get('subagent_type'), 40)
+    if not wanted:
+        return ''
+    matches = [entry[0] for entry in parse_subagents(current_text)
+               if entry[2] != 'done' and entry[1] == wanted]
+    return matches[0] if len(matches) == 1 else ''
+
+
 def next_entries(current, agent, event, state, now):
     # Drop entries left by older versions that retained completed children.
     entries = [entry for entry in parse_subagents(current) if entry[2] != 'done']
