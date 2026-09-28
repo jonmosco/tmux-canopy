@@ -51,7 +51,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     split(process_line,process_field,/[[:space:]]+/)
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
-    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp") agent_process[pid]=name
+    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy") agent_process[pid]=name
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     next
 }
@@ -236,7 +236,7 @@ function canonical_agent(value) {
     sub(/^.*\//,"",value)
     sub(/\.exe$/,"",value)
     if (value == "claude-code") return "claude"
-    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp") return value
+    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy") return value
     return ""
 }
 function agent_name(kind) {
@@ -246,6 +246,7 @@ function agent_name(kind) {
     if (kind == "gemini") return "Gemini CLI"
     if (kind == "pi") return "Pi"
     if (kind == "omp") return "Oh My Pi"
+    if (kind == "agy") return "Antigravity"
     return kind
 }
 # The displayed status word, shared with title_detail()'s width budgeting so
@@ -387,9 +388,9 @@ function appcolor(value, n, parts) {
     sub(/\.exe$/,"",value)
     if (value ~ /^(nvim|vim|vi)$/) return icon_blue
     if (value ~ /^(node|python|python3)$/) return icon_yellow
-    if (value ~ /^(npm|npx|git|lazygit|oc)$/) return icon_red
+    if (value ~ /^(npm|npx|git|lazygit|oc|hunk)$/) return icon_red
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
-    if (value ~ /^(ssh|codex|top|htop|btop)$/) return icon_cyan
+    if (value ~ /^(ssh|codex|top|htop|btop|agy)$/) return icon_cyan
     if (value ~ /^(pi|omp|opencode)$/) return icon_purple
     if (value ~ /^(claude|claude-code)$/) return icon_yellow
     if (value == "gemini") return icon_white
@@ -404,13 +405,15 @@ function appicon(value, n, parts) {
     if (value ~ /^(bash|zsh|fish|sh)$/) return ""
     if (value ~ /^(node|npm|npx)$/) return ""
     if (value ~ /^(python|python3)$/) return ""
-    if (value ~ /^(git|lazygit)$/) return "󰊢"
+    if (value ~ /^(git|lazygit|hunk)$/) return "󰊢"
     if (value == "ssh") return "󰢹"
     if (value ~ /^(kubectl|oc|k9s)$/) return "󱃾"
-    if (value ~ /^(claude|claude-code)$/) return ""
-    if (value == "codex") return ""
+    if (value ~ /^(claude|claude-code)$/) return "󰔑"
+    if (value == "codex") return "󰟷"
     if (value == "gemini") return "󰊭"
     if (value ~ /^(pi|omp|opencode)$/) return "󰚩"
+    if (value ~ /^(agy|antigravity)$/) return "󰊠"
+    if (value ~ /^(make|cmake|ninja)$/) return ""
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
     return pane_icon
 }

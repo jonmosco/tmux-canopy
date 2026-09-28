@@ -72,7 +72,8 @@ canopy_process_identity() {
   return 1
 }
 canopy_agent_name_matches() {
-  case "$2:$1" in
+  local target=${1%.exe}
+  case "$2:$target" in
     codex:codex|claude:claude|claude:claude-code|opencode:opencode|gemini:gemini|pi:pi|omp:omp) return 0 ;;
     *) return 1 ;;
   esac
