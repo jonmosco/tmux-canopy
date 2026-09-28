@@ -44,13 +44,17 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     legacy_agy.parent.mkdir(parents=True)
     legacy_agy.write_text(json.dumps({"theme": "dark", "hooks": {
         "SessionStart": [{"hooks": [{"type": "command", "command": str(ROOT / "scripts" / "agent-hook") + " agy"}]}]}}))
+    cursor = home / ".cursor" / "hooks.json"
+    cursor.parent.mkdir(parents=True)
+    cursor.write_text(json.dumps({"version": 1, "hooks": {
+        "stop": [{"command": "/usr/bin/other-cursor-hook", "timeout": 5}]}}))
 
     cli = str(ROOT / "canopy")
     assert "legacy install" in run(cli, "integration", "status", "agy", env=env).stdout
     before = codex.read_text()
     run(cli, "integration", "install", "codex", "--dry-run", env=env)
     assert codex.read_text() == before
-    installed = run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
+    installed = run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", env=env)
     assert "set -g @tmux-canopy-agents on" in installed.stdout
     first = codex.read_text()
     data = json.loads(first)
@@ -69,18 +73,30 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert agy_block["Stop"][0]["command"].endswith(" agy Stop")
     assert agy_data["other-hook"]["Stop"][0]["command"] == "/usr/bin/other"
     assert json.loads(legacy_agy.read_text()) == {"theme": "dark"}
+    cursor_data = json.loads(cursor.read_text())
+    assert cursor_data["version"] == 1
+    assert cursor_data["hooks"]["stop"][0] == {"command": "/usr/bin/other-cursor-hook", "timeout": 5}
+    cursor_hook_cmd = str(ROOT / "scripts" / "agent-hook") + " cursor-agent"
+    for event in ("sessionStart", "beforeSubmitPrompt", "sessionEnd", "subagentStart"):
+        assert cursor_data["hooks"][event] == [{"command": cursor_hook_cmd, "timeout": 3}]
+    assert cursor_data["hooks"]["stop"][1] == {"command": cursor_hook_cmd, "timeout": 3, "loop_limit": None}
+    assert cursor_data["hooks"]["subagentStop"] == [{"command": cursor_hook_cmd, "timeout": 3, "loop_limit": None}]
     codex.write_text(first.replace(str(ROOT), "/previous/install"))
     assert "outdated path" in run(cli, "integration", "status", "codex", env=env).stdout
-    run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
+    cursor.write_text(cursor.read_text().replace(str(ROOT), "/previous/install"))
+    assert "outdated path" in run(cli, "integration", "status", "cursor-agent", env=env).stdout
+    run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", env=env)
     assert codex.read_text() == first
+    assert cursor.read_text() == json.dumps(cursor_data, indent=2, ensure_ascii=False) + "\n"
     result = run(cli, "integration", "status", env=env)
-    assert all(f"{kind:9} installed" in result.stdout for kind in ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode"))
+    assert all(f"{kind:12} installed" in result.stdout for kind in
+               ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent"))
     plugin = Path(env["XDG_CONFIG_HOME"]) / "opencode/plugins/canopy-agent-state.js"
     plugin.write_text(plugin.read_text() + "\n// user change\n")
     result = run(cli, "integration", "uninstall", "opencode", env=env, ok=False)
     assert result.returncode != 0 and "review it manually" in result.stderr
     plugin.write_text(plugin.read_text().removesuffix("\n// user change\n"))
-    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
+    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", env=env)
     restored = json.loads(codex.read_text())
     assert restored["notify"] == ["user"]
     assert restored["hooks"] == {"Stop": [{"hooks": [{"command": "/usr/bin/other", "type": "command"}]}]}
@@ -90,6 +106,9 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert "other-hook" in json.loads(agy_hooks.read_text())
     assert json.loads(legacy_agy.read_text()) == {"theme": "dark"}
     assert list(codex.parent.glob("hooks.json.canopy-backup-*"))
+    cursor_restored = json.loads(cursor.read_text())
+    assert cursor_restored == {"version": 1, "hooks": {
+        "stop": [{"command": "/usr/bin/other-cursor-hook", "timeout": 5}]}}
     print("ok - integrations install idempotently, preserve unrelated settings, and uninstall only owned entries")
 
     for answer in ("", "all"):
@@ -106,9 +125,11 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
         if not answer:
             assert json.loads(codex.read_text()) == restored
     status = run(cli, "integration", "status", env=env).stdout
-    assert all(f"{kind:9} installed" in status for kind in ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode"))
-    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
+    assert all(f"{kind:12} installed" in status for kind in
+               ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent"))
+    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", env=env)
     assert json.loads(codex.read_text()) == restored
+    assert json.loads(cursor.read_text()) == cursor_restored
     print("ok - dry-run, interactive setup cancellation, all-agent setup and removal")
 
     codex.write_text("{invalid")

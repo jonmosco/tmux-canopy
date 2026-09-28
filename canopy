@@ -14,8 +14,9 @@ from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent
 PLACEHOLDER = "/absolute/path/to/tmux-canopy"
-KINDS = ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode")
-EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "agy": "agy", "pi": "pi", "omp": "omp", "opencode": "opencode"}
+KINDS = ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent")
+EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "agy": "agy", "pi": "pi", "omp": "omp",
+               "opencode": "opencode", "cursor-agent": "agent"}
 TEMPLATES = {
     "codex": "codex-hooks.example.json",
     "claude": "claude-hooks.example.json",
@@ -24,6 +25,7 @@ TEMPLATES = {
     "pi": "pi-canopy.extension.ts",
     "omp": "pi-canopy.extension.ts",
     "opencode": "opencode-canopy.plugin.js",
+    "cursor-agent": "cursor-agent-hooks.example.json",
 }
 
 
@@ -41,6 +43,8 @@ def config_path(kind):
         return Path(os.environ.get("PI_CODING_AGENT_DIR", home / ".pi" / "agent")).expanduser() / "extensions" / "canopy-agent-state.ts"
     if kind == "omp":
         return home / ".omp" / "agent" / "extensions" / "canopy-agent-state.ts"
+    if kind == "cursor-agent":
+        return home / ".cursor" / "hooks.json"
     return Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")).expanduser() / "opencode" / "plugins" / "canopy-agent-state.js"
 
 
@@ -50,7 +54,7 @@ def legacy_agy_path():
 
 def template(kind):
     content = (ROOT / "docs" / TEMPLATES[kind]).read_text()
-    if kind in ("codex", "claude", "gemini", "agy"):
+    if kind in ("codex", "claude", "gemini", "agy", "cursor-agent"):
         return json.loads(content.replace(PLACEHOLDER, shlex.quote(str(ROOT))))
     content = content.replace("'" + PLACEHOLDER + "/scripts/agent-hook'", json.dumps(str(ROOT / "scripts" / "agent-hook")))
     if kind == "omp":
@@ -136,6 +140,44 @@ def remove_hooks(data, kind):
         data.pop("hooks", None)
 
 
+def is_cursor_entry(item, kind):
+    return isinstance(item, dict) and is_ours(item.get("command"), kind)
+
+
+def count_cursor_hooks(data, kind):
+    return sum(1 for groups in data.get("hooks", {}).values() if isinstance(groups, list)
+               for item in groups if is_cursor_entry(item, kind))
+
+
+def merge_cursor_hooks(data, kind):
+    data.setdefault("version", 1)
+    hooks = data.setdefault("hooks", {})
+    for event, entries in template(kind)["hooks"].items():
+        existing = hooks.setdefault(event, [])
+        if not isinstance(existing, list):
+            raise ValueError(f"{event}: expected a hook list")
+        wanted = entries[0]
+        found = False
+        for item in existing:
+            if is_cursor_entry(item, kind):
+                item.clear(); item.update(wanted); found = True; break
+        if not found:
+            existing.append(dict(wanted))
+
+
+def remove_cursor_hooks(data, kind):
+    for event, groups in list(data.get("hooks", {}).items()):
+        if not isinstance(groups, list):
+            continue
+        kept = [item for item in groups if not is_cursor_entry(item, kind)]
+        if kept:
+            data["hooks"][event] = kept
+        else:
+            del data["hooks"][event]
+    if not data.get("hooks"):
+        data.pop("hooks", None)
+
+
 def write_safely(path, content):
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -206,6 +248,17 @@ def integration_state(kind):
         state = ("installed" if len(current) == len(expected) else
                  "outdated path" if len(present) == len(expected) else
                  "partial" if count_hooks(data, kind) else "absent")
+    elif kind == "cursor-agent":
+        data = read_json(path)
+        expected = template(kind)["hooks"]
+        present = [event for event in expected if any(
+            is_cursor_entry(item, kind) for item in data.get("hooks", {}).get(event, []) if isinstance(item, dict))]
+        current = [event for event, entries in expected.items() if any(
+            isinstance(item, dict) and item.get("command") == entries[0]["command"]
+            for item in data.get("hooks", {}).get(event, []))]
+        state = ("installed" if len(current) == len(expected) else
+                 "outdated path" if len(present) == len(expected) else
+                 "partial" if count_cursor_hooks(data, kind) else "absent")
     elif not path.exists():
         state = "absent"
     else:
@@ -215,7 +268,7 @@ def integration_state(kind):
 
 def status(kind):
     available = "found" if shutil.which(EXECUTABLES[kind]) else "not on PATH"
-    return f"{kind:9} {integration_state(kind):26} CLI {available:11} {config_path(kind)}"
+    return f"{kind:12} {integration_state(kind):26} CLI {available:11} {config_path(kind)}"
 
 
 def load_module(name, path):
@@ -239,6 +292,7 @@ SELF_TEST_EVENTS = {
                   "info": {"id": "self-test", "directory": "/tmp"}}}, "ready"),
     "pi": ({"type": "agent_start", "session_id": "self-test"}, "working"),
     "omp": ({"type": "agent_start", "session_id": "self-test"}, "working"),
+    "cursor-agent": ({"hook_event_name": "beforeSubmitPrompt", "conversation_id": "self-test"}, "working"),
 }
 
 
@@ -328,13 +382,13 @@ def change(kind, action, dry_run=False):
     path = config_path(kind)
     if path.is_symlink():
         path = path.resolve()
-    if kind in ("codex", "claude", "gemini"):
+    if kind in ("codex", "claude", "gemini", "cursor-agent"):
         data = read_json(path)
         before = json.dumps(data, sort_keys=True)
         if action == "install":
-            merge_hooks(data, kind)
+            (merge_cursor_hooks if kind == "cursor-agent" else merge_hooks)(data, kind)
         else:
-            remove_hooks(data, kind)
+            (remove_cursor_hooks if kind == "cursor-agent" else remove_hooks)(data, kind)
         after = json.dumps(data, sort_keys=True)
         if before == after:
             print(f"{kind}: already {'installed' if action == 'install' else 'absent'}")
@@ -420,7 +474,7 @@ def show_live_agents():
                     note += "; Codex also requires trusting new hooks via /hooks"
             else:
                 note = f"no report; integration {state} (canopy integration install {kind})"
-        print(f"  {pane:6} {kind:9} {note}")
+        print(f"  {pane:6} {kind:12} {note}")
 
 
 def show_status(kinds):
@@ -429,7 +483,7 @@ def show_status(kinds):
         try:
             print(status(kind))
         except (OSError, ValueError, TypeError) as error:
-            print(f"{kind:9} error: {error}", file=sys.stderr)
+            print(f"{kind:12} error: {error}", file=sys.stderr)
             result = 1
     return result
 
