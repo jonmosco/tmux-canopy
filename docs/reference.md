@@ -276,6 +276,7 @@ set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
 set -g @tmux-canopy-icon-theme 'auto' # Unicode by default; choose nerdfont explicitly
 set -g @tmux-canopy-appearance 'classic' # or 'lazygit'
+set -g @tmux-canopy-animate 'off' # on: moving highlight on WORKING
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
@@ -406,6 +407,14 @@ rounded end branches (`╰─`), cyan fold chevrons, and default session/window 
 (Nerd Font when `@tmux-canopy-icon-theme` is `nerdfont`, otherwise Unicode/`S`/`W` in ASCII).
 Icon theme still controls application glyphs. Close and reopen the sidebar after
 changing appearance; `Ctrl-r` alone does not restyle a running fzf process.
+
+`@tmux-canopy-animate on` (default `off`) adds a moving reverse-video highlight
+band across visible `WORKING` / `wrk` status words while an agent is working.
+Frames come from a cached tree snapshot (~awk only), not a full tmux rescan, at
+about 6–7 updates per second. A short-lived worker starts only when a working
+row is drawn and exits when none remain, the sidebar closes, the view leaves
+Tree/Agents, the theme is `mono`, or the option is off — no permanent ticker.
+Requires agent awareness. Close and reopen the sidebar after enabling it.
 
 `ansi` uses the terminal's standard palette for application icons, active panes,
 notifications, and pending operations; `mono` disables source styling. Density

@@ -85,6 +85,13 @@ def main():
         tm('set-option', '-g', '@tmux-canopy-appearance', 'nope')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'classic'
+        assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'off'
+        tm('set-option', '-g', '@tmux-canopy-animate', 'on')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
+        tm('set-option', '-g', '@tmux-canopy-animate', 'maybe')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'off'
         assert 'navigate' in binding('n') and 'toggle' in binding('T')
         assert 'global' in binding('T') and 'slot' in binding('T')
         installed = binding('n')

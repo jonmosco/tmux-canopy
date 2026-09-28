@@ -54,6 +54,31 @@ source_pid=''
 trap '[[ -z "$source_pid" ]] || kill "$source_pid" 2>/dev/null || true' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
+
+# Cache tree/Agents rows for the opt-in WORKING animator and keep one worker
+# alive only while a working badge is visible.
+schedule_animate() {
+  local sidebar="${TMUX_PANE:-}" token cache
+  [[ "$TMUX_CANOPY_NUL" == 1 && -n "$state_file" && "$sidebar" =~ ^%[0-9]+$ ]] || return 0
+  cache="${state_file}.animate"
+  if [[ "$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)" != on ||
+        "$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)" == mono ]]; then
+    rm -f -- "$cache" "${state_file}.animate.frame"
+    tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+    return 0
+  fi
+  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | grep -aEq 'WORKING|wrk'; then
+    printf '%s\0' "${records[@]}" > "$cache"
+    token="$$.$RANDOM"
+    tmux set-option -p -t "$sidebar" @tmux_canopy_animate_token "$token" 2>/dev/null || true
+    # shellcheck disable=SC2091 # tmux_shell builds a quoted argv for run-shell.
+    tmux run-shell -b "$(tmux_shell "$SCRIPT_DIR/agent-animate" "$sidebar" "$token" "$state_file")" 2>/dev/null || true
+  else
+    rm -f -- "$cache" "${state_file}.animate.frame"
+    tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+  fi
+}
+
 exec {source_fd}< <(render_source 2>/dev/null)
 source_pid=$!
 if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then
@@ -71,6 +96,7 @@ if ((rc == 0)); then
     else printf '%s\n' "${records[@]}"
     fi
   fi
+  schedule_animate
   exit 0
 fi
 sidebar_failure "${TMUX_CANOPY_CLIENT:-}" source "Sidebar data unavailable (source exit $rc). Ctrl-r retries; a opens diagnostics."

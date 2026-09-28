@@ -40,6 +40,7 @@ notification_target="$(tmux show-option -gqv @tmux-canopy-notification-target)"
 silence_seconds="$(tmux show-option -gqv @tmux-canopy-silence-seconds)"
 icon_theme="$(tmux show-option -gqv @tmux-canopy-icon-theme)"
 appearance="$(tmux show-option -gqv @tmux-canopy-appearance)"
+animate="$(tmux show-option -gqv @tmux-canopy-animate)"
 resize_mode="$(tmux show-option -gqv @tmux-canopy-resize-mode)"
 width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 
@@ -54,6 +55,7 @@ width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 : "${silence_seconds:=30}"
 : "${icon_theme:=auto}"
 : "${appearance:=classic}"
+: "${animate:=off}"
 : "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
 
@@ -88,6 +90,9 @@ fi
 if [[ "$appearance" != 'lazygit' && "$appearance" != 'classic' ]]; then
   appearance=classic
 fi
+if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
+  animate=off
+fi
 
 sidebar_notification_sources="$notification_sources"
 if [[ "$notification_target" == 'status' ]]; then
@@ -98,6 +103,7 @@ tmux set-option -gq @tmux_canopy_notifications "$sidebar_notification_sources"
 tmux set-option -gq @tmux_canopy_notification_target "$notification_target"
 tmux set-option -gq @tmux_canopy_icon_theme "$icon_theme"
 tmux set-option -gq @tmux_canopy_appearance "$appearance"
+tmux set-option -gq @tmux_canopy_animate "$animate"
 tmux set-option -gq @tmux_canopy_resize_mode "$resize_mode"
 tmux set-option -gq @tmux_canopy_width_presets "$width_presets"
 

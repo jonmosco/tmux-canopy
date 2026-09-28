@@ -48,16 +48,15 @@ sidebar.
 - [ ] Test stale requests, focus and cancellation, literal response text, duplicate
   submissions, concurrent clients, acknowledgement failures, and narrow terminals.
 
-## Working-state animation (backlog)
+## Working-state animation
 
-- [ ] Animate the **WORKING** status word with a moving highlight band while an
+- [x] Animate the **WORKING** status word with a moving highlight band while an
   agent works, opt-in via `@tmux-canopy-animate`.
-- [ ] Redraw frames from a cached snapshot (awk only, measured ~2–3ms) instead
-  of a full source reload (~60ms), driven by a bounded worker that starts only
-  when a working row is drawn and exits when none remain, the sidebar is not
-  visible, or its pane closes. Target 5–8 frames per second at a few percent of
-  one core.
-- [ ] Keep the no-daemon rule: no ticker without a visible working agent, and
+- [x] Redraw frames from a cached snapshot (awk only) instead of a full source
+  reload, driven by a bounded worker that starts only when a working row is
+  drawn and exits when none remain, the sidebar is not visible, or its pane
+  closes. Target about 6–7 frames per second.
+- [x] Keep the no-daemon rule: no ticker without a visible working agent, and
   static output (and all tests) when the option is off or the theme is `mono`.
 
 ## Switch sidebar side without reopening

@@ -106,6 +106,7 @@ set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-icon-theme 'auto'     # auto (Unicode), unicode, ascii, or nerdfont
 set -g @tmux-canopy-appearance 'classic'  # classic or lazygit
+set -g @tmux-canopy-animate 'off'         # on: WORKING status highlight band
 ```
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
