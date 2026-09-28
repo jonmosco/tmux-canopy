@@ -24,6 +24,7 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     env["CODEX_HOME"] = str(home / "custom codex")
     env["CLAUDE_CONFIG_DIR"] = str(home / "custom claude")
     env["AGY_CONFIG_DIR"] = str(home / "custom agy")
+    env["AGY_HOOKS_PATH"] = str(home / "agy hooks.json")
     env["PI_CODING_AGENT_DIR"] = str(home / "custom pi")
     env["XDG_CONFIG_HOME"] = str(home / "config")
     env.pop("TMUX", None)
@@ -37,8 +38,15 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     claude_target.parent.mkdir(parents=True)
     claude_target.write_text('{"theme": "dark"}\n')
     claude_link.symlink_to(claude_target)
+    agy_hooks = Path(env["AGY_HOOKS_PATH"])
+    agy_hooks.write_text(json.dumps({"other-hook": {"Stop": [{"type": "command", "command": "/usr/bin/other"}]}}))
+    legacy_agy = Path(env["AGY_CONFIG_DIR"]) / "settings.json"
+    legacy_agy.parent.mkdir(parents=True)
+    legacy_agy.write_text(json.dumps({"theme": "dark", "hooks": {
+        "SessionStart": [{"hooks": [{"type": "command", "command": str(ROOT / "scripts" / "agent-hook") + " agy"}]}]}}))
 
     cli = str(ROOT / "canopy")
+    assert "legacy install" in run(cli, "integration", "status", "agy", env=env).stdout
     before = codex.read_text()
     run(cli, "integration", "install", "codex", "--dry-run", env=env)
     assert codex.read_text() == before
@@ -51,6 +59,15 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert any(action["command"] == "/usr/bin/other" for group in data["hooks"]["Stop"] for action in group["hooks"])
     assert str(ROOT / "scripts" / "codex-hook") in first
     assert "SubagentStart" in data["hooks"] and "SubagentStop" in data["hooks"]
+    agy_data = json.loads(agy_hooks.read_text())
+    agy_block = agy_data["tmux-canopy"]
+    assert set(agy_block) == {"PreInvocation", "PostToolUse", "Stop"}
+    assert agy_block["PreInvocation"][0]["command"].endswith(" agy PreInvocation")
+    assert "hooks" not in agy_block["PreInvocation"][0]
+    assert agy_block["PostToolUse"][0]["matcher"] == "*"
+    assert agy_block["Stop"][0]["command"].endswith(" agy Stop")
+    assert agy_data["other-hook"]["Stop"][0]["command"] == "/usr/bin/other"
+    assert json.loads(legacy_agy.read_text()) == {"theme": "dark"}
     codex.write_text(first.replace(str(ROOT), "/previous/install"))
     assert "outdated path" in run(cli, "integration", "status", "codex", env=env).stdout
     run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", env=env)
@@ -68,6 +85,9 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert restored["hooks"] == {"Stop": [{"hooks": [{"command": "/usr/bin/other", "type": "command"}]}]}
     assert claude_link.is_symlink() and json.loads(claude_target.read_text()) == {"theme": "dark"}
     assert not plugin.exists()
+    assert "tmux-canopy" not in json.loads(agy_hooks.read_text())
+    assert "other-hook" in json.loads(agy_hooks.read_text())
+    assert json.loads(legacy_agy.read_text()) == {"theme": "dark"}
     assert list(codex.parent.glob("hooks.json.canopy-backup-*"))
     print("ok - integrations install idempotently, preserve unrelated settings, and uninstall only owned entries")
 

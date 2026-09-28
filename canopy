@@ -36,12 +36,16 @@ def config_path(kind):
     if kind == "gemini":
         return home / ".gemini" / "settings.json"
     if kind == "agy":
-        return Path(os.environ.get("AGY_CONFIG_DIR", home / ".gemini" / "antigravity-cli")).expanduser() / "settings.json"
+        return Path(os.environ.get("AGY_HOOKS_PATH", home / ".gemini" / "config" / "hooks.json")).expanduser()
     if kind == "pi":
         return Path(os.environ.get("PI_CODING_AGENT_DIR", home / ".pi" / "agent")).expanduser() / "extensions" / "canopy-agent-state.ts"
     if kind == "omp":
         return home / ".omp" / "agent" / "extensions" / "canopy-agent-state.ts"
     return Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")).expanduser() / "opencode" / "plugins" / "canopy-agent-state.js"
+
+
+def legacy_agy_path():
+    return Path(os.environ.get("AGY_CONFIG_DIR", Path.home() / ".gemini" / "antigravity-cli")).expanduser() / "settings.json"
 
 
 def template(kind):
@@ -73,8 +77,13 @@ def is_ours(command, kind):
     except ValueError:
         return False
     script = "codex-hook" if kind == "codex" else "agent-hook"
-    expected = 1 if kind == "codex" else 2
-    return len(parts) == expected and parts[0].endswith("/scripts/" + script) and (expected == 1 or parts[1] == kind)
+    if not parts or not parts[0].endswith("/scripts/" + script):
+        return False
+    if kind == "codex":
+        return len(parts) == 1
+    if kind == "agy":
+        return len(parts) in (2, 3) and parts[1] == kind
+    return len(parts) == 2 and parts[1] == kind
 
 
 def count_hooks(data, kind):
@@ -150,9 +159,37 @@ def write_safely(path, content):
             os.unlink(tmp)
 
 
+def agy_commands(data):
+    block = data.get("tmux-canopy", {})
+    if not isinstance(block, dict):
+        return []
+    return [action.get("command") for event, entries in block.items() if isinstance(entries, list)
+            for entry in entries if isinstance(entry, dict)
+            for action in (entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else [entry])
+            if isinstance(action, dict)]
+
+
+def agy_state():
+    data = read_json(config_path("agy"))
+    wanted = template("agy")["tmux-canopy"]
+    actual = data.get("tmux-canopy")
+    legacy = read_json(legacy_agy_path())
+    has_legacy = count_hooks(legacy, "agy") > 0
+    if actual == wanted:
+        return "partial" if has_legacy else "installed"
+    if actual is not None:
+        commands = agy_commands(data)
+        if commands and all(is_ours(command, "agy") for command in commands):
+            return "outdated path" if len(commands) == 3 else "partial"
+        return "modified (review manually)"
+    return "legacy install" if has_legacy else "absent"
+
+
 def integration_state(kind):
     path = config_path(kind)
-    if kind in ("codex", "claude", "gemini", "agy"):
+    if kind == "agy":
+        return agy_state()
+    if kind in ("codex", "claude", "gemini"):
         data = read_json(path)
         expected = template(kind)["hooks"]
         present = [event for event in expected if any(
@@ -193,8 +230,8 @@ SELF_TEST_EVENTS = {
                 "tool_name": "Bash", "tool_input": {"command": "true"}}, "needs-input"),
     "gemini": ({"hook_event_name": "Notification", "session_id": "self-test",
                 "notification_type": "ToolPermission"}, "needs-input"),
-    "agy": ({"hook_event_name": "Notification", "session_id": "self-test",
-             "notification_type": "ToolPermission"}, "needs-input"),
+    "agy": ({"conversationId": "self-test", "invocationNum": 0,
+             "initialNumSteps": 0}, "working"),
     "opencode": ({"type": "permission.asked", "properties": {"sessionID": "self-test"}}, "needs-input"),
     "pi": ({"type": "agent_start", "session_id": "self-test"}, "working"),
     "omp": ({"type": "agent_start", "session_id": "self-test"}, "working"),
@@ -230,7 +267,7 @@ def reporter_self_test():
             if kind == "codex":
                 core.report(event)
             else:
-                hook.report(kind, event)
+                hook.report(kind, event, "PreInvocation" if kind == "agy" else None)
         except Exception as error:  # Any exception here is a silent failure in a real hook.
             failures.append(f"{kind}: {type(error).__name__}: {error}")
             continue
@@ -239,11 +276,53 @@ def reporter_self_test():
     return failures
 
 
+def change_agy(action, dry_run=False):
+    path = config_path("agy")
+    legacy_path = legacy_agy_path()
+    if path.is_symlink():
+        path = path.resolve()
+    if legacy_path.is_symlink():
+        legacy_path = legacy_path.resolve()
+    data = read_json(path)
+    legacy = read_json(legacy_path)
+    original = json.dumps(data, sort_keys=True)
+    legacy_original = json.dumps(legacy, sort_keys=True)
+    existing = data.get("tmux-canopy")
+    if existing is not None:
+        commands = agy_commands(data)
+        if not commands or not all(is_ours(command, "agy") for command in commands):
+            raise ValueError(f"{path}: tmux-canopy hook has unrecognized content; review it manually")
+    if action == "install":
+        data["tmux-canopy"] = template("agy")["tmux-canopy"]
+    else:
+        data.pop("tmux-canopy", None)
+    remove_hooks(legacy, "agy")
+    changed = json.dumps(data, sort_keys=True) != original
+    legacy_changed = json.dumps(legacy, sort_keys=True) != legacy_original
+    if not changed and not legacy_changed:
+        print(f"agy: already {'installed' if action == 'install' else 'absent'}")
+        return
+    if dry_run:
+        if changed:
+            print(f"would {action}: agy -> {path}")
+        if legacy_changed:
+            print(f"would remove legacy agy hooks -> {legacy_path}")
+        return
+    if changed:
+        write_safely(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        print(f"{action}ed: agy -> {path}")
+    if legacy_changed:
+        write_safely(legacy_path, json.dumps(legacy, indent=2, ensure_ascii=False) + "\n")
+        print(f"removed legacy agy hooks: {legacy_path}")
+
+
 def change(kind, action, dry_run=False):
+    if kind == "agy":
+        return change_agy(action, dry_run)
     path = config_path(kind)
     if path.is_symlink():
         path = path.resolve()
-    if kind in ("codex", "claude", "gemini", "agy"):
+    if kind in ("codex", "claude", "gemini"):
         data = read_json(path)
         before = json.dumps(data, sort_keys=True)
         if action == "install":
@@ -397,7 +476,7 @@ def main():
             print(f"{kind}: {error}", file=sys.stderr)
             result = 1
     if args.action == "install" and not args.dry_run and result == 0:
-        print("To show agent and subagent rows, set -g @tmux-canopy-agents on, reload tmux config, and reopen Canopy.")
+        print("To show agent rows, set -g @tmux-canopy-agents on, reload tmux config, and reopen Canopy.")
     return result
 
 

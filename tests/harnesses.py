@@ -50,13 +50,13 @@ try:
             assert result.returncode == 0, (name, result.stderr)
             return result.stdout
 
-        def event(kind, pane_id, payload):
+        def event(kind, pane_id, payload, name=None):
             script_env = env | {'TMUX': tmux_env, 'TMUX_PANE': pane_id}
-            result = sp.run([str(ROOT / 'scripts/agent-hook'), kind],
+            result = sp.run([str(ROOT / 'scripts/agent-hook'), kind, *([name] if name else [])],
                             input=json.dumps(payload), env=script_env, text=True,
                             capture_output=True, timeout=10)
-            expected_out = ('{}\n', '{"decision": "allow"}\n') if kind == 'agy' else ('',)
-            assert result.returncode == 0 and result.stdout in expected_out, result.stderr
+            expected_out = ('{"decision": ""}\n' if name == 'Stop' else '{}\n') if kind == 'agy' else ''
+            assert result.returncode == 0 and result.stdout == expected_out, result.stderr
 
         agent_view = run('tree-source', pane, ['--agents'])
         for name, pane_id in panes.items():
@@ -87,16 +87,22 @@ try:
         event('gemini', panes['gemini'], {'hook_event_name': 'BeforeAgent', 'session_id': 'other'})
         assert 'Status: Approval requested' in run('agent-preview', panes['gemini'], ['P:' + panes['gemini']])
 
-        event('agy', panes['agy'], {'hook_event_name': 'SessionStart', 'session_id': 'a1'})
-        event('agy', panes['agy'], {'hook_event_name': 'UserPromptSubmit', 'session_id': 'a1'})
+        agy = {'conversationId': 'a1', 'workspacePaths': ['/work'],
+               'transcriptPath': '/work/transcript.jsonl', 'modelName': 'gemini'}
+        event('agy', panes['agy'], agy | {'hook_event_name': 'PermissionRequest'}, 'PermissionRequest')
+        assert 'Source: visible terminal text' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], agy | {'invocationNum': 0, 'initialNumSteps': 0}, 'PreInvocation')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
-        event('agy', panes['agy'], {'hook_event_name': 'PermissionRequest', 'session_id': 'a1',
-                                    'tool_name': 'Bash', 'tool_input': {'command': 'date'}})
-        assert 'Status: Approval requested (hook report)' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
-        event('agy', panes['agy'], {'hook_event_name': 'PostToolUse', 'session_id': 'a1',
-                                    'tool_name': 'Bash'})
+        event('agy', panes['agy'], agy | {'toolCall': {'name': 'run_command', 'args': {'CommandLine': 'date'}},
+                                          'stepIdx': 1, 'error': ''}, 'PostToolUse')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
-        event('agy', panes['agy'], {'hook_event_name': 'BeforeAgent', 'session_id': 'a1'})
+        event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
+                                          'error': '', 'fullyIdle': False}, 'Stop')
+        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
+                                          'error': '', 'fullyIdle': True}, 'Stop')
+        assert 'Status: Turn ended' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], agy | {'invocationNum': 1, 'initialNumSteps': 4}, 'PreInvocation')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
 
         event('pi', panes['pi'], {'type': 'session_start', 'session_id': 'p1'})
