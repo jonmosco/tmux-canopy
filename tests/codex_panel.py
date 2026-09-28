@@ -31,6 +31,7 @@ try:
         agent = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'studio', '-x', '120', '-y', '35',
                    '-P', '-F', '#{pane_id}',
                    f"/bin/bash -c 'printf \"Do you want to run this command?\\n\"; exec {binary} 600'")
+        tm('set-option', '-g', '@tmux-canopy-agents', 'on')
         window = tm('display-message', '-p', '-t', agent, '#{window_id}')
         session = tm('display-message', '-p', '-t', agent, '#{session_id}')
         other = tm('new-window', '-d', '-t', 'studio:', '-P', '-F', '#{pane_id}', 'sleep 600')

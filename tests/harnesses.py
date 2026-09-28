@@ -31,6 +31,7 @@ try:
             install_agent_fixture(temp / name)
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '100', '-y', '30',
                   '-P', '-F', '#{pane_id}', str(temp / names[0]) + ' 600')
+        tm('set-option', '-g', '@tmux-canopy-agents', 'on')
         panes = {names[0]: pane}
         for name in names[1:]:
             panes[name] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',

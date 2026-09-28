@@ -22,8 +22,11 @@ render_source() {
     if [[ "$kind" == VIEW ]]; then view="$value"; break; fi
   done < "$state_file"
   if [[ "$view" == agents ]]; then
-    export TMUX_CANOPY_HEADER=1
-    exec "$SCRIPT_DIR/tree-source" --agents
+    if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]; then
+      export TMUX_CANOPY_HEADER=1
+      exec "$SCRIPT_DIR/tree-source" --agents
+    fi
+    view=tree
   fi
   if [[ "$view" != processes && "$view" != buffers ]]; then
     export TMUX_CANOPY_HEADER=1

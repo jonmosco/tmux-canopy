@@ -82,6 +82,23 @@ pane_exists() {
   tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -Fqx -- "$pane_id"
 }
 
+signal_sidebar_group() {
+  local pane_pid="${1:-}"
+  if [[ "$pane_pid" =~ ^[1-9][0-9]*$ ]]; then
+    kill -TERM -- "-$pane_pid" 2>/dev/null || true
+  fi
+}
+
+close_sidebar_pane() {
+  local pane_id="${1:-}" pane_pid
+  [[ "$pane_id" =~ ^%[0-9]+$ ]] || return 1
+  # tmux closes the PTY on kill-pane, but a newly launched fzf can keep its
+  # process group alive without a terminal. Stop the pane's group first.
+  pane_pid="$(tmux display-message -p -t "$pane_id" '#{pane_pid}' 2>/dev/null || true)"
+  signal_sidebar_group "$pane_pid"
+  tmux kill-pane -t "$pane_id"
+}
+
 is_sidebar_pane() {
   local pane_id="${1:-}"
   [[ -n "$pane_id" ]] || return 1

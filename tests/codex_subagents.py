@@ -31,6 +31,7 @@ try:
         install_agent_fixture(temp / 'codex')
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '120', '-y', '30',
                   '-P', '-F', '#{pane_id}', str(temp / 'codex') + ' 600')
+        tm('set-option', '-g', '@tmux-canopy-agents', 'on')
         other = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}', 'sleep 600')
         tmux_env = tm('display-message', '-p', '-t', pane, '#{socket_path},#{pid},0')
         base = env | {'TMUX': tmux_env, 'TMUX_CANOPY_STATE': str(state), 'TMUX_PANE': other}

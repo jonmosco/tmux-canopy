@@ -23,6 +23,7 @@ sidebar_width_expression "$requested" "$minimum" "$maximum" "$min_content"
 
 while IFS='|' read -r sidebar owner restore_zoom; do
   [[ "$sidebar" =~ ^%[0-9]+$ ]] || continue
+  sidebar_pid="$(tmux display-message -p -t "$sidebar" '#{pane_pid}' 2>/dev/null || true)"
   guard="$(sidebar_transition_option "$owner")"
   # Native predicates recheck live geometry/ownership at commit time. A queued
   # terminal-resize worker must not resize or kill a dock mid-navigation.
@@ -37,6 +38,7 @@ while IFS='|' read -r sidebar owner restore_zoom; do
   result="$(tmux if-shell -F -t "$sidebar" "#{&&:#{==:#{@tmux_canopy},1},#{!=:#{$guard},1}}" \
     "run-shell -C -t '$sidebar' \"$quoted_body\"" 2>/dev/null || true)"
   if [[ "$result" == closed ]]; then
+    signal_sidebar_group "$sidebar_pid"
     [[ -n "$owner" ]] && clear_sidebar_cache "$owner"
     if [[ "$restore_zoom" =~ ^%[0-9]+$ ]] && pane_exists "$restore_zoom"; then
       tmux resize-pane -Z -t "$restore_zoom" 2>/dev/null || true

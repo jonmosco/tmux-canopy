@@ -33,7 +33,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - Context-sensitive native action menus for sessions, windows, and panes
 - Window reorder, cross-session link/unlink, layouts, pane rotation, and guarded synchronized input
 - Pane zoom, swap, break-to-window, dead-pane respawn, and object information popups
-- Switchable Tree, pane-attributed Processes, tmux Buffers, and detected Agents views
+- Switchable Tree, pane-attributed Processes, and tmux Buffers views; optional detected Agents view
 - ANSI semantic colors, compact tree guides, width-aware paths, dynamic mode tabs, and adaptive preview
 - Responsive fixed or percentage widths with minimum sidebar/content constraints
 - Staged one-shot mouse resizing and compact/default/wide width presets
@@ -74,7 +74,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 
 | Key | Action |
 |---|---|
-| `1` / `2` / `3` / `4` | Switch to Tree, Processes, Buffers, or Agents view |
+| `1` / `2` / `3` | Switch to Tree, Processes, or Buffers view |
 | `j` / `k` or arrows | Move selection |
 | `h` / Left | Collapse the selected node or pane's window |
 | `l` / Right | Expand the selected session or window |
@@ -83,7 +83,6 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `Enter` | Focus a tree/process target, paste a buffer, or complete move/link placement |
 | `a` | Open the selected object's native action menu |
 | `p` | Toggle the preview drawer on/off without closing the sidebar |
-| `i` | Toggle the drawer between terminal and agent summaries; show it if hidden |
 | `Shift-p` | Open an enlarged read-only preview popup (`q` closes; arrows scroll) |
 | `prefix + Space` | Cycle content layouts while leaving the sidebar fixed |
 | `m` | Mark the selected window or pane as the move source; press again to cancel |
@@ -101,7 +100,6 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `/` | Enter fuzzy-filter mode |
 | `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
-| `n` | Jump to the next agent reporting needs-input, across all sessions and windows |
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
 | `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
@@ -110,6 +108,8 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `prefix + T` | Toggle the sidebar open or closed |
 
 Tree navigation starts in a normal mode so navigation and creation keys remain available. Press `/` before typing a fuzzy query; normal-mode letter bindings are temporarily disabled while filtering. Expanded state lasts for the lifetime of each sidebar process.
+
+With `@tmux-canopy-agents on`, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` toggles the agent summary drawer.
 
 `H` collapses every branch, leaving only session rows; `L` opens every branch again. These commands affect the whole tree, including linked windows, and leave move/link/delete state intact. They do nothing in Processes or Buffers view. While searching, uppercase `H` and `L` are ordinary search text.
 
@@ -203,12 +203,12 @@ Linked window occurrences carry both stable window and session IDs internally, s
 
 ### Views
 
-The same long-running fzf process switches among four sources:
+The same long-running fzf process switches among three built-in sources, plus Agents when enabled:
 
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
 3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste, yank to the system clipboard, or delete.
-4. **Agents** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Pi, or Oh My Pi process. The header summarizes unique agent panes by reported state: `◆` needs input, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. The header shortens the view tabs as needed, then shows the leading state and total (such as `◆2/5`) when space is tight. ASCII uses `!`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. Ctrl-r refreshes the process inventory.
+4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Pi, or Oh My Pi process. The header summarizes unique agent panes by reported state: `◆` needs input, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. The header shortens the view tabs as needed, then shows the leading state and total (such as `◆2/5`) when space is tight. ASCII uses `!`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. Ctrl-r refreshes the process inventory.
 
 Process signals are revalidated immediately before delivery by walking the current parent chain back to the owning `#{pane_pid}`. Stale or reused PIDs are ignored.
 
@@ -443,11 +443,10 @@ notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palett
 index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
 `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
 uses a cyan background. Monochrome mode also disables fzf UI colors. The compact
-header shows `Tree`, `Proc`, `Buff`, and `Agents`, with brackets around the active
-view. The Tree filter follows as `· All`, `· Session`, or `· Unread` (`|` in
+header shows `Tree`, `Proc`, and `Buff`; enabling agent awareness adds `Agents`.
+Brackets mark the active view. The Tree filter follows as `· All`, `· Session`, or `· Unread` (`|` in
 ASCII); `+W` and `+T` mark name filters. Labels shorten when space is tight,
-while the `1`–`4` view
-shortcuts remain in help. Pending `MOVE`, `LINK`, or `DELETE` operations remain
+while the enabled view shortcuts remain in help. Pending `MOVE`, `LINK`, or `DELETE` operations remain
 visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
 hidden. Tree rows use `├─`, `└─`, and `│` guides with colored application icons.
@@ -465,6 +464,8 @@ The **agent summary** is a read-only view for detected Codex, Claude Code, OpenC
 The summary detects a supported agent command in the pane or its process descendants and shows its title and directory. Without an integration, it checks the visible screen for likely approval wording and labels any match **possible input requested (unverified)**. It does not inspect transcripts, agent configuration, or hidden terminal history. Without a supported agent process, the drawer explains that no agent was found.
 
 ### Agent lifecycle adapters
+
+Agent awareness is disabled by default. Set `@tmux-canopy-agents 'on'` before loading Canopy, reload the tmux configuration, then close and reopen existing sidebars. This enables the Agents view, agent process detection, inline status and subagent lines, the summary drawer, `n`/`i`/`4`, and the pane-command monitor where tmux supports it. Setting the option to `off` and reloading removes those UI controls and the monitor. Existing agent integrations remain installed until removed with `canopy integration uninstall`; their reporters may still receive events, but Canopy does not display their state while awareness is off.
 
 Adapters are optional and observational. Agent rows distinguish `[process]` (executable detected) from a colored status word — `WORKING`, `NEEDS INPUT`, `READY`, `TURN ENDED`, `SESSION ENDED`, `INTERRUPTED`, or `UNKNOWN` — followed by a dim `·hook` origin marker for fresh lifecycle reports. Below 36 columns the word abbreviates to `wrk`, `req`, `rdy`, `end`, `int`, or `?`. OpenCode uses `·plugin?` because its server plugin may see sessions other than the one displayed in a pane. A pane with a live status also shows how long it's been since that report — `<1m`, `2m`, `1h4m`, and so on — right-aligned at the row's edge, the same way a collapsed window's hidden pane count is shown; it's simply omitted on narrower terminals instead of crowding out the status word. The drawer labels visible-screen request hints **unverified**. A hook report is tied to the pane PID, live agent process PID and start time, and agent session; a stale report becomes **unknown** after 15 minutes. Approval means a request was reported, not that a human still needs to act. Turn ended does not establish task completion.
 

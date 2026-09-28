@@ -391,6 +391,8 @@ def main():
         except (OSError, ValueError, TypeError) as error:
             print(f"{kind}: {error}", file=sys.stderr)
             result = 1
+    if args.action == "install" and not args.dry_run and result == 0:
+        print("To show agent and subagent rows, set -g @tmux-canopy-agents on, reload tmux config, and reopen Canopy.")
     return result
 
 

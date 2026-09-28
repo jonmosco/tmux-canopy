@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Reload live sidebars without replacing fzf or changing the selected view.
 set -u
+[[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]] || exit 0
 while IFS='|' read -r pane sidebar; do
   [[ $pane == %* && $sidebar == 1 ]] || continue
   tmux send-keys -t "$pane" C-r 2>/dev/null || true

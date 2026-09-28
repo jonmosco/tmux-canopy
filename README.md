@@ -1,6 +1,6 @@
 # tmux-canopy
 
-A persistent sidebar for navigating tmux sessions, windows, panes, processes, and buffers.
+A persistent sidebar for navigating tmux sessions, windows, and panes.
 
 **One tree. One persistent sidebar. Every tmux session.**
 
@@ -21,8 +21,7 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus.
 - Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
-- Agents view detects Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi processes. Its header summarizes panes needing input, working, ready/ended, and without a verified state. `[process]` means detection only.
-- Optional lifecycle adapters for these harnesses show recent reported state as `[state·hook]` and identify stale reports as unknown. Claude Code and Codex subagents appear beneath their parent panes when their hooks are installed. The drawer labels screen-based input hints as unverified.
+- Optional agent awareness adds an Agents view, status labels, a summary drawer, and a jump to panes needing input.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets.
 - One sidebar owned by the client that opened it; no daemon or agent service.
@@ -69,9 +68,17 @@ tmux run-shell "$HOME/.tmux/plugins/tmux-canopy/tmux-canopy.tmux"
 
 Press **prefix + T** to open it. With the default prefix, press **Ctrl-b**, release, then **Shift-t**. The same shortcut closes it.
 
-Run `~/.tmux/plugins/tmux-canopy/canopy doctor` to check requirements and see every active tmux binding, option, and hook Canopy installs. Add the repository root to your `PATH` if you prefer the short `canopy` command. The basic sidebar needs no agent hooks.
+Run `~/.tmux/plugins/tmux-canopy/canopy doctor` to check requirements and see every active tmux binding, option, and hook Canopy installs. Add the repository root to your `PATH` if you prefer the short `canopy` command.
 
-For optional reported agent states, run `~/.tmux/plugins/tmux-canopy/canopy setup` for an interactive list of detected CLIs, or `canopy integration install codex` (also `claude`, `gemini`, `pi`, `omp`, `opencode`). Use `canopy integration status` to inspect them, `canopy integration install codex --dry-run` to preview a change, and `canopy integration uninstall codex` to remove only Canopy's entries. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters) for details.
+### Optional agent awareness
+
+Agent awareness is off by default. To show the Agents view, inline status, summary drawer, and jump control, add this **before** the Canopy `run-shell` line in your tmux configuration:
+
+```tmux
+set -g @tmux-canopy-agents 'on'
+```
+
+Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. Use `canopy integration status` to inspect them or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
 ### Defaults
 
@@ -102,14 +109,12 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `h` / `l` | Collapse / expand |
 | `H` / `L` | Collapse / expand all |
 | `/`, then `Esc` | Search, then clear the search query |
-| `1` / `2` / `3` / `4` | Tree / Processes / Buffers / Agents |
+| `1` / `2` / `3` | Tree / Processes / Buffers |
 | `a` | Actions for the selected object |
 | `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
-| `n` | Jump to the next agent reporting needs-input, across all sessions and windows |
 | `p` / `P` | Toggle preview / open enlarged terminal preview |
-| `i` | Switch the preview drawer between terminal and agent summaries |
 | `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |
 | `?` | Scrollable help popup |
@@ -118,6 +123,8 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 
 Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
 When you leave the sidebar for a content pane, its selection pointer follows the active pane automatically.
+
+With agent awareness enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
 
 The default Tree view uses one active-pane dot, shorter branch prefixes, and
 directory labels that adapt to sidebar width. For the leanest view, set
@@ -141,7 +148,7 @@ This restoration applies to settings first installed by the current version. Whe
 - Closing the sidebar returns its space but may not restore every previous pane proportion.
 - Confirmed deletion has no undo.
 
-Agent awareness and moving an open sidebar between edges are described in the [roadmap](ROADMAP.md).
+Moving an open sidebar between edges and other planned work are described in the [roadmap](ROADMAP.md).
 
 ## Development and release checks
 

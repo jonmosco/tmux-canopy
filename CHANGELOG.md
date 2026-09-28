@@ -29,6 +29,8 @@
 
 ### Changed
 
+- Agent awareness is opt-in through `@tmux-canopy-agents on`; the default sidebar focuses on tmux navigation, processes, and buffers. Agent tabs, controls, labels, scans, and pane-command monitoring are hidden until enabled.
+
 - Show a tmux session glyph instead of the inline dash; retain Unicode, ASCII, and custom-icon fallbacks.
 
 - Bind Codex reports to the live process and refresh expiring reports; accelerate the Agents view process scan on Linux.

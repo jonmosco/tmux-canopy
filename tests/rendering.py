@@ -372,8 +372,10 @@ def main():
 
             tm('select-pane', '-t', sidebar)
             time.sleep(.2)
-            tm('send-keys', '-t', sidebar, 'M-b')
-            assert selection()[1] == pane_identity
+            def linked_selection_ready():
+                tm('send-keys', '-t', sidebar, 'M-b')
+                return selection()[1] == pane_identity
+            wait_for(linked_selection_ready, 'linked pane selection after focus refresh')
             tm('send-keys', '-t', sidebar, 'Enter')
             wait_for(lambda: tm('list-clients', '-F', '#{session_id}|#{pane_id}') == f'{sid_b}|{pane_b}', 'linked pane activation in its displayed session')
             tm('select-pane', '-t', sidebar)
