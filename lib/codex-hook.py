@@ -103,7 +103,7 @@ def process_identity(root, kind="codex"):
     """Find a live agent process in this pane, including nested shells."""
     names = {"codex": {"codex"}, "claude": {"claude", "claude-code"},
              "opencode": {"opencode"}, "gemini": {"gemini"},
-             "pi": {"pi"}, "omp": {"omp"}}.get(kind, set())
+             "pi": {"pi"}, "omp": {"omp"}, "agy": {"agy", "antigravity"}}.get(kind, set())
     if not names:
         return None
     try:

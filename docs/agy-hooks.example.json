@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
+    "BeforeAgent": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
+    "Notification": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
+    "AfterTool": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
+    "AfterAgent": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}],
+    "SessionEnd": [{"hooks": [{"type": "command", "command": "/absolute/path/to/tmux-canopy/scripts/agent-hook agy", "timeout": 3000}]}]
+  }
+}

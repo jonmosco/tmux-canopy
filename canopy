@@ -14,12 +14,13 @@ from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent
 PLACEHOLDER = "/absolute/path/to/tmux-canopy"
-KINDS = ("codex", "claude", "gemini", "pi", "omp", "opencode")
-EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "pi": "pi", "omp": "omp", "opencode": "opencode"}
+KINDS = ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode")
+EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "agy": "agy", "pi": "pi", "omp": "omp", "opencode": "opencode"}
 TEMPLATES = {
     "codex": "codex-hooks.example.json",
     "claude": "claude-hooks.example.json",
     "gemini": "gemini-hooks.example.json",
+    "agy": "agy-hooks.example.json",
     "pi": "pi-canopy.extension.ts",
     "omp": "pi-canopy.extension.ts",
     "opencode": "opencode-canopy.plugin.js",
@@ -34,6 +35,8 @@ def config_path(kind):
         return Path(os.environ.get("CLAUDE_CONFIG_DIR", home / ".claude")).expanduser() / "settings.json"
     if kind == "gemini":
         return home / ".gemini" / "settings.json"
+    if kind == "agy":
+        return Path(os.environ.get("AGY_CONFIG_DIR", home / ".gemini" / "antigravity-cli")).expanduser() / "settings.json"
     if kind == "pi":
         return Path(os.environ.get("PI_CODING_AGENT_DIR", home / ".pi" / "agent")).expanduser() / "extensions" / "canopy-agent-state.ts"
     if kind == "omp":
@@ -43,7 +46,7 @@ def config_path(kind):
 
 def template(kind):
     content = (ROOT / "docs" / TEMPLATES[kind]).read_text()
-    if kind in ("codex", "claude", "gemini"):
+    if kind in ("codex", "claude", "gemini", "agy"):
         return json.loads(content.replace(PLACEHOLDER, shlex.quote(str(ROOT))))
     content = content.replace("'" + PLACEHOLDER + "/scripts/agent-hook'", json.dumps(str(ROOT / "scripts" / "agent-hook")))
     if kind == "omp":
@@ -149,7 +152,7 @@ def write_safely(path, content):
 
 def integration_state(kind):
     path = config_path(kind)
-    if kind in ("codex", "claude", "gemini"):
+    if kind in ("codex", "claude", "gemini", "agy"):
         data = read_json(path)
         expected = template(kind)["hooks"]
         present = [event for event in expected if any(
@@ -190,6 +193,8 @@ SELF_TEST_EVENTS = {
                 "tool_name": "Bash", "tool_input": {"command": "true"}}, "needs-input"),
     "gemini": ({"hook_event_name": "Notification", "session_id": "self-test",
                 "notification_type": "ToolPermission"}, "needs-input"),
+    "agy": ({"hook_event_name": "Notification", "session_id": "self-test",
+             "notification_type": "ToolPermission"}, "needs-input"),
     "opencode": ({"type": "permission.asked", "properties": {"sessionID": "self-test"}}, "needs-input"),
     "pi": ({"type": "agent_start", "session_id": "self-test"}, "working"),
     "omp": ({"type": "agent_start", "session_id": "self-test"}, "working"),
@@ -238,7 +243,7 @@ def change(kind, action, dry_run=False):
     path = config_path(kind)
     if path.is_symlink():
         path = path.resolve()
-    if kind in ("codex", "claude", "gemini"):
+    if kind in ("codex", "claude", "gemini", "agy"):
         data = read_json(path)
         before = json.dumps(data, sort_keys=True)
         if action == "install":
@@ -322,7 +327,7 @@ def show_live_agents():
         else:
             try:
                 state = integration_state(kind)
-            except (OSError, ValueError, TypeError):
+            except (OSError, ValueError, TypeError, KeyError):
                 state = "unreadable"
             if state == "installed":
                 note = "no report yet; hooks load at startup, so restart this agent if it predates the install"
