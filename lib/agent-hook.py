@@ -286,6 +286,8 @@ def main():
     try:
         raw = sys.stdin.buffer.read(131073)
         oversized = len(raw) > 131072
+        # Oversized stdin cannot be parsed into an event, so cursor_response
+        # never leaves its inert '{}' default for this request.
         event = {} if oversized else (json.loads(raw) if raw.strip() else {})
     except (OSError, ValueError):
         oversized, event = False, None
@@ -299,19 +301,26 @@ def main():
             not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE)):
         emit()
         return
+    # Exactly one emit() must run past this point, however report() exits:
+    # a single try/except/finally, followed by one unconditional emit().
     try:
         lock = 'tmux-canopy-agent-' + core.PANE[1:]
-        if core.tmux('wait-for', '-L', lock).returncode:
-            emit()
-            return
-        try:
-            report(kind, event, agy_event)
-        finally:
-            core.tmux('wait-for', '-U', lock)
-            emit()
+        locked = core.tmux('wait-for', '-L', lock).returncode == 0
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
+        locked = False
+    if not locked:
         emit()
         return
+    try:
+        report(kind, event, agy_event)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
+        pass
+    finally:
+        try:
+            core.tmux('wait-for', '-U', lock)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
+            pass
+    emit()
 
 
 if __name__ == '__main__':
