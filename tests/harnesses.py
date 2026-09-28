@@ -138,6 +138,11 @@ try:
         assert 'WORKING' in agent_view and '·plugin?' in agent_view and 'TURN ENDED' in agent_view
         cursor_row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes['agent'] + '\t'))
         assert 'cursor-agent' in cursor_row and 'WORKING' in cursor_row, cursor_row
+        # Tree view (no --agents) must also resolve the raw "agent" process
+        # command to cursor-agent's lifecycle label, not only the process scan.
+        tree_view = run('tree-source', pane)
+        tree_cursor_row = next(line for line in tree_view.splitlines() if line.startswith('P:' + panes['agent'] + '\t'))
+        assert 'WORKING' in tree_cursor_row, tree_cursor_row
         tm('set-option', '-pq', '-t', panes['pi'], '@tmux_canopy_agent_updated', '1')
         stale_view = run('tree-source', pane, ['--agents'])
         stale_row = next(line for line in stale_view.splitlines() if line.startswith('P:' + panes['pi'] + '\t'))
