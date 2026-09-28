@@ -28,15 +28,15 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 
 ## Requirements and support
 
-The tested platform is **Linux**, with:
+Tested on **Linux** and **macOS**, with:
 
 - tmux **3.7c**
 - fzf **0.74.4**
 - Bash **4.4+** (locally tested with 5.3.9)
-- Standard command-line utilities, including awk and procps `ps`
+- Standard command-line utilities, including awk and `ps` (procps or macOS BSD `ps`)
 - `less` for the optional enlarged preview
 
-Startup checks tmux capabilities and fzf options before splitting an application pane. Older tmux/fzf versions and macOS are not currently part of the tested support matrix. The default Unicode icons are command-specific and do not require a Nerd Font. Set the `nerdfont` icon theme for additional app glyphs after enabling a Nerd Font in your terminal; use `ascii` if Unicode glyphs are missing.
+Startup checks tmux capabilities and fzf options before splitting an application pane. Older tmux/fzf versions are not currently part of the tested support matrix. The default Unicode icons are command-specific and do not require a Nerd Font. Set the `nerdfont` icon theme for additional app glyphs after enabling a Nerd Font in your terminal; use `ascii` if Unicode glyphs are missing.
 
 ## Install
 
@@ -78,7 +78,7 @@ Agent awareness is off by default. To show the Agents view, inline status, summa
 set -g @tmux-canopy-agents 'on'
 ```
 
-Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. Use `canopy integration status` to inspect them or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
+Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. Use `canopy integration status` to inspect them or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
 ### Defaults
 
