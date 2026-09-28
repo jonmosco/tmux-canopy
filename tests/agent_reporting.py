@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Lifecycle semantics and the optional normalized agent-report contract."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -201,5 +203,58 @@ check(run_hook("cursor-agent", {"hook_event_name": "subagentStart", "conversatio
       "main() allows cursor-agent subagentStart with invalid TMUX/TMUX_PANE")
 check(run_hook("cursor-agent", {"hook_event_name": "sessionStart", "conversation_id": "c1"}) == '{}\n',
       "main() prints inert default for other cursor-agent events (e.g. sessionStart)")
+
+
+class FakeStdin:
+    def __init__(self, data):
+        self.buffer = io.BytesIO(data)
+
+
+def call_main_with_failing_report(kind, event):
+    """Exercise the real hook.main() in-process with a stubbed report() that
+    raises, and a stubbed core.tmux() that simulates a successful lock
+    acquire/release without touching a real tmux server. Regression check
+    for the double-emit bug: report() raising must still yield exactly one
+    emit()."""
+    original_report, original_tmux, original_pane = hook.report, core.tmux, core.PANE
+    original_argv, original_stdin = sys.argv, sys.stdin
+    original_tmux_env, original_pane_env = os.environ.get("TMUX"), os.environ.get("TMUX_PANE")
+
+    def failing_report(*args, **kwargs):
+        raise ValueError("forced failure for double-emit regression test")
+
+    def fake_tmux(*args):
+        returncode = 0 if args[:1] == ("wait-for",) else 1
+        return subprocess.CompletedProcess(args, returncode, "", "")
+
+    hook.report = failing_report
+    core.tmux = fake_tmux
+    core.PANE = "%4"
+    os.environ["TMUX"] = "real"
+    os.environ.pop("TMUX_PANE", None)
+    sys.argv = ["agent-hook.py", kind]
+    sys.stdin = FakeStdin(json.dumps(event).encode())
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            hook.main()
+    finally:
+        hook.report, core.tmux, core.PANE = original_report, original_tmux, original_pane
+        sys.argv, sys.stdin = original_argv, original_stdin
+        if original_tmux_env is None:
+            os.environ.pop("TMUX", None)
+        else:
+            os.environ["TMUX"] = original_tmux_env
+        if original_pane_env is None:
+            os.environ.pop("TMUX_PANE", None)
+        else:
+            os.environ["TMUX_PANE"] = original_pane_env
+    return buf.getvalue()
+
+
+output = call_main_with_failing_report(
+    "cursor-agent", {"hook_event_name": "subagentStart", "conversation_id": "c1"})
+check(output == '{"permission":"allow"}\n',
+      f"main() emits exactly one line when report() raises: {output!r}")
 
 print("ok - Gemini, Pi/OMP, OpenCode lifecycle edges and common report contract")
