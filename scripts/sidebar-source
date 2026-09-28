@@ -61,6 +61,11 @@ schedule_animate() {
   local sidebar="${TMUX_PANE:-}" token cache
   [[ "$TMUX_CANOPY_NUL" == 1 && -n "$state_file" && "$sidebar" =~ ^%[0-9]+$ ]] || return 0
   cache="${state_file}.animate"
+  if ! command -v perl >/dev/null 2>&1; then
+    rm -f -- "$cache" "${state_file}.animate.frame"
+    tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+    return 0
+  fi
   if [[ "$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)" != on ||
         "$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)" == mono ]]; then
     rm -f -- "$cache" "${state_file}.animate.frame"
