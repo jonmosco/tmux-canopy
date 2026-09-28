@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from agent_kinds import process_name
 from subagent_state import agent_id, list_field, next_entries
 
 SEP = "\x1f"
@@ -122,12 +123,7 @@ def process_identity(root, kind="codex"):
             stat = linux_stat(current)
             if not stat:
                 break
-            try:
-                with open(f"/proc/{current}/comm", encoding="utf-8") as stream:
-                    pname = stream.read().strip().removesuffix(".exe")
-            except OSError:
-                pname = ""
-            chain.append((current, pname, stat[1]))
+            chain.append((current, process_name(current), stat[1]))
             if current == root:
                 for pid, name, birth in chain:
                     if name in names:
@@ -146,11 +142,7 @@ def process_identity(root, kind="codex"):
             for entry in entries:
                 if not entry.name.isdigit():
                     continue
-                try:
-                    with open(f"{entry.path}/comm", encoding="utf-8") as stream:
-                        if stream.read().strip().removesuffix(".exe") not in names:
-                            continue
-                except OSError:
+                if process_name(entry.name) not in names:
                     continue
                 pid = int(entry.name)
                 stat = linux_stat(pid)
@@ -158,8 +150,9 @@ def process_identity(root, kind="codex"):
                     candidates.append((pid, stat[1]))
         stat_for = linux_stat
     else:
+        # args= exposes argv0 for Node CLIs whose comm is a thread name.
         try:
-            records = subprocess.run(("ps", "-eo", "pid=,ppid=,comm="), text=True,
+            records = subprocess.run(("ps", "-eo", "pid=,ppid=,args="), text=True,
                                      capture_output=True, timeout=3, check=False).stdout.splitlines()
         except (OSError, subprocess.TimeoutExpired):
             return None
@@ -169,7 +162,8 @@ def process_identity(root, kind="codex"):
             fields = line.split(None, 2)
             if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
                 parents[int(fields[0])] = int(fields[1])
-                if os.path.basename(fields[2]).removesuffix(".exe") in names:
+                argv0 = fields[2].split(None, 1)[0]
+                if os.path.basename(argv0).removesuffix(".exe") in names:
                     candidates.append((int(fields[0]), ""))
         def stat_for(pid):
             return (parents[pid], "") if pid in parents else None
