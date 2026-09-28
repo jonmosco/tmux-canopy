@@ -80,6 +80,8 @@ set -g @tmux-canopy-agents 'on'
 
 Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. Use `canopy integration status` to inspect them or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
+Antigravity's current CLI hooks report working and turn-end state, but do not expose permission requests or subagent start/stop events to Canopy. Reinstall an older Canopy Antigravity integration with `canopy integration install agy` to replace its unsupported hooks.
+
 ### Defaults
 
 Canopy opens on the **left**, follows its client across windows and sessions, and uses stable slots to keep application geometry steady when revisiting windows. It starts at 42 columns. Mouse resizing is live, with no fixed maximum; at least 40 columns are reserved for content.

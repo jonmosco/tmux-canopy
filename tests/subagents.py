@@ -164,39 +164,5 @@ try:
         assert len(option('subagents').split(';')) == 1
         print('ok - subagent fields are sanitized and malformed ids are ignored')
 
-        # agy subagents follow identical behavior to claude
-        install_agent_fixture(temp / 'agy')
-        agy_pane = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
-                      str(temp / 'agy') + ' 600')
-
-        def agy_event(payload):
-            result = sp.run([str(ROOT / 'scripts/agent-hook'), 'agy'], input=json.dumps(payload),
-                            env=base | {'TMUX_PANE': agy_pane}, text=True, capture_output=True, timeout=10)
-            assert result.returncode == 0 and result.stdout in ('{}\n', '{"decision": "allow"}\n'), result.stderr
-
-        agy_session = {'session_id': 'agy-main'}
-        agy_event(agy_session | {'hook_event_name': 'SessionStart'})
-        agy_event(agy_session | {'hook_event_name': 'UserPromptSubmit'})
-        agy_event(agy_session | {'hook_event_name': 'SubagentStart', 'agent_id': 'ag1', 'agent_type': 'Research'})
-        lines = rows()['P:' + agy_pane].split('\n')
-        assert any('Research' in line and 'WORKING' in line for line in lines[1:]), lines
-
-        agy_event(agy_session | {'hook_event_name': 'PermissionRequest', 'agent_id': 'ag1',
-                                'agent_type': 'Research', 'tool_name': 'Bash'})
-        lines = rows('--agents')['P:' + agy_pane].split('\n')
-        assert any('Research' in line and 'NEEDS INPUT' in line for line in lines[1:]), lines
-        assert tm('display-message', '-p', '-t', agy_pane, '#{@tmux_canopy_agent_status}') == 'needs-input'
-
-        agy_event(agy_session | {'hook_event_name': 'PostToolUse', 'agent_id': 'ag1',
-                                'agent_type': 'Research', 'tool_name': 'Bash'})
-        assert tm('display-message', '-p', '-t', agy_pane, '#{@tmux_canopy_agent_status}') == 'working'
-
-        agy_event(agy_session | {'hook_event_name': 'SubagentStop', 'agent_id': 'ag1', 'agent_type': 'Research'})
-        lines = rows()['P:' + agy_pane].split('\n')
-        assert not any('Research' in line for line in lines[1:]), lines
-
-        agy_event(agy_session | {'hook_event_name': 'Stop'})
-        assert tm('display-message', '-p', '-t', agy_pane, '#{@tmux_canopy_agent_status}') == 'turn-ended'
-        print('ok - agy subagent behavior matches claude identically')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)
