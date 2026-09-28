@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def animate(text, frame):
     record = f'P:%1\t{text}\tP:%1:$0\0'
     result = sp.run(
-        ['awk', '-v', f'frame={frame}', '-f', str(ROOT / 'lib/animate.awk')],
+        ['perl', str(ROOT / 'lib/animate.pl'), str(frame)],
         input=record, text=True, capture_output=True, check=True,
     )
     assert result.stdout.endswith('\0'), repr(result.stdout)
@@ -21,18 +21,28 @@ def animate(text, frame):
 
 def main():
     word = '\x1b[1m\x1b[1;36mWORKING\x1b[0m\x1b[2m ·hook\x1b[0m'
-    frames = [animate(f'codex {word}', frame) for frame in range(8)]
+    frames = [animate(f'codex {word}', frame) for frame in range(11)]
     assert all('WORKING' in re.sub(r'\x1b\[[0-9;]*m', '', frame) for frame in frames)
     assert any('\x1b[7m' in frame for frame in frames), frames
     assert len(set(frames)) > 1, frames
-    # Band moves: first and later frames differ inside WORKING.
+    # The band reaches the far end, reverses, and returns to the first frame.
     assert frames[0] != frames[3]
+    assert frames[1] == frames[9] and frames[0] == frames[10], frames
+    assert frames[5] != frames[6], frames
 
     narrow = animate('claude \x1b[1m\x1b[1;36mwrk\x1b[0m\x1b[2m ·hook\x1b[0m', 1)
     assert '\x1b[7m' in narrow and 'wrk' in re.sub(r'\x1b\[[0-9;]*m', '', narrow)
 
     plain = animate('just a shell row', 2)
     assert plain == 'just a shell row'
+
+    multi = f'P:%1\tcodex {word}\tP:%1:$0\0P:%2\tshell\tP:%2:$0\0'
+    result = sp.run(
+        ['perl', str(ROOT / 'lib/animate.pl'), '1'],
+        input=multi, text=True, capture_output=True, check=True,
+    )
+    assert result.stdout.count('\0') == 2, repr(result.stdout)
+    assert result.stdout.endswith('\0') and 'P:%2\tshell\tP:%2:$0\0' in result.stdout
 
     with tempfile.TemporaryDirectory(prefix='canopy-animate-frame-') as directory:
         state = Path(directory) / 'state'

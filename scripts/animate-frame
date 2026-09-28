@@ -10,4 +10,8 @@ frame=0
 [[ -r "$frame_file" ]] && frame="$(<"$frame_file")"
 [[ "$frame" =~ ^[0-9]+$ ]] || frame=0
 export TMUX_CANOPY_STABLE=1 TMUX_CANOPY_NUL=1
-awk -v frame="$frame" -f "$SCRIPT_DIR/../lib/animate.awk" "$cache"
+if ! command -v perl >/dev/null 2>&1; then
+  cat "$cache"
+  exit 0
+fi
+exec perl "$SCRIPT_DIR/../lib/animate.pl" "$frame" < "$cache"
