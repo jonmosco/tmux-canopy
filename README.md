@@ -78,7 +78,7 @@ Agent awareness is off by default. To show the Agents view, inline status, summa
 set -g @tmux-canopy-agents 'on'
 ```
 
-Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, and Oh My Pi. `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
+Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, Oh My Pi, and Cursor Agent (`agent`, shown as `cursor-agent` in the Agents view). `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`, `cursor-agent`). Adapters show `[state·hook]`; Claude Code and Codex adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
 For Antigravity, install or update Canopy's adapter from the installation directory:
 
