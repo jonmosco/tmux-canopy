@@ -9,6 +9,8 @@ import re
 import subprocess
 import sys
 import time
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from subagent_state import agent_id, list_field, next_entries
 
 spec = importlib.util.spec_from_file_location('canopy_codex_hook', Path(__file__).with_name('codex-hook.py'))
 core = importlib.util.module_from_spec(spec)
@@ -71,63 +73,8 @@ def session_id(kind, event):
     return core.field(event.get('session_id'), 128)
 
 
-# Claude Code subagents share their parent's session and pane; events fired
-# inside one carry agent_id/agent_type. They are kept as a small list on the
-# parent pane: id,type,status,updated,tool entries joined by ';'.
-MAX_SUBAGENTS = 8
-SUBAGENT_STATES = ('working', 'needs-input', 'done')
-# Claude Code delivers a background subagent's result as a new turn, so a
-# finished subagent is kept this long before a new prompt may drop it.
-SUBAGENT_DONE_GRACE = 30
-
-
 def subagent_id(kind, event):
-    value = event.get('agent_id') if kind == 'claude' else None
-    return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', value) else ''
-
-
-def list_field(value, limit):
-    return re.sub(r'[;,]', ' ', core.field(value, limit)).strip()
-
-
-def parse_subagents(text):
-    entries = []
-    for item in text.split(';'):
-        parts = item.split(',')
-        if (len(parts) == 5 and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', parts[0]) and
-                parts[2] in SUBAGENT_STATES and parts[3].isdigit()):
-            entries.append(parts)
-    return entries
-
-
-def format_subagents(entries):
-    # Past the cap, forget finished subagents first, then the oldest.
-    while len(entries) > MAX_SUBAGENTS:
-        finished = [entry for entry in entries if entry[2] == 'done']
-        entries.remove(finished[0] if finished else entries[0])
-    return ';'.join(','.join(entry) for entry in entries)
-
-
-def update_subagent(entries, agent, event, state, now):
-    entry = next((item for item in entries if item[0] == agent), None)
-    if entry is None:
-        if state == 'subagent-stop':
-            return
-        entry = [agent, 'subagent', 'working', now, '']
-        entries.append(entry)
-    before = entry[:]
-    entry[1] = list_field(event.get('agent_type'), 40) or entry[1]
-    tool = list_field(event.get('tool_name'), 80)
-    if state in ('subagent-stop', 'turn-ended'):
-        entry[2], entry[4] = 'done', ''
-    elif state == 'needs-input':
-        entry[2], entry[4] = 'needs-input', tool
-    elif state == 'clear-request' and entry[2] == 'needs-input' and entry[4] == tool:
-        entry[2], entry[4] = 'working', ''
-    # Routine tool calls only refresh a minute-old timestamp, so a busy
-    # subagent does not redraw the sidebar on every tool call.
-    if entry != before or int(now) - int(entry[3]) >= 60:
-        entry[3] = now
+    return agent_id(event) if kind == 'claude' else ''
 
 
 def report(kind, event):
@@ -163,22 +110,15 @@ def report(kind, event):
         current = {key: '' for key in core.FIELDS}
     now = str(int(time.time()))
     agent = subagent_id(kind, event)
-    subagents = parse_subagents(current['subagents'])
-    if agent:
-        update_subagent(subagents, agent, event, state, now)
-    elif state == 'working':
-        # A new prompt starts a new turn: subagents that finished a while ago
-        # are dropped, recently finished and still running ones stay.
-        subagents = [entry for entry in subagents if entry[2] != 'done' or
-                     int(now) - int(entry[3]) < SUBAGENT_DONE_GRACE]
-    elif state == 'session-ended':
-        subagents = []
     values = dict(current)
     values.update(source=kind + '-hook', session=session, pane_pid=pid,
                   process_pid=process_pid, process_birth=process_birth,
-                  subagents=format_subagents(subagents))
+                  subagents=next_entries(current['subagents'], agent, event, state, now))
     # Only a request's own agent (or the main thread) can clear it.
-    if state == 'clear-request' and current['status'] == 'needs-input' and \
+    if state == 'subagent-stop' and current['status'] == 'needs-input' and \
+            current['request_agent'] == agent:
+        state = 'working'
+    elif state == 'clear-request' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent and \
             (kind not in ('claude', 'gemini') or core.field(event.get('tool_name'), 80) == current['tool']):
         state = 'working'

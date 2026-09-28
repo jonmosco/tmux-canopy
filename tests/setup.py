@@ -48,6 +48,7 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert claude_link.is_symlink() and json.loads(claude_target.read_text())["theme"] == "dark"
     assert any(action["command"] == "/usr/bin/other" for group in data["hooks"]["Stop"] for action in group["hooks"])
     assert str(ROOT / "scripts" / "codex-hook") in first
+    assert "SubagentStart" in data["hooks"] and "SubagentStop" in data["hooks"]
     codex.write_text(first.replace(str(ROOT), "/previous/install"))
     assert "outdated path" in run(cli, "integration", "status", "codex", env=env).stdout
     run(cli, "integration", "install", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)

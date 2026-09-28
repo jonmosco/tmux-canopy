@@ -107,7 +107,7 @@ legend_records() {
   legend_item '● green' 'Current content pane. On a folded branch, the dot moves to its window or session.' green
   legend_item 'bold name' 'Current session or window.'
   legend_item '▾ / ▸' 'Expanded / collapsed session or window.'
-  legend_item 'session icon' 'A tmux session. Nerd Font uses the tmux glyph; Unicode and ASCII use ◈ and S.' dim
+  note 'Session and window names use the tree guides; they have no default icon.'
   legend_item '├─ └─ │' 'Tree guides show which pane belongs to which window and session.' dim
   legend_item '1:dotfiles' 'Tmux window index and name.'
   legend_item '2p' 'Two content panes hidden in a collapsed window. Sidebar and reserve panes are excluded.' dim
@@ -116,7 +116,8 @@ legend_records() {
   legend_item '[1/2w]' 'With a filter, one of two windows matches in a session.' dim
 
   section 'Pane labels'
-  legend_item 'icon + codex' 'Foreground command and its app icon. Icon color identifies the app, not its state.' cyan
+  legend_item '◈ codex' 'Recognized apps have icons; shells and unknown commands show names only. Icon color does not show state.' cyan
+  note 'Set @tmux-canopy-icon-codex (or another app name) to replace its glyph; none hides it. Press Ctrl-r to refresh.'
   legend_item 'dim title' 'Pane title, shortened to fit the available width.' dim
   legend_item 'dim path' 'Working directory, inline or below the command depending on width. Adjacent panes sharing it can show it once.' dim
   legend_item '×' 'Retained pane whose command exited.' amber
@@ -129,6 +130,8 @@ legend_records() {
   note 'A pane shows its highest-priority badge: bell, activity, then silence. Preview lists every notice. Focusing its window clears notices.'
 
   section 'Agent state labels'
+  legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
+  note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
   legend_item '[process]' 'An agent process was found in this pane; its state is unknown.' dim
   legend_item '[working·hook]' 'A live agent recently reported a running turn.' cyan
   legend_item '[approval·hook]' 'An agent reported an approval request. Another reviewer may handle it.' amber
@@ -136,7 +139,7 @@ legend_records() {
   legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
   legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
   legend_item '[unknown·hook]' 'The last hook report is stale. Current agent state is unknown.' dim
-  legend_item '├─ Explore WORKING' 'A Claude Code subagent of the pane above: WORKING, NEEDS INPUT or DONE. Read-only; its prompts appear in that pane.' cyan
+  legend_item '├─ Explore WORKING' 'A running Claude Code or Codex subagent of the pane above: WORKING or NEEDS INPUT. It disappears when it stops.' cyan
   legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
   note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
   note 'Hook labels require a matching live agent process, pane PID, session, and recent report. Screen hints appear only in the drawer and say unverified.'
@@ -150,9 +153,9 @@ legend_records() {
   note 'Agent icons, unread badges, and [process] do not establish whether an agent is working or waiting. Press i for the agent drawer.'
 
   section 'Views and filters'
-  legend_item '[All]' 'All sessions and panes. F changes Tree filters.' dim
-  legend_item '[Session]' 'Only the current session.' dim
-  legend_item '[Unread]' 'Only panes with unread notices and their parents.' dim
+  legend_item '· All' 'All sessions and panes. F changes Tree filters.' dim
+  legend_item '· Session' 'Only the current session.' dim
+  legend_item '· Unread' 'Only panes with unread notices and their parents.' dim
   legend_item '+W / +T' 'Window-name / pane-title text filter is active.' dim
   note 'Press ? for command help. Press g for this legend. q or Esc closes either popup.'
 }

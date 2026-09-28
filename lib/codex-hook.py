@@ -12,11 +12,14 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from subagent_state import agent_id, list_field, next_entries
 
 SEP = "\x1f"
 PANE = os.environ.get("TMUX_PANE", "")
 EVENTS = {"SessionStart", "UserPromptSubmit", "PermissionRequest",
-          "PostToolUse", "Stop", "Interrupt", "SessionEnd"}
+          "PreToolUse", "PostToolUse", "Stop", "Interrupt", "SessionEnd",
+          "SubagentStart", "SubagentStop"}
 PREFIX = "@tmux_canopy_agent_"
 FIELDS = ("source", "session", "turn", "pane_pid", "status", "tool",
           "summary", "command", "request", "updated", "process_pid", "process_birth",
@@ -50,7 +53,12 @@ def read_options(keys):
 
 
 def fingerprint(event):
-    value = json.dumps([event.get("tool_name"), event.get("tool_input")],
+    inputs = event.get("tool_input")
+    if isinstance(inputs, dict):
+        # PermissionRequest may add a human approval reason that tool events
+        # omit. It describes the request, not the tool invocation.
+        inputs = {key: item for key, item in inputs.items() if key != "description"}
+    value = json.dumps([event.get("tool_name"), inputs],
                        sort_keys=True, ensure_ascii=True, default=str)
     return hashlib.sha256(value.encode()).hexdigest()[:24]
 
@@ -212,6 +220,9 @@ def report(event):
         return
     if kind == "SessionStart" and event.get("source") == "compact":
         return
+    agent = agent_id(event)
+    if kind in ("SubagentStart", "SubagentStop") and not agent:
+        return
     meta = tmux("display-message", "-p", "-t", PANE,
                 "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}")
     if meta.returncode:
@@ -228,17 +239,51 @@ def report(event):
     current = combined
     if current["pane_pid"] != pid or current["process_pid"] != process_pid or current["process_birth"] != process_birth:
         current = {key: "" for key in FIELDS}
+    if kind == "SessionStart" and current["session"] != session:
+        current = {key: "" for key in FIELDS}
     if kind not in ("SessionStart", "UserPromptSubmit") and current["session"] not in ("", session):
         return
-    if kind in ("PermissionRequest", "PostToolUse", "Stop", "Interrupt") and \
+    if kind in ("PermissionRequest", "PreToolUse", "PostToolUse", "Stop", "Interrupt") and \
             current["turn"] and turn and current["turn"] != turn:
         return
     if kind == "PermissionRequest" and current["status"] in \
             ("turn-ended", "interrupted", "session-ended"):
         return
     values = dict(current)
-    if kind == "PostToolUse":
-        if current["status"] != "needs-input" or current["request"] != fingerprint(event):
+    now = str(int(time.time()))
+    sub_state = ("subagent-start" if kind == "SubagentStart" else
+                 "subagent-stop" if kind == "SubagentStop" else
+                 "needs-input" if kind == "PermissionRequest" else
+                 "clear-request" if kind in ("PreToolUse", "PostToolUse") else
+                 "working" if kind == "UserPromptSubmit" else
+                 "session-ended" if kind == "SessionEnd" else "")
+    values["subagents"] = next_entries(current["subagents"], agent, event, sub_state, now)
+    if kind in ("SubagentStart", "SubagentStop"):
+        clears_request = (kind == "SubagentStop" and current["status"] == "needs-input" and
+                          current["request_agent"] == agent)
+        if values["subagents"] == current["subagents"] and not clears_request:
+            return
+        values.update(source="codex-hook", session=session, pane_pid=pid,
+                      process_pid=process_pid, process_birth=process_birth,
+                      status=current["status"] or "working",
+                      updated=current["updated"] or now)
+        if clears_request:
+            values.update(status="working", updated=now, tool="", summary="",
+                          command="", request="", request_agent="")
+        if turn and not current["turn"]:
+            values["turn"] = turn
+        if write(values):
+            schedule_expiry(process_pid, process_birth, current_timer)
+            refresh()
+        return
+    if kind in ("PreToolUse", "PostToolUse"):
+        if current["status"] != "needs-input" or current["request"] != fingerprint(event) or current["request_agent"] != agent:
+            if values["subagents"] != current["subagents"]:
+                values.update(source="codex-hook", session=session, pane_pid=pid,
+                              process_pid=process_pid, process_birth=process_birth,
+                              updated=current["updated"] or now)
+                if write(values):
+                    refresh()
             return
         status = "working"
     else:
@@ -247,7 +292,8 @@ def report(event):
                   "Interrupt": "interrupted", "SessionEnd": "session-ended"}[kind]
     values.update(source="codex-hook", session=session, pane_pid=pid,
                   process_pid=process_pid, process_birth=process_birth,
-                  status=status, updated=str(int(time.time())))
+                  status=status, updated=now,
+                  request_agent=agent if kind == "PermissionRequest" else "")
     if kind == "SessionStart":
         values["turn"] = ""
     elif turn:
@@ -259,6 +305,8 @@ def report(event):
         values["tool"] = field(event.get("tool_name"), 80)
         values["summary"] = field(inputs.get("description"), 300) or \
             ("Approval requested for " + values["tool"])
+        if agent:
+            values["summary"] = field(f"{list_field(event.get('agent_type'), 40) or 'Subagent'}: {values['summary']}", 300)
         values["command"] = field(inputs.get("command"), 500)
         values["request"] = fingerprint(event)
     else:
@@ -285,8 +333,8 @@ def main():
             report(event)
         finally:
             tmux("wait-for", "-U", lock)
-        if event.get("hook_event_name") == "Stop":
-            # Codex requires a JSON object from a successful Stop hook.
+        if event.get("hook_event_name") in ("Stop", "SubagentStop"):
+            # Codex requires JSON from successful stop hooks.
             print("{}")
     except (OSError, ValueError, subprocess.TimeoutExpired):
         # Hooks are observational; a reporter failure must never block Codex.

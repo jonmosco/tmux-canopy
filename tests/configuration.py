@@ -39,6 +39,13 @@ def main():
         tm('set-window-option', '-g', 'window-status-activity-style', 'fg=blue')
         tm('set-option', '-g', '@tmux-canopy-notifications', 'all')
         load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
+        tm('set-option', '-g', '@tmux-canopy-icon-theme', 'nerdfont')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'nerdfont'
+        tm('set-option', '-g', '@tmux-canopy-icon-theme', 'auto')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         assert 'navigate' in binding('n') and 'toggle' in binding('T')
         assert 'global' in binding('T') and 'slot' in binding('T')
         installed = binding('n')

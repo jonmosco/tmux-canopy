@@ -48,8 +48,8 @@ def main():
         compact = re.sub(r'\s+', ' ', legend)
         if width >= 24:
             for phrase in ('Sidebar legend', 'Selected row', 'Current content pane',
-                           'Unread terminal output', 'does not mean an agent needs input', 'A tmux session',
-                           'Foreground command', 'Working directory', 'Window-name / pane-title'):
+                           'Unread terminal output', 'does not mean an agent needs input', 'Session and window names',
+                           'Recognized apps have icons', 'Working directory', 'Window-name / pane-title'):
                 assert phrase in compact, (width, phrase)
     print('ok - responsive legend explains selection, location, pane details, notices and filters')
 

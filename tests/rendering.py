@@ -109,8 +109,7 @@ def main():
             session_rows = [row for row in framed if row[0].startswith('S:')]
             assert len(session_rows) == 2
             assert '─' not in session_rows[0][1] and '─' not in session_rows[1][1]
-            assert any(icon in session_rows[0][1] for icon in ('', '◈', 'S'))
-            assert any(icon in session_rows[1][1] for icon in ('', '◈', 'S'))
+            assert all(icon not in row[1] for row in session_rows for icon in ('', '◈'))
             assert all(not row[1].startswith('\n') for row in framed)
             assert len(rows()) == len(snapshot), 'legacy record count changed'
             state.write_text('FILTER\tsession\n')
@@ -218,7 +217,7 @@ def main():
             frame = tm('capture-pane', '-p', '-t', sidebar).splitlines()
             second_session_line = next(i for i, line in enumerate(frame) if '▾' in line and 'two' in line)
             assert second_session_line > 0 and frame[second_session_line - 1].strip(), frame
-            assert any(icon in frame[second_session_line] for icon in ('', '◈', 'S')), frame
+            assert 'two' in frame[second_session_line] and all(icon not in frame[second_session_line] for icon in ('', '◈')), frame
             tm('send-keys', '-t', sidebar, 'M-c')
             wait_for(lambda: selection()[0] == f'S:{sid_b}', 'second session selection')
             frame = tm('capture-pane', '-p', '-t', sidebar).splitlines()

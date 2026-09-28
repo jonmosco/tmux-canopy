@@ -2,21 +2,30 @@
 """Application icon colors without a tmux server or a font dependency."""
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = [
-    ('bash', 39, ''), ('zsh', 39, ''), ('unknown', 39, ''),
+    ('bash', 39, ' '), ('zsh', 39, ' '), ('unknown', 39, ' '),
     ('nvim', 94, ''), ('vim', 94, ''),
     ('node', 93, ''), ('npm', 91, ''), ('python3', 93, ''),
     ('/usr/bin/git', 91, '󰊢'), ('lazygit', 91, '󰊢'),
     ('kubectl', 94, '󱃾'), ('k9s', 94, '󱃾'), ('oc', 91, '󱃾'),
-    ('ssh', 96, '󰢹'), ('pi', 95, '󰚩'), ('claude', 93, ''),
-    ('codex', 96, ''), ('opencode', 95, '󰚩'), ('btop', 96, '󰍛'),
-    ('gemini', 97, '󰊭'),
-    ('claude.exe', 93, '\uec82'), ('codex.exe', 96, '\uec81'),
+    ('ssh', 96, '󰢹'), ('pi', 95, '󰚩'), ('claude', 93, '◇'),
+    ('codex', 96, '◈'), ('opencode', 95, '󰚩'), ('btop', 96, '󰍛'),
+    ('gemini', 97, '󰊭'), ('agy', 96, '󰀘'),
+    ('claude.exe', 93, '◇'), ('codex.exe', 96, '◈'), ('agy.exe', 96, '\U000f0018'),
 ]
+UNICODE_ICONS = {
+    'nvim': '✎', 'vim': '✎', 'node': '◆', 'npm': '◆',
+    'python3': '◉', '/usr/bin/git': '◇', 'lazygit': '◇',
+    'kubectl': '✣', 'k9s': '✣', 'oc': '✣', 'ssh': '⇄',
+    'pi': '◎', 'claude': '✦', 'codex': '◈', 'opencode': '◎',
+    'btop': '▥', 'gemini': '✧', 'agy': '○',
+    'claude.exe': '✦', 'codex.exe': '◈', 'agy.exe': '○',
+}
 
 
 def main():
@@ -35,17 +44,18 @@ def main():
                 for index, (command, _, _) in enumerate(CASES):
                     records.append(['P', f'%{index}', '@0', str(index), command, '', '/test', '0', '', '', '', '', '', '', '', ''])
                 snapshot = '\n'.join('\x1f'.join(record) for record in records) + '\n'
-                result = subprocess.run(['awk', '-v', 'stable=1', '-v', 'header=0', '-f',
+                result = subprocess.run(['awk', '-v', 'stable=1', '-v', 'header=1', '-f',
                                          str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
                                         input=snapshot, text=True, capture_output=True, env=env, check=True)
                 rows = {parts[0]: parts for line in result.stdout.splitlines() if (parts := line.split('\t'))}
-                session_glyph = {'nerdfont': '', 'unicode': '◈', 'ascii': 'S'}[icons]
-                assert session_glyph in rows['S:$0'][1], rows['S:$0']
+                assert (' | All' if icons == 'ascii' else ' · All') in rows['H:'][1]
+                session_row = re.sub(r'\x1b\[[0-9;]*m', '', rows['S:$0'][1])
+                assert session_row.startswith('▾ test'), session_row
                 assert '─' not in rows['S:$0'][1], rows['S:$0']
-                for index, (_, color, glyph) in enumerate(CASES):
+                for index, (command, color, glyph) in enumerate(CASES):
                     row = rows[f'P:%{index}']
                     assert len(row) == 3 and row[2] == f'P:%{index}:$0'
-                    glyph = glyph if icons == 'nerdfont' else '>' if icons == 'ascii' else '▹'
+                    glyph = glyph if icons == 'nerdfont' else '>' if icons == 'ascii' else UNICODE_ICONS.get(command, ' ')
                     if theme == 'ansi':
                         assert f'\x1b[{color}m{glyph}\x1b[0m' in row[1], row
                     else:
@@ -54,6 +64,24 @@ def main():
                     assert '\x1b[1;32m●\x1b[0m' in rows['P:%0'][1]
                 else:
                     assert '\x1b' not in result.stdout
+
+                if theme == 'ansi' and icons == 'nerdfont':
+                    keys = 'nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top'.split()
+                    overrides = {'shell': 'S', 'python': 'P', 'claude': 'C', 'codex': 'none'}
+                    records[0].extend([''] * (17 - len(records[0])))
+                    records[0].extend(overrides.get(key, '') for key in keys)
+                    changed = subprocess.run(['awk', '-v', 'stable=1', '-f',
+                                              str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
+                                             input='\n'.join('\x1f'.join(record) for record in records)+'\n',
+                                             text=True, capture_output=True, env=env, check=True)
+                    changed_rows = {parts[0]: parts[1] for line in changed.stdout.splitlines()
+                                    if (parts := line.split('\t'))}
+                    for command, glyph in (('bash', 'S'), ('python3', 'P'), ('claude', 'C'), ('claude.exe', 'C')):
+                        index = next(i for i, case in enumerate(CASES) if case[0] == command)
+                        assert f'{glyph}\x1b[0m' in changed_rows[f'P:%{index}'], (command, changed_rows[f'P:%{index}'])
+                    for command in ('codex', 'codex.exe'):
+                        index = next(i for i, case in enumerate(CASES) if case[0] == command)
+                        assert '◈' not in changed_rows[f'P:%{index}']
     print('ok - command-aware icon colors, active green marker, all glyph themes and monochrome output')
 
 

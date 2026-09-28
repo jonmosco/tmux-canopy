@@ -164,7 +164,7 @@ def live():
             run('toggle',client,first,'42','global','T','Tab','slot')
             sidebar=next(r.split('|')[0] for r in tm('list-panes','-a','-F','#{pane_id}|#{@tmux_canopy}').splitlines() if r.endswith('|1'))
             script_env['TMUX_PANE']=sidebar
-            wait(lambda:'[All]' in screen(),'initial header')
+            wait(lambda:'[Tree] Proc Buff Agents · All' in screen(),'initial header')
             def state_ready():
                 if state_path.exists() and state_path.stat().st_size: return True
                 tm('send-keys','-t',sidebar,'M-y');time.sleep(.08)
@@ -172,7 +172,7 @@ def live():
             wait(state_ready,'state path')
             state=Path(state_path.read_text());script_env['TMUX_CANOPY_STATE']=str(state)
             ui_pid=sp.check_output(['pgrep','-P',display(sidebar,'#{pane_pid}'),'-x','fzf'],text=True).strip()
-            menu();os.write(master,b's');wait(lambda:'[Session]' in screen(),'session filter applied')
+            menu();os.write(master,b's');wait(lambda:'· Session' in screen(),'session filter applied')
             assert 'two' not in screen()
             output.clear();menu();os.write(master,b'w')
             wait(lambda:b'Window name contains' in output,'window prompt');os.write(master,b'ORCH\r')
@@ -192,12 +192,12 @@ def live():
             tm('send-keys','-t',sidebar,'Escape');time.sleep(.4)
             print('ok - native filter menu/prompts, cancel, text composition, query/selection preservation and Ctrl-f')
             run('tree-filter','set-title','nothing-matches');wait(lambda:'No matches' in screen(),'empty result hint')
-            menu();os.write(master,b'c');wait(lambda:'[All]' in screen() and 'worker' in screen(),'clear all recovers')
+            menu();os.write(master,b'c');wait(lambda:'· All' in screen() and 'worker' in screen(),'clear all recovers')
             # A collapsed window's active pane need not be the unread pane.
             urgent=tm('split-window','-d','-v','-t',worker,'-P','-F','#{pane_id}','sleep 600')
             worker_window=display(worker,'#{window_id}'); first_session=display(first,'#{session_id}')
             run('notify','set',worker_window,urgent,'activity')
-            menu();os.write(master,b'u');wait(lambda:'[Unread]' in screen(),'unread mode')
+            menu();os.write(master,b'u');wait(lambda:'· Unread' in screen(),'unread mode')
             run('sidebar-action','collapse',f'W:{worker_window}:{first_session}')
             run('sidebar-action','activate',f'W:{worker_window}:{first_session}')
             wait(lambda:tm('list-clients','-F','#{pane_id}')==urgent,'filtered parent focuses unread descendant')
@@ -206,7 +206,7 @@ def live():
             print('ok - unread mode and collapsed parent activation target a matching pane, then clear read notifications')
             # Default settings can be restored after temporary per-sidebar overrides.
             tm('set-option','-g','@tmux-canopy-filter','session')
-            run('tree-filter','defaults');wait(lambda:'[Session]' in screen(),'configured defaults')
+            run('tree-filter','defaults');wait(lambda:'· Session' in screen(),'configured defaults')
             tm('switch-client','-c',client,'-t','two')
             wait(lambda:'one' not in screen() and 'two' in screen(),'current session follows owner')
             # Input remains literal through tmux prompts, labels, state and matching.

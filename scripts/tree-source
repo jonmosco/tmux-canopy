@@ -7,6 +7,11 @@ state_file="${TMUX_CANOPY_STATE:?}"
 sep=$'\037'
 text() { printf '#{s/[\001-\037\177]/ /:%s}' "$1"; }
 config="D${sep}#{@tmux_canopy_icon_theme}${sep}#{@tmux_canopy_notifications}${sep}#{@tmux-canopy-theme}${sep}#{@tmux-canopy-density}${sep}$(text @tmux-canopy-icon-session)${sep}$(text @tmux-canopy-icon-window)${sep}$(text @tmux-canopy-icon-pane)${sep}#{pane_id}${sep}#{window_id}${sep}#{session_id}${sep}#{pane_width}${sep}$(text host)${sep}#{@tmux-canopy-compact-single-panes}${sep}$(text @tmux-canopy-filter)${sep}$(text @tmux-canopy-filter-window)${sep}$(text @tmux-canopy-filter-title)"
+# Keep overrides in the same batched tmux snapshot as the tree. The renderer
+# reads these fields in this order, after the existing configuration fields.
+for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top; do
+  config+="${sep}$(text "@tmux-canopy-icon-$app")"
+done
 sessions="S${sep}#{session_id}${sep}$(text session_name)${sep}#{session_attached}"
 windows="W${sep}#{session_id}${sep}#{window_id}${sep}#{window_index}${sep}$(text window_name)${sep}#{window_linked_sessions}${sep}#{synchronize-panes}${sep}#{@tmux_canopy_notice_activity}${sep}#{@tmux_canopy_notice_bell}${sep}#{@tmux_canopy_notice_silence}"
 panes="P${sep}#{pane_id}${sep}#{window_id}${sep}#{pane_index}${sep}$(text pane_current_command)${sep}$(text pane_title)${sep}$(text pane_current_path)${sep}#{pane_dead}${sep}#{@tmux_canopy}${sep}#{@tmux_canopy_slot}${sep}#{@tmux_canopy_notice_pane_activity}${sep}#{@tmux_canopy_notice_pane_bell}${sep}#{@tmux_canopy_notice_pane_silence}${sep}#{@tmux_canopy_target}${sep}#{@tmux_canopy_target_session}${sep}#{pane_last}${sep}#{pane_pid}${sep}#{@tmux_canopy_agent_source}${sep}$(text @tmux_canopy_agent_session)${sep}#{@tmux_canopy_agent_pane_pid}${sep}#{@tmux_canopy_agent_status}${sep}#{@tmux_canopy_agent_updated}${sep}#{@tmux_canopy_agent_process_pid}${sep}$(text @tmux_canopy_agent_process_birth)${sep}$(text @tmux_canopy_agent_subagents)"

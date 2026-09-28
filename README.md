@@ -21,8 +21,8 @@ Canopy moves the same sidebar pane as you switch windows and sessions, preservin
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus.
 - Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
-- Agents view detects Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi processes. `[process]` means detection only.
-- Optional lifecycle adapters for these harnesses show recent reported state as `[state·hook]` and identify stale reports as unknown. The drawer labels screen-based input hints as unverified.
+- Agents view detects Codex, Claude Code, OpenCode, Gemini CLI, Pi, and Oh My Pi processes. Its header summarizes panes needing input, working, ready/ended, and without a verified state. `[process]` means detection only.
+- Optional lifecycle adapters for these harnesses show recent reported state as `[state·hook]` and identify stale reports as unknown. Claude Code and Codex subagents appear beneath their parent panes when their hooks are installed. The drawer labels screen-based input hints as unverified.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets.
 - One sidebar owned by the client that opened it; no daemon or agent service.
@@ -37,7 +37,7 @@ The tested platform is **Linux**, with:
 - Standard command-line utilities, including awk and procps `ps`
 - `less` for the optional enlarged preview
 
-Startup checks tmux capabilities and fzf options before splitting an application pane. Older tmux/fzf versions and macOS are not currently part of the tested support matrix. A Nerd Font is optional; use the `unicode` or `ascii` icon theme if glyphs are missing.
+Startup checks tmux capabilities and fzf options before splitting an application pane. Older tmux/fzf versions and macOS are not currently part of the tested support matrix. The default Unicode icons are command-specific and do not require a Nerd Font. Set the `nerdfont` icon theme for additional app glyphs after enabling a Nerd Font in your terminal; use `ascii` if Unicode glyphs are missing.
 
 ## Install
 
@@ -88,7 +88,7 @@ set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
 set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
-set -g @tmux-canopy-icon-theme 'unicode'  # unicode, ascii, nerdfont, or auto
+set -g @tmux-canopy-icon-theme 'auto'     # auto (Unicode), unicode, ascii, or nerdfont
 ```
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
@@ -122,6 +122,8 @@ When you leave the sidebar for a content pane, its selection pointer follows the
 The default Tree view uses one active-pane dot, shorter branch prefixes, and
 directory labels that adapt to sidebar width. For the leanest view, set
 `@tmux-canopy-density 'minimal'` and press `Ctrl-r` in the sidebar.
+Recognized app icons can be changed with options such as
+`@tmux-canopy-icon-codex`; use `none` to hide one. See [Icons](docs/reference.md#icons).
 
 See the [configuration and command reference](docs/reference.md) for all controls, appearance settings, notifications, and architecture.
 
