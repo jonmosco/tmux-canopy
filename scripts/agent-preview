@@ -34,15 +34,17 @@ base=${command##*/}; base=${base%.exe}
 case "$base" in
   codex) kind=codex ;;
   claude|claude-code) kind=claude ;;
-  opencode|gemini|pi|omp) kind=$base ;;
+  opencode|gemini|pi|omp|agy) kind=$base ;;
+  antigravity) kind=agy ;;
 esac
 if [[ -z "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
   # Agents can be children of a pane shell. Resolve only descendants of that
   # pane, and prefer the closest matching process when there is more than one.
   kind="$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$pid" '
     { parent[$1]=$2; name=$3; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
-      if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp") kind[$1]=name
-      else if (name=="claude" || name=="claude-code") kind[$1]="claude" }
+      if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy") kind[$1]=name
+      else if (name=="claude" || name=="claude-code") kind[$1]="claude"
+      else if (name=="antigravity") kind[$1]="agy" }
     END { best=129; for (p in kind) { q=p; for (depth=0;depth<128 && q>0;depth++) {
       if (q==root) { if (depth<best) { best=depth; result=kind[p] }; break }
       if (seen[p,q]++) break; q=parent[q] }
@@ -55,6 +57,7 @@ case "$kind" in
   gemini) agent='Gemini CLI' ;;
   pi) agent='Pi' ;;
   omp) agent='Oh My Pi' ;;
+  agy) agent='Antigravity' ;;
 esac
 if [[ -z "$agent" ]]; then
   printf 'No supported agent process found in pane %s.\n' "$pane"

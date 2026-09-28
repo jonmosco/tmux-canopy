@@ -26,7 +26,7 @@ try:
         temp = Path(directory)
         state = temp / 'state'
         state.touch()
-        names = ('claude', 'opencode', 'gemini', 'pi', 'omp')
+        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy')
         for name in names:
             install_agent_fixture(temp / name)
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '100', '-y', '30',
@@ -85,6 +85,10 @@ try:
                                          'notification_type': 'ToolPermission', 'message': 'Allow shell command?'})
         event('gemini', panes['gemini'], {'hook_event_name': 'BeforeAgent', 'session_id': 'other'})
         assert 'Status: Approval requested' in run('agent-preview', panes['gemini'], ['P:' + panes['gemini']])
+
+        event('agy', panes['agy'], {'hook_event_name': 'SessionStart', 'session_id': 'a1'})
+        event('agy', panes['agy'], {'hook_event_name': 'BeforeAgent', 'session_id': 'a1'})
+        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
 
         event('pi', panes['pi'], {'type': 'session_start', 'session_id': 'p1'})
         event('pi', panes['pi'], {'type': 'agent_start', 'session_id': 'p1'})

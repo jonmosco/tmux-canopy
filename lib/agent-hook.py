@@ -18,7 +18,7 @@ spec.loader.exec_module(core)
 
 
 def normalized(kind, event):
-    name = event.get('hook_event_name') if kind in ('claude', 'gemini') else event.get('type')
+    name = event.get('hook_event_name') if kind in ('claude', 'gemini', 'agy') else event.get('type')
     if not isinstance(name, str):
         return None
     if kind == 'claude':
@@ -30,7 +30,7 @@ def normalized(kind, event):
             return 'needs-input', name
         if name == 'PostToolUse':
             return 'clear-request', name
-    elif kind == 'gemini':
+    elif kind in ('gemini', 'agy'):
         mapping = {'SessionStart': 'ready', 'BeforeAgent': 'working',
                    'AfterAgent': 'turn-ended', 'SessionEnd': 'session-ended'}
         if name == 'Notification' and event.get('notification_type') == 'ToolPermission':
@@ -120,7 +120,7 @@ def report(kind, event):
         state = 'working'
     elif state == 'clear-request' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent and \
-            (kind not in ('claude', 'gemini') or core.field(event.get('tool_name'), 80) == current['tool']):
+            (kind not in ('claude', 'gemini', 'agy') or core.field(event.get('tool_name'), 80) == current['tool']):
         state = 'working'
     elif (agent and state != 'needs-input') or state in ('clear-request', 'subagent-start', 'subagent-stop'):
         # Subagent progress leaves the main thread's status and its age alone.
@@ -157,7 +157,7 @@ def report(kind, event):
 
 def main():
     kind = sys.argv[1] if len(sys.argv) > 1 else ''
-    if kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp') or not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE):
+    if kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy') or not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE):
         return
     try:
         raw = sys.stdin.buffer.read(131073)
