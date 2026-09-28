@@ -10,7 +10,8 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from subagent_state import agent_id, list_field, next_entries
+from subagent_state import (agent_id, list_field, next_entries, resolve_cursor_stop_id,
+                            with_cursor_subagent_fields)
 
 spec = importlib.util.spec_from_file_location('canopy_codex_hook', Path(__file__).with_name('codex-hook.py'))
 core = importlib.util.module_from_spec(spec)
@@ -19,7 +20,7 @@ spec.loader.exec_module(core)
 
 def normalized(kind, event, event_name=None):
     name = (event_name if kind == 'agy' else
-            event.get('hook_event_name') if kind in ('claude', 'gemini') else event.get('type'))
+            event.get('hook_event_name') if kind in ('claude', 'gemini', 'cursor-agent') else event.get('type'))
     if not isinstance(name, str):
         return None
     if kind == 'agy':
@@ -68,6 +69,10 @@ def normalized(kind, event, event_name=None):
                 return 'working', name
             if state == 'idle':
                 return 'turn-ended', name
+    elif kind == 'cursor-agent':
+        mapping = {'sessionStart': 'ready', 'beforeSubmitPrompt': 'working',
+                   'stop': 'turn-ended', 'sessionEnd': 'session-ended',
+                   'subagentStart': 'subagent-start', 'subagentStop': 'subagent-stop'}
     else:
         return None
     state = mapping.get(name)
@@ -126,11 +131,17 @@ def session_id(kind, event):
         return core.field(event.get('session_id'), 128)
     if kind == 'agy':
         return core.field(event.get('conversationId'), 128)
+    if kind == 'cursor-agent':
+        return core.field(event.get('conversation_id') or event.get('session_id'), 128)
     return core.field(event.get('session_id'), 128)
 
 
-def subagent_id(kind, event):
-    return agent_id(event) if kind == 'claude' else ''
+def subagent_id(kind, event, current=None):
+    if kind == 'claude':
+        return agent_id(event)
+    if kind == 'cursor-agent':
+        return resolve_cursor_stop_id(event, current['subagents'] if current else '')
+    return ''
 
 
 def report(kind, event, event_name=None):
@@ -139,7 +150,7 @@ def report(kind, event, event_name=None):
         agent_kind = event.get('agent')
         state = event.get('state')
         allowed = {'ready', 'working', 'needs-input', 'turn-ended', 'session-ended', 'interrupted'}
-        if agent_kind not in ('claude', 'codex', 'opencode', 'gemini', 'pi', 'omp', 'agy') or state not in allowed:
+        if agent_kind not in ('claude', 'codex', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent') or state not in allowed:
             return
         request = event.get('request') if isinstance(event.get('request'), dict) else {}
         if state == 'needs-input' and not any(request.get(k) for k in ('id', 'summary', 'tool')):
@@ -180,18 +191,19 @@ def report(kind, event, event_name=None):
         current = {key: '' for key in core.FIELDS}
     # Events can be delayed across agent session resets. Once a session is
     # associated with a pane, only a fresh start may replace its identity.
-    start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation') or \
+    start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation', 'sessionStart') or \
         (is_contract and state == 'ready')
     if current['session'] and current['session'] != session and not start:
         return
     if current['session'] != session and start:
         current = {key: '' for key in core.FIELDS}
     now = str(int(time.time()))
-    agent = subagent_id(kind, event)
+    agent = subagent_id(kind, event, current)
+    subagent_event = with_cursor_subagent_fields(event) if kind == 'cursor-agent' else event
     values = dict(current)
     values.update(source=kind + '-hook', session=session, pane_pid=pid,
                   process_pid=process_pid, process_birth=process_birth,
-                  subagents=next_entries(current['subagents'], agent, event, state, now))
+                  subagents=next_entries(current['subagents'], agent, subagent_event, state, now))
     # Only a request's own agent (or the main thread) can clear it.
     if state == 'subagent-stop' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent:
@@ -257,25 +269,39 @@ def main():
     # The adapter is observational. It never registers PreToolUse and never
     # returns a permission decision that could authorize a tool.
     response = '{"decision": ""}' if agy_event == 'Stop' else '{}'
-    if kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy') or not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE):
+    # Cursor Agent requires an explicit allow response for subagentStart (and
+    # only that event); every other reply is the inert default below.
+    cursor_response = '{}'
+    if (kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent') or
+            not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE)):
         if kind == 'agy':
             print(response)
+        elif kind == 'cursor-agent':
+            print(cursor_response)
         return
     try:
         raw = sys.stdin.buffer.read(131073)
         if len(raw) > 131072:
             if kind == 'agy':
                 print(response)
+            elif kind == 'cursor-agent':
+                print(cursor_response)
             return
         event = json.loads(raw) if raw.strip() else {}
         if not isinstance(event, dict):
             if kind == 'agy':
                 print(response)
+            elif kind == 'cursor-agent':
+                print(cursor_response)
             return
+        if kind == 'cursor-agent' and event.get('hook_event_name') == 'subagentStart':
+            cursor_response = '{"permission":"allow"}'
         lock = 'tmux-canopy-agent-' + core.PANE[1:]
         if core.tmux('wait-for', '-L', lock).returncode:
             if kind == 'agy':
                 print(response)
+            elif kind == 'cursor-agent':
+                print(cursor_response)
             return
         try:
             report(kind, event, agy_event)
@@ -283,9 +309,13 @@ def main():
             core.tmux('wait-for', '-U', lock)
             if kind == 'agy':
                 print(response)
+            elif kind == 'cursor-agent':
+                print(cursor_response)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
         if kind == 'agy':
             print(response)
+        elif kind == 'cursor-agent':
+            print(cursor_response)
         return
 
 
