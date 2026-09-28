@@ -5,6 +5,7 @@ toggle_key="${TMUX_CANOPY_KEY:-T}"
 last_window_key="${TMUX_CANOPY_LAST_KEY:-Tab}"
 toggle_key="${toggle_key//[[:cntrl:]]/ }"
 last_window_key="${last_window_key//[[:cntrl:]]/ }"
+agents_enabled="$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)"
 legend_mode=0
 if [[ "${1:-}" == --legend ]]; then legend_mode=1; shift; fi
 legend_args=()
@@ -37,11 +38,11 @@ help_records() {
   key '1' 'Tree: sessions, windows and panes'
   key '2' 'Processes grouped by their pane'
   key '3' 'Paste buffers; Enter pastes into the target pane'
-  key '4' 'Detected agent panes, grouped by session and window'
+  [[ "$agents_enabled" != on ]] || key '4' 'Detected agent panes, grouped by session and window'
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
-  key 'n' 'Jump to the next agent needing input, across all sessions and windows'
+  [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'
   key 'p' 'Show or hide the preview drawer'
-  key 'i' 'Switch the drawer between terminal and agent summaries; show it if hidden'
+  [[ "$agents_enabled" != on ]] || key 'i' 'Switch the drawer between terminal and agent summaries; show it if hidden'
   key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'
 
   section 'Manage'
@@ -49,9 +50,11 @@ help_records() {
   key 'r' 'Rename a session or window'
   key 'x, then x' 'Confirm deletion of a pane, window or session'
   key 'a, then D' 'Open diagnostics'
-  note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'
-  note 'Optional agent hooks or plugins report lifecycle events. Without them, screen-based request hints remain unverified.'
-  note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale reports show unknown.'
+  if [[ "$agents_enabled" == on ]]; then
+    note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'
+    note 'Optional agent hooks or plugins report lifecycle events. Without them, screen-based request hints remain unverified.'
+    note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale reports show unknown.'
+  fi
   note 'The actions menu also has reorder, link, unlink, layout, zoom, swap, synchronization and dead-pane respawn.'
 
   section 'Create'
@@ -97,6 +100,7 @@ help_records() {
   note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. Default off.'
+  [[ "$agents_enabled" == on ]] || note 'Set @tmux-canopy-agents on before loading Canopy to add the Agents view, status labels, and agent summary drawer.'
   note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight. Session and window selections use their active content pane.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
@@ -129,28 +133,32 @@ legend_records() {
   legend_item '●2' 'Two unread descendants on a folded branch; counts panes on windows and windows on sessions.' amber
   note 'A pane shows its highest-priority badge: bell, activity, then silence. Preview lists every notice. Focusing its window clears notices.'
 
-  section 'Agent state labels'
-  legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
-  note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
-  legend_item '[process]' 'An agent process was found in this pane; its state is unknown.' dim
-  legend_item '[working·hook]' 'A live agent recently reported a running turn.' cyan
-  legend_item '[approval·hook]' 'An agent reported an approval request. Another reviewer may handle it.' amber
-  legend_item '[ready·hook]' 'An agent reported session start and is ready for a prompt.' dim
-  legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
-  legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
-  legend_item '[unknown·hook]' 'The last hook report is stale. Current agent state is unknown.' dim
-  legend_item '├─ Explore WORKING' 'A running Claude Code or Codex subagent of the pane above: WORKING or NEEDS INPUT. It disappears when it stops.' cyan
-  legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
-  note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
-  note 'Hook labels require a matching live agent process, pane PID, session, and recent report. Screen hints appear only in the drawer and say unverified.'
+  if [[ "$agents_enabled" == on ]]; then
+    section 'Agent state labels'
+    legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
+    note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
+    legend_item '[process]' 'An agent process was found in this pane; its state is unknown.' dim
+    legend_item '[working·hook]' 'A live agent recently reported a running turn.' cyan
+    legend_item '[approval·hook]' 'An agent reported an approval request. Another reviewer may handle it.' amber
+    legend_item '[ready·hook]' 'An agent reported session start and is ready for a prompt.' dim
+    legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
+    legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
+    legend_item '[unknown·hook]' 'The last hook report is stale. Current agent state is unknown.' dim
+    legend_item '├─ Explore WORKING' 'A running Claude Code or Codex subagent of the pane above: WORKING or NEEDS INPUT. It disappears when it stops.' cyan
+    legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
+    note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
+    note 'Hook labels require a matching live agent process, pane PID, session, and recent report. Screen hints appear only in the drawer and say unverified.'
+  fi
 
   section 'Other tree markers'
   legend_item '⇢ / ⇉' 'Object marked for move / link.' cyan
   legend_item '✕' 'Deletion waiting for confirmation.' amber
   legend_item 'linked:2' 'Window is linked into two sessions.' dim
   legend_item 'SYNC' 'Synchronized input is on for this window.' dim
-  legend_item '[2 agents]' 'Two detected agent panes in this window, shown in Agents view.' dim
-  note 'Agent icons, unread badges, and [process] do not establish whether an agent is working or waiting. Press i for the agent drawer.'
+  if [[ "$agents_enabled" == on ]]; then
+    legend_item '[2 agents]' 'Two detected agent panes in this window, shown in Agents view.' dim
+    note 'Agent icons, unread badges, and [process] do not establish whether an agent is working or waiting. Press i for the agent drawer.'
+  fi
 
   section 'Views and filters'
   legend_item '· All' 'All sessions and panes. F changes Tree filters.' dim

@@ -228,13 +228,18 @@ exec REAL --bind BINDING --bind LOAD "$@"
             for _ in range(2):
                 tm('set-option', '-w', '-t', window, '@tmux_canopy_notice_activity', '1')
                 sidebar = open_sidebar()
+                sidebar_pid = display(sidebar, '#{pane_pid}')
+                fzf_pid = sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip()
                 wait(lambda: tm('show-option', '-wqv', '-t', window,
                                 '@tmux_canopy_notice_activity') != '1', 'notice cleared on open')
                 run('toggle', client, pane, '42', 'global', 'T', 'Tab', 'slot')
                 wait(lambda: not sidebars(), 'toggle close')
+                wait(lambda: not sp.run(['ps', '-p', f'{sidebar_pid},{fzf_pid}', '-o', 'pid='],
+                                        capture_output=True, text=True).stdout.strip(),
+                     'sidebar and fzf process exit')
                 script_env['TMUX_PANE'] = pane
                 assert display(pane, '#{pane_in_mode}') == '0'
-            print('ok - close/reopen with pending notifications returns success without an error overlay')
+            print('ok - close/reopen clears notifications and reaps sidebar/fzf processes')
 
             for shell in ('bash', 'zsh', 'fish'):
                 executable = shutil.which(shell)

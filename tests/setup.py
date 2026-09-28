@@ -41,7 +41,8 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     before = codex.read_text()
     run(cli, "integration", "install", "codex", "--dry-run", env=env)
     assert codex.read_text() == before
-    run(cli, "integration", "install", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    installed = run(cli, "integration", "install", "codex", "claude", "gemini", "pi", "omp", "opencode", env=env)
+    assert "set -g @tmux-canopy-agents on" in installed.stdout
     first = codex.read_text()
     data = json.loads(first)
     assert data["notify"] == ["user"]
@@ -106,6 +107,7 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
         assert "scripts/toggle" in keys
         doctor = run(cli, "doctor", env=env, ok=False)
         assert "Canopy-owned tmux configuration" in doctor.stdout
+        assert "Agent awareness: off" in doctor.stdout
         assert "Agent integrations:" in doctor.stdout
         assert "Reporter self-test (stubbed tmux, real report path):\n  OK" in doctor.stdout, doctor.stdout
         assert "Agents running in tmux panes:" in doctor.stdout

@@ -1,95 +1,31 @@
 # Roadmap
 
-Planned work for tmux-canopy. Unchecked items are not implemented; this list does
-not promise a release date. The [README](README.md#current-features) describes
-what is available today.
+Remaining work for tmux-canopy. This list does not promise a release date. The
+[README](README.md#features) describes what is available today.
 
-## Agent awareness
+## Agent status reliability
 
-Canopy already helps users find agent terminals, preview their output, inspect
-pane processes, and move between projects. Its current activity, bell, and
-silence badges report terminal events. They do not establish whether an agent
-is working, waiting for input, or finished.
+- [ ] Extend lifecycle regression coverage beyond Codex to verify that agent
+  exit, restart, and pane reuse cannot leave misleading status behind.
 
-The agent preview is available through `i`. Without an integration, it reads
-current pane metadata and visible screen text and labels possible prompts as
-unverified. Optional Codex, Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi
-adapters report supported lifecycle events. The Agents view (`4`) lists panes
-containing those detected processes; `[process]` means detection only, while
-`·hook` identifies a recent hook report; `·plugin?` marks an OpenCode plugin
-report whose pane/session association needs confirmation. Parent counts are process
-counts, not task status.
+## Jump to an agent needing input
 
-The goal is to help users identify which agent needs attention while continuing
-to use their existing tmux sessions, windows, panes, and tools.
-
-### 1. Agent status on panes
-
-- [x] Define pane metadata for agent identity, status, reporting source, and
-  freshness.
-- [x] Add optional Codex, Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi
-  lifecycle reporters. Each reports only events its harness actually exposes.
-- [x] Display reported **working**, **approval**, **ready**, **turn ended**, and
-  **unknown** states beside matching live agent panes, with readable text in
-  monochrome mode and a visible source label.
-- [ ] Handle agent exit, restart, stale reports, and pane removal without leaving
-  misleading status behind.
-- [ ] Verify that installations without an integration retain normal sidebar
-  behavior and do not acquire a mandatory daemon or polling loop.
-
-Design requirements:
-
-- Keep agent lifecycle state separate from unread terminal notifications.
-- Focusing a blocked agent may clear its unread badge, but **needs input** must
-  remain until a subsequent lifecycle event changes it.
-- Treat unsupported or stale state as unknown. Output, silence, process
-  existence, and command icons alone do not establish task completion.
-- Report only agents that can be associated with a tmux pane. Internal agent
-  subtasks (such as Claude Code subagents) may be shown as read-only children of
-  their pane when the harness reports them, but must not imply that they are
-  independently focusable or controllable.
-
-### 2. Attention summaries
-
-- [x] Aggregate agent status on window and session rows, including collapsed
-  branches, so users can see summaries such as **2 need input**.
-- [x] Give input requests priority over working and finished indicators.
-- [x] Define counting for linked windows so repeated tree occurrences do not
-  inflate totals within a session.
-- [x] Preserve row selection, search queries, and collapse state during updates.
-
-### 3. Jump to the next agent needing input
-
-- [x] Add an action and documented shortcut to focus the next pane reporting
-  **needs input** across sessions and windows.
-- [x] Define a predictable traversal order, wraparound behavior, and behavior
-  when no agents need input.
-- [x] Use the existing client-aware navigation and width-preserving transitions.
 - [ ] Test stale targets, agent exits, linked windows, and multiple clients.
 
-### 4. Subagents
+## Additional subagent integrations
 
-- [x] Show Claude Code subagents as read-only child lines of their pane, with
-  type, **working**/**needs input**/**done** status, and age.
-- [x] Attribute a subagent's approval request to it, clear it only on that
-  subagent's own tool completion, and count waiting subagents in roll-ups and
-  jump-to-next-agent.
-- [x] Bound the list per pane, drop finished subagents at the next prompt once
-  they have shown **done** for 30 seconds, and
-  sanitize reported fields.
-- [ ] Report subagents from other harnesses (Codex, Gemini CLI, OpenCode) where
-  their integrations expose them.
+- [ ] Report Gemini CLI and OpenCode subagents if their integrations expose
+  enough lifecycle and identity information.
 
-### 5. Agent request panel and responses (backlog)
+## Agent request panel and responses (backlog)
 
-Explore a preview-like panel that shows what an agent needs and, for supported
-integrations, lets the user respond without switching to the agent's window or
-pane. The Codex hook supplies a first read-only request summary; response
-controls still depend on a verified request and response contract.
+The agent summary already shows a read-only Codex request description and
+proposed command when a hook supplies them. The remaining work is to make
+supported requests easier to inspect and, where safe, respond to them from the
+sidebar.
 
-- [ ] Expand the read-only Codex request panel showing the agent, session/window/pane,
-  request text, relevant context (including a proposed command when supplied),
-  and freshness. Available choices and narrow-width scrolling remain future work.
+- [ ] Show structured response choices when an integration supplies them, and
+  make long requests scrollable at narrow sidebar widths.
 - [ ] Define an optional integration contract for request identity, agent-session
   identity, target pane, request state, and supported response types. Distinguish
   structured requests from an ordinary terminal-output preview; do not infer
@@ -106,9 +42,9 @@ controls still depend on a verified request and response contract.
 - [ ] Show sending, acknowledged, failed, or unknown outcomes. Wait for the agent's
   acknowledgement or lifecycle update before clearing needs-input; do not blindly
   retry a response whose delivery is uncertain.
-- [ ] Stage delivery: request display first, then supported choice responses, then
-  free-text responses. Keep responses explicitly user-initiated and preserve the
-  current content window/pane and sidebar geometry throughout.
+- [ ] Add supported choice responses before free-text responses. Keep responses
+  explicitly user-initiated and preserve the current content window/pane and
+  sidebar geometry throughout.
 - [ ] Test stale requests, focus and cancellation, literal response text, duplicate
   submissions, concurrent clients, acknowledgement failures, and narrow terminals.
 
@@ -141,14 +77,13 @@ currently takes effect when the sidebar is reopened.
 
 ## Appearance and theme sources
 
-Canopy currently uses the terminal's default foreground/background and ANSI
+Canopy already uses the terminal's default foreground/background and ANSI
 palette for most of its UI, with a separate `mono` mode and configurable
-selection background. Add an explicit theme source so users can choose how the
-sidebar fits their existing setup:
+selection background. The remaining work is to make theme sources explicit and
+consistent across views:
 
-- [ ] **Terminal:** inherit the terminal's foreground/background and standard
-  ANSI colors. Keep contrast readable on both light and dark palettes without
-  assuming a specific terminal theme.
+- [ ] Keep the terminal palette usable on both light and dark themes without
+  assuming a particular palette.
 - [ ] **tmux:** derive sidebar colors from the active tmux status, pane border,
   and message styles where available. Define clear fallbacks when those styles
   use `default` or omit a color.
@@ -167,10 +102,10 @@ sidebar fits their existing setup:
 
 ## Scope
 
-These features add visibility, navigation, and planned user-initiated responses
-to agent requests. Agent launching, task assignment,
+Planned request controls would add user-initiated responses to agent requests.
+Agent launching, task assignment,
 automatic approval, inter-agent coordination, worktree provisioning, and a
 dedicated orchestration API are outside this initial roadmap.
 
-As work is implemented, check off completed items and document the shipped
+As work is implemented, remove completed items and document the shipped
 behavior in the README and built-in help.

@@ -146,6 +146,7 @@ def live():
             tm('set-option','-g','status-keys','emacs')
             for key,value in [('scope','global'),('transition','slot'),('preview','off'),('theme','mono'),('notifications','activity,bell')]:
                 tm('set-option','-g','@tmux-canopy-'+key,value)
+            tm('set-option','-g','@tmux-canopy-agents','on')
             script_env=env|{'TMUX':display(first,'#{socket_path},#{pid},0'),'TMUX_PANE':first}
             install_fzf_probe(temp,[f'''alt-y:execute-silent(printf '%s' "$TMUX_CANOPY_STATE" > {state_path})''',
                 f"alt-z:execute-silent(printf '%s|%s|%s' {{1}} {{3}} {{q}} > {selected})"],script_env)

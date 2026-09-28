@@ -40,7 +40,7 @@ fi
 if [[ -n "$sidebar_pane" ]]; then
   restore_zoom_pane="$(tmux show-option -pqv -t "$sidebar_pane" @tmux_canopy_restore_zoom_pane 2>/dev/null || true)"
   clear_sidebar_cache "$client"
-  tmux kill-pane -t "$sidebar_pane"
+  close_sidebar_pane "$sidebar_pane"
   [[ "$transition" == 'slot' ]] && cleanup_slots_if_no_sidebars
   if [[ -n "$restore_zoom_pane" ]] && pane_exists "$restore_zoom_pane"; then
     tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true

@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import subprocess as sp
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -39,6 +40,37 @@ def main():
         tm('set-window-option', '-g', 'window-status-activity-style', 'fg=blue')
         tm('set-option', '-g', '@tmux-canopy-notifications', 'all')
         load()
+        with tempfile.TemporaryDirectory(prefix='canopy-agent-option-') as directory:
+            state = Path(directory) / 'state'
+            state.touch()
+            source_env = env | {'TMUX_PANE': pane, 'TMUX_CANOPY_STATE': str(state),
+                                'TMUX_CANOPY_HEADER': '1'}
+
+            def source(*args):
+                result = sp.run([str(ROOT / 'scripts/tree-source'), *args], env=source_env,
+                                capture_output=True, text=True, timeout=15)
+                assert result.returncode == 0, result.stderr
+                return result.stdout
+
+            def ui_options():
+                result = sp.run(['bash', '-c',
+                                 'source "$1"; sidebar_ui_options "$2"; printf "%s\\n" "${SIDEBAR_FZF_ARGS[@]}"',
+                                 'bash', str(ROOT / 'scripts/ui-options.sh'), pane],
+                                env=source_env, capture_output=True, text=True, timeout=15)
+                assert result.returncode == 0, result.stderr
+                return result.stdout
+
+            assert 'Agents' not in source() and 'Agents' not in source('--agents')
+            assert source('--needs-input') == ''
+            assert '--bind=4:' not in ui_options() and '--bind=n:' not in ui_options()
+            tm('set-option', '-g', '@tmux-canopy-agents', 'on')
+            load()
+            assert 'Agents' in source() and '[Agents]' in source('--agents')
+            assert '--bind=4:' in ui_options() and '--bind=n:' in ui_options()
+            tm('set-option', '-g', '@tmux-canopy-agents', 'off')
+            load()
+            assert 'Agents' not in source() and '--bind=4:' not in ui_options()
+            print('ok - agent view, scan and bindings are opt-in and reversible')
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'nerdfont')
         load()

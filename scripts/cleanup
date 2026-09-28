@@ -12,7 +12,7 @@ if [[ "$mode" == 'client' && -n "$client" ]]; then
   sidebar="$(sidebar_for_client "$client")"
   if [[ -n "$sidebar" ]]; then
     restore_zoom="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_restore_zoom_pane 2>/dev/null || true)"
-    tmux kill-pane -t "$sidebar" 2>/dev/null || true
+    close_sidebar_pane "$sidebar" 2>/dev/null || true
     if [[ -n "$restore_zoom" ]] && pane_exists "$restore_zoom"; then
       tmux resize-pane -Z -t "$restore_zoom" 2>/dev/null || true
     fi

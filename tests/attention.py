@@ -20,7 +20,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='canopy-attention-test-', ignore_cleanup_errors=True) as directory:
         state = Path(directory) / 'state'
 
-        def render(*, collapsed='', icons='nerdfont', theme='ansi', extra_rows=()):
+        def render(*, collapsed='', icons='nerdfont', theme='ansi', extra_rows=(), agents='on'):
             state.write_text(collapsed)
             data = [
                 ['D', icons, 'all', theme, 'normal', '', '', '', '%0', '@0', '$0', '42', 'host'],
@@ -29,6 +29,7 @@ def main():
                 ['P', '%1', '@0', '1', 'bash', '', '/work', '0', '', '', '0', '0', '0', '', '', '0', '', '', '', '', '', '', '', ''],
                 *extra_rows,
             ]
+            data[0].extend([''] * (34 - len(data[0])) + [agents])
             result = sp.check_output(['awk', '-v', 'stable=1', '-v', 'nul=1', '-f', str(ROOT/'lib/tree-render.awk'), str(state), '-'],
                                      input='\n'.join('\x1f'.join(row) for row in data)+'\n', text=True,
                                      env=os.environ | {'TMUX_CANOPY_RENDER_CLIENT': '', 'TMUX_CANOPY_RENDER_HOME': '/home/test'})
@@ -85,6 +86,8 @@ def main():
         expanded = render(extra_rows=[need_pane, verified_10])
         assert 'NEEDS INPUT' in expanded['P:%10:$0'] and '·hook' in expanded['P:%10:$0']
         assert '◆' not in expanded['W:@0:$0']
+        disabled = render(extra_rows=[need_pane, verified_10], agents='off')
+        assert 'NEEDS INPUT' not in disabled['P:%10:$0'] and '◆' not in disabled['W:@0:$0']
 
         # ascii theme uses a plain-text glyph instead of the Unicode diamond.
         ascii_collapsed = render(collapsed='W:@0:$0\n', icons='ascii', extra_rows=[need_pane, verified_10])
@@ -109,6 +112,7 @@ def main():
             ['A', '%15', 'claude'], ['A', '%16', 'gemini'],
             verified_10, verified_11, verified_13, ['V', '%15'],
         ]
+        overview_data[0].extend([''] * (34 - len(overview_data[0])) + ['on'])
         state.write_text('')
 
         def overview(width, icons='unicode', theme='ansi', raw=False):

@@ -10,7 +10,7 @@ export FZF_PREVIEW_LINES="$rows"
 
 render() {
   local mode=''
-  if [[ "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]]; then
+  if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on && "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]]; then
     mode="$(tmux show-option -pqv -t "$TMUX_PANE" @tmux_canopy_preview_mode 2>/dev/null || true)"
   fi
   if [[ ( "$mode" == agent || "$mode" == codex ) && "${TMUX_CANOPY_PREVIEW_EXPANDED:-0}" != 1 ]]; then
@@ -33,7 +33,13 @@ render() {
     Q:*) "$SCRIPT_DIR/pane-preview" "${token#Q:}" ;;
     V:empty) printf 'No panes match the Tree filters.\nF / Ctrl-f changes filters; Ctrl-g searches everything.\n' ;;
     V:agents-empty) printf 'No Codex or Claude processes detected in tmux panes.\nPress 1 for Tree or Ctrl-g to search everything.\n' ;;
-    V:*) printf 'Switch views with 1 (Tree), 2 (Processes), 3 (Buffers), or 4 (Agents).\n' ;;
+    V:*)
+      if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]; then
+        printf 'Switch views with 1 (Tree), 2 (Processes), 3 (Buffers), or 4 (Agents).\n'
+      else
+        printf 'Switch views with 1 (Tree), 2 (Processes), or 3 (Buffers).\n'
+      fi
+      ;;
     *) "$SCRIPT_DIR/tree-preview" "$token" ;;
   esac
 }

@@ -29,6 +29,7 @@ try:
 
         first = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'work', '-x', '100', '-y', '30',
                    '-P', '-F', '#{pane_id}', f'{binary} 600')
+        tm('set-option', '-g', '@tmux-canopy-agents', 'on')
         # A wrapper shell in front of the agent: only the agent_view-caliber
         # descendant walk finds this, not a direct pane_current_command match.
         wrapped = tm('new-window', '-d', '-t', 'work:', '-n', 'wrapped', '-P', '-F', '#{pane_id}',

@@ -17,6 +17,8 @@ $1 == "D" {
     custom_s=$6; custom_w=$7; custom_p=$8
     nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
+    agents_enabled=($35 == "on")
+    if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
     if (!window_set) window_filter=$16
@@ -254,6 +256,7 @@ function agent_duration_text(p, age) {
 # Hook state is displayed only while a matching agent process still belongs to
 # this live pane. Expired reports say unknown; unsupported agents show no state.
 function agent_label(p, age,status,kind) {
+    if (!agents_enabled) return ""
     if (p in agent_labels) return agent_labels[p]
     agent_labels[p]=""
     kind=(agent_view ? agent_kind[p] : canonical_agent(command[p]))
@@ -310,6 +313,7 @@ function agent_status_word(label, narrow) {
 # Claude Code and Codex subagents reported on their parent pane as id,type,status,updated,tool
 # entries. They are shown, and counted, only while the parent's report is.
 function load_subagents(p, n,i,items,parts,age,state) {
+    if (!agents_enabled) return 0
     if (p in sub_count) return sub_count[p]
     sub_count[p]=0; sub_need[p]=0; sub_work[p]=0
     if (subagent_list[p] == "" || agent_label(p) == "") return 0
@@ -333,6 +337,7 @@ function subagent_word(state, narrow) {
 }
 # One continuation line per subagent, drawn as children of the pane row.
 function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
+    if (!agents_enabled) return ""
     n=load_subagents(p)
     lines=""
     for (i=1;i<=n;i++) {
@@ -350,6 +355,7 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
 # it recedes instead of competing for attention. Origin stays a small dim
 # suffix since ·plugin? still meaningfully flags an unconfirmed association.
 function agent_badge(p, label,style,origin,word) {
+    if (!agents_enabled) return ""
     label=agent_label(p)
     if (label=="") return agent_view && agent_kind[p] != "" ? " " dim "[process]" reset : ""
     style=(label=="working" ? accent : label=="approval" || label=="interrupted" ? attention : dim)
@@ -574,10 +580,10 @@ END {
             if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="T P B [A]"
             if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="[A]"
         } else {
-            tabs="[Tree] Proc Buff Agents"
+            tabs=(agents_enabled ? "[Tree] Proc Buff Agents" : "[Tree] Proc Buff")
             # Leave room for fzf's right edge and an active operation label.
-            if (text_width(tabs)+reserved>available-2) tabs="[Tree] P B A"
-            if (text_width(tabs)+reserved>available-2) tabs="[T] P B A"
+            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[Tree] P B A" : "[Tree] P B")
+            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[T] P B A" : "[T] P B")
             if (text_width(tabs)+reserved>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
             if (text_width(tabs)+text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="[T]"
             tabs=tabs filter_sep filter_label

@@ -34,6 +34,7 @@ def main():
     env = os.environ.copy()
     env.pop('TMUX', None)
     env.pop('TMUX_PANE', None)
+    env.pop('TMUX_CANOPY_NAVIGATION_TEST_TRACE', None)
     env['TERM'] = 'xterm-256color'
     client_process = other_process = None
     master = other_master = None
@@ -61,9 +62,13 @@ def main():
             assert result.returncode == 0, (args, result.stderr)
             return result.stdout.strip()
 
-        def run(name, *args):
+        def run(name, *args, trace=False):
+            run_env = action_env.copy()
+            run_env.pop('TMUX_CANOPY_NAVIGATION_TEST_TRACE', None)
+            if trace:
+                run_env['TMUX_CANOPY_NAVIGATION_TEST_TRACE'] = '1'
             result = subprocess.run([str(root / 'scripts' / name), *args],
-                                    env=action_env, capture_output=True, text=True, timeout=15)
+                                    env=run_env, capture_output=True, text=True, timeout=15)
             assert result.returncode == 0, (name, result.stderr)
 
         def current():
@@ -77,7 +82,7 @@ def main():
             return tm('display-message', '-p', '-t', pane, field)
 
         def activate(pane):
-            run('sidebar-action', 'activate', 'P:' + pane)
+            run('sidebar-action', 'activate', 'P:' + pane, trace=True)
 
         def recorded_commands():
             return [shlex.split(line) for line in calls.read_text().splitlines()]
@@ -129,8 +134,9 @@ def main():
                               TMUX_CANOPY_SCOPE='global', TMUX_CANOPY_TRANSITION='slot')
             # Instrument foreground commands only. Server hooks use their normal PATH.
             wrapper = temp / 'tmux'
-            wrapper.write_text('#!/bin/bash\nprintf -v line "%q " "$@"\nprintf "%s\\n" "$line" >> ' + shlex.quote(str(calls)) +
-                               '\nexec ' + shlex.join([real_tmux, '-L', socket]) + ' "$@"\n')
+            wrapper.write_text('#!/bin/bash\nif [[ ${TMUX_CANOPY_NAVIGATION_TEST_TRACE:-} == 1 ]]; then\n'
+                               '  printf -v line "%q " "$@"\n  printf "%s\\n" "$line" >> ' + shlex.quote(str(calls)) +
+                               '\nfi\nexec ' + shlex.join([real_tmux, '-L', socket]) + ' "$@"\n')
             wrapper.chmod(0o755)
             action_env['PATH'] = str(temp) + ':' + env['PATH']
             tm('set-option', '-g', '@tmux-canopy-scope', 'global')
@@ -153,16 +159,15 @@ def main():
 
             calls.write_text('')
             activate(peer)
-            # A delayed sidebar refresh can collect its read-only snapshot
-            # while the navigation wrapper is recording. It is independent
-            # of the foreground navigation command count.
-            commands = [row for row in recorded_commands()
-                        if not (row[0] == 'display-message' and 'list-sessions' in row)]
-            # Returning the sidebar pointer to the active target adds two
-            # read-only option lookups before the batched navigation command.
-            assert len(commands) == 4, commands
-            assert all(row[:2] == ['show-option', '-pqv'] for row in commands[:2]), commands
-            assert commands[2][0] == 'list-clients' and commands[3][0] == 'set-option', commands
+            # The running sidebar can perform its own read-only refresh, but
+            # only commands inherited from this action carry the trace flag.
+            commands = recorded_commands()
+            # Same-window navigation uses one batched snapshot and one
+            # mutation batch; no separate pane-option lookups are needed.
+            assert len(commands) == 2, commands
+            assert commands[0][0] == 'list-clients' and 'list-panes' in commands[0], commands
+            assert commands[1] == ['set-option', '-p', '-t', sidebar, '@tmux_canopy_target', peer,
+                                   ';', 'select-pane', '-t', peer, ';'], commands
             assert current()[2] == peer
             assert display(sidebar, '#{@tmux_canopy_target}') == peer
             assert not any('select-window' in row or 'switch-client' in row or 'swap-pane' in row for row in commands)
@@ -182,7 +187,7 @@ def main():
             print('ok - warm window switches preserve sidebar/fzf identity and deliver no application SIGWINCH')
 
             calls.write_text('')
-            run('navigate', client, 'next', '42', 'global', 'slot')
+            run('navigate', client, 'next', '42', 'global', 'slot', trace=True)
             assert current()[1] == window_b
             assert not any('switch-client' in row for row in recorded_commands())
             run('navigate', client, 'previous', '42', 'global', 'slot')

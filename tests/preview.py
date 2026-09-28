@@ -126,6 +126,7 @@ while True:
             threading.Thread(target=drain, daemon=True).start()
             wait(lambda: client in tm('list-clients', '-F', '#{client_tty}'), 'client attach')
             script_env['TMUX_CANOPY_CLIENT'] = client
+            tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             run('toggle', client, pane, '42', 'global', 'T', 'Tab', 'slot')
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             script_env['TMUX_PANE'] = sidebar

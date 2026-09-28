@@ -2,6 +2,7 @@
 # Jump to the next agent reporting needs-input, across all sessions/windows,
 # in natural tree order, wrapping around. A no-op when nothing needs input.
 set -u
+[[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]] || exit 0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 sidebar="${TMUX_PANE:-}"
 [[ "$sidebar" =~ ^%[0-9]+$ ]] || exit 0

@@ -97,7 +97,10 @@ while IFS= read -r window; do
     else
       # No attached owner or no remaining window that can fit a dock. Let the
       # last window/session end normally rather than leave an internal zombie.
-      tmux if-shell -F -t "$sidebar" "$empty" "kill-pane -t $sidebar" 2>/dev/null || true
+      sidebar_pid="$(tmux display-message -p -t "$sidebar" '#{pane_pid}' 2>/dev/null || true)"
+      closed="$(tmux if-shell -F -t "$sidebar" "$empty" \
+        "kill-pane -t $sidebar ; display-message -p closed" 2>/dev/null || true)"
+      [[ "$closed" != closed ]] || signal_sidebar_group "$sidebar_pid"
     fi
     release_owner
   done < <(tmux list-panes -t "$window" -f '#{==:#{@tmux_canopy},1}' -F '#{pane_id}|#{@tmux_canopy_client}|#{@tmux_canopy_position}' 2>/dev/null)

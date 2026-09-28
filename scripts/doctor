@@ -40,6 +40,12 @@ printf 'Enlarged preview (less): '
 if command -v less >/dev/null 2>&1; then printf 'available\n'; else printf 'unavailable (optional)\n'; fi
 printf 'Process view (ps): '
 if command -v ps >/dev/null 2>&1; then printf 'available\n'; else printf 'unavailable\n'; fi
+printf 'Agent awareness: '
+if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]; then
+  printf 'on (optional lifecycle integrations are configured separately)\n'
+else
+  printf 'off (set @tmux-canopy-agents on to show Agents and subagents)\n'
+fi
 printf '\nRequired commands, formats, UI options and temporary state: '
 result=0
 if sidebar_preflight "$owner" "$target"; then printf 'OK\n'; else printf 'FAILED\n'; result=1; fi

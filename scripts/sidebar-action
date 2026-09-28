@@ -90,7 +90,9 @@ case "$action" in
   view-tree) set_view tree ;;
   view-processes) set_view processes ;;
   view-buffers) set_view buffers ;;
-  view-agents) set_view agents ;;
+  view-agents)
+    [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" != on ]] || set_view agents
+    ;;
 
   activate)
     case "$token" in
