@@ -25,10 +25,16 @@ def normalized(kind, event, event_name=None):
     if kind == 'agy':
         if name == 'PreInvocation' and 'invocationNum' in event:
             return 'working', name
+        if name == 'PostInvocation' and 'invocationNum' in event:
+            return 'working', name
         if name == 'PostToolUse' and isinstance(event.get('toolCall'), dict):
             return 'working', name
         if name == 'Stop' and isinstance(event.get('fullyIdle'), bool):
-            return ('turn-ended' if event['fullyIdle'] else 'working'), name
+            if not event['fullyIdle']:
+                return 'working', name
+            if event.get('error') or event.get('terminationReason') in ('error', 'max_steps_exceeded'):
+                return 'interrupted', name
+            return 'turn-ended', name
         return None
     if kind == 'claude':
         mapping = {'SessionStart': 'ready', 'UserPromptSubmit': 'working',
@@ -68,6 +74,45 @@ def normalized(kind, event, event_name=None):
     return (state, name) if state else None
 
 
+def opencode_pane(session, event):
+    """Resolve global OpenCode plugin events only to a uniquely verified pane."""
+    props = event.get('properties') or {}
+    if not isinstance(props, dict):
+        return ''
+    rows = core.tmux('list-panes', '-a', '-F',
+                     '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_pane_pid}|#{@tmux_canopy_agent_process_pid}|#{@tmux_canopy_agent_process_birth}')
+    if rows.returncode:
+        return ''
+    bound, new_session = set(), set()
+    for line in rows.stdout.splitlines():
+        fields = (line.split('|') + [''] * 11)[:11]
+        pane, root, dead, sidebar, slot, path, source, bound_session, bound_pane_pid, bound_process, bound_birth = fields
+        if not root.isdigit() or dead == '1' or sidebar == '1' or slot == '1':
+            continue
+        if source == 'opencode-hook' and bound_session == session and bound_pane_pid == root:
+            identity = core.process_identity(root, 'opencode')
+            if identity and identity == (bound_process, bound_birth):
+                bound.add(pane)
+        elif event.get('type') == 'session.created':
+            identity = core.process_identity(root, 'opencode')
+            if not identity:
+                continue
+            info = props.get('info') or {}
+            directory = info.get('directory') if isinstance(info, dict) else ''
+            # Without the session's project directory there is no safe way to
+            # distinguish this server event from another OpenCode session.
+            if not isinstance(directory, str) or not directory:
+                continue
+            try:
+                if os.path.realpath(path) != os.path.realpath(directory):
+                    continue
+            except (OSError, TypeError):
+                continue
+            new_session.add(pane)
+    candidates = bound or new_session
+    return next(iter(candidates)) if len(candidates) == 1 else ''
+
+
 def session_id(kind, event):
     if kind == 'opencode':
         props = event.get('properties') or {}
@@ -89,11 +134,32 @@ def subagent_id(kind, event):
 
 
 def report(kind, event, event_name=None):
-    result = normalized(kind, event, event_name)
+    is_contract = kind == 'contract'
+    if kind == 'contract':
+        agent_kind = event.get('agent')
+        state = event.get('state')
+        allowed = {'ready', 'working', 'needs-input', 'turn-ended', 'session-ended', 'interrupted'}
+        if agent_kind not in ('claude', 'codex', 'opencode', 'gemini', 'pi', 'omp', 'agy') or state not in allowed:
+            return
+        request = event.get('request') if isinstance(event.get('request'), dict) else {}
+        if state == 'needs-input' and not any(request.get(k) for k in ('id', 'summary', 'tool')):
+            return
+        event = {'session_id': event.get('session_id'), 'state': state,
+                 'tool_name': request.get('tool'), 'tool_input': {'description': request.get('summary', ''),
+                 'command': request.get('command', '')}, 'request': request, '_contract': True}
+        kind = agent_kind
+        result = (state, 'ContractReport')
+    else:
+        result = normalized(kind, event, event_name)
     session = session_id(kind, event)
     if not result or not session:
         return
     state, name = result
+    if kind == 'opencode':
+        target = opencode_pane(session, event)
+        if not target:
+            return
+        core.PANE = target
     if kind == 'claude' and name == 'SessionStart' and event.get('source') == 'compact':
         return
     meta = core.tmux('display-message', '-p', '-t', core.PANE,
@@ -112,9 +178,10 @@ def report(kind, event, event_name=None):
     if (current['source'] != kind + '-hook' or current['pane_pid'] != pid or
             current['process_pid'] != process_pid or current['process_birth'] != process_birth):
         current = {key: '' for key in core.FIELDS}
-    # OpenCode server plugins can receive events for other sessions. Once a
-    # session is associated with a pane, never accept a different session.
-    start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation')
+    # Events can be delayed across agent session resets. Once a session is
+    # associated with a pane, only a fresh start may replace its identity.
+    start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation') or \
+        (is_contract and state == 'ready')
     if current['session'] and current['session'] != session and not start:
         return
     if current['session'] != session and start:
@@ -132,6 +199,11 @@ def report(kind, event, event_name=None):
     elif state == 'clear-request' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent and \
             (kind not in ('claude', 'gemini') or core.field(event.get('tool_name'), 80) == current['tool']):
+        if kind == 'opencode':
+            props = event.get('properties') or {}
+            reply_id = core.field(props.get('permissionID') or props.get('requestID') or props.get('id'), 128) if isinstance(props, dict) else ''
+            if not reply_id or reply_id != current['request']:
+                return
         state = 'working'
     elif (agent and state != 'needs-input') or state in ('clear-request', 'subagent-start', 'subagent-stop'):
         # Subagent progress leaves the main thread's status and its age alone.
@@ -149,16 +221,29 @@ def report(kind, event, event_name=None):
             detail = {}
         props = event.get('properties') or {}
         if kind == 'opencode' and isinstance(props, dict):
-            tool = core.field(props.get('permission'), 80)
+            tool = core.field(props.get('permission') or props.get('action'), 80)
+            metadata = props.get('metadata') if isinstance(props.get('metadata'), dict) else {}
+            detail = metadata
+            if not event.get('message') and not detail.get('description') and tool:
+                values['summary'] = core.field(f"{tool} permission requested", 300)
+            patterns = props.get('patterns')
+            if not detail.get('command') and isinstance(patterns, list):
+                detail = dict(detail, command=', '.join(core.field(item, 120) for item in patterns if isinstance(item, str)))
         values['tool'] = tool
         values['summary'] = (core.field(event.get('message'), 300) or
                              core.field(detail.get('description'), 300) or
-                             ('Approval requested' if tool else 'Input requested'))
+                             (core.field(f"{tool} permission requested", 300) if kind == 'opencode' and tool else
+                              'Approval requested' if tool else 'Input requested'))
         if agent:
             values['summary'] = core.field(f"{list_field(event.get('agent_type'), 40) or 'Subagent'}: {values['summary']}", 300)
         values['command'] = core.field(detail.get('command'), 500)
-        values['request'] = hashlib.sha256(json.dumps([session, name, tool, detail],
-                                                        sort_keys=True, default=str).encode()).hexdigest()[:24]
+        request_id = ''
+        if is_contract:
+            request_id = core.field((event.get('request') or {}).get('id'), 128) if isinstance(event.get('request'), dict) else ''
+        elif kind == 'opencode':
+            request_id = core.field(props.get('requestID') or props.get('permissionID') or props.get('id'), 128) if isinstance(props, dict) else ''
+        values['request'] = request_id or hashlib.sha256(json.dumps([session, name, tool, detail],
+                                                                     sort_keys=True, default=str).encode()).hexdigest()[:24]
     else:
         values.update(tool='', summary='', command='', request='')
     if core.write(values):

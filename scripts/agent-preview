@@ -101,7 +101,6 @@ if [[ "$pid" =~ ^[0-9]+$ ]]; then
     fi
     if [[ "$kind" == opencode ]]; then source_name="$agent plugin (session association unverified)"; else source_name="$agent lifecycle hook"; fi
     printf 'Source: %s · last report %ss ago\n' "$source_name" "$age"
-    printf 'Status: Unknown (report stale)\n'
     exit 0
   fi
 fi

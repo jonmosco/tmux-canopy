@@ -53,7 +53,7 @@ help_records() {
   if [[ "$agents_enabled" == on ]]; then
     note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'
     note 'Optional agent hooks or plugins report lifecycle events. Without them, screen-based request hints remain unverified.'
-    note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale reports show unknown.'
+    note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale hook state clears after 15 minutes.'
   fi
   note 'The actions menu also has reorder, link, unlink, layout, zoom, swap, synchronization and dead-pane respawn.'
 
@@ -137,13 +137,12 @@ legend_records() {
     section 'Agent state labels'
     legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
     note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
-    legend_item '[process]' 'An agent process was found in this pane; its state is unknown.' dim
+    legend_item '[process]' 'An agent process was found in this pane; no lifecycle state is available.' dim
     legend_item '[working·hook]' 'A live agent recently reported a running turn.' cyan
     legend_item '[approval·hook]' 'An agent reported an approval request. Another reviewer may handle it.' amber
     legend_item '[ready·hook]' 'An agent reported session start and is ready for a prompt.' dim
     legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
     legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
-    legend_item '[unknown·hook]' 'The last hook report is stale. Current agent state is unknown.' dim
     legend_item '├─ Explore WORKING' 'A running Claude Code or Codex subagent of the pane above: WORKING or NEEDS INPUT. It disappears when it stops.' cyan
     legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
     note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
