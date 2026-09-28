@@ -14,6 +14,8 @@ fi
 width="$(tmux display-message -p -t "${TMUX_PANE:-}" '#{pane_width}' 2>/dev/null || printf '42')"
 [[ "$width" =~ ^[1-9][0-9]*$ ]] || width=42
 agents_enabled="$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)"
+appearance="$(tmux show-option -gqv @tmux_canopy_appearance 2>/dev/null || true)"
+: "${appearance:=classic}"
 # Match the tree renderer, including fzf's pointer gutter and right edge.
 case "$view" in
   processes) selected=1 ;;
@@ -23,6 +25,8 @@ case "$view" in
 esac
 reserved=0
 [[ -z "$mode" ]] || reserved=$((${#mode}+1))
+box_pad=0
+[[ "$appearance" == lazygit ]] && box_pad=3
 for tier in full compact tiny; do
   case "$tier" in
     full) labels=('Tree' 'Proc' 'Buff') ;;
@@ -32,21 +36,26 @@ for tier in full compact tiny; do
   if [[ "$agents_enabled" == on ]]; then
     if [[ "$tier" == full ]]; then labels+=('Agents'); else labels+=('A'); fi
   fi
-  labels[selected]="[${labels[selected]}]"
+  if [[ "$appearance" != lazygit ]]; then
+    labels[selected]="[${labels[selected]}]"
+  fi
   tabs="${labels[*]}"
-  (( ${#tabs} + reserved <= width - 4 )) && break
+  (( ${#tabs} + reserved + box_pad <= width - 4 )) && break
 done
 theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 accent=$'\033[1;36m'; reset=$'\033[0m'; dim=$'\033[2m'
 if [[ "$theme" == mono ]]; then accent=''; reset=''; dim=''; mode_color=''; fi
 printf 'H:\t'
+if [[ "$appearance" == lazygit ]]; then
+  printf '%s╭─ %s' "$accent" "$reset"
+fi
 for index in "${!labels[@]}"; do
   ((index == 0)) || printf ' '
   style="$dim"; ((index != selected)) || style="$accent"
   printf '%s%s%s' "$style" "${labels[index]}" "$reset"
 done
 if [[ -n "$mode" ]]; then
-  padding=$((width - 2 - ${#tabs} - ${#mode}))
+  padding=$((width - 2 - ${#tabs} - ${#mode} - box_pad))
   ((padding < 1)) && padding=1
   printf '%*s%b%s%s' "$padding" '' "$mode_color" "$mode" "$reset"
 fi

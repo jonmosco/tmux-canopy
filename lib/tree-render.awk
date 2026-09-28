@@ -17,7 +17,8 @@ $1 == "D" {
     custom_s=$6; custom_w=$7; custom_p=$8
     nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
-    agents_enabled=($35 == "on")
+    appearance=($35 == "lazygit" ? "lazygit" : "classic")
+    agents_enabled=($36 == "on")
     if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
@@ -524,8 +525,22 @@ END {
     if (custom_s != "") session_icon=custom_s
     if (custom_w != "") window_icon=custom_w
     if (custom_p != "") pane_icon=custom_p
-    branch_mid=(icons == "ascii" ? "|-" : "├─"); branch_end=(icons == "ascii" ? "`-" : "└─")
-    stem_mid=(icons == "ascii" ? "|  " : "│  ")
+    if (appearance == "lazygit" && icons != "ascii") {
+        branch_mid="├─"; branch_end="╰─"; stem_mid="│  "
+        fold_open="▼ "; fold_closed="▶ "
+    } else if (appearance == "lazygit") {
+        branch_mid="|-"; branch_end="`-"; stem_mid="|  "
+        fold_open="v "; fold_closed="> "
+    } else {
+        branch_mid=(icons == "ascii" ? "|-" : "├─"); branch_end=(icons == "ascii" ? "`-" : "└─")
+        stem_mid=(icons == "ascii" ? "|  " : "│  ")
+        fold_open="▾ "; fold_closed="▸ "
+    }
+    if (appearance == "lazygit" && theme != "mono") {
+        fold_open=accent fold_open reset; fold_closed=accent fold_closed reset
+    }
+    show_session_glyph=(appearance == "lazygit" || custom_s != "")
+    show_window_glyph=(appearance == "lazygit" || custom_w != "")
     filter_session=current_s
     if (sidebar[current_p] == 1) {
         last=last_content[pw[current_p]]
@@ -566,19 +581,27 @@ END {
         # Reserve fzf's pointer gutter and keep operation warnings visible.
         available=width-2
         filter_label=(filter == "session" ? "Session" : filter == "unread" ? "Unread" : "All")
-        filter_sep=(icons == "ascii" ? " | " : " · ")
+        filter_sep=(icons == "ascii" ? " | " : appearance == "lazygit" ? " ─ " : " · ")
         if (window_filter != "") filter_label=filter_label "+W"
         if (title_filter != "") filter_label=filter_label "+T"
         reserved=text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)
+        box_pad=(appearance == "lazygit" ? 3 : 0)
         if (agent_view) {
             agent_overview()
             tabs="Tree Proc Buff [Agents]"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) {
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) {
                 overview_plain=overview_short_plain; overview_color=overview_short_color
             }
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="T P B [Agents]"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="T P B [A]"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="[A]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T P B [Agents]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T P B [A]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="[A]"
+        } else if (appearance == "lazygit") {
+            tabs=(agents_enabled ? "Tree Proc Buff Agents" : "Tree Proc Buff")
+            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "Tree P B A" : "Tree P B")
+            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "T P B A" : "T P B")
+            if (text_width(tabs)+reserved+box_pad>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
+            if (text_width(tabs)+text_width(filter_sep filter_label)+box_pad+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="Tree"
+            tabs=tabs filter_sep filter_label
         } else {
             tabs=(agents_enabled ? "[Tree] Proc Buff Agents" : "[Tree] Proc Buff")
             # Leave room for fzf's right edge and an active operation label.
@@ -588,9 +611,20 @@ END {
             if (text_width(tabs)+text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="[T]"
             tabs=tabs filter_sep filter_label
         }
-        padding=available-text_width(tabs)-length(mode)-(agent_view ? text_width(overview_plain)+1 : 0); if (padding<1) padding=1
-        styled_tabs=tabs; sub(/\[/,reset accent "[",styled_tabs); sub(/\]/,"]" reset dim,styled_tabs); styled_tabs=dim styled_tabs
-        row("H:",styled_tabs reset (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
+        padding=available-text_width(tabs)-length(mode)-box_pad-(agent_view ? text_width(overview_plain)+1 : 0); if (padding<1) padding=1
+        if (appearance == "lazygit" && !agent_view) {
+            styled_tabs=tabs
+            if (match(styled_tabs, /^(Tree|T|Proc|P|Buff|B|Agents|A)/)) {
+                active=substr(styled_tabs, RSTART, RLENGTH)
+                rest=substr(styled_tabs, RSTART+RLENGTH)
+                styled_tabs=accent active reset dim rest
+            } else styled_tabs=dim styled_tabs
+            header_text=accent "╭─ " reset styled_tabs reset
+        } else {
+            styled_tabs=tabs; sub(/\[/,reset accent "[",styled_tabs); sub(/\]/,"]" reset dim,styled_tabs); styled_tabs=dim styled_tabs
+            header_text=styled_tabs reset
+        }
+        row("H:",header_text (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
     }
     # A separate flat inventory ignores presentation folds without editing state.
     # Every linked occurrence retains its session, including pane targets.
@@ -617,9 +651,9 @@ END {
         if (!visible_s[s]) continue
         sm=(st == del ? "✕" : s == current_s && (collapsed[st] || !visible_w[s,current_w]) ? "●" : " ")
         meta=(agent_view ? " [" shown_agents_s[s] " agent" (shown_agents_s[s]==1 ? "" : "s") "]" : filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
-        session_glyph=(custom_s != "" ? dim session_icon reset " " : "")
+        session_glyph=(show_session_glyph ? dim session_icon reset " " : "")
         session_style=(s == current_s ? bold : "")
-        row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset,st)
+        row(st,(collapsed[st] ? fold_closed : fold_open) (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset,st)
         if (collapsed[st]) continue
         visible_wpos=0
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -633,7 +667,7 @@ END {
             collapsed_count=(!agent_view && !filtered && collapsed[wt] && np[w]>1 ? np[w] "p" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
-            window_glyph=(custom_w != "" ? dim window_icon reset " " : "")
+            window_glyph=(show_window_glyph ? dim window_icon reset " " : "")
             window_style=(w == current_w && s == current_s ? bold : "")
             if (!agent_view && compact_single && np[w] == 1 && shown_p[w] == 1) {
                 p=panes[w,1]; pt="P:" p
@@ -650,7 +684,7 @@ END {
             }
             grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
                 group_count[first_p[w]] == shown_p[w] && path[first_p[w]] != "" && !collapsed[wt])
-            window_text=dim branch reset " " (collapsed[wt] ? "▸ " : "▾ ") (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_work[w],w_done[w]) : "") dim meta reset
+            window_text=dim branch reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_work[w],w_done[w]) : "") dim meta reset
             window_text=edge_count(window_text,collapsed_count,width-3)
             if (grouped) {
                 continuation=dim stem stem_mid "   "

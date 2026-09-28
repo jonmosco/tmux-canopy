@@ -4,6 +4,8 @@
 
 ### Added
 
+- `@tmux-canopy-appearance` with `classic` (default) and `lazygit` presets for sidebar chrome, structural glyphs, and tree guides.
+- Tree reload on `after-split-window` so newly created panes appear without waiting for another focus change.
 - TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.
 - Doctor output lists Canopy-owned tmux bindings, options, hooks, and optional agent integration states.
 - Claude Code subagents appear as read-only child lines of their pane with type, status (working, needs input, done), and age; a waiting subagent counts toward attention roll-ups and `n`, and its approval request is attributed to it. Requires reinstalling the Claude integration for the new `SubagentStart`/`SubagentStop` hooks.
@@ -29,6 +31,7 @@
 
 ### Changed
 
+- Sidebar reloads from `cleanup refresh` skip clients mid window-transition so slot creation does not flash a stale tree.
 - Antigravity now uses its documented `PreInvocation`, `PostToolUse`, and `Stop` hooks in a named `~/.gemini/config/hooks.json` entry. Reinstalling the integration removes the older unsupported hook entries from Antigravity CLI settings. Its reporter never grants tool permission; verified permission and subagent states are unavailable until Antigravity exposes those events.
 - Agent awareness is opt-in through `@tmux-canopy-agents on`; the default sidebar focuses on tmux navigation, processes, and buffers. Agent tabs, controls, labels, scans, and pane-command monitoring are hidden until enabled.
 

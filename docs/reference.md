@@ -222,7 +222,7 @@ Press `m` on a window or pane. The source remains visible with a `⇢` marker wh
 - For a pane, select a destination pane or window and press `Enter`. A native tmux menu chooses left, right, above, below, or break into a new window.
 - Press `m` on the marked source or `c` anywhere to cancel.
 
-Ordinary `Enter` or double-click navigation does not synchronously reload the list inside the window transition. After focus settles, an owner-only background refresh updates the active markers. Native tmux keyboard, mouse, window creation, and session changes use the same mechanism; structural move operations still reload after completion.
+Ordinary `Enter` or double-click navigation does not synchronously reload the list inside the window transition. After focus settles, an owner-only background refresh updates the active markers. Native tmux keyboard, mouse, window creation, **pane splits**, and session changes use the same family of refresh paths; `after-split-window` forces a tree reload so a new pane appears immediately rather than only after the next focus change. Structural move operations still reload after completion.
 
 The green `●` identifies the current content pane and its window/session occurrence; the highlighted row/pointer identifies the object you are browsing. These are independent while you browse in the sidebar. When you leave it for a content pane, switch panes, or return focus to the sidebar, its pointer jumps to the current content pane, or its nearest visible window/session row when folded. Press `Ctrl-o` to do the same at any time. This clears an active search query but leaves folds and tree filters intact. If filters hide the location entirely, it rings the bell. A collapsed active window/session retains its green marker. Entering the sidebar retains the last content pane (using native `pane_last` or the remembered target), instead of marking the sidebar as the working pane.
 
@@ -275,6 +275,7 @@ set -g @tmux-canopy-notifications 'activity,bell'
 set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
 set -g @tmux-canopy-icon-theme 'auto' # Unicode by default; choose nerdfont explicitly
+set -g @tmux-canopy-appearance 'classic' # or 'lazygit'
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
@@ -397,6 +398,15 @@ The option model is provider-neutral: each provider owns a namespaced pane/windo
 
 ### Appearance
 
+`@tmux-canopy-appearance` selects sidebar chrome. The default `classic` look keeps
+today's tree: `▸`/`▾` folds, `├─`/`└─` guides, bracketed tabs (`[Tree] Proc Buff · All`),
+and session/window glyphs only when you set `@tmux-canopy-icon-session` /
+`@tmux-canopy-icon-window`. Set `lazygit` for section-style tabs (`╭─ Tree Proc Buff ─ All`),
+rounded end branches (`╰─`), cyan fold chevrons, and default session/window glyphs
+(Nerd Font when `@tmux-canopy-icon-theme` is `nerdfont`, otherwise Unicode/`S`/`W` in ASCII).
+Icon theme still controls application glyphs. Close and reopen the sidebar after
+changing appearance; `Ctrl-r` alone does not restyle a running fzf process.
+
 `ansi` uses the terminal's standard palette for application icons, active panes,
 notifications, and pending operations; `mono` disables source styling. Density
 may be `minimal`, `normal`, `compact`, or `detailed`:
@@ -419,9 +429,10 @@ may be `minimal`, `normal`, `compact`, or `detailed`:
 
 The active pane has one green dot. Its session and window names are bold; fzf's
 highlight and cyan pointer identify the selected row. A minimal combined window
-row carries the dot when it contains the active pane. Default session and window
-icons are omitted to leave room for names; explicitly configured icons remain.
-Expanded branches omit pane/client totals unless a Tree filter is active.
+row carries the dot when it contains the active pane. Classic appearance omits
+default session and window icons to leave room for names; lazygit shows them.
+Explicitly configured icons remain in both. Expanded branches omit pane/client
+totals unless a Tree filter is active.
 An ordinary collapsed window shows a muted pane count at the right edge when
 it hides more than one pane. Expanded windows, including adjacent panes that
 share one directory label, show no pane count. A collapsed filtered window
@@ -442,14 +453,15 @@ style uses a muted gray background and a cyan pointer while preserving icon and
 notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palette
 index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
 `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
-uses a cyan background. Monochrome mode also disables fzf UI colors. The compact
-header shows `Tree`, `Proc`, and `Buff`; enabling agent awareness adds `Agents`.
-Brackets mark the active view. The Tree filter follows as `· All`, `· Session`, or `· Unread` (`|` in
-ASCII); `+W` and `+T` mark name filters. Labels shorten when space is tight,
-while the enabled view shortcuts remain in help. Pending `MOVE`, `LINK`, or `DELETE` operations remain
-visible. The search input appears
+uses a cyan background. Monochrome mode also disables fzf UI colors. The header shows `Tree`, `Proc`, and `Buff`; enabling agent awareness adds `Agents`.
+In classic appearance, brackets mark the active view and the Tree filter follows as
+`· All`, `· Session`, or `· Unread` (`|` in ASCII). Lazygit appearance uses a leading
+`╭─` section mark and `─` before the filter label instead of brackets and `·`. Labels
+shorten when space is tight, while the enabled view shortcuts remain in help.
+Pending `MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
-hidden. Tree rows use `├─`, `└─`, and `│` guides with colored application icons.
+hidden. Classic tree rows use `├─`, `└─`, and `│` guides; lazygit uses `╰─` for the
+last sibling. Colored application icons apply in both appearances.
 
 ### Preview
 
@@ -516,7 +528,9 @@ Icon themes:
 | `ascii` | Plain ASCII markers |
 | `auto` | Use Unicode (the default); font availability cannot be inferred from the tmux server |
 
-Session and window names use the tree guides without a default icon. Recognized pane commands retain app glyphs, while shells and unknown commands leave that slot blank so names stay aligned. The Unicode theme uses compact symbols such as `✎` for editors, `◇` for Git, `✦` for Claude, and `◈` for Codex. The Nerd Font theme uses `◇` for Claude and `◈` for Codex because these shapes work with older Nerd Fonts; other recognized apps keep their Nerd Font glyphs. Set `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, or `@tmux-canopy-icon-pane` to override the corresponding structural icon.
+Session and window names omit default icons in classic appearance to leave room for
+names; the lazygit appearance shows them. Explicitly configured icons remain in both.
+Recognized pane commands retain app glyphs, while shells and unknown commands leave that slot blank so names stay aligned. The Unicode theme uses compact symbols such as `✎` for editors, `◇` for Git, `✦` for Claude, and `◈` for Codex. The Nerd Font theme uses `◇` for Claude and `◈` for Codex because these shapes work with older Nerd Fonts; other recognized apps keep their Nerd Font glyphs. Set `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, or `@tmux-canopy-icon-pane` to override the corresponding structural icon.
 
 Override a recognized app's icon with `@tmux-canopy-icon-<app>`; set it to `none` to leave its icon slot blank. These options work with every icon theme and take effect after `Ctrl-r` in the sidebar. For example:
 

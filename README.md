@@ -105,6 +105,7 @@ set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-icon-theme 'auto'     # auto (Unicode), unicode, ascii, or nerdfont
+set -g @tmux-canopy-appearance 'classic'  # classic or lazygit
 ```
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
