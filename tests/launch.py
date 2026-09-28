@@ -274,7 +274,7 @@ exec REAL --bind BINDING --bind LOAD "$@"
 
             # Exercise failures inside the actual subordinate providers.
             tm('send-keys', '-t', sidebar, 'Escape')
-            wait(lambda: '[1 Tree]' in tm('capture-pane', '-p', '-t', sidebar).splitlines()[0], 'navigation header with hidden search input')
+            wait(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar).splitlines()[0], 'navigation header with hidden search input')
             assert probe().endswith('|'), 'Escape must clear the search query'
             ps_failure = binary_dir / 'ps'
             ps_failure.write_text('#!/bin/bash\necho NOT_FOR_DIAGNOSTICS >&2\nexit 6\n')
@@ -283,24 +283,24 @@ exec REAL --bind BINDING --bind LOAD "$@"
             wait(lambda: 'data unavailable' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider failure')
             ps_failure.unlink()
             tm('send-keys', '-t', sidebar, 'C-r')
-            wait(lambda: '[2 Proc]' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider recovery')
+            wait(lambda: '[Proc]' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider recovery')
             buffer_failure.touch()
             tm('send-keys', '-t', sidebar, '3')
             wait(lambda: 'data unavailable' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider failure')
             assert 'PARTIAL_NOT_A_BUFFER' not in tm('capture-pane', '-p', '-t', sidebar)
             buffer_failure.unlink()
             tm('send-keys', '-t', sidebar, 'C-r')
-            wait(lambda: '[3 Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider recovery')
+            wait(lambda: '[Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider recovery')
             assert sp.check_output(['pgrep', '-P', parent, '-x', 'fzf'], text=True).strip() == ui_pid
             tm('send-keys', '-t', sidebar, '1')
-            wait(lambda: '[1 Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored')
+            wait(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored')
             print('ok - ps and tmux buffer failures propagate through the real providers and recover in place')
 
             format_marker = temp / 'format-job-executed'
             buffer_name = "buf' quoted, $literal #{version} #(touch " + shlex.quote(str(format_marker)) + ')'
             tm('set-buffer', '-b', buffer_name, 'fixture')
             tm('send-keys', '-t', sidebar, '3')
-            wait(lambda: '[3 Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer view')
+            wait(lambda: '[Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer view')
             terminal_output.clear()
             tm('send-keys', '-t', sidebar, 'a')
             wait(lambda: b'Buffer actions' in terminal_output, 'literal buffer context menu')
@@ -315,7 +315,7 @@ exec REAL --bind BINDING --bind LOAD "$@"
             assert not format_marker.exists()
             tm('delete-buffer', '-b', buffer_name)
             tm('send-keys', '-t', sidebar, '1')
-            wait(lambda: '[1 Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored after buffer menu')
+            wait(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored after buffer menu')
             print('ok - buffer context actions and diagnostics treat format-like buffer names as data')
 
             terminal_output.clear()

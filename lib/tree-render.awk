@@ -15,6 +15,8 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
+    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode antigravity make top",icon_keys," ")
+    for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
     if (!window_set) window_filter=$16
@@ -200,6 +202,43 @@ function agent_summary(need,work,done, glyph,color,count) {
     else return ""
     return " " color glyph (count>1 ? count : "") reset
 }
+# Count each detected pane once, even when its window is linked into several
+# sessions. A subagent can raise its parent pane's priority, but is not a
+# separate focus target. Unknown includes process-only and stale reports.
+function overview_add(glyph,count,color, space) {
+    if (!count) return
+    space=(overview_plain == "" ? "" : " ")
+    overview_plain=overview_plain space glyph count
+    overview_color=overview_color space color glyph count reset
+}
+function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,count) {
+    overview_plain=""; overview_color=""
+    for (p in agent_kind) {
+        if (!visible_p[p]) continue
+        total++
+        label=agent_label(p)
+        load_subagents(p)
+        if (label == "approval" || label == "interrupted" || sub_need[p]) need++
+        else if (label == "working" || sub_work[p]) work++
+        else if (label == "ready" || label == "turn ended" || label == "session ended") settled++
+        else unknown++
+    }
+    if (!total) {
+        overview_plain="0 agents"; overview_color=dim overview_plain reset
+        overview_short_plain="0"; overview_short_color=dim overview_short_plain reset
+        return
+    }
+    overview_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
+    overview_add(agent_work_badge,work,accent)
+    overview_add(agent_done_badge,settled,dim)
+    overview_add(icons == "ascii" ? "o" : "○",unknown,dim)
+    if (need) { glyph=(icons == "ascii" ? "!" : agent_need_badge); color=attention; count=need }
+    else if (work) { glyph=agent_work_badge; color=accent; count=work }
+    else if (settled) { glyph=agent_done_badge; color=dim; count=settled }
+    else { glyph=(icons == "ascii" ? "o" : "○"); color=dim; count=unknown }
+    overview_short_plain=glyph count "/" total
+    overview_short_color=color glyph count reset dim "/" total reset
+}
 # How long since the current report, for the row's right-aligned edge_count.
 # Independent of agent_badge()'s own text so it never competes for the same
 # inline width budget; edge_count already omits it gracefully when tight.
@@ -268,7 +307,7 @@ function agent_status_word(label, narrow) {
     if (label=="interrupted") return "INTERRUPTED"
     return "UNKNOWN"
 }
-# Claude Code subagents reported on their parent pane as id,type,status,updated,tool
+# Claude Code and Codex subagents reported on their parent pane as id,type,status,updated,tool
 # entries. They are shown, and counted, only while the parent's report is.
 function load_subagents(p, n,i,items,parts,age,state) {
     if (p in sub_count) return sub_count[p]
@@ -276,9 +315,9 @@ function load_subagents(p, n,i,items,parts,age,state) {
     if (subagent_list[p] == "" || agent_label(p) == "") return 0
     n=split(subagent_list[p],items,";")
     for (i=1;i<=n;i++) {
-        if (split(items[i],parts,",") != 5 || parts[4] !~ /^[0-9]+$/) continue
+        if (split(items[i],parts,",") != 5 || parts[4] !~ /^[0-9]+$/ || parts[3] == "done") continue
         age=now-parts[4]
-        state=(parts[3] == "done" ? "done" : age<0 || age>900 ? "unknown" : parts[3])
+        state=(age<0 || age>900 ? "unknown" : parts[3])
         sub_count[p]++
         sub_type[p,sub_count[p]]=parts[2]; sub_state[p,sub_count[p]]=state
         sub_age[p,sub_count[p]]=age
@@ -290,7 +329,6 @@ function load_subagents(p, n,i,items,parts,age,state) {
 function subagent_word(state, narrow) {
     if (state == "working") return narrow ? "wrk" : "WORKING"
     if (state == "needs-input") return narrow ? "req" : "NEEDS INPUT"
-    if (state == "done") return narrow ? "end" : "DONE"
     return narrow ? "?" : "UNKNOWN"
 }
 # One continuation line per subagent, drawn as children of the pane row.
@@ -308,7 +346,7 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
     return lines
 }
 # The status word itself carries the color (no bracket tag): bold for the two
-# actionable tiers (needs-input, working), plain dim for finished/unknown so
+# actionable tiers (needs-input, working), plain dim for unknown so
 # it recedes instead of competing for attention. Origin stays a small dim
 # suffix since ·plugin? still meaningfully flags an unconfirmed association.
 function agent_badge(p, label,style,origin,word) {
@@ -396,26 +434,65 @@ function appcolor(value, n, parts) {
     if (value == "gemini") return icon_white
     return icon_neutral
 }
-function appicon(value, n, parts) {
-    if (icons != "nerdfont") return pane_icon
+function app_key(value) {
+    if (value == "nvim") return "nvim"
+    if (value ~ /^(vim|vi)$/) return "vim"
+    if (value ~ /^(bash|zsh|fish|sh)$/) return "shell"
+    if (value ~ /^(node|npm|npx)$/) return "node"
+    if (value ~ /^(python|python3)$/) return "python"
+    if (value ~ /^(git|lazygit|hunk)$/) return "git"
+    if (value == "ssh") return "ssh"
+    if (value ~ /^(kubectl|oc|k9s)$/) return "kubectl"
+    if (value ~ /^(claude|claude-code)$/) return "claude"
+    if (value == "codex") return "codex"
+    if (value == "gemini") return "gemini"
+    if (value == "pi") return "pi"
+    if (value == "omp") return "omp"
+    if (value == "opencode") return "opencode"
+    if (value ~ /^(agy|antigravity)$/) return "antigravity"
+    if (value ~ /^(make|cmake|ninja)$/) return "make"
+    if (value ~ /^(top|htop|btop)$/) return "top"
+    return ""
+}
+function appicon(value, n, parts,key,override) {
     n=split(value,parts,"/"); value=parts[n]
     sub(/\.exe$/,"",value)
+    key=app_key(value)
+    override=(key == "" ? "" : icon_override[key])
+    if (override != "") return override == "none" ? " " : override
+    if (icons == "ascii") return pane_icon
+    if (icons == "unicode") {
+        if (value ~ /^(nvim|vim|vi)$/) return "✎"
+        if (value ~ /^(node|npm|npx)$/) return "◆"
+        if (value ~ /^(python|python3)$/) return "◉"
+        if (value ~ /^(git|lazygit|hunk)$/) return "◇"
+        if (value == "ssh") return "⇄"
+        if (value ~ /^(kubectl|oc|k9s)$/) return "✣"
+        if (value ~ /^(claude|claude-code)$/) return "✦"
+        if (value == "codex") return "◈"
+        if (value == "gemini") return "✧"
+        if (value ~ /^(pi|omp|opencode)$/) return "◎"
+        if (value ~ /^(agy|antigravity)$/) return "○"
+        if (value ~ /^(make|cmake|ninja)$/) return "✱"
+        if (value ~ /^(top|htop|btop)$/) return "▥"
+        return custom_p != "" ? pane_icon : " "
+    }
     if (value == "nvim") return ""
     if (value ~ /^(vim|vi)$/) return ""
-    if (value ~ /^(bash|zsh|fish|sh)$/) return ""
+    if (value ~ /^(bash|zsh|fish|sh)$/) return " "
     if (value ~ /^(node|npm|npx)$/) return ""
     if (value ~ /^(python|python3)$/) return ""
     if (value ~ /^(git|lazygit|hunk)$/) return "󰊢"
     if (value == "ssh") return "󰢹"
     if (value ~ /^(kubectl|oc|k9s)$/) return "󱃾"
-    if (value ~ /^(claude|claude-code)$/) return "󰔑"
-    if (value == "codex") return "󰟷"
+    if (value ~ /^(claude|claude-code)$/) return "◇"
+    if (value == "codex") return "◈"
     if (value == "gemini") return "󰊭"
     if (value ~ /^(pi|omp|opencode)$/) return "󰚩"
-    if (value ~ /^(agy|antigravity)$/) return "󰊠"
+    if (value ~ /^(agy|antigravity)$/) return "󰀘"
     if (value ~ /^(make|cmake|ninja)$/) return ""
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
-    return pane_icon
+    return custom_p != "" ? pane_icon : " "
 }
 END {
     if (ns == 0) exit
@@ -479,29 +556,35 @@ END {
     if (header && !switcher) {
         mode=(move != "" ? "MOVE" : link != "" ? "LINK" : del != "" ? "DELETE" : "")
         mode_color=(del != "" && move == "" && link == "" ? attention : accent)
+        mode_gap=(mode == "" ? 0 : 1)
         # Reserve fzf's pointer gutter and keep operation warnings visible.
         available=width-2
         filter_label=(filter == "session" ? "Session" : filter == "unread" ? "Unread" : "All")
+        filter_sep=(icons == "ascii" ? " | " : " · ")
         if (window_filter != "") filter_label=filter_label "+W"
         if (title_filter != "") filter_label=filter_label "+T"
-        reserved=length(filter_label)+3+(mode != "" ? length(mode)+1 : 0)
+        reserved=text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)
         if (agent_view) {
-            tabs="1 Tree  2 Proc  3 Buff  [4 Agents]"
-            if (length(tabs)>available) tabs="1 T  2 P  3 B  [4 Agt]"
-            if (length(tabs)>available) tabs="1 2 3 [4]"
+            agent_overview()
+            tabs="Tree Proc Buff [Agents]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) {
+                overview_plain=overview_short_plain; overview_color=overview_short_color
+            }
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="T P B [Agents]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="T P B [A]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1>available-2) tabs="[A]"
         } else {
-            tabs="[1 Tree]  2 Proc  3 Buff  4 Agents"
-            # Leave room for fzf's right edge; an exact fit can clip [All].
-            if (length(tabs)+reserved>available-2) tabs="[1 Tree]  2 Proc  3 Buff  4 Agt"
-            if (length(tabs)+reserved>available-2) tabs="[1 T]  2 P  3 B  4 Agt"
-            if (length(tabs)+reserved>available) tabs="[1] 2 3 4"
-            if (length(tabs)+reserved>available) tabs="[1]234"
-            if (length(tabs)+reserved>available) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
-            tabs=tabs " [" filter_label "]"
+            tabs="[Tree] Proc Buff Agents"
+            # Leave room for fzf's right edge and an active operation label.
+            if (text_width(tabs)+reserved>available-2) tabs="[Tree] P B A"
+            if (text_width(tabs)+reserved>available-2) tabs="[T] P B A"
+            if (text_width(tabs)+reserved>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
+            if (text_width(tabs)+text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="[T]"
+            tabs=tabs filter_sep filter_label
         }
-        padding=available-length(tabs)-length(mode); if (padding<1) padding=1
-        styled_tabs=tabs; sub(/\]/,"]" reset dim,styled_tabs)
-        row("H:",accent styled_tabs reset (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
+        padding=available-text_width(tabs)-length(mode)-(agent_view ? text_width(overview_plain)+1 : 0); if (padding<1) padding=1
+        styled_tabs=tabs; sub(/\[/,reset accent "[",styled_tabs); sub(/\]/,"]" reset dim,styled_tabs); styled_tabs=dim styled_tabs
+        row("H:",styled_tabs reset (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
     }
     # A separate flat inventory ignores presentation folds without editing state.
     # Every linked occurrence retains its session, including pane targets.
@@ -528,7 +611,7 @@ END {
         if (!visible_s[s]) continue
         sm=(st == del ? "✕" : s == current_s && (collapsed[st] || !visible_w[s,current_w]) ? "●" : " ")
         meta=(agent_view ? " [" shown_agents_s[s] " agent" (shown_agents_s[s]==1 ? "" : "s") "]" : filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
-        session_glyph=dim session_icon reset " "
+        session_glyph=(custom_s != "" ? dim session_icon reset " " : "")
         session_style=(s == current_s ? bold : "")
         row(st,(collapsed[st] ? "▸ " : "▾ ") (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset,st)
         if (collapsed[st]) continue

@@ -279,11 +279,11 @@ while True:
             print('ok - real Ctrl-a Space cycles seven content layouts without moving/restarting the sidebar')
 
             tm('send-keys', '-t', sidebar, '4')
-            wait(lambda: '[4 Agents]' in capture(), 'Agents view header')
+            wait(lambda: '[Agents]' in capture(), 'Agents view header')
             wait(lambda: 'No supported agent processes detected' in capture(), 'Agents empty view')
             assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
             tm('send-keys', '-t', sidebar, '1')
-            wait(lambda: '[1 Tree]' in capture(), 'Tree view restored')
+            wait(lambda: '[Tree]' in capture(), 'Tree view restored')
             assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids
             print('ok - 4 opens Agents view and 1 returns to Tree in the same fzf process')
         finally:

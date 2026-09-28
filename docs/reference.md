@@ -208,7 +208,7 @@ The same long-running fzf process switches among four sources:
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
 3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste, yank to the system clipboard, or delete.
-4. **Agents** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Pi, or Oh My Pi process. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. Ctrl-r refreshes the process inventory.
+4. **Agents** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Pi, or Oh My Pi process. The header summarizes unique agent panes by reported state: `◆` needs input, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. The header shortens the view tabs as needed, then shows the leading state and total (such as `◆2/5`) when space is tight. ASCII uses `!`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. Ctrl-r refreshes the process inventory.
 
 Process signals are revalidated immediately before delivery by walking the current parent chain back to the owning `#{pane_pid}`. Stale or reused PIDs are ignored.
 
@@ -274,7 +274,7 @@ set -g @tmux-canopy-last-window-key 'Tab'
 set -g @tmux-canopy-notifications 'activity,bell'
 set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
-set -g @tmux-canopy-icon-theme 'nerdfont'
+set -g @tmux-canopy-icon-theme 'auto' # Unicode by default; choose nerdfont explicitly
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
@@ -443,9 +443,12 @@ notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palett
 index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
 `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
 uses a cyan background. Monochrome mode also disables fzf UI colors. The compact
-header shows `1 Tree`, `2 Proc`, `3 Buff`, and `4 Agents`, with brackets around the active
-view. At narrow widths, labels shorten to `1 T`, `2 P`, `3 B`, and `4 Agt`. Pending
-`MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
+header shows `Tree`, `Proc`, `Buff`, and `Agents`, with brackets around the active
+view. The Tree filter follows as `· All`, `· Session`, or `· Unread` (`|` in
+ASCII); `+W` and `+T` mark name filters. Labels shorten when space is tight,
+while the `1`–`4` view
+shortcuts remain in help. Pending `MOVE`, `LINK`, or `DELETE` operations remain
+visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
 hidden. Tree rows use `├─`, `└─`, and `│` guides with colored application icons.
 
@@ -467,7 +470,7 @@ Adapters are optional and observational. Agent rows distinguish `[process]` (exe
 
 A collapsed window or session rolls up its descendants' hook-reported agent state into one badge, separate from unread terminal notifications, in priority order: an amber `◆` (`!` in ASCII) with a count means at least one descendant needs input (approval requested or interrupted); otherwise a cyan `▷` (`+` in ASCII) means descendants are working; otherwise a dim `✓` (`d` in ASCII) means descendants finished (ready, turn ended, or session ended). Reports the drawer calls unknown are not counted. This summary appears in both Tree and Agents views, disappears once every affected pane is expanded into view (each pane already carries its own `NEEDS INPUT`/`WORKING` status word there), and is unaffected by clearing unread notifications.
 
-Claude Code subagents appear as read-only lines beneath their parent pane in Tree and Agents views, each with its type (`Explore`, `general-purpose`, a custom agent name), a status word (`WORKING`, `NEEDS INPUT`, `DONE`, or `UNKNOWN` once its last report is 15 minutes old), and the time since that report. They come from the `SubagentStart` and `SubagentStop` hooks and from tool and permission events that Claude Code tags with the subagent's `agent_id`. A subagent's approval request is attributed to it in the drawer (`Request: general-purpose: Approval requested`), and only that subagent's own tool completion clears it. A subagent waiting on input counts toward the `◆` roll-up and is a target for `n` even if the main thread has since reported something else; its prompt appears in the parent pane, so selecting a subagent line selects that pane. Finished subagents stay listed as `DONE` for at least 30 seconds (Claude Code delivers a background subagent's result as a new turn) and are dropped at the next prompt after that; running background subagents stay, and at most eight are kept per pane. Subagent lines require multi-line rows and are omitted in compact density. Reinstall the Claude integration (`canopy integration install claude`) to add the two subagent hooks; `canopy integration status` reports `partial` until then.
+Claude Code and Codex subagents appear as read-only lines beneath their parent pane in Tree and Agents views, each with its type (`Explore`, `general-purpose`, a custom agent profile), a status word (`WORKING`, `NEEDS INPUT`, or `UNKNOWN` once its last report is 15 minutes old), and the time since that report. `SubagentStart` and `SubagentStop` supply the child identity and lifecycle. Claude Code can also tag tool and permission events with the subagent's `agent_id`. Codex currently documents `agent_id` for child start and stop; Canopy attributes a Codex tool or permission event to a child only when that event actually includes the ID. A tagged subagent approval request is attributed in the drawer. The matching tool event clears it, and stopping that subagent also clears it. A subagent waiting on input counts toward the `◆` roll-up and is a target for `n`; selecting its line focuses the parent pane. A stopped subagent disappears immediately; running background subagents stay, and at most eight are kept per pane. Subagent lines require multi-line rows and are omitted in compact density. Reinstall an older Claude or Codex integration with `canopy integration install claude codex` to add the two subagent hooks; `canopy integration status` reports `partial` until then.
 
 Press `n` from any view to jump straight to the next pane reporting needs-input (approval requested or interrupted), across every session and window, ignoring active Tree filters — the same "search everything" scope `Ctrl-g` already uses. Detection always runs at Agents-view strength, so an agent running under a wrapper shell is found even from the Tree view. Order follows the tree's own natural session/window/pane order; a linked window contributes one entry per session it's linked into. Repeated presses wrap back to the first match after the last, and `n` does nothing when no agent currently needs input.
 
@@ -481,9 +484,9 @@ For Pi, copy [pi-canopy.extension.ts](pi-canopy.extension.ts) into `~/.pi/agent/
 
 ### Codex hook setup
 
-Codex CLI can optionally report lifecycle events to the selected pane's agent drawer. For manual setup, copy [the example hook configuration](codex-hooks.example.json) to `~/.codex/hooks.json`, replace every `/absolute/path/to/tmux-canopy` with your installation's absolute path, and merge its `hooks` object with any hooks you already use. Python 3 is required for this optional script. In Codex, use `/hooks` to review and trust the new definition. The hook runs only for Codex processes launched within tmux. See [OpenAI's hook documentation](https://learn.chatgpt.com/docs/hooks) for the event contract and trust flow.
+Codex CLI can optionally report lifecycle events to the selected pane's agent drawer. `./canopy integration install codex` merges Canopy's hooks into `~/.codex/hooks.json`, or `$CODEX_HOME/hooks.json` when `CODEX_HOME` is set. It includes `SubagentStart` and `SubagentStop` so Codex children appear under their parent pane. For manual setup, copy [the example hook configuration](codex-hooks.example.json) there, replace every `/absolute/path/to/tmux-canopy` with your installation's absolute path, and merge its `hooks` object with any hooks you already use. Python 3 is required for this optional script. Codex enables hooks by default; if your `config.toml` explicitly has `[features] hooks = false`, change it to `true`. Restart Codex inside tmux, then use `/hooks` to review and trust the new definition. See [OpenAI's hook documentation](https://learn.chatgpt.com/docs/hooks) for the event contract and trust flow.
 
-The reporter stores only bounded status, tool name, optional approval description and command, session/turn identity, pane PID, Codex process PID/start time, and update time in tmux pane options. It never approves, denies, sends input, or changes agent permissions. A `PermissionRequest` appears as **Approval requested (hook report)**: the event does not prove a person must respond, because another reviewer may approve automatically. A matching `PostToolUse`, a new prompt, turn end, interruption, or session end clears that request. A report older than 15 minutes becomes **Unknown (report stale)**. If the pane or Codex process changes, the report is ignored. `Stop` means **Turn ended**, not task finished. Claude Code and Codex without hooks continue to show the unverified screen summary.
+The reporter stores only bounded status, tool name, optional approval description and command, session/turn identity, pane PID, Codex process PID/start time, and update time in tmux pane options. It never approves, denies, sends input, or changes agent permissions. A `PermissionRequest` appears as **Approval requested (hook report)**: the event does not prove a person must respond, because another reviewer may approve automatically. A matching `PreToolUse` clears it if Codex delivers that event after approval; otherwise a matching `PostToolUse` clears it when the tool finishes. A new prompt, turn end, interruption, or session end also clears it. Matching ignores the optional human approval description, which may be absent from later tool events. A report older than 15 minutes becomes **Unknown (report stale)**. If the pane or Codex process changes, the report is ignored. `Stop` means **Turn ended**, not task finished. Claude Code and Codex without hooks continue to show the unverified screen summary.
 
 Tree and Agents pane rows show a bold colored status word for fresh reports, such as `WORKING` or `NEEDS INPUT`, with a dim `·hook` origin marker; finished/unknown states render dim and unbolded so they recede visually. In the Agents view, `[process]` means executable detection only. Labels require matching pane and process identities plus a recent hook report; screen hints never become row status. Hook events refresh rows without switching views; a bounded expiry worker refreshes when a report becomes stale. tmux 3.8 and later also monitor pane command changes once per second; tmux 3.7c refreshes on focus changes and Ctrl-r. The drawer shows the report source, request details when available, and unverified screen hints otherwise. On Linux, the Agents view uses an optional Python 3 `/proc` scan; it falls back to `ps` when Python or `/proc` is unavailable.
 
@@ -499,18 +502,40 @@ This protection covers `prefix + Space` and the sidebar layout menu. Direct nati
 
 ### Icons
 
-Application icons retain command-aware colors: blue editors and Kubernetes tools, yellow Node/Python and Claude, red Git/npm/OpenShift, cyan SSH/Codex/system monitors, white Gemini, and magenta pi/OpenCode. Shells and unknown commands use the terminal foreground. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
+Application icons retain command-aware colors: blue editors and Kubernetes tools, yellow Node/Python and Claude, red Git/npm/OpenShift, cyan SSH/Codex/Antigravity/system monitors, white Gemini, and magenta pi/OpenCode. In Unicode and Nerd Font themes, shells and unknown commands show their names without a default icon; ASCII retains its plain pane marker. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
 
 Icon themes:
 
 | Theme | Behavior |
 |---|---|
-| `nerdfont` | tmux glyph (``) on session rows, with Nerd Font window and command-aware pane icons |
-| `unicode` | Portable Unicode geometric glyphs |
+| `nerdfont` | Nerd Font glyphs for recognized apps; requires a Nerd Font in the displaying terminal |
+| `unicode` | Command-aware Unicode symbols with no Nerd Font dependency |
 | `ascii` | Plain ASCII markers |
-| `auto` | Use Nerd Font when Fontconfig finds one; otherwise Unicode |
+| `auto` | Use Unicode (the default); font availability cannot be inferred from the tmux server |
 
-Session rows show a tmux icon in the Nerd Font theme, `◈` in Unicode, or `S` in ASCII. Pane icons recognize common commands including Neovim, shells, Node.js, Python, Git, SSH, Kubernetes tools, system monitors, and AI coding agents. In the Nerd Font theme, Claude Code and Codex use their own brand glyphs and Gemini uses the Google glyph; Pi, Oh My Pi, and OpenCode share a generic robot glyph. Unknown commands receive the generic terminal glyph. Override the structural icons with `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, and `@tmux-canopy-icon-pane`.
+Session and window names use the tree guides without a default icon. Recognized pane commands retain app glyphs, while shells and unknown commands leave that slot blank so names stay aligned. The Unicode theme uses compact symbols such as `✎` for editors, `◇` for Git, `✦` for Claude, and `◈` for Codex. The Nerd Font theme uses `◇` for Claude and `◈` for Codex because these shapes work with older Nerd Fonts; other recognized apps keep their Nerd Font glyphs. Set `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, or `@tmux-canopy-icon-pane` to override the corresponding structural icon.
+
+Override a recognized app's icon with `@tmux-canopy-icon-<app>`; set it to `none` to leave its icon slot blank. These options work with every icon theme and take effect after `Ctrl-r` in the sidebar. For example:
+
+```tmux
+set -g @tmux-canopy-icon-claude '✦'
+set -g @tmux-canopy-icon-codex 'none'
+```
+
+| Option suffix | Commands covered |
+|---|---|
+| `nvim`, `vim` | `nvim`; `vim`, `vi` |
+| `shell` | `bash`, `zsh`, `fish`, `sh` |
+| `node`, `python` | `node`, `npm`, `npx`; `python`, `python3` |
+| `git`, `ssh`, `kubectl` | `git`, `lazygit`, `hunk`; `ssh`; `kubectl`, `oc`, `k9s` |
+| `claude`, `codex`, `gemini` | `claude`, `claude-code`; `codex`; `gemini` |
+| `pi`, `omp`, `opencode` | Each matching command |
+| `antigravity` | `agy`, `antigravity` |
+| `make`, `top` | `make`, `cmake`, `ninja`; `top`, `htop`, `btop` |
+
+The existing `@tmux-canopy-icon-pane` controls the fallback for unrecognized commands. App override values are scrubbed of control bytes before rendering; keep them to one terminal glyph for alignment.
+
+For Nerd Font icons, install and select a recent Nerd Font or Symbols Nerd Font on the computer displaying the terminal. A font found on the tmux server does not establish that a local or remote terminal can render it. If a symbol appears as a question mark, select the `unicode` or `ascii` theme, or update the terminal font and keep `nerdfont` explicitly selected. Reload the tmux configuration after changing the theme.
 
 Generic activity can be noisy for log tails. Use `bell`, `activity,bell`, or `none` according to the desired signal level. Use `notification-target status` to return alert presentation to the normal tmux status bar without collecting sidebar unread state. Silence monitoring is only enabled when `silence` or `all` is configured.
 

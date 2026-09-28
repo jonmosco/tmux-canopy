@@ -2,6 +2,7 @@
 """Aggregated agent-attention summaries on collapsed window/session rows."""
 import os
 from pathlib import Path
+import re
 import subprocess as sp
 import tempfile
 
@@ -93,7 +94,52 @@ def main():
         mono_collapsed = render(collapsed='W:@0:$0\n', theme='mono', extra_rows=[need_pane, verified_10])
         assert '◆' in mono_collapsed['W:@0:$0'] and '\x1b' not in mono_collapsed['W:@0:$0']
 
-        print('ok - agent attention summaries aggregate onto collapsed window/session rows with needs-input priority')
+        # The Agents header summarizes unique panes, including a subagent
+        # request, even when the same window appears in two sessions.
+        sub_pane = agent_pane('%15', '@0', '7', 'claude', '116', 'working')
+        sub_pane.append('child,Explore,needs-input,100,Bash')
+        unseen_pane = agent_pane('%16', '@0', '8', 'gemini', '117', '')
+        overview_data = [
+            ['D', 'unicode', 'none', 'ansi', 'normal', '', '', '', '%0', '@0', '$0', '42', 'host'],
+            ['S', '$0', 'one', '1'], ['S', '$1', 'two', '1'],
+            ['W', '$0', '@0', '0', 'agents', '2', 'off', '', '', ''],
+            ['W', '$1', '@0', '0', 'agents', '2', 'off', '', '', ''],
+            need_pane, work_pane, done_pane, sub_pane, unseen_pane,
+            ['A', '%10', 'claude'], ['A', '%11', 'codex'], ['A', '%13', 'pi'],
+            ['A', '%15', 'claude'], ['A', '%16', 'gemini'],
+            verified_10, verified_11, verified_13, ['V', '%15'],
+        ]
+        state.write_text('')
+
+        def overview(width, icons='unicode', theme='ansi', raw=False):
+            overview_data[0][1] = icons
+            overview_data[0][3] = theme
+            overview_data[0][11] = str(width)
+            output = sp.check_output(['awk', '-v', 'stable=1', '-v', 'agent_view=1',
+                                      '-v', 'header=1', '-v', 'now=100', '-f',
+                                      str(ROOT/'lib/tree-render.awk'), str(state), '-'],
+                                     input='\n'.join('\x1f'.join(row) for row in overview_data)+'\n',
+                                     text=True, env=os.environ | {'TMUX_CANOPY_RENDER_CLIENT': '',
+                                                                   'TMUX_CANOPY_RENDER_HOME': '/home/test'})
+            header = output.splitlines()[0].split('\t')[1]
+            return header if raw else re.sub(r'\x1b\[[0-9;]*m', '', header)
+
+        normal = overview(42)
+        narrow = overview(24)
+        ascii_header = overview(42, icons='ascii', theme='mono')
+        state.write_text('MOVE\tP:%10\n')
+        narrow_with_action = overview(24)
+        assert '[Agents] ◆2 ▷1 ✓1 ○1' in normal, normal
+        assert '\x1b[0m\x1b[1;36m[Agents]' in overview(42, raw=True)
+        assert '[Agents] ◆2/5' in narrow, narrow
+        assert '[Agents] !2 +1 d1 o1' in ascii_header, ascii_header
+        assert '[A] ◆2/5' in narrow_with_action and narrow_with_action.endswith('MOVE'), narrow_with_action
+        overview_data = overview_data[:5]
+        empty_with_action = overview(24)
+        assert '[A] 0 ' in empty_with_action and empty_with_action.endswith('MOVE'), empty_with_action
+        assert len(empty_with_action) <= 22, empty_with_action
+
+        print('ok - agent attention summaries and unique-pane Agents overview with narrow and ASCII layouts')
 
 
 if __name__ == '__main__':

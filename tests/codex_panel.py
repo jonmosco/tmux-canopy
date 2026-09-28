@@ -103,9 +103,17 @@ try:
         hook({'hook_event_name': 'PostToolUse', 'session_id': 'codex-session',
               'turn_id': 't1', 'tool_name': 'other_tool', 'tool_input': {}})
         assert 'Status: Approval requested (hook report)' in report()
+        hook({'hook_event_name': 'PreToolUse', 'session_id': 'codex-session',
+              'turn_id': 't1', 'tool_name': 'other_tool', 'tool_input': {}})
+        assert 'Status: Approval requested (hook report)' in report()
+        hook({'hook_event_name': 'PreToolUse', 'session_id': 'codex-session',
+              'turn_id': 't1', 'tool_name': 'shell_command',
+              'tool_input': {'command': 'npm install example'}})
+        assert 'Status: Working' in report() and 'npm install example' not in report()
+        hook(request)
         hook({'hook_event_name': 'PostToolUse', 'session_id': 'codex-session',
               'turn_id': 't1', 'tool_name': 'shell_command',
-              'tool_input': request['tool_input']})
+              'tool_input': {'command': 'npm install example'}})
         assert 'Status: Working' in report() and 'npm install example' not in report()
         assert 'WORKING' in tree_row(agent) and '·hook' in tree_row(agent)
         hook({'hook_event_name': 'Stop', 'session_id': 'codex-session', 'turn_id': 't1'})
@@ -160,7 +168,7 @@ try:
         source = run('sidebar-source', '--stable')
         rows = [line.split('\t') for line in source.splitlines()]
         ids = [row[2] for row in rows]
-        assert ids[0] == 'H:tree' and '[4 Agents]' in rows[0][1]
+        assert ids[0] == 'H:tree' and '[Agents]' in rows[0][1]
         assert f'P:{agent}:{session}' in ids and f'P:{claude}:{session}' in ids
         assert f'P:{other}:{session}' not in ids
         assert f'S:{empty_session}' not in ids

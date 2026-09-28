@@ -98,8 +98,10 @@ try:
         assert f'P:{pane}\t' not in needs_input()
         event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a1', 'agent_type': 'Explore'})
         lines = pane_row().split('\n')
-        assert any('Explore' in line and 'DONE' in line for line in lines[1:]), lines
-        print('ok - subagent completion shows DONE without changing the main thread status')
+        assert not any('Explore' in line for line in lines[1:]), lines
+        assert all(not entry.startswith('a1,') for entry in option('subagents').split(';'))
+        assert option('status') == 'working'
+        print('ok - subagent completion removes its row without changing the main thread status')
 
         # A subagent still waiting on input keeps the pane actionable even after
         # the main thread reports something else.
@@ -114,33 +116,42 @@ try:
         state.write_text('')
         print('ok - a waiting subagent rolls up as needs-input and is a jump target')
 
-        # A background subagent's result arrives as a new turn right after it
-        # stops: the new prompt must not hide its DONE line.
+        event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a2',
+                         'agent_type': 'general-purpose'})
+        assert option('status') == 'turn-ended' and option('request_agent') == ''
+        assert option('subagents') == '' and f'P:{pane}\t' not in needs_input()
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a4', 'agent_type': 'Plan'})
+        event(session | {'hook_event_name': 'PermissionRequest', 'agent_id': 'a4',
+                         'agent_type': 'Plan', 'tool_name': 'Bash'})
+        event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a4', 'agent_type': 'Plan'})
+        assert option('status') == 'working' and option('request_agent') == ''
+        assert option('subagents') == '' and f'P:{pane}\t' not in needs_input()
+        print('ok - child completion clears outstanding requests and removes its row')
+
+        # A background child disappears as soon as it stops, even if the
+        # parent's next prompt has not yet arrived.
         event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a3', 'agent_type': 'Research'})
         event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a3', 'agent_type': 'Research'})
+        assert option('subagents') == ''
         event(session | {'hook_event_name': 'UserPromptSubmit'})
         lines = pane_row().split('\n')
-        assert any('Research' in line and 'DONE' in line for line in lines[1:]), lines
-        assert any('Explore' in line and 'DONE' in line for line in lines[1:]), lines
-        print('ok - a just-finished subagent stays DONE across the turn that delivers its result')
+        assert not any('Research' in line or 'Explore' in line for line in lines[1:]), lines
+        print('ok - completed background children stay absent on the next prompt')
 
-        # Once finished long enough ago, the next prompt forgets it; running ones stay.
-        # Session end clears all.
-        aged = ';'.join(entry if ',done,' not in entry else
-                        ','.join(part if index != 3 else str(int(part) - 600)
-                                 for index, part in enumerate(entry.split(',')))
-                        for entry in option('subagents').split(';'))
-        tm('set-option', '-p', '-t', pane, '@tmux_canopy_agent_subagents', aged)
+        # Legacy DONE entries are hidden and pruned on the next hook event.
+        tm('set-option', '-p', '-t', pane, '@tmux_canopy_agent_subagents', 'old,Explore,done,1,')
+        assert not any('Explore' in line for line in pane_row().split('\n')[1:])
         event(session | {'hook_event_name': 'UserPromptSubmit'})
-        lines = pane_row().split('\n')
-        assert not any('Explore' in line or 'Research' in line for line in lines), lines
-        assert any('general-purpose' in line for line in lines[1:]), lines
+        assert option('subagents') == ''
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a2',
+                         'agent_type': 'general-purpose'})
+        assert any('general-purpose' in line for line in pane_row().split('\n')[1:])
         for index in range(12):
             event(session | {'hook_event_name': 'SubagentStart', 'agent_id': f'b{index}', 'agent_type': 'Plan'})
         assert len(option('subagents').split(';')) == 8
         event(session | {'hook_event_name': 'SessionEnd'})
         assert option('subagents') == ''
-        print('ok - finished subagents clear on the next prompt, the list is capped, and session end clears it')
+        print('ok - legacy rows are pruned, the list is capped, and session end clears it')
 
         # Delimiters and control bytes in agent_type cannot forge extra entries.
         event(session | {'hook_event_name': 'SessionStart'})

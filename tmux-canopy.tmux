@@ -76,11 +76,9 @@ if [[ "$resize_mode" != 'staged' && "$resize_mode" != 'preset' && "$resize_mode"
 fi
 
 if [[ "$icon_theme" == 'auto' ]]; then
-  if command -v fc-list >/dev/null 2>&1 && fc-list : family 2>/dev/null | grep -Eqi 'Nerd Font|Symbols Nerd'; then
-    icon_theme=nerdfont
-  else
-    icon_theme=unicode
-  fi
+  # tmux cannot inspect the font selected by each attached terminal client.
+  # A Nerd Font installed on the server is not evidence that its glyphs render.
+  icon_theme=unicode
 fi
 if [[ "$icon_theme" != 'nerdfont' && "$icon_theme" != 'unicode' && "$icon_theme" != 'ascii' ]]; then
   icon_theme=unicode
