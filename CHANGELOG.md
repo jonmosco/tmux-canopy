@@ -4,6 +4,7 @@
 
 ### Added
 
+- Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.
 - Opt-in `@tmux-canopy-animate` moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
 - `@tmux-canopy-appearance` with `classic` (default) and `lazygit` presets for sidebar chrome, structural glyphs, and tree guides.
 - Tree reload on `after-split-window` so newly created panes appear without waiting for another focus change.
