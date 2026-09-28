@@ -428,14 +428,16 @@ def live_agents():
         if pid.isdigit() and sidebar != "1" and slot != "1":
             owners[int(pid)] = (pane, source, updated)
     parents, found = {}, {}
-    records = subprocess.run(("ps", "-eo", "pid=,ppid=,comm="), text=True,
+    # args= exposes argv0 for Node CLIs whose comm is a thread name (e.g. MainThread).
+    records = subprocess.run(("ps", "-eo", "pid=,ppid=,args="), text=True,
                              capture_output=True, timeout=5, check=False).stdout
     candidates = []
     for line in records.splitlines():
         parts = line.split(None, 2)
         if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
             parents[int(parts[0])] = int(parts[1])
-            kind = PROCESS_KINDS.get(os.path.basename(parts[2]).removesuffix(".exe"))
+            argv0 = parts[2].split(None, 1)[0]
+            kind = PROCESS_KINDS.get(os.path.basename(argv0).removesuffix(".exe"))
             if kind:
                 candidates.append((int(parts[0]), kind))
     for pid, kind in candidates:

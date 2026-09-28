@@ -2,7 +2,7 @@
 """Read a tmux snapshot and emit live agent and verified-report records."""
 import os
 import sys
-from agent_kinds import KINDS
+from agent_kinds import KINDS, process_name
 
 SEP = '\x1f'
 
@@ -49,11 +49,7 @@ def main():
         for entry in entries:
             if not entry.name.isdigit():
                 continue
-            try:
-                with open(f'{entry.path}/comm', encoding='utf-8') as stream:
-                    name = stream.read().strip().removesuffix('.exe')
-            except OSError:
-                continue
+            name = process_name(entry.name)
             if name not in KINDS:
                 continue
             pid = int(entry.name)

@@ -9,15 +9,16 @@ canopy_ps_status=0
 canopy_load_ps_snapshot() {
   ((canopy_ps_loaded)) && return "$canopy_ps_status"
   canopy_ps_loaded=1
-  local pid ppid w1 w2 w3 w4 w5 comm raw
-  raw="$(ps -eo pid=,ppid=,lstart=,comm= 2>/dev/null)"
+  local pid ppid w1 w2 w3 w4 w5 argv0 rest raw
+  # args= exposes argv0 for Node CLIs whose comm is a thread name (e.g. MainThread).
+  raw="$(ps -eo pid=,ppid=,lstart=,args= 2>/dev/null)"
   canopy_ps_status=$?
-  while IFS=' ' read -r pid ppid w1 w2 w3 w4 w5 comm; do
+  while IFS=' ' read -r pid ppid w1 w2 w3 w4 w5 argv0 rest; do
     [[ $pid =~ ^[1-9][0-9]*$ ]] || continue
     CANOPY_PPID[$pid]=$ppid
     CANOPY_LSTART[$pid]="$w1 $w2 $w3 $w4 $w5"
-    comm=${comm##*/}
-    CANOPY_COMM[$pid]=${comm%.exe}
+    argv0=${argv0##*/}
+    CANOPY_COMM[$pid]=${argv0%.exe}
   done <<< "$raw"
   return "$canopy_ps_status"
 }
@@ -40,12 +41,28 @@ canopy_proc_stat() {
   CANOPY_PARENT=${fields[1]}
   CANOPY_BIRTH=${fields[19]}
 }
+# Prefer argv0 basename from cmdline so Node-based CLIs still match.
+canopy_process_name() {
+  local pid=$1 argv0 name
+  [[ $pid =~ ^[1-9][0-9]*$ ]] || return 1
+  if [[ -r /proc/$pid/cmdline ]]; then
+    IFS= read -r -d '' argv0 < "/proc/$pid/cmdline" 2>/dev/null || true
+    name=${argv0##*/}
+    name=${name%.exe}
+    if [[ -n $name ]]; then
+      printf '%s\n' "$name"
+      return 0
+    fi
+  fi
+  [[ -r /proc/$pid/comm ]] || return 1
+  IFS= read -r name < "/proc/$pid/comm" 2>/dev/null || return 1
+  printf '%s\n' "${name%.exe}"
+}
 canopy_process_identity() {
   local root=$1 pid=$2 birth=$3 kind=${4:-codex} current=$2 depth=0 name
   [[ $root =~ ^[1-9][0-9]*$ && $pid =~ ^[1-9][0-9]*$ ]] || return 1
   if [[ -d /proc/self ]]; then
-    [[ -r /proc/$pid/comm ]] || return 1
-    IFS= read -r name < "/proc/$pid/comm" 2>/dev/null || return 1
+    name="$(canopy_process_name "$pid")" || return 1
     canopy_agent_name_matches "$name" "$kind" || return 1
     canopy_proc_stat "$pid" || return 1
     [[ $CANOPY_BIRTH == "$birth" ]] || return 1
