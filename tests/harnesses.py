@@ -26,7 +26,7 @@ try:
         temp = Path(directory)
         state = temp / 'state'
         state.touch()
-        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy')
+        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'agent')
         for name in names:
             install_agent_fixture(temp / name)
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '100', '-y', '30',
@@ -55,7 +55,13 @@ try:
             result = sp.run([str(ROOT / 'scripts/agent-hook'), kind, *([name] if name else [])],
                             input=json.dumps(payload), env=script_env, text=True,
                             capture_output=True, timeout=10)
-            expected_out = ('{"decision": ""}\n' if name == 'Stop' else '{}\n') if kind == 'agy' else ''
+            if kind == 'agy':
+                expected_out = '{"decision": ""}\n' if name == 'Stop' else '{}\n'
+            elif kind == 'cursor-agent':
+                expected_out = ('{"permission":"allow"}\n' if payload.get('hook_event_name') == 'subagentStart'
+                                else '{}\n')
+            else:
+                expected_out = ''
             assert result.returncode == 0 and result.stdout == expected_out, result.stderr
 
         agent_view = run('tree-source', pane, ['--agents'])
@@ -123,9 +129,15 @@ try:
         event('opencode', panes['opencode'], {'type': 'permission.asked', 'properties': {'sessionID': 'other'}})
         assert 'Status: Working' in run('agent-preview', panes['opencode'], ['P:' + panes['opencode']])
 
+        event('cursor-agent', panes['agent'], {'hook_event_name': 'sessionStart', 'conversation_id': 'ca1'})
+        event('cursor-agent', panes['agent'], {'hook_event_name': 'beforeSubmitPrompt', 'conversation_id': 'ca1'})
+        assert 'Status: Working' in run('agent-preview', panes['agent'], ['P:' + panes['agent']])
+
         agent_view = run('tree-source', pane, ['--agents'])
         assert 'WORKING' in agent_view and 'NEEDS INPUT' in agent_view and '·hook' in agent_view
         assert 'WORKING' in agent_view and '·plugin?' in agent_view and 'TURN ENDED' in agent_view
+        cursor_row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes['agent'] + '\t'))
+        assert 'cursor-agent' in cursor_row and 'WORKING' in cursor_row, cursor_row
         tm('set-option', '-pq', '-t', panes['pi'], '@tmux_canopy_agent_updated', '1')
         stale_view = run('tree-source', pane, ['--agents'])
         stale_row = next(line for line in stale_view.splitlines() if line.startswith('P:' + panes['pi'] + '\t'))
