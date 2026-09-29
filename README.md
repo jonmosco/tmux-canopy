@@ -108,8 +108,7 @@ set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
 set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
-set -g @tmux-canopy-icon-theme 'auto'     # auto (Unicode), unicode, ascii, or nerdfont
-set -g @tmux-canopy-appearance 'classic'  # classic or lazygit
+set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
 set -g @tmux-canopy-animate 'off'         # on: WORKING status highlight band
 ```
 
@@ -144,8 +143,11 @@ With agent awareness enabled, `4` opens Agents, `n` jumps to the next pane repor
 The default Tree view uses one active-pane dot, shorter branch prefixes, and
 directory labels that adapt to sidebar width. For the leanest view, set
 `@tmux-canopy-density 'minimal'` and press `Ctrl-r` in the sidebar.
-Recognized app icons can be changed with options such as
-`@tmux-canopy-icon-codex`; use `none` to hide one. See [Icons](docs/reference.md#icons).
+The default appearance groups panes by working directory and uses folder and
+application icons. Set `@tmux-canopy-appearance 'ascii'` for an ASCII-only view
+without glyph-font requirements. Recognized app icons can be changed with
+options such as `@tmux-canopy-icon-codex`; use `none` to hide one. See
+[Icons](docs/reference.md#icons).
 
 See the [configuration and command reference](docs/reference.md) for all controls, appearance settings, notifications, and architecture.
 

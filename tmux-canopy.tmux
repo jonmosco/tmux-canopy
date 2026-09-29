@@ -54,7 +54,7 @@ width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 : "${notification_target:=sidebar}"
 : "${silence_seconds:=30}"
 : "${icon_theme:=auto}"
-: "${appearance:=classic}"
+: "${appearance:=default}"
 : "${animate:=off}"
 : "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
@@ -87,9 +87,12 @@ fi
 if [[ "$icon_theme" != 'nerdfont' && "$icon_theme" != 'unicode' && "$icon_theme" != 'ascii' ]]; then
   icon_theme=unicode
 fi
-if [[ "$appearance" != 'lazygit' && "$appearance" != 'classic' && "$appearance" != 'pills' && "$appearance" != 'places' ]]; then
-  appearance=classic
-fi
+case "$appearance" in
+  default|'') appearance=places ;;
+  ascii) appearance=places; icon_theme=ascii ;;
+  classic) appearance=classic ;; # Preserve explicitly configured older setups.
+  *) appearance=places ;;
+esac
 if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
   animate=off
 fi

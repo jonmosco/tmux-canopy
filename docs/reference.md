@@ -275,8 +275,7 @@ set -g @tmux-canopy-last-window-key 'Tab'
 set -g @tmux-canopy-notifications 'activity,bell'
 set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
-set -g @tmux-canopy-icon-theme 'auto' # Unicode by default; choose nerdfont explicitly
-set -g @tmux-canopy-appearance 'classic' # or 'lazygit' or 'pills'
+set -g @tmux-canopy-appearance 'default' # or 'ascii'
 set -g @tmux-canopy-animate 'off' # on: moving highlight on WORKING
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
@@ -400,14 +399,13 @@ The option model is provider-neutral: each provider owns a namespaced pane/windo
 
 ### Appearance
 
-`@tmux-canopy-appearance` selects sidebar chrome. The default `classic` look keeps
-today's tree: `▸`/`▾` folds, `├─`/`└─` guides, bracketed tabs (`[Tree] Proc Buff · All`),
-and session/window glyphs only when you set `@tmux-canopy-icon-session` /
-`@tmux-canopy-icon-window`. Set `lazygit` for section-style tabs (`╭─ Tree Proc Buff ─ All`),
-rounded end branches (`╰─`), cyan fold chevrons, and default session/window glyphs
-(Nerd Font when `@tmux-canopy-icon-theme` is `nerdfont`, otherwise Unicode/`S`/`W` in ASCII).
-Icon theme still controls application glyphs. Close and reopen the sidebar after
-changing appearance; `Ctrl-r` alone does not restyle a running fzf process.
+`@tmux-canopy-appearance` has two values. `default` groups panes by working
+directory and shows folder and application
+icons using Unicode glyphs; `ascii` switches to an ASCII-only rendering for
+terminals without glyph support. `@tmux-canopy-icon-theme` remains available for
+advanced customization. Close and reopen the
+sidebar after changing appearance; `Ctrl-r` alone does not restyle a running fzf
+process.
 
 `@tmux-canopy-animate on` (default `off`) adds a moving reverse-video highlight
 band across visible `WORKING` / `wrk` status words while an agent is working.
@@ -440,8 +438,8 @@ may be `minimal`, `normal`, `compact`, or `detailed`:
 
 The active pane has one green dot. Its session and window names are bold; fzf's
 highlight and cyan pointer identify the selected row. A minimal combined window
-row carries the dot when it contains the active pane. Classic appearance omits
-default session and window icons to leave room for names; lazygit shows them.
+row carries the dot when it contains the active pane. The default appearance
+shows folder and application icons; ASCII mode uses text markers.
 Explicitly configured icons remain in both. Expanded branches omit pane/client
 totals unless a Tree filter is active.
 An ordinary collapsed window shows a muted pane count at the right edge when
@@ -465,14 +463,13 @@ notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palett
 index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
 `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
 uses a cyan background. Monochrome mode also disables fzf UI colors. The header shows `Tree`, `Proc`, and `Buff`; enabling agent awareness adds `Agents`.
-In classic appearance, brackets mark the active view and the Tree filter follows as
-`· All`, `· Session`, or `· Unread` (`|` in ASCII). Lazygit appearance uses a leading
-`╭─` section mark and `─` before the filter label instead of brackets and `·`. Labels
-shorten when space is tight, while the enabled view shortcuts remain in help.
+The header marks the active view and shows the Tree filter (`· All`, `· Session`,
+or `· Unread`; `|` in ASCII). Labels shorten when space is tight, while the enabled
+view shortcuts remain in help.
 Pending `MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
-hidden. Classic tree rows use `├─`, `└─`, and `│` guides; lazygit uses `╰─` for the
-last sibling. Colored application icons apply in both appearances.
+hidden. Tree rows use branch guides and the ASCII fallback uses plain-text
+equivalents. Colored application icons apply in the default appearance.
 
 ### Preview
 
@@ -549,8 +546,8 @@ Icon themes:
 | `ascii` | Plain ASCII markers |
 | `auto` | Use Unicode (the default); font availability cannot be inferred from the tmux server |
 
-Session and window names omit default icons in classic appearance to leave room for
-names; the lazygit appearance shows them. Explicitly configured icons remain in both.
+Folder and application icons follow the selected appearance. Explicitly configured
+icons remain available in either mode.
 Recognized pane commands retain app glyphs, while shells and unknown commands leave that slot blank so names stay aligned. The Unicode theme uses compact symbols such as `✎` for editors, `◇` for Git, `✳` for Claude, and `❋` for Codex. The Nerd Font theme uses Codicons for Claude (`cod-claude`), Codex (`cod-openai`), Cursor (`cod-cursor`), and Gemini's four-point star; these need a current Nerd Font. OpenCode's logo is a pixel wordmark, so its row uses a code glyph instead. Antigravity keeps an orbit glyph. Pi and Oh My Pi use `π`. Set `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, or `@tmux-canopy-icon-pane` to override the corresponding structural icon.
 
 Override a recognized app's icon with `@tmux-canopy-icon-<app>`; set it to `none` to leave its icon slot blank. These options work with every icon theme and take effect after `Ctrl-r` in the sidebar. For example:

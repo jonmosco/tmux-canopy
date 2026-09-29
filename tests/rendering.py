@@ -87,6 +87,7 @@ def main():
             tm('set-option', '-g', 'status', 'off')
             tm('set-option', '-g', '@tmux-canopy-scope', 'global')
             tm('set-option', '-g', '@tmux-canopy-transition', 'slot')
+            tm('set-option', '-g', '@tmux-canopy-appearance', 'classic')
             tm('set-option', '-g', '@tmux-canopy-theme', 'mono')
             tm('set-option', '-g', '@tmux-canopy-density', 'detailed')
             tm('set-option', '-g', '@tmux-canopy-preview', 'off')
