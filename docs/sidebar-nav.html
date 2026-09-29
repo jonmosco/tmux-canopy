@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cleaner Canopy navigation</title>
+<style>
+  :root {
+    --bg: #101114; --ink: #d7dbe2; --dim: #8b93a1; --faint: #5c6472;
+    --line: #2a2e36; --cyan: #7fdbda; --green: #7dcea0; --amber: #e6c07b;
+    --pink: #d7a3c8; --yellow: #e5c07b; --sel: #243044;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Palatino, Georgia, serif; }
+  header, main { max-width: 1100px; margin: 0 auto; padding: 32px 28px; }
+  main { padding-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  h1 { font-weight: 500; font-size: 30px; margin: 0 0 8px; }
+  .lede { color: var(--dim); max-width: 70ch; }
+  h2 { grid-column: 1 / -1; margin: 10px 0 0; font: 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+  figure { margin: 0; }
+  figcaption { color: var(--dim); font-size: 14px; margin-top: 8px; }
+  figcaption b { color: var(--ink); }
+  .term {
+    background: #0c0d10; border: 1px solid var(--line); border-radius: 10px;
+    min-height: 360px; padding: 10px 0; font: 13px/1.38 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .row { display: flex; gap: 6px; padding: 0 12px; white-space: nowrap; }
+  .dim { color: var(--faint); } .muted { color: var(--dim); }
+  .cyan { color: var(--cyan); } .green { color: var(--green); }
+  .amber { color: var(--amber); } .pink { color: var(--pink); } .yellow { color: var(--yellow); }
+  .sel { background: var(--sel); }
+  .right { margin-left: auto; }
+  .findings { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 18px; }
+  .findings div { border-top: 1px solid var(--line); padding-top: 8px; color: var(--dim); font-size: 14px; }
+  .findings b { color: var(--ink); }
+  @media (max-width: 860px) { main, .findings { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cleaner navigation, still a tree</h1>
+  <p class="lede">The pills trial failed because it threw away the tree. The live sidebar is narrow, so the problem is how much each row spends before the name. These three keep lazygit’s guides and only remove what does not help you move.</p>
+  <div class="findings">
+    <div><b>The header collapses.</b> At this width it becomes <span class="cyan">╭─ Tree ─ A</span>. The tabs are not usable, so they should not be the way you switch views.</div>
+    <div><b>A window costs two rows.</b> <span class="muted">5:zsh</span> plus a child <span class="muted">zsh</span> is the same place twice. Ten windows means twenty lines before you reach the one you want.</div>
+    <div><b>Status eats the name.</b> <span class="muted">int ·hook ●</span> and <span class="muted">wrk ·hook</span> are abbreviations forced by the guides, the index, and the icon already on the row.</div>
+  </div>
+</header>
+<main>
+  <h2>Now</h2>
+  <figure>
+    <div class="term">
+      <div class="row cyan">╭─ Tree ─ A</div>
+      <div class="row"><span class="cyan">▼</span> <span class="dim"></span> test-session</div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">▼</span> <span class="dim">󰖯</span> 1:codex</div>
+      <div class="row"><span class="dim">│  ├─</span> <span class="cyan">❋</span> codex <span class="dim">int ·hook ●</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh</div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">▼</span> <span class="dim">󰖯</span> 5:zsh</div>
+      <div class="row"><span class="dim">│  ├─</span> <span class="yellow">✳</span> claude.exe</div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh <span class="amber">●</span></div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">▼</span> <span class="dim">󰖯</span> 9:node</div>
+      <div class="row sel"><span class="dim">│  ├─</span> <span class="pink">π</span> pi <span class="cyan">wrk ·hook</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh</div>
+      <div class="row"><span class="dim">╰─</span> <span class="cyan">▼</span> <span class="dim">󰖯</span> 10:zsh</div>
+    </div>
+    <figcaption><b>Live lazygit crop.</b> Guides, a window glyph, an index, a command, a status word, a hook tag, and an unread dot. The name is what is left.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">tree</span> <span class="dim">· test-session</span> <span class="right dim">4 agents</span></div>
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">▼</span> codex <span class="right amber">!</span></div>
+      <div class="row"><span class="dim">│  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="dim">│  ╰─</span> <span class="dim">zsh</span></div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">▼</span> zsh</div>
+      <div class="row"><span class="dim">│  ├─</span> <span class="yellow">✳</span> claude</div>
+      <div class="row"><span class="dim">│  ╰─</span> <span class="dim">zsh</span> <span class="right amber">●</span></div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">▼</span> node</div>
+      <div class="row sel"><span class="dim">│  ├─</span> <span class="pink">π</span> pi <span class="right cyan">▷</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> <span class="dim">zsh</span></div>
+      <div class="row"><span class="dim">╰─</span> <span class="dim">▸</span> zsh</div>
+    </div>
+    <figcaption><b>Quiet row.</b> Same tree, same folds. Drop the window icon and the <span class="muted">index:</span> prefix. Status is one mark at the edge: <span class="cyan">▷</span> working, <span class="amber">!</span> needs input. The word stays in the drawer.</figcaption>
+  </figure>
+
+  <h2>Easier to move through</h2>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">tree</span> <span class="dim">· here</span></div>
+      <div class="row sel"><span class="green">●</span> <span class="pink">π</span> pi <span class="dim">node</span> <span class="right cyan">▷</span></div>
+      <div class="row"><span class="dim">▼</span> test-session <span class="right dim">10</span></div>
+      <div class="row"><span class="dim">  ▾</span> codex <span class="right amber">!</span></div>
+      <div class="row"><span class="dim">  ▾</span> agy</div>
+      <div class="row"><span class="dim">  ▾</span> zsh <span class="yellow">✳</span></div>
+      <div class="row"><span class="dim">  ▸</span> nvim</div>
+      <div class="row"><span class="dim">▸</span> test-4 <span class="right dim">1</span></div>
+    </div>
+    <figcaption><b>Current window first.</b> The pane you are in is one row at the top. Other windows stay folded to a name until you open them. This is the change that shortens a 20-line sidebar to about 8.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">❋</span> codex <span class="dim">+ zsh</span> <span class="right amber">!</span></div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">󰀘</span> agy <span class="dim">+ zsh</span></div>
+      <div class="row"><span class="dim">├─</span> <span class="yellow">✳</span> claude <span class="dim">+ zsh</span> <span class="right amber">●</span></div>
+      <div class="row"><span class="dim">├─</span> zsh</div>
+      <div class="row"><span class="dim">├─</span> <span class="dim"></span> nvim</div>
+      <div class="row sel"><span class="dim">├─</span> <span class="pink">π</span> pi <span class="dim">+ zsh</span> <span class="right cyan">▷</span></div>
+      <div class="row"><span class="dim">╰─</span> zsh</div>
+    </div>
+    <figcaption><b>One row per window.</b> You already have this for a window with a single pane. Extend it: the interesting command is the row, and a shell sibling is <span class="muted">+ zsh</span> instead of another line. <span class="muted">l</span> still opens the real panes.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><b>Do this</b></div>
+      <div class="row muted">1. Quiet row. Keep lazygit guides. Remove index, window icon, and ·hook from the row.</div>
+      <div class="row muted">2. One row per window, with l to expand. Biggest cut in distance.</div>
+      <div class="row muted">3. Pin the active pane. Do not make people scroll to where they already are.</div>
+      <div class="row" style="height:10px"></div>
+      <div class="row"><b>Do not</b></div>
+      <div class="row muted">Replace the tree with cards or pills. That hid which window a pane belongs to.</div>
+      <div class="row muted">Put view tabs in the header. They already do not fit.</div>
+    </div>
+    <figcaption><b>Order.</b> Each step still uses the same objects, folds, and keys. The drawer keeps the long status. The row only keeps what you need to choose the next pane.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

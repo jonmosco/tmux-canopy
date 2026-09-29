@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
 
 state_file="${TMUX_CANOPY_STATE:?}"
 view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null)"
@@ -13,29 +16,39 @@ fi
 
 width="$(tmux display-message -p -t "${TMUX_PANE:-}" '#{pane_width}' 2>/dev/null || printf '42')"
 [[ "$width" =~ ^[1-9][0-9]*$ ]] || width=42
-agents_enabled="$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)"
+if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
 appearance="$(tmux show-option -gqv @tmux_canopy_appearance 2>/dev/null || true)"
 : "${appearance:=classic}"
 # Match the tree renderer, including fzf's pointer gutter and right edge.
 case "$view" in
   processes) selected=1 ;;
   buffers) selected=2 ;;
-  agents) if [[ "$agents_enabled" == on ]]; then selected=3; else selected=0; fi ;;
+  agents) selected=1 ;;
   *) selected=0 ;;
 esac
+# Agents sits beside Tree, so later tabs shift one place while the mode is on.
+if [[ "$agents_enabled" == on && "$selected" -gt 0 && "$view" != agents ]]; then
+  selected=$((selected + 1))
+fi
+if [[ "$agents_enabled" != on && "$view" == agents ]]; then selected=0; fi
 reserved=0
 [[ -z "$mode" ]] || reserved=$((${#mode}+1))
 box_pad=0
 [[ "$appearance" == lazygit ]] && box_pad=3
 for tier in full compact tiny; do
   case "$tier" in
-    full) labels=('Tree' 'Proc' 'Buff') ;;
-    compact) labels=('Tree' 'Proc' 'B') ;;
-    tiny) labels=('T' 'P' 'B') ;;
+    full) labels=('Tree') ;;
+    compact) labels=('Tree') ;;
+    tiny) labels=('T') ;;
   esac
   if [[ "$agents_enabled" == on ]]; then
     if [[ "$tier" == full ]]; then labels+=('Agents'); else labels+=('A'); fi
   fi
+  case "$tier" in
+    full) labels+=('Proc' 'Buff') ;;
+    compact) labels+=('Proc' 'B') ;;
+    tiny) labels+=('P' 'B') ;;
+  esac
   if [[ "$appearance" != lazygit ]]; then
     labels[selected]="[${labels[selected]}]"
   fi

@@ -416,7 +416,7 @@ def change(kind, action, dry_run=False):
 def live_agents():
     """Yield (pane, kind, source, updated) for agent processes running in panes."""
     sys.path.insert(0, str(ROOT / "lib"))
-    from agent_kinds import KINDS as PROCESS_KINDS
+    from agent_kinds import KINDS as PROCESS_KINDS, name_from_args
     fields = "#{pane_id}|#{pane_pid}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_updated}"
     panes = subprocess.run(("tmux", "list-panes", "-a", "-F", fields), text=True,
                            capture_output=True, timeout=5, check=False)
@@ -436,8 +436,7 @@ def live_agents():
         parts = line.split(None, 2)
         if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
             parents[int(parts[0])] = int(parts[1])
-            argv0 = parts[2].split(None, 1)[0]
-            kind = PROCESS_KINDS.get(os.path.basename(argv0).removesuffix(".exe"))
+            kind = PROCESS_KINDS.get(name_from_args(parts[2].split()))
             if kind:
                 candidates.append((int(parts[0]), kind))
     for pid, kind in candidates:

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directory colors</title>
+<style>
+  :root {
+    --bg: #101114; --ink: #d7dbe2; --dim: #8b93a1; --faint: #5c6472;
+    --line: #2a2e36; --cyan: #7fdbda; --green: #7dcea0; --amber: #e6c07b;
+    --pink: #d7a3c8; --yellow: #e5c07b; --blue: #7aa2f7; --gold: #dcb67a;
+    --vscode: #cccccc; --nvimg: #98c379; --sel: #243044;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Palatino, Georgia, serif; }
+  header, main { max-width: 1040px; margin: 0 auto; padding: 32px 28px; }
+  main { padding-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  h1 { font-weight: 500; font-size: 30px; margin: 0 0 8px; }
+  .lede { color: var(--dim); max-width: 70ch; }
+  figure { margin: 0; }
+  figcaption { color: var(--dim); font-size: 14px; margin-top: 8px; }
+  figcaption b { color: var(--ink); }
+  .term {
+    background: #1e1e1e; border: 1px solid var(--line); border-radius: 10px;
+    min-height: 230px; padding: 12px 0; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace;
+    color: var(--vscode);
+  }
+  .term.nvim { background: #1a1b26; }
+  .row { padding: 0 14px; white-space: nowrap; }
+  .dim { color: #6a6a6a; }
+  .guide { color: #4a4a4a; }
+  .blue { color: #519aba; }
+  .gold { color: var(--gold); }
+  .soft { color: #7aa2f7; }
+  .green { color: var(--nvimg); }
+  .cyan { color: var(--cyan); }
+  .pink { color: var(--pink); }
+  .amber { color: var(--amber); }
+  .sel { background: #04395e; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Clearer directory color</h1>
+  <p class="lede">The current blue is the same blue as several app icons, and it paints the whole name. VS Code and nvim usually color only the folder mark, or use a color that is not already a status. The chevron stays dim.</p>
+</header>
+<main>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="guide">▼</span> test-session</div>
+      <div class="row"><span class="guide">├─ ▼</span> <span class="blue"></span> tmux-canopy</div>
+      <div class="row"><span class="guide">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="guide">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row sel"><span class="guide">│  │  ╰─</span> zsh</div>
+      <div class="row"><span class="guide">╰─ ▸</span> <span class="blue"></span> .dotfiles</div>
+    </div>
+    <figcaption><b>VS Code Dark+.</b> The folder icon is a muted steel blue. The directory name stays the same gray as the processes. This is the clearest: color means “folder,” not “read this word.”</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="guide">▼</span> test-session</div>
+      <div class="row"><span class="guide">├─ ▼</span> <span class="gold"></span> tmux-canopy</div>
+      <div class="row"><span class="guide">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="guide">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="guide">╰─ ▸</span> <span class="gold"></span> .dotfiles</div>
+    </div>
+    <figcaption><b>Material Icon theme.</b> Folders are a tan gold, names stay normal. Easy to see, but it sits next to the yellow unread dot and the amber <span class="amber">!</span>, so those three can blur together.</figcaption>
+  </figure>
+  <figure>
+    <div class="term nvim">
+      <div class="row"><span class="guide">▼</span> test-session</div>
+      <div class="row"><span class="guide">├─ ▼</span> <span class="soft"></span> <span class="soft">tmux-canopy</span></div>
+      <div class="row"><span class="guide">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="guide">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="guide">╰─ ▸</span> <span class="soft"></span> <span class="soft">.dotfiles</span></div>
+    </div>
+    <figcaption><b>neo-tree.</b> Icon and name share a soft blue. This is what you have now, a step brighter. It marks the place well and makes a long directory list louder than the processes.</figcaption>
+  </figure>
+  <figure>
+    <div class="term nvim">
+      <div class="row"><span class="guide">▼</span> test-session</div>
+      <div class="row"><span class="guide">├─ ▼</span> <span class="green"></span> <span class="green">tmux-canopy</span></div>
+      <div class="row"><span class="guide">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="guide">│  │  ├─</span> <span class="pink">π</span> pi <span class="cyan">▷</span></div>
+      <div class="row"><span class="guide">╰─ ▸</span> <span class="green"></span> <span class="green">.dotfiles</span></div>
+    </div>
+    <figcaption><b>nvim-tree default.</b> Folders are green. Distinct from unread yellow and from <span class="amber">!</span>, but green is already the “you are here” arrow, so a folded tree can look active when it is not.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

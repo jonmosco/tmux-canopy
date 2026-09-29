@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+### Changed
+
+- The preview drawer starts hidden. Press `p` to open it. `@tmux-canopy-preview auto` still shows it when the sidebar is tall enough.
+- Press `A` in the sidebar to turn agent mode on or off for this client. Tree stays available. `@tmux-canopy-agents` is only the default until a client chooses. Integrations stay installed when the mode is off.
+- The Agents tab sits beside Tree (`Tree Agents Proc Buff`) instead of after Buffers.
+- Lazygit rows drop the window index, window icon, and `·hook` label. Working and needs-input are a `▷` or `!` at the row edge. The full status remains in the drawer.
+- Pi and Oh My Pi are no longer labeled `node` when Node is only the runtime. Other Node processes stay `node`.
+- Pi's sidebar icon is π, the mark used on [pi.dev](https://pi.dev/). Oh My Pi uses the same π in yellow, matching the orange accent on its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg).
+- Nerd Font agent icons use Codicons where those marks exist: Claude, OpenAI/Codex, Cursor, and Gemini's four-point star. OpenCode stays a code glyph because its logo is a pixel wordmark. Antigravity keeps an orbit glyph.
+
 ### Added
 
+- Pi and Oh My Pi adapters report tool execution, extension UI prompts as needs-input, and aborted or errored settles as interrupted. Reinstall with `canopy integration install pi` (and `omp`) so the extension file is replaced.
 - Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.
 - Opt-in `@tmux-canopy-animate` moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
 - `@tmux-canopy-appearance` with `classic` (default) and `lazygit` presets for sidebar chrome, structural glyphs, and tree guides.

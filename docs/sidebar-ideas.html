@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canopy sidebar ideas</title>
+<style>
+  :root {
+    --bg: #101114;
+    --panel: #16181d;
+    --ink: #d7dbe2;
+    --dim: #8b93a1;
+    --faint: #5c6472;
+    --line: #2a2e36;
+    --cyan: #7fdbda;
+    --green: #7dcea0;
+    --amber: #e6c07b;
+    --pink: #d7a3c8;
+    --yellow: #e5c07b;
+    --blue: #7aa2f7;
+    --red: #e06c75;
+    --sel: #243044;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 "Iowan Old Style", Palatino, Georgia, serif;
+  }
+  header.page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 36px 28px 8px;
+  }
+  h1 { font-weight: 500; font-size: 32px; margin: 0 0 8px; }
+  .lede { color: var(--dim); max-width: 68ch; margin: 0; }
+  .notes {
+    max-width: 1180px;
+    margin: 18px auto 0;
+    padding: 0 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .notes article {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    color: var(--dim);
+    font-size: 14px;
+  }
+  .notes strong { color: var(--ink); font-weight: 600; }
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 22px 28px 48px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+  figure { margin: 0; }
+  figcaption { margin: 10px 2px 0; color: var(--dim); font-size: 14px; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  .term {
+    background: #0c0d10;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    min-height: 430px;
+    padding: 12px 0 10px;
+    font: 13px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    overflow: hidden;
+  }
+  .row { display: flex; gap: 8px; padding: 1px 12px; white-space: nowrap; }
+  .dim { color: var(--faint); }
+  .muted { color: var(--dim); }
+  .cyan { color: var(--cyan); }
+  .green { color: var(--green); }
+  .amber { color: var(--amber); }
+  .pink { color: var(--pink); }
+  .yellow { color: var(--yellow); }
+  .blue { color: var(--blue); }
+  .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .right { margin-left: auto; color: var(--faint); }
+  .sel { background: var(--sel); }
+  .pill {
+    border-radius: 999px;
+    padding: 0 7px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+  .pill.work { color: #9be7c4; background: #16352a; }
+  .pill.wait { color: #f0d7a0; background: #3a3018; }
+  .pill.idle { color: #9aa3b2; background: #22262e; }
+  .hint {
+    margin-top: 8px;
+    padding: 8px 12px 2px;
+    border-top: 1px solid var(--line);
+    color: var(--faint);
+    display: flex;
+    gap: 12px;
+  }
+  .hint b { color: var(--dim); font-weight: 600; }
+  .card {
+    margin: 6px 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #12141a;
+  }
+  .card .top { display: flex; gap: 8px; align-items: center; }
+  .card .sub { color: var(--faint); margin-top: 3px; font-size: 12px; }
+  .rail { width: 3px; border-radius: 2px; align-self: stretch; }
+  .workrail { background: var(--green); }
+  .waitrail { background: var(--amber); }
+  .idlerail { background: #2c313a; }
+  h2.sec {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+    font-family: ui-monospace, Menlo, monospace;
+    font-weight: 500;
+  }
+  @media (max-width: 860px) {
+    main, .notes { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Sidebar ideas for Canopy</h1>
+  <p class="lede">These are sketches, not a new theme yet. They borrow from Herdr’s agent cards, sessionx’s flat switcher, and file navigators like yazi and k9s. The current tree can stay. The gain is less chrome and a clearer status.</p>
+</header>
+<section class="notes">
+  <article><strong>Herdr.</strong> Workspace, then tab, then agent. Status is a pill or card, not a long word on the tree row. Provider icons matter more than tmux indices.</article>
+  <article><strong>sessionx.</strong> A centered list plus a preview, search first. Good as a jump surface, a poor persistent sidebar. Canopy already has the tree for that.</article>
+  <article><strong>yazi / k9s.</strong> Indent instead of pipes. Selection is a full row. Key hints live in a footer, so the top line is the place, not a tab strip.</article>
+</section>
+<main>
+  <h2 class="sec">What you have</h2>
+  <figure>
+    <div class="term">
+      <div class="row cyan">╭─ <span>Tree</span> <span class="dim">Agents Proc Buff ─ All</span></div>
+      <div class="row"><span class="cyan">▼</span> <span class="dim"></span> orchestrator</div>
+      <div class="row"><span class="dim">╰─</span> <span class="cyan">▼</span> <span class="dim">󰖯</span> 2:review</div>
+      <div class="row"><span class="dim">   ├─</span> <span class="green">●</span> <span class="yellow">✳</span> claude <span class="dim">TURN ENDED ·hook</span></div>
+      <div class="row sel"><span class="dim">   ├─</span> <span class="cyan">›</span> <span class="pink">π</span> pi <span class="cyan">WORKING</span> <span class="dim">·hook</span></div>
+      <div class="row"><span class="dim">   ╰─</span> <span class="cyan">◈</span> codex <span class="dim">TURN ENDED ·hook</span></div>
+      <div class="row"><span class="cyan">▼</span> <span class="dim"></span> tmux-canopy</div>
+      <div class="row"><span class="dim">╰─</span> <span class="dim">󰖯</span> 1:zsh <span class="dim">3p</span></div>
+    </div>
+    <figcaption><b>Current lazygit header.</b> The tab strip, tree pipes, index, icon, command, status word, and hook marker all compete for the same row. Status is accurate and hard to scan.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="muted">orchestrator</span> <span class="right">2 agents</span></div>
+      <div class="row"><span class="yellow">✳</span> <span class="grow">review</span> <span class="pill idle">ended</span></div>
+      <div class="row sel"><span class="pink">π</span> <span class="grow">tmux-canopy</span> <span class="pill work">working</span></div>
+      <div class="row"><span class="cyan">❋</span> <span class="grow">diagnostics</span> <span class="pill idle">ended</span></div>
+      <div class="row"><span class="blue">✧</span> <span class="grow">agy</span> <span class="pill wait">needs input</span></div>
+      <div class="row" style="height:8px"></div>
+      <div class="row"><span class="muted">tmux-canopy</span> <span class="right">shells</span></div>
+      <div class="row"><span class="dim">▹</span> <span class="grow">zsh</span> <span class="dim">3</span></div>
+      <div class="row"><span class="dim">▹</span> <span class="grow">nvim</span></div>
+      <div class="hint"><span><b>1</b> tree</span><span><b>4</b> agents</span><span><b>A</b> mode</span><span><b>n</b> next</span></div>
+    </div>
+    <figcaption><b>Pills, Herdr-like.</b> Keep the tree, drop the pipes. A session is a label. Status is a short pill at the edge. The footer holds the keys that currently live in the header.</figcaption>
+  </figure>
+
+  <h2 class="sec">Three directions</h2>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="dim">canopy</span> <span class="right">agents on</span></div>
+      <div class="card">
+        <div class="top"><span class="pink">π</span> <b>Pi</b> <span class="pill work">working</span> <span class="right">2m</span></div>
+        <div class="sub">tmux-canopy · editing sidebar icons</div>
+      </div>
+      <div class="card">
+        <div class="top"><span class="blue">✧</span> <b>Antigravity</b> <span class="pill wait">waiting</span> <span class="right">9m</span></div>
+        <div class="sub">review · tool finished, idle stop</div>
+      </div>
+      <div class="card">
+        <div class="top"><span class="yellow">✳</span> <b>Claude</b> <span class="pill idle">ended</span> <span class="right">1h</span></div>
+        <div class="sub">subagents · 1 child still listed</div>
+      </div>
+      <div class="card" style="opacity:.72">
+        <div class="top"><span class="cyan">❋</span> <b>Codex</b> <span class="pill idle">ended</span></div>
+        <div class="sub">diagnostics · hook trusted</div>
+      </div>
+    </div>
+    <figcaption><b>Cards.</b> This is the Herdr move: one agent, one block, task text instead of the raw command. It is the right Agents view, and the wrong default Tree. Use it only when <b>A</b> is on and <b>4</b> is selected.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="dim">~/tmux-canopy</span></div>
+      <div class="row"><span class="dim">▾ orchestrator</span></div>
+      <div class="row"><span class="grow">  ▾ review</span> <span class="amber">●</span></div>
+      <div class="row"><span class="workrail rail"></span><span class="yellow">✳</span> <span class="grow">claude</span></div>
+      <div class="row sel"><span class="workrail rail"></span><span class="pink">π</span> <span class="grow">pi</span> <span class="dim">working</span></div>
+      <div class="row"><span class="idlerail rail"></span><span class="cyan">❋</span> <span class="grow">codex</span></div>
+      <div class="row"><span class="dim">▸ canopy</span> <span class="dim">4</span></div>
+      <div class="row"><span class="dim">▸ dots</span> <span class="dim">2</span></div>
+      <div class="hint"><span>enter focus</span><span>h fold</span><span>A agents</span></div>
+    </div>
+    <figcaption><b>File tree.</b> Indent and a chevron, like yazi. A 3px rail carries working or waiting, so the row can stay a name. The green dot and the selection pointer collapse into one highlighted row plus that rail.</figcaption>
+  </figure>
+  <figure>
+    <div class="term" style="display:grid; grid-template-columns: 1fr 1.1fr; padding:0;">
+      <div style="border-right:1px solid var(--line); padding:12px 0;">
+        <div class="row dim">search › pi</div>
+        <div class="row sel"><span class="pink">π</span> canopy <span class="right">work</span></div>
+        <div class="row"><span class="yellow">✳</span> review <span class="right">end</span></div>
+        <div class="row"><span class="cyan">❋</span> diagnostics <span class="right">end</span></div>
+        <div class="row"><span class="blue">✧</span> agy <span class="right">wait</span></div>
+        <div class="row dim">zsh · 3 panes</div>
+      </div>
+      <div style="padding:12px 14px; color: var(--dim);">
+        <div class="cyan" style="margin-bottom:8px;">π · canopy · working</div>
+        <div>Directory tmux-canopy</div>
+        <div>Last report &lt;1m · hook</div>
+        <div style="margin-top:14px; color:var(--faint);">recent crop of the pane, not a second tree.</div>
+      </div>
+    </div>
+    <figcaption><b>sessionx switcher.</b> Search on the left, preview on the right. Useful for <b>Ctrl-g</b>, not for the docked sidebar. Canopy’s quick switcher is already this idea without the preview column.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><b>Keep</b></div>
+      <div class="row dim">Tree as home. Folds. Real tmux objects. Hook status that can go stale.</div>
+      <div class="row" style="height:8px"></div>
+      <div class="row"><b>Change first</b></div>
+      <div class="row">1 <span class="muted">Footer hints instead of the tab strip.</span></div>
+      <div class="row">2 <span class="muted">Agents beside Tree only while A is on. Already done.</span></div>
+      <div class="row">3 <span class="muted">Status as a pill or left rail, word on hover or in the drawer.</span></div>
+      <div class="row">4 <span class="muted">Drop ├─ └─ in the normal theme. Keep them in lazygit.</span></div>
+      <div class="row">5 <span class="muted">Cards only inside the Agents view, not in Tree.</span></div>
+    </div>
+    <figcaption><b>Suggested order.</b> None of this needs a new glyph set. The first visible win is moving chrome out of the row so the name and the state can both be seen at 42 columns.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

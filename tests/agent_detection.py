@@ -48,7 +48,15 @@ def test_process_name_prefers_argv0():
         fake_proc(proc, 44, comm="node",
                   cmdline=b"/usr/bin/node\0/opt/app/index.js\0")
         check(process_name(44, proc_root=str(proc)) == "node",
-              "ordinary argv0 still returns basename")
+              "ordinary node process stays node")
+        fake_proc(proc, 45, comm="node",
+                  cmdline=b"/usr/bin/node\0/Users/jmosco/.pi/agent/install/releases/0.87.1/node_modules/.bin/pi\0")
+        check(process_name(45, proc_root=str(proc)) == "pi",
+              "node hosting the pi launcher is pi")
+        fake_proc(proc, 46, comm="node",
+                  cmdline=b"node\0/opt/pi-coding-agent/dist/cli.js\0")
+        check(process_name(46, proc_root=str(proc)) == "pi",
+              "node hosting pi-coding-agent is pi")
 
 
 def test_live_cursor_agent_identity():
@@ -121,6 +129,15 @@ def test_live_agent_process_scan():
 
 def main():
     test_process_name_prefers_argv0()
+    script = ROOT / "lib" / "agent-process.sh"
+    probe = subprocess.run(["bash", "-c", f"""
+set -u
+source {script}
+ps() {{ printf '%s\n' '10 1 Mon Sep 28 18:47:49 2026 -zsh' '11 10 Mon Sep 28 18:54:08 2026 pi'; }}
+export -f ps
+canopy_pane_agent 10
+"""], capture_output=True, text=True, timeout=10)
+    check(probe.returncode == 0 and probe.stdout.strip() == "pi", probe.stderr or probe.stdout)
     print("ok - process_name prefers argv0 over Node MainThread comm")
     test_live_cursor_agent_identity()
     print("ok - process_identity finds live cursor-agent panes")

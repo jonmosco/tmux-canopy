@@ -165,7 +165,7 @@ def live():
             run('toggle',client,first,'42','global','T','Tab','slot')
             sidebar=next(r.split('|')[0] for r in tm('list-panes','-a','-F','#{pane_id}|#{@tmux_canopy}').splitlines() if r.endswith('|1'))
             script_env['TMUX_PANE']=sidebar
-            wait(lambda:'[Tree] Proc Buff Agents · All' in screen(),'initial header')
+            wait(lambda:'[Tree] Agents Proc Buff · All' in screen(),'initial header')
             def state_ready():
                 if state_path.exists() and state_path.stat().st_size: return True
                 tm('send-keys','-t',sidebar,'M-y');time.sleep(.08)

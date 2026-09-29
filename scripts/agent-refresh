@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Reload live sidebars without replacing fzf or changing the selected view.
 set -u
-[[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]] || exit 0
-while IFS='|' read -r pane sidebar; do
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
+while IFS='|' read -r pane sidebar client; do
   [[ $pane == %* && $sidebar == 1 ]] || continue
+  canopy_agents_enabled "$client" || continue
   tmux send-keys -t "$pane" C-r 2>/dev/null || true
-done < <(tmux list-panes -a -F '#{pane_id}|#{@tmux_canopy}' 2>/dev/null)
+done < <(tmux list-panes -a -F '#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_client}' 2>/dev/null)

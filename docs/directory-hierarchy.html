@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directory as a place in the tree</title>
+<style>
+  :root {
+    --bg: #101114; --ink: #d7dbe2; --dim: #8b93a1; --faint: #5c6472;
+    --line: #2a2e36; --cyan: #7fdbda; --green: #7dcea0; --amber: #e6c07b;
+    --pink: #d7a3c8; --yellow: #e5c07b; --sel: #243044;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Palatino, Georgia, serif; }
+  header, main { max-width: 1080px; margin: 0 auto; padding: 32px 28px; }
+  main { padding-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  h1 { font-weight: 500; font-size: 30px; margin: 0 0 8px; }
+  .lede { color: var(--dim); max-width: 68ch; }
+  h2 { grid-column: 1 / -1; margin: 12px 0 0; font: 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  figure { margin: 0; }
+  figcaption { color: var(--dim); font-size: 14px; margin-top: 8px; }
+  figcaption b { color: var(--ink); }
+  .term {
+    background: #0c0d10; border: 1px solid var(--line); border-radius: 10px;
+    min-height: 300px; padding: 10px 0 12px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .row { display: flex; gap: 6px; padding: 0 12px; white-space: nowrap; }
+  .dim { color: var(--faint); } .muted { color: var(--dim); }
+  .cyan { color: var(--cyan); } .green { color: var(--green); }
+  .amber { color: var(--amber); } .pink { color: var(--pink); } .yellow { color: var(--yellow); }
+  .sel { background: var(--sel); }
+  .right { margin-left: auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>The directory is the place</h1>
+  <p class="lede">A path after the command reads like a label. The directory is where the pane is, so it should be a level of the tree, and the process should sit inside it. The window stays, because that is still the tmux object you rename and kill.</p>
+</header>
+<main>
+  <h2>Now</h2>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─ ▼</span> codex</div>
+      <div class="row"><span class="dim">│  ├─</span> <span class="cyan">❋</span> codex <span class="muted">tmux-canopy</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh <span class="muted">tmux-canopy</span></div>
+      <div class="row"><span class="dim">├─ ▼</span> node</div>
+      <div class="row sel"><span class="dim">│  ├─</span> <span class="pink">π</span> pi <span class="cyan">▷</span> <span class="muted">tmux-canopy</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh <span class="muted">tmux-canopy</span></div>
+      <div class="row"><span class="dim">╰─ ▼</span> nvim</div>
+      <div class="row"><span class="dim">   ╰─</span> nvim <span class="muted">.dotfiles</span></div>
+    </div>
+    <figcaption><b>Path as a suffix.</b> The same directory is repeated on every process. It does not tell you that those processes are in one place.</figcaption>
+  </figure>
+
+  <h2>Three ways to put the directory in the tree</h2>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─ ▼</span> codex</div>
+      <div class="row"><span class="dim">│  ▼</span> <span class="muted">tmux-canopy</span></div>
+      <div class="row"><span class="dim">│  ├─</span> <span class="cyan">❋</span> codex <span class="right amber">!</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh</div>
+      <div class="row"><span class="dim">├─ ▼</span> node</div>
+      <div class="row"><span class="dim">│  ▼</span> <span class="muted">tmux-canopy</span></div>
+      <div class="row sel"><span class="dim">│  ├─</span> <span class="pink">π</span> pi <span class="right cyan">▷</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> zsh <span class="right amber">●</span></div>
+      <div class="row"><span class="dim">╰─</span> nvim <span class="muted">.dotfiles</span></div>
+    </div>
+    <figcaption><b>Directory under the window.</b> Session, window, directory, process. Fold the directory when you do not need the processes. A window with one pane and one directory stays one row: <span class="muted">nvim .dotfiles</span>.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">▼</span> <span class="muted">tmux-canopy</span> <span class="right dim">3</span></div>
+      <div class="row"><span class="dim">├─</span> <span class="cyan">❋</span> codex <span class="dim">codex</span> <span class="right amber">!</span></div>
+      <div class="row sel"><span class="dim">├─</span> <span class="pink">π</span> pi <span class="dim">node</span> <span class="right cyan">▷</span></div>
+      <div class="row"><span class="dim">╰─</span> zsh <span class="dim">node</span> <span class="right amber">●</span></div>
+      <div class="row"><span class="dim">▸</span> <span class="muted">.dotfiles</span> <span class="right dim">1</span></div>
+      <div class="row"><span class="dim">▸</span> <span class="muted">home</span> <span class="right dim">2</span></div>
+    </div>
+    <figcaption><b>Directory first, inside the session.</b> You jump to a place, then see who is there. The dim word is the tmux window, so you can still tell codex from node. This is the best scan when many windows share one project.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─ ▼</span> <span class="muted">tmux-canopy</span></div>
+      <div class="row"><span class="dim">│  ├─</span> codex <span class="cyan">❋</span> <span class="right amber">!</span></div>
+      <div class="row sel"><span class="dim">│  ├─</span> node <span class="pink">π</span> pi <span class="right cyan">▷</span></div>
+      <div class="row"><span class="dim">│  ╰─</span> node zsh <span class="right amber">●</span></div>
+      <div class="row"><span class="dim">╰─ ▸</span> <span class="muted">.dotfiles</span> <span class="dim">nvim</span></div>
+    </div>
+    <figcaption><b>Window name stays on the process.</b> The directory is the fold. The window name is a short prefix of the process, so killing or renaming a window still has a row to land on. Collapsed, you see the place and the window in one line.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><b>Use the second.</b></div>
+      <div class="row muted">Group by directory inside the session. Repeat a directory only when two windows are in different places.</div>
+      <div class="row muted">A single process in that directory does not get its own child row. The process icon sits on the directory row.</div>
+      <div class="row muted">Enter still focuses the pane. The window name stays visible so tmux actions do not disappear.</div>
+      <div class="row muted">Do not invent a fourth object. The directory row is a fold of the panes already there.</div>
+    </div>
+    <figcaption><b>Recommendation.</b> Directory-first matches “where I am, then what is running.” The window-then-directory version adds a level on every window, which is what made the earlier tree feel long.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

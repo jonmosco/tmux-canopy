@@ -87,7 +87,7 @@ fi
 if [[ "$icon_theme" != 'nerdfont' && "$icon_theme" != 'unicode' && "$icon_theme" != 'ascii' ]]; then
   icon_theme=unicode
 fi
-if [[ "$appearance" != 'lazygit' && "$appearance" != 'classic' ]]; then
+if [[ "$appearance" != 'lazygit' && "$appearance" != 'classic' && "$appearance" != 'pills' && "$appearance" != 'places' ]]; then
   appearance=classic
 fi
 if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
@@ -239,16 +239,18 @@ tmux set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook
 for hook in client-resized after-resize-window; do
   tmux set-hook -g "${hook}[9003]" "$(plugin_job -b responsive-width)"
 done
+# Right-edge marks are padded to the sidebar width at render time. One reload
+# after the width settles, not a tree rebuild on every column of a drag.
+tmux set-hook -gu 'after-resize-pane[9006]' 2>/dev/null || true
+tmux set-hook -g 'after-resize-pane[9006]' "$(plugin_job -b edge-refresh '#{pane_id}')"
 for hook in after-rename-session after-rename-window; do
   tmux set-hook -g "${hook}[9003]" "$(plugin_job -b cleanup refresh)"
 done
-# tmux 3.8+ monitors pane command changes for the optional Agents view.
-# Remove a prior monitor when the feature is disabled and Canopy is reloaded.
+# tmux 3.8+ monitors pane command changes. The refresh script no-ops unless
+# a sidebar client currently has agent mode on.
 tmux set-hook -Bgu '@tmux_canopy_command:%*:#{pane_current_command}' 2>/dev/null || true
-if [[ "$(tmux show-option -gqv @tmux-canopy-agents)" == on ]]; then
-  tmux set-hook -B -g '@tmux_canopy_command:%*:#{pane_current_command}' \
-    "$(plugin_job -b agent-refresh)" 2>/dev/null || true
-fi
+tmux set-hook -B -g '@tmux_canopy_command:%*:#{pane_current_command}' \
+  "$(plugin_job -b agent-refresh)" 2>/dev/null || true
 # Mouse and keyboard changes use the same debounced, state-preserving refresh.
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
   tmux set-hook -g "${focus_hook}[9004]" \

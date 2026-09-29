@@ -18,19 +18,51 @@ NAMES = {
 }
 
 
+def name_from_args(args):
+    """Return the CLI name for an argv list.
+
+    Pi and Oh My Pi are Node programs. When argv0 is ``node`` or ``nodejs``,
+    a later argument that is the ``pi``/``omp`` launcher identifies the agent.
+    Any other Node process stays ``node``.
+    """
+    names = []
+    for arg in args or ():
+        if isinstance(arg, bytes):
+            arg = arg.decode('utf-8', 'replace')
+        if arg:
+            names.append(arg)
+    if not names:
+        return ''
+    base = os.path.basename(names[0]).removesuffix('.exe')
+    if base not in ('node', 'nodejs'):
+        return base
+    for arg in names[1:]:
+        if arg.startswith('-'):
+            continue
+        token = os.path.basename(arg).removesuffix('.exe')
+        if token in ('pi', 'omp'):
+            return token
+        normalized = arg.replace('\\', '/')
+        if '/pi-coding-agent/' in normalized:
+            return 'pi'
+        if '/oh-my-pi/' in normalized:
+            return 'omp'
+    return base
+
+
 def process_name(pid, proc_root='/proc'):
     """Return the executable basename used for agent kind matching.
 
-    Prefer argv0 from cmdline so Node-based CLIs (Cursor's ``agent``, whose
-    ``comm`` is often ``MainThread``) still resolve. Fall back to ``comm``.
+    Prefer argv so Node-based CLIs still resolve: Cursor's ``agent`` (whose
+    ``comm`` is often ``MainThread``) and Pi, whose executable is ``node``.
+    Fall back to ``comm``.
     """
     base = f'{proc_root}/{pid}'
     try:
-        argv0 = open(f'{base}/cmdline', 'rb').read().split(b'\0', 1)[0].decode(
-            'utf-8', 'replace')
-    except (OSError, UnicodeError):
-        argv0 = ''
-    name = os.path.basename(argv0).removesuffix('.exe')
+        argv = open(f'{base}/cmdline', 'rb').read().split(b'\0')
+    except OSError:
+        argv = []
+    name = name_from_args(argv)
     if name:
         return name
     try:

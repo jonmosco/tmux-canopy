@@ -82,6 +82,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `L` / Shift-l | Expand all sessions and windows in Tree or Agents view |
 | `Enter` | Focus a tree/process target, paste a buffer, or complete move/link placement |
 | `a` | Open the selected object's native action menu |
+| `A` | Turn agent mode on or off for this client; Tree stays on `1` |
 | `p` | Toggle the preview drawer on/off without closing the sidebar |
 | `Shift-p` | Open an enlarged read-only preview popup (`q` closes; arrows scroll) |
 | `prefix + Space` | Cycle content layouts while leaving the sidebar fixed |
@@ -109,7 +110,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 
 Tree navigation starts in a normal mode so navigation and creation keys remain available. Press `/` before typing a fuzzy query; normal-mode letter bindings are temporarily disabled while filtering. Expanded state lasts for the lifetime of each sidebar process.
 
-With `@tmux-canopy-agents on`, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` toggles the agent summary drawer.
+Press `A` to turn agent mode on or off for this client. Tree stays on `1`. While the mode is on, the header shows `Agents` beside `Tree`, `4` opens it, `n` jumps to the next pane reporting needs-input, and `i` toggles the agent summary drawer. While it is off, those controls do nothing extra and the tree does not scan or label agents. The choice is remembered for this client. `@tmux-canopy-agents on` is only the default for a client that has not chosen yet.
 
 `H` collapses every branch, leaving only session rows; `L` opens every branch again. These commands affect the whole tree, including linked windows, and leave move/link/delete state intact. They do nothing in Processes or Buffers view. While searching, uppercase `H` and `L` are ordinary search text.
 
@@ -275,13 +276,13 @@ set -g @tmux-canopy-notifications 'activity,bell'
 set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
 set -g @tmux-canopy-icon-theme 'auto' # Unicode by default; choose nerdfont explicitly
-set -g @tmux-canopy-appearance 'classic' # or 'lazygit'
+set -g @tmux-canopy-appearance 'classic' # or 'lazygit' or 'pills'
 set -g @tmux-canopy-animate 'off' # on: moving highlight on WORKING
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
 set -g @tmux-canopy-selection-style 'subtle'
-set -g @tmux-canopy-preview 'auto'
+set -g @tmux-canopy-preview 'off'
 set -g @tmux-canopy-preview-height '35%'
 set -g @tmux-canopy-copy-command ''        # override the detected clipboard command
 ```
@@ -475,7 +476,7 @@ last sibling. Colored application icons apply in both appearances.
 
 ### Preview
 
-Preview may be `auto`, `on`, or `off`. Auto starts hidden below 28 rows so the object list remains useful; `p` toggles it on/off in navigation mode without closing the sidebar. Set `@tmux-canopy-preview 'off'` to start hidden and open it only when needed. While editing a search query, `p`/`P` remain text input, like the other letter shortcuts.
+Preview may be `off`, `on`, or `auto`. It starts hidden. `p` toggles the drawer in navigation mode without closing the sidebar. `auto` shows it only when the sidebar is at least 28 rows tall. While editing a search query, `p`/`P` remain text input, like the other letter shortcuts.
 
 The drawer keeps a consistent configured height (35% by default) while browsing. Output is **clipped, not wrapped**: a source terminal row remains one preview row, with terminal-cell/ANSI handling delegated to fzf rather than byte truncation. Pane previews have a compact two-line heading and use `FZF_PREVIEW_LINES`/`FZF_PREVIEW_COLUMNS` to fit the available drawer. Shell/log snapshots show recent physical rows through the cursor, rather than a fixed 80-line dump or mostly empty screen bottom. Alternate-screen TUIs and common full-screen commands show a cursor-centered slice of the current screen, without shell scrollback. `[recent crop]` or `[screen crop]` identifies a cropped snapshot.
 
@@ -487,7 +488,7 @@ The summary detects a supported agent command in the pane or its process descend
 
 ### Agent lifecycle adapters
 
-Agent awareness is disabled by default. Set `@tmux-canopy-agents 'on'` before loading Canopy, reload the tmux configuration, then close and reopen existing sidebars. This enables the Agents view, agent process detection, inline status and subagent lines, the summary drawer, `n`/`i`/`4`, and the pane-command monitor where tmux supports it. Setting the option to `off` and reloading removes those UI controls and the monitor. Existing agent integrations remain installed until removed with `canopy integration uninstall`; their reporters may still receive events, but Canopy does not display their state while awareness is off.
+Agent awareness is off by default. Press `A` in the sidebar to turn it on or off for this client without reloading tmux or reopening the sidebar. Turning it off returns to Tree if Agents was open, hides status labels and the Agents tab, and stops process scans for that client. `@tmux-canopy-agents on` starts new clients in agent mode until they press `A`. Existing agent integrations remain installed until removed with `canopy integration uninstall`; their reporters may still receive events, but Canopy does not display their state while awareness is off.
 
 Adapters are optional and observational. Agent rows distinguish `[process]` (executable detected) from a colored status word — `WORKING`, `NEEDS INPUT`, `READY`, `TURN ENDED`, `SESSION ENDED`, or `INTERRUPTED` — followed by a dim `·hook` origin marker for fresh lifecycle reports. Below 36 columns the word abbreviates to `wrk`, `req`, `rdy`, `end`, and `int`. OpenCode uses `·plugin?` because its server plugin may see sessions other than the one displayed in a pane. A pane with a live status also shows how long it's been since that report — `<1m`, `2m`, `1h4m`, and so on — right-aligned at the row's edge; this age is omitted when the report expires after 15 minutes, along with its status and `·hook` marker. The pane remains listed as a detected process. The summary drawer shows the last report time without assigning a stale status. It labels visible-screen request hints **unverified**. A hook report is tied to the pane PID, live agent process PID and start time, and agent session. Approval means a request was reported, not that a human still needs to act. Turn ended does not establish task completion.
 
@@ -505,7 +506,7 @@ For manual setup, merge [claude-hooks.example.json](claude-hooks.example.json) i
 
 Antigravity's documented hooks support Canopy's observational `PreInvocation`, `PostInvocation`, `PostToolUse`, and `Stop` reports. Invocation hooks keep a long-running turn's report fresh between tool calls. A fully idle stop appears as **turn ended**; a stop with background work still active remains **working**; a stop with an error appears as **interrupted**. The hook contract has no dedicated permission-request or subagent lifecycle event, so Canopy cannot show verified Antigravity needs-input or subagent rows. Canopy never registers `PreToolUse` or sends an allow/deny tool decision. Reinstall an earlier Antigravity integration with `canopy integration install agy`, then restart `agy` and check `/hooks`.
 
-For Pi, copy [pi-canopy.extension.ts](pi-canopy.extension.ts) into `~/.pi/agent/extensions/`, set its reporter path, and reload Pi. For Oh My Pi, put a separate copy in its extension directory and set `kind` to `omp`. The extension reports session start, agent start/end, and shutdown; it does not claim to know whether a permission prompt is waiting. For OpenCode, copy [opencode-canopy.plugin.js](opencode-canopy.plugin.js) into `~/.config/opencode/plugins/`, set its reporter path, and restart OpenCode. The plugin uses official session and permission events. Because a server plugin may observe multiple sessions, Canopy only binds a new session on `session.created` when its reported project directory matches the current pane; later events must match that pane's live session and process identity. Permission replies clear only the matching request ID. Sessions that cannot be tied to one pane are ignored rather than attributed by guesswork.
+For Pi, copy [pi-canopy.extension.ts](pi-canopy.extension.ts) into `~/.pi/agent/extensions/`, set its reporter path, and reload Pi (`canopy integration install pi` writes that file). For Oh My Pi, put a separate copy in its extension directory and set `kind` to `omp`. The extension reports session start, agent start, tool execution (to keep a long turn fresh), extension UI prompts as **needs input**, an aborted or errored settle as **interrupted**, agent end / settled as **turn ended**, and shutdown. It never blocks a tool or answers a prompt. Built-in tool confirmations that do not emit `ui_prompt_start` stay unverified. For OpenCode, copy [opencode-canopy.plugin.js](opencode-canopy.plugin.js) into `~/.config/opencode/plugins/`, set its reporter path, and restart OpenCode. The plugin uses official session and permission events. Because a server plugin may observe multiple sessions, Canopy only binds a new session on `session.created` when its reported project directory matches the current pane; later events must match that pane's live session and process identity. Permission replies clear only the matching request ID. Sessions that cannot be tied to one pane are ignored rather than attributed by guesswork.
 
 ### Common reporter contract
 
@@ -537,7 +538,7 @@ This protection covers `prefix + Space` and the sidebar layout menu. Direct nati
 
 ### Icons
 
-Application icons retain command-aware colors: blue editors and Kubernetes tools, yellow Node/Python and Claude, red Git/npm/OpenShift, cyan SSH/Codex/Antigravity/system monitors, white Gemini, and magenta pi/OpenCode. In Unicode and Nerd Font themes, shells and unknown commands show their names without a default icon; ASCII retains its plain pane marker. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
+Application icons retain command-aware colors: blue editors, Kubernetes tools, and Gemini, yellow Node/Python, Claude, and Oh My Pi, red Git/npm/OpenShift, cyan SSH/Codex/Antigravity/system monitors, magenta Pi, and neutral OpenCode and Cursor Agent. Oh My Pi uses the same π mark as its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg); the orange plug on that mark cannot be drawn in one terminal cell, so the row uses yellow instead of Pi's magenta. In Unicode and Nerd Font themes, shells and unknown commands show their names without a default icon; ASCII retains its plain pane marker. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
 
 Icon themes:
 
@@ -550,7 +551,7 @@ Icon themes:
 
 Session and window names omit default icons in classic appearance to leave room for
 names; the lazygit appearance shows them. Explicitly configured icons remain in both.
-Recognized pane commands retain app glyphs, while shells and unknown commands leave that slot blank so names stay aligned. The Unicode theme uses compact symbols such as `✎` for editors, `◇` for Git, `✦` for Claude, and `◈` for Codex. The Nerd Font theme uses `◇` for Claude and `◈` for Codex because these shapes work with older Nerd Fonts; other recognized apps keep their Nerd Font glyphs. Set `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, or `@tmux-canopy-icon-pane` to override the corresponding structural icon.
+Recognized pane commands retain app glyphs, while shells and unknown commands leave that slot blank so names stay aligned. The Unicode theme uses compact symbols such as `✎` for editors, `◇` for Git, `✳` for Claude, and `❋` for Codex. The Nerd Font theme uses Codicons for Claude (`cod-claude`), Codex (`cod-openai`), Cursor (`cod-cursor`), and Gemini's four-point star; these need a current Nerd Font. OpenCode's logo is a pixel wordmark, so its row uses a code glyph instead. Antigravity keeps an orbit glyph. Pi and Oh My Pi use `π`. Set `@tmux-canopy-icon-session`, `@tmux-canopy-icon-window`, or `@tmux-canopy-icon-pane` to override the corresponding structural icon.
 
 Override a recognized app's icon with `@tmux-canopy-icon-<app>`; set it to `none` to leave its icon slot blank. These options work with every icon theme and take effect after `Ctrl-r` in the sidebar. For example:
 

@@ -87,6 +87,16 @@ exec cat "$PROCESS_FIXTURE/processes"
         assert 'worker\x1b[0m' in colored and '\x1b[32m' not in colored
         print('ok - descendants, sibling order, indentation, pane attribution, linked duplicates and themes')
 
+        hosted = process(100, 1, 'zsh', 'zsh') + process(
+            200, 100, 'node', '/usr/bin/node /Users/me/.pi/agent/node_modules/.bin/pi')
+        plain = process(100, 1, 'zsh', 'zsh') + process(200, 100, 'node', 'node server.js')
+        hosted_pane = pane(1, 100).replace('|bash|', '|node|')
+        hosted_out = run(hosted, hosted_pane).stdout
+        plain_out = run(plain, hosted_pane).stdout
+        assert ' 0 pi ' in hosted_out and 'X:200:%1\t    pi ' in hosted_out, hosted_out
+        assert ' 0 node ' in plain_out and 'X:200:%1\t    node ' in plain_out, plain_out
+        print('ok - node is labeled pi only when it is hosting the pi agent')
+
         for elapsed, seconds in [('00:12', 12), ('02:03', 123),
                                  ('01:02:03', 3723), ('2-01:02:03', 176523)]:
             result = run(process(110, 100).replace('00:12', elapsed), pane(1, 100))

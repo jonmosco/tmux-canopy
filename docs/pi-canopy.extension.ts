@@ -1,13 +1,14 @@
 // Copy this single file to ~/.pi/agent/extensions/ and set the Canopy path.
+// Observational only: it never blocks tools or answers a prompt.
 import { spawn } from 'node:child_process';
 
 const reporter = '/absolute/path/to/tmux-canopy/scripts/agent-hook';
 const kind = 'pi'; // Use 'omp' when installing under Oh My Pi.
 
 export default function (pi: any) {
-  async function report(type: string, ctx: any) {
+  async function report(type: string, ctx: any, extra: Record<string, unknown> = {}) {
     if (!process.env.TMUX || !process.env.TMUX_PANE) return;
-    const session_id = ctx.sessionManager.getSessionId();
+    const session_id = ctx.sessionManager?.getSessionId?.();
     if (!session_id) return;
     await new Promise<void>((resolve) => {
       const child = spawn(reporter, [kind], { stdio: ['pipe', 'ignore', 'ignore'] });
@@ -15,11 +16,33 @@ export default function (pi: any) {
       child.on('error', () => { clearTimeout(timer); resolve(); });
       child.on('close', () => { clearTimeout(timer); resolve(); });
       child.stdin.on('error', () => {});
-      child.stdin.end(JSON.stringify({ type, session_id }));
+      child.stdin.end(JSON.stringify({ type, session_id, ...extra }));
     });
   }
+
+  function toolInput(args: any) {
+    if (!args || typeof args !== 'object') return undefined;
+    const command = typeof args.command === 'string' ? args.command.slice(0, 500) : undefined;
+    return command ? { command } : undefined;
+  }
+
   pi.on('session_start', async (_event: any, ctx: any) => report('session_start', ctx));
   pi.on('agent_start', async (_event: any, ctx: any) => report('agent_start', ctx));
+  pi.on('tool_execution_start', async (event: any, ctx: any) => report('tool_execution_start', ctx, {
+    tool_name: event.toolName,
+    tool_input: toolInput(event.args),
+  }));
+  pi.on('ui_prompt_start', async (event: any, ctx: any) => report('ui_prompt_start', ctx, {
+    tool_name: event.kind,
+    message: event.title || 'Input requested',
+  }));
+  pi.on('ui_prompt_end', async (_event: any, ctx: any) => report('ui_prompt_end', ctx));
+  pi.on('agent_before_settle', async (event: any, ctx: any) => {
+    if (event.outcome === 'error' || event.outcome === 'aborted') {
+      await report('agent_interrupted', ctx, { outcome: event.outcome });
+    }
+  });
   pi.on('agent_end', async (_event: any, ctx: any) => report('agent_end', ctx));
+  pi.on('agent_settled', async (_event: any, ctx: any) => report('agent_settled', ctx));
   pi.on('session_shutdown', async (_event: any, ctx: any) => report('session_shutdown', ctx));
 }

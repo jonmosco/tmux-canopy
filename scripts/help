@@ -5,7 +5,9 @@ toggle_key="${TMUX_CANOPY_KEY:-T}"
 last_window_key="${TMUX_CANOPY_LAST_KEY:-Tab}"
 toggle_key="${toggle_key//[[:cntrl:]]/ }"
 last_window_key="${last_window_key//[[:cntrl:]]/ }"
-agents_enabled="$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
+if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
 legend_mode=0
 if [[ "${1:-}" == --legend ]]; then legend_mode=1; shift; fi
 legend_args=()
@@ -38,6 +40,7 @@ help_records() {
   key '1' 'Tree: sessions, windows and panes'
   key '2' 'Processes grouped by their pane'
   key '3' 'Paste buffers; Enter pastes into the target pane'
+  key 'Shift-a' 'Turn agent mode on or off for this client; Tree stays on 1'
   [[ "$agents_enabled" != on ]] || key '4' 'Detected agent panes, grouped by session and window'
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
   [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'
@@ -100,7 +103,7 @@ help_records() {
   note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. Default off.'
-  [[ "$agents_enabled" == on ]] || note 'Set @tmux-canopy-agents on before loading Canopy to add the Agents view, status labels, and agent summary drawer.'
+  note 'Press Shift-a to show or hide agent mode. @tmux-canopy-agents on is only the default for clients that have not chosen. Integrations stay installed either way.'
   note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight. Session and window selections use their active content pane.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
@@ -120,7 +123,7 @@ legend_records() {
   legend_item '[1/2w]' 'With a filter, one of two windows matches in a session.' dim
 
   section 'Pane labels'
-  legend_item '◈ codex' 'Recognized apps have icons; shells and unknown commands show names only. Icon color does not show state.' cyan
+  legend_item '❋ codex' 'Recognized apps have icons; shells and unknown commands show names only. Icon color does not show state.' cyan
   note 'Set @tmux-canopy-icon-codex (or another app name) to replace its glyph; none hides it. Press Ctrl-r to refresh.'
   legend_item 'dim title' 'Pane title, shortened to fit the available width.' dim
   legend_item 'dim path' 'Working directory, inline or below the command depending on width. Adjacent panes sharing it can show it once.' dim

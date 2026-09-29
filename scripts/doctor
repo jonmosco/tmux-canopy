@@ -42,9 +42,9 @@ printf 'Process view (ps): '
 if command -v ps >/dev/null 2>&1; then printf 'available\n'; else printf 'unavailable\n'; fi
 printf 'Agent awareness: '
 if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]; then
-  printf 'on (optional lifecycle integrations are configured separately)\n'
+  printf 'default on (Shift-a toggles it per client; integrations are separate)\n'
 else
-  printf 'off (set @tmux-canopy-agents on to show Agents and subagents)\n'
+  printf 'default off (Shift-a toggles it per client without a reload)\n'
 fi
 printf '\nRequired commands, formats, UI options and temporary state: '
 result=0

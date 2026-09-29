@@ -18,7 +18,7 @@ sidebar_ui_options() {
   preview_mode="$(tmux show-option -gqv @tmux-canopy-preview 2>/dev/null || true)"
   preview_height="$(tmux show-option -gqv @tmux-canopy-preview-height 2>/dev/null || true)"
   selection_style="$(tmux show-option -gqv @tmux-canopy-selection-style 2>/dev/null || true)"
-  : "${preview_mode:=auto}"
+  : "${preview_mode:=off}"
   : "${preview_height:=35%}"
   : "${selection_style:=subtle}"
   pane_height="$(tmux display-message -p -t "$pane" '#{pane_height}' 2>/dev/null || printf '30')"
@@ -44,10 +44,8 @@ sidebar_ui_options() {
   [[ "$theme" != mono ]] || fzf_colors='bw'
   appearance="$(tmux show-option -gqv @tmux_canopy_appearance 2>/dev/null || true)"
   : "${appearance:=classic}"
-  pointer='›'; prompt='search › '; marker='●'; scrollbar='│'
-  if [[ "$appearance" == lazygit ]]; then
-    pointer='›'; prompt='search › '; marker='●'; scrollbar='│'
-  fi
+  # Current-line arrow is drawn at the row edge. Leave the left pointer blank.
+  pointer=' '; prompt='search › '; marker='●'; scrollbar='│'
   # shellcheck disable=SC2034 # Output array consumed by sidebar/preflight.
   SIDEBAR_FZF_ARGS=(
     --ansi --read0 --multi-line --no-wrap --no-hscroll --gap=0 --highlight-line
@@ -66,8 +64,8 @@ sidebar_ui_options() {
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     --bind='load:+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
-    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
+    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
+    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     --bind="g:execute-silent($help_cmd --legend)"
@@ -75,6 +73,10 @@ sidebar_ui_options() {
     --bind="1:execute-silent($action_cmd view-tree)+reload-sync($source_cmd --stable)"
     --bind="2:execute-silent($action_cmd view-processes)+reload-sync($source_cmd --stable)"
     --bind="3:execute-silent($action_cmd view-buffers)+reload-sync($source_cmd --stable)"
+    --bind="4:execute-silent($action_cmd view-agents)+reload-sync($source_cmd --stable)"
+    --bind="A:execute-silent($action_cmd toggle-agents)+reload-sync($source_cmd --stable)"
+    --bind="n:execute-silent($jump_agent_cmd)"
+    --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
     --bind="a:execute-silent($action_cmd actions {1})"
     --bind='p:toggle-preview'
     --bind="P:execute-silent($popup_cmd {1})"
@@ -103,11 +105,4 @@ sidebar_ui_options() {
     --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'
   )
-  if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]; then
-    SIDEBAR_FZF_ARGS+=(
-      --bind="4:execute-silent($action_cmd view-agents)+reload-sync($source_cmd --stable)"
-      --bind="n:execute-silent($jump_agent_cmd)"
-      --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
-    )
-  fi
 }
