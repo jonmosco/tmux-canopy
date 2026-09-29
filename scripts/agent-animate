@@ -21,7 +21,7 @@ while sleep 0.15; do
   [[ "$view" == tree || "$view" == agents || -z "$view" ]] || exit 0
   [[ -r "$cache" ]] || exit 0
   # NUL-framed cache; -a keeps GNU grep from treating it as binary.
-  grep -aEq 'WORKING|wrk' "$cache" 2>/dev/null || exit 0
+  grep -aEq 'WORKING|wrk|▷' "$cache" 2>/dev/null || exit 0
   frame=$(( (frame + 1) % 10 ))
   printf '%s\n' "$frame" > "$frame_file"
   tmux send-keys -t "$sidebar" C-t 2>/dev/null || exit 0

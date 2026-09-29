@@ -12,6 +12,8 @@ while (defined(my $row = <STDIN>)) {
     my @fields = split(/\t/, $row, 3);
     if (@fields >= 2) {
         $fields[1] =~ s/(WORKING|wrk)/animate_word($1, $frame)/ge;
+        # The quiet working mark is one cell, so it pulses instead of sweeping.
+        $fields[1] =~ s/\xe2\x96\xb7/animate_mark($frame)/ge;
         $row = join("\t", @fields);
     }
     print $row, "\0";
@@ -33,4 +35,10 @@ sub animate_word {
             : $char;
     }
     return $out;
+}
+
+sub animate_mark {
+    my ($frame) = @_;
+    my @styles = ("\e[36m", "\e[1;36m", "\e[1;96m", "\e[7;36m");
+    return $styles[$frame % 4] . "\xe2\x96\xb7\e[0m";
 }

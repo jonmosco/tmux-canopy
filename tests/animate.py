@@ -36,6 +36,9 @@ def main():
     plain = animate('just a shell row', 2)
     assert plain == 'just a shell row'
 
+    mark = animate('pi \x1b[1;36m▷\x1b[0m', 1)
+    assert '▷' in mark and mark != 'pi \x1b[1;36m▷\x1b[0m'
+
     multi = f'P:%1\tcodex {word}\tP:%1:$0\0P:%2\tshell\tP:%2:$0\0'
     result = sp.run(
         ['perl', str(ROOT / 'lib/animate.pl'), '1'],
