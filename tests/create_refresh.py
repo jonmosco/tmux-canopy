@@ -32,7 +32,7 @@ def main():
             assert load.returncode == 0 and not load.stderr, load.stderr
             hooks = tm('show-hooks', '-g')
             split_hook = next((line for line in hooks.splitlines() if line.startswith('after-split-window[9003]')), '')
-            assert split_hook and 'cleanup' in split_hook and 'refresh' in split_hook, hooks
+            assert split_hook and "cleanup' 'split'" in split_hook, hooks
 
             sidebar = tm('split-window', '-d', '-h', '-l', '42', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
@@ -50,8 +50,12 @@ def main():
             wrapper.chmod(0o755)
             wrapped = env | {'PATH': str(temp) + ':' + env['PATH']}
 
-            sp.run([str(ROOT / 'scripts/cleanup'), 'refresh'], env=wrapped, check=True, timeout=15)
+            sp.run([str(ROOT / 'scripts/cleanup'), 'split'], env=wrapped, check=True, timeout=15)
             assert any(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()), \
+                deliveries.read_text()
+
+            sp.run([str(ROOT / 'scripts/cleanup'), 'refresh'], env=wrapped, check=True, timeout=15)
+            assert sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()) == 2, \
                 deliveries.read_text()
 
             guard = sp.run(
