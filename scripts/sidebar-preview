@@ -12,7 +12,7 @@ export FZF_PREVIEW_LINES="$rows"
 
 render() {
   local mode=''
-  if canopy_agents_enabled && "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]]; then
+  if canopy_agents_enabled && [[ "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]]; then
     mode="$(tmux show-option -pqv -t "$TMUX_PANE" @tmux_canopy_preview_mode 2>/dev/null || true)"
   fi
   if [[ ( "$mode" == agent || "$mode" == codex ) && "${TMUX_CANOPY_PREVIEW_EXPANDED:-0}" != 1 ]]; then
