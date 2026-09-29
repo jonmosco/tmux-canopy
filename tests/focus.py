@@ -111,6 +111,7 @@ def main():
             tm('set-option', '-g', 'mouse', 'on')
             tm('set-option', '-g', 'escape-time', '10')
             for option, value in [('scope', 'global'), ('transition', 'slot'), ('theme', 'ansi'),
+                                  ('appearance', 'classic'),
                                   ('preview', 'off'), ('notifications', 'none')]:
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env.copy()

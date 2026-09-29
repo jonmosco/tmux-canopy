@@ -179,8 +179,14 @@ render_help() {
     function wrap(text, indent, style, first,    available,piece,cut) {
       available=width-length(indent)
       while (length(text)>available) {
-        piece=substr(text,1,available); cut=length(piece)
-        if (substr(text,available+1,1)!=" ") {
+        cut=available
+        while (cut > 0 && substr(text, cut + 1, 1) >= "\200" && substr(text, cut + 1, 1) <= "\277") cut--
+        if (cut == 0) {
+          cut = 1
+          while (cut < length(text) && substr(text, cut + 1, 1) >= "\200" && substr(text, cut + 1, 1) <= "\277") cut++
+        }
+        piece=substr(text,1,cut)
+        if (substr(text,cut+1,1)!=" ") {
           sub(/ [^ ]*$/, "", piece)
           if (length(piece)>0) cut=length(piece)
         }

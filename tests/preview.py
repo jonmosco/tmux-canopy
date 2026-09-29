@@ -100,7 +100,8 @@ while True:
             server_pid = int(display(pane, '#{pid}'))
             tm('set-option', '-g', 'status', 'off')
             tm('set-option', '-g', 'default-shell', '/bin/bash')
-            for option, value in [('scope', 'global'), ('transition', 'slot'), ('theme', 'mono'), ('preview', 'off')]:
+            for option, value in [('scope', 'global'), ('transition', 'slot'), ('theme', 'mono'),
+                                  ('appearance', 'classic'), ('preview', 'off')]:
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env | {'TMUX': display(pane, '#{socket_path},#{pid},0'), 'TMUX_PANE': pane,
                                 'TMUX_CANOPY_STATE': str(state), 'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '40'}

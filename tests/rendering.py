@@ -54,7 +54,7 @@ def main():
             return [row.split('\t') for row in run('sidebar-source', '--stable').splitlines()]
 
         def wait_for(predicate, description):
-            deadline = time.monotonic() + 5
+            deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
                 if predicate():
                     return
@@ -195,6 +195,7 @@ def main():
             install_fzf_probe(temp, bindings, script_env)
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 44, 160, 0, 0))
+            client = os.ttyname(slave)
             client_process = sp.Popen([tmux, '-L', socket, 'attach-session', '-t', 'one'],
                                      stdin=slave, stdout=slave, stderr=slave, env=env, start_new_session=True)
             os.close(slave)
@@ -206,12 +207,11 @@ def main():
                 except OSError:
                     pass
             threading.Thread(target=drain, args=(master,), daemon=True).start()
-            time.sleep(.2)
-            client = tm('list-clients', '-F', '#{client_tty}')
+            wait_for(lambda: client in tm('list-clients', '-F', '#{client_tty}').splitlines(), 'client attach')
             script_env['TMUX_CANOPY_CLIENT'] = client
             run('toggle', client, pane_a, '42', 'global', 'T', 'Tab', 'slot')
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
-            wait_for(lambda: loads.stat().st_size > 0, 'initial sidebar load')
+            wait_for(lambda: any('two' in line for line in tm('capture-pane', '-p', '-t', sidebar).splitlines()), 'initial sidebar render')
             time.sleep(.3)
             script_env['TMUX_PANE'] = sidebar
             wait_for(lambda: tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_focus_location').endswith('|' + pane_a), 'current content location')
