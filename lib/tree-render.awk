@@ -396,7 +396,27 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
 function quiet_mark(label) {
     if (label == "working") return icons == "ascii" ? "+" : "▷"
     if (label == "approval" || label == "interrupted") return "!"
+    if (label == "ready" || label == "turn ended" || label == "session ended") return icons == "ascii" ? "d" : "✓"
     return ""
+}
+function hook_glyph(p,    label,status,glyph,style) {
+    label=agent_label(p)
+    if (label == "") return ""
+    status=report_status[p]
+    if (label == "stale") {
+        if (status == "working") label="working"
+        else if (status == "needs-input") label="approval"
+        else if (status == "interrupted") label="interrupted"
+        else if (status == "ready") label="ready"
+        else if (status == "turn-ended") label="turn ended"
+        else if (status == "session-ended") label="session ended"
+        else return ""
+        style=dim
+    } else style=""
+    glyph=quiet_mark(label)
+    if (glyph == "") return ""
+    if (style == "") style=(glyph == "!" ? attention : glyph == "▷" || glyph == "+" ? accent : dim)
+    return " " style glyph reset
 }
 function pill_word(p, label) {
     label=agent_label(p)
@@ -465,7 +485,7 @@ function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pco
                 p=place_pane[id, idx]; pt="P:" p
                 cmd=command[p]; icon=appicon(cmd)
                 pm=(pt == del ? "✕" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
-                line=lazy_prefix(win_stem, idx == win_last[windex] ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd status_mark(quiet_mark(agent_label(p)))
+                line=lazy_prefix(win_stem, idx == win_last[windex] ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd hook_glyph(p)
                 row(pt, edge_colored(line, pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"), width-3), pt ":" s)
             }
         }

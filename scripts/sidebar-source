@@ -72,7 +72,7 @@ schedule_animate() {
     tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
     return 0
   fi
-  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | grep -aEq 'WORKING|wrk'; then
+  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | grep -aEq 'WORKING|wrk|▷'; then
     printf '%s\0' "${records[@]}" > "$cache"
     token="$$.$RANDOM"
     tmux set-option -p -t "$sidebar" @tmux_canopy_animate_token "$token" 2>/dev/null || true

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Working mark pulse</title>
+<style>
+  body { margin: 0; background: #101114; color: #d7dbe2; font: 16px/1.4 Palatino, Georgia, serif; }
+  main { max-width: 720px; margin: 40px auto; padding: 0 28px; }
+  h1 { font-weight: 500; font-size: 28px; }
+  p { color: #8b93a1; }
+  .term {
+    background: #0c0d10; border: 1px solid #2a2e36; border-radius: 10px;
+    padding: 18px 16px; font: 15px/1.6 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .row { white-space: pre; }
+  .dim { color: #5c6472; }
+  .pink { color: #d7a3c8; }
+  .mark { color: #7fdbda; }
+  .mark.f0 { color: #3d8a89; }
+  .mark.f1 { color: #7fdbda; }
+  .mark.f2 { color: #d6ffff; font-weight: 700; }
+  .mark.f3 { color: #0c0d10; background: #7fdbda; }
+  .still { color: #e6c07b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>The working mark pulses</h1>
+  <p>Only <span class="mark">▷</span> moves. <span class="still">!</span> and <span class="still">✓</span> stay put. This is the same four-step pulse the sidebar uses.</p>
+  <div class="term">
+    <div class="row"><span class="dim">│  ├─</span> <span class="pink">π</span> pi <span class="mark" id="mark">▷</span> <span class="dim">tmux-canopy</span></div>
+    <div class="row"><span class="dim">│  ├─</span> <span class="dim">❋</span> codex <span class="still">!</span> <span class="dim">tmux-canopy</span></div>
+    <div class="row"><span class="dim">│  ├─</span> <span class="dim">󰀘</span> agy <span class="still">✓</span> <span class="dim">tmux-canopy</span></div>
+  </div>
+</main>
+<script>
+  const mark = document.getElementById('mark');
+  let frame = 0;
+  setInterval(() => {
+    mark.className = 'mark f' + (frame % 4);
+    frame++;
+  }, 150);
+</script>
+</body>
+</html>
