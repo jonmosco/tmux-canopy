@@ -77,6 +77,7 @@ fi
 exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
 '''.replace('REAL', shlex.quote(fzf)).replace('MODE', shlex.quote(str(mode))).replace('BINDING', shlex.quote(ui_binding)).replace('LOAD', shlex.quote('load:execute-silent(printf x >> ' + str(loads) + ')')))
         wrapper.chmod(0o755)
+        env['PATH'] = str(binary_dir) + ':' + env['PATH']
         state = temp / 'state'
         state.touch()
 
@@ -102,14 +103,16 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
                     return
                 time.sleep(.05)
             kids = ''
+            screen = ''
             try:
                 side = sidebars()[0]
                 pid = tm('display-message', '-p', '-t', side, '#{pane_pid}')
                 kids = sp.check_output(['ps', '-o', 'command=', '-g', pid], text=True, stderr=sp.STDOUT)
                 Path('/tmp/canopy-fzf-cmd').write_text(kids)
+                screen = tm('capture-pane', '-p', '-t', side)
             except Exception as exc:
                 kids = str(exc)
-            raise AssertionError((message, loads.stat().st_size, kids[:1500]))
+            raise AssertionError((message, loads.stat().st_size, screen, kids[:1500]))
 
         def sidebars():
             return tm('list-panes', '-a', '-f', '#{==:#{@tmux_canopy},1}', '-F', '#{pane_id}').splitlines()
@@ -150,7 +153,9 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             other = tm('new-window', '-d', '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('set-option', '-g', 'status', 'off')
             tm('set-option', '-g', 'status-keys', 'emacs')
-            for option, value in [('scope', 'global'), ('transition', 'slot'), ('preview', 'off'), ('notifications', 'activity,bell')]:
+            for option, value in [('scope', 'global'), ('transition', 'slot'), ('theme', 'mono'),
+                                  ('appearance', 'classic'),
+                                  ('preview', 'off'), ('notifications', 'activity,bell')]:
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env | {'TMUX': display(pane, '#{socket_path},#{pid},0'), 'TMUX_PANE': pane,
                                 'TMUX_CANOPY_STATE': str(state), 'TMPDIR': str(tmpdir),
@@ -260,6 +265,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
                 close_sidebar(sidebar)
                 script_env['TMUX_PANE'] = pane
                 time.sleep(.2)
+            tm('set-option', '-g', 'default-shell', '/bin/bash')
             print('ok - Bash/zsh/fish launches, quoted paths/TMPDIR, and hostile ambient fzf defaults')
 
             sidebar = open_sidebar()

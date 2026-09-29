@@ -10,6 +10,7 @@ canopy_load_ps_snapshot() {
   ((canopy_ps_loaded)) && return "$canopy_ps_status"
   canopy_ps_loaded=1
   local pid ppid w1 w2 w3 w4 w5 argv0 rest raw
+  local -a rest_args
   # args= exposes argv0 for Node CLIs whose comm is a thread name (e.g. MainThread).
   raw="$(ps -eo pid=,ppid=,lstart=,args= 2>/dev/null)"
   canopy_ps_status=$?
@@ -19,7 +20,8 @@ canopy_load_ps_snapshot() {
     CANOPY_LSTART[$pid]="$w1 $w2 $w3 $w4 $w5"
     argv0=${argv0##*/}
     CANOPY_COMM[$pid]=${argv0%.exe}
-    CANOPY_KIND[$pid]=$(canopy_hosted_agent "${CANOPY_COMM[$pid]}" $rest)
+    read -ra rest_args <<< "$rest"
+    CANOPY_KIND[$pid]=$(canopy_hosted_agent "${CANOPY_COMM[$pid]}" "${rest_args[@]}")
   done <<< "$raw"
   return "$canopy_ps_status"
 }

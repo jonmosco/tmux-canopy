@@ -149,7 +149,8 @@ def live():
             tm('set-option','-g','escape-time','10')
             # Native prompt key mode otherwise inherits EDITOR/VISUAL.
             tm('set-option','-g','status-keys','emacs')
-            for key,value in [('scope','global'),('transition','slot'),('preview','off'),('theme','mono'),('notifications','activity,bell')]:
+            for key,value in [('scope','global'),('transition','slot'),('preview','off'),('theme','mono'),
+                              ('appearance','classic'),('notifications','activity,bell')]:
                 tm('set-option','-g','@tmux-canopy-'+key,value)
             tm('set-option','-g','@tmux-canopy-agents','on')
             script_env=env|{'TMUX':display(first,'#{socket_path},#{pid},0'),'TMUX_PANE':first}
