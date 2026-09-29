@@ -39,6 +39,9 @@ sub animate_word {
 
 sub animate_mark {
     my ($frame) = @_;
-    my @styles = ("\e[36m", "\e[1;36m", "\e[1;96m", "\e[7;36m");
-    return $styles[$frame % 4] . "\xe2\x96\xb7\e[0m";
+    # A low-contrast breathing dot reads as background activity, not an alert.
+    # Eight 150ms steps give the pulse a gentler rise and fall without reverse video.
+    my @styles = ("\e[2;36m", "\e[2;36m", "\e[36m", "\e[36m",
+                  "\e[1;36m", "\e[36m", "\e[36m", "\e[2;36m");
+    return $styles[$frame % 8] . "\xe2\x97\x8f\e[0m";
 }

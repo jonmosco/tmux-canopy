@@ -3,6 +3,7 @@
 # and exits when animation is off, the theme is mono, the sidebar closes, the
 # view leaves Tree/Agents, or no working rows remain.
 set -u
+umask 077
 sidebar="${1:-}"
 token="${2:-}"
 state_file="${3:-}"

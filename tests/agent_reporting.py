@@ -39,7 +39,8 @@ def harness(kind, path="/repo"):
             root = written.get("pane_pid", "4000")
             proc = written.get("process_pid", "")
             birth = written.get("process_birth", "")
-            output = f"%4|{root}|0||0|{path}|{source}|{session}|{root}|{proc}|{birth}\n"
+            subagents = written.get("subagents", "")
+            output = f"%4|{root}|0||0|{path}|{source}|{session}|{root}|{proc}|{birth}|{subagents}\n"
         for i, arg in enumerate(args[:-5]):
             if arg == "set-option":
                 written[args[i + 4].removeprefix(core.PREFIX)] = args[i + 5]
@@ -129,6 +130,41 @@ check(state["status"] == "working" and not state["request"], "matching OpenCode 
 send("opencode", {"type": "permission.asked", "properties": {
     "sessionID": "foreign", "id": "perm-2", "permission": "bash"}})
 check(state["session"] == "o1" and state["status"] == "working", "foreign OpenCode session is ignored")
+
+# OpenCode task agents run as child sessions. Only a child whose parentID is
+# the verified pane session is rendered; later child events resolve by child ID.
+send("opencode", {"type": "session.created", "properties": {
+    "sessionID": "child-1", "info": {"id": "child-1", "parentID": "o1",
+    "agent": "explore", "title": "Find the config"}}})
+check(state["session"] == "o1" and "child-1,explore: Find the config,unknown" in state.get("subagents", ""),
+      f"OpenCode child session is retained on its parent: {state}")
+send("opencode", {"type": "session.status", "properties": {
+    "sessionID": "child-1", "status": {"type": "busy"}}})
+check("child-1,explore: Find the config,working" in state.get("subagents", ""),
+      f"OpenCode child busy is working: {state}")
+send("opencode", {"type": "permission.updated", "properties": {
+    "sessionID": "child-1", "id": "child-perm", "permission": "bash",
+    "metadata": {"command": "rg config"}}})
+check(state["status"] == "needs-input" and state["request_agent"] == "child-1" and
+      "child-1,explore: Find the config,needs-input," in state.get("subagents", ""),
+      f"OpenCode child permission is attributed to that child: {state}")
+send("opencode", {"type": "permission.replied", "properties": {
+    "sessionID": "child-1", "permissionID": "child-perm"}})
+check(state["status"] == "working" and "child-1,explore: Find the config,working" in state.get("subagents", ""),
+      f"matching OpenCode child reply clears only its request: {state}")
+send("opencode", {"type": "session.status", "properties": {
+    "sessionID": "child-1", "status": {"type": "idle"}}})
+check("child-1,explore: Find the config,done" in state.get("subagents", ""),
+      f"OpenCode child idle remains as done: {state}")
+send("opencode", {"type": "session.status", "properties": {
+    "sessionID": "child-1", "status": {"type": "busy"}}})
+check("child-1,explore: Find the config,working" in state.get("subagents", ""),
+      f"resumed OpenCode child returns to working: {state}")
+send("opencode", {"type": "session.deleted", "properties": {"sessionID": "child-1"}})
+check("child-1," not in state.get("subagents", ""), f"OpenCode child deletion removes it: {state}")
+send("opencode", {"type": "session.updated", "properties": {
+    "sessionID": "o1", "info": {"id": "o1", "directory": "/repo", "title": "Renamed parent"}}})
+check(state["status"] == "working", "OpenCode parent metadata updates do not reset lifecycle state")
 
 state = harness("opencode", "/repo")
 original_tmux = core.tmux
