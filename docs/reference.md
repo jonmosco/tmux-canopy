@@ -276,7 +276,7 @@ set -g @tmux-canopy-notifications 'activity,bell'
 set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
 set -g @tmux-canopy-appearance 'default' # or 'ascii'
-set -g @tmux-canopy-animate 'off' # on: moving highlight on WORKING
+set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
@@ -407,14 +407,17 @@ advanced customization. Close and reopen the
 sidebar after changing appearance; `Ctrl-r` alone does not restyle a running fzf
 process.
 
-`@tmux-canopy-animate on` (default `off`) adds a moving reverse-video highlight
-band across visible `WORKING` / `wrk` status words while an agent is working.
+`@tmux-canopy-animate on` (default) adds a moving reverse-video highlight
+band across visible `WORKING` / `wrk` status words while an agent is working. The
+compact working marker breathes as a low-contrast cyan dot rather than flashing an
+arrow.
 Frames come from a cached tree snapshot, not a full tmux rescan, at
 about 6–7 updates per second. Perl preserves fzf's NUL-delimited rows; without
 Perl the sidebar stays static. A short-lived worker starts only when a working
 row is drawn and exits when none remain, the sidebar closes, the view leaves
 Tree/Agents, the theme is `mono`, or the option is off — no permanent ticker.
-Requires agent awareness. Close and reopen the sidebar after enabling it.
+Requires agent awareness. Set the option to `off` and reopen the sidebar to
+disable it.
 
 `ansi` uses the terminal's standard palette for application icons, active panes,
 notifications, and pending operations; `mono` disables source styling. Density
@@ -491,7 +494,7 @@ Adapters are optional and observational. Agent rows distinguish `[process]` (exe
 
 A collapsed window or session rolls up its descendants' hook-reported agent state into one badge, separate from unread terminal notifications, in priority order: an amber `◆` (`!` in ASCII) with a count means at least one descendant needs input (approval requested or interrupted); otherwise a cyan `▷` (`+` in ASCII) means descendants are working; otherwise a dim `✓` (`d` in ASCII) means descendants finished (ready, turn ended, or session ended). Reports the drawer calls unknown are not counted. This summary appears in both Tree and Agents views, disappears once every affected pane is expanded into view (each pane already carries its own `NEEDS INPUT`/`WORKING` status word there), and is unaffected by clearing unread notifications.
 
-Claude Code, Codex, and Cursor Agent subagents appear as read-only lines beneath their parent pane in Tree and Agents views, each with their type (`Explore`, `general-purpose`, a custom agent profile, or Cursor `subagent_type`), a status word (`WORKING` or `NEEDS INPUT` while fresh; Cursor children are `WORKING` only because hooks do not report needs-input), and the time since that report. Once stale, the status word clears while the child identity and report age remain. `SubagentStart` and `SubagentStop` supply the child identity and lifecycle. Claude Code can also tag tool and permission events with the subagent's `agent_id`. Codex currently documents `agent_id` for child start and stop; Canopy attributes a Codex tool or permission event to a child only when that event actually includes the ID. A tagged subagent approval request is attributed in the drawer. The matching tool event clears it, and stopping that subagent also clears it. A subagent waiting on input counts toward the `◆` roll-up and is a target for `n`; selecting its line focuses the parent pane. A stopped subagent disappears immediately; running background subagents stay, and at most eight are kept per pane. Subagent lines require multi-line rows and are omitted in compact density. Reinstall an older Claude or Codex integration with `canopy integration install claude codex` to add the two subagent hooks, or Cursor Agent with `canopy integration install cursor-agent` (then restart `agent`); `canopy integration status` reports `partial` until then.
+Claude Code, Codex, OpenCode, and Cursor Agent subagents appear as read-only lines beneath their parent pane in Tree and Agents views, each with their type and status. OpenCode child sessions use their configured agent and title; they begin unmarked until OpenCode reports `busy` or `retry`, then show `WORKING`, `NEEDS INPUT`, or `DONE`. A completed OpenCode child remains through the current turn and is removed when the parent advances or the child session is deleted. Claude Code can tag tool and permission events with the subagent's `agent_id`; Codex attributes child events only when they include that ID. A tagged subagent approval request is attributed in the drawer. The matching reply or tool event clears it, and stopping that subagent also clears it. A subagent waiting on input counts toward the `◆` roll-up and is a target for `n`; selecting its line focuses the parent pane. At most eight are kept per pane. Subagent lines require multi-line rows and are omitted in compact density. Reinstall the relevant integration and restart its agent to receive its current hooks or plugin events.
 
 Press `n` from any view to jump straight to the next pane reporting needs-input (approval requested or interrupted), across every session and window, ignoring active Tree filters — the same "search everything" scope `Ctrl-g` already uses. Detection always runs at Agents-view strength, so an agent running under a wrapper shell is found even from the Tree view. Order follows the tree's own natural session/window/pane order; a linked window contributes one entry per session it's linked into. Repeated presses wrap back to the first match after the last, and `n` does nothing when no agent currently needs input.
 

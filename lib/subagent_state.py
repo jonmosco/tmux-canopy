@@ -2,7 +2,7 @@
 import re
 
 MAX_SUBAGENTS = 8
-SUBAGENT_STATES = ('working', 'needs-input', 'done')
+SUBAGENT_STATES = ('unknown', 'working', 'needs-input', 'done')
 
 
 def agent_id(event):
@@ -34,12 +34,12 @@ def format_subagents(entries):
 
 
 def update_subagent(entries, agent, event, state, now):
-    if state in ('subagent-stop', 'turn-ended'):
+    if state == 'subagent-stop':
         entries[:] = [entry for entry in entries if entry[0] != agent]
         return
     entry = next((item for item in entries if item[0] == agent), None)
     if entry is None:
-        entry = [agent, 'subagent', 'working', now, '']
+        entry = [agent, 'subagent', 'unknown' if state == 'subagent-update' else 'working', now, '']
         entries.append(entry)
     before = entry[:]
     entry[1] = list_field(event.get('agent_type'), 40) or entry[1]
@@ -48,6 +48,10 @@ def update_subagent(entries, agent, event, state, now):
         entry[2], entry[4] = 'needs-input', tool
     elif state == 'clear-request' and entry[2] == 'needs-input' and entry[4] == tool:
         entry[2], entry[4] = 'working', ''
+    elif state == 'working':
+        entry[2], entry[4] = 'working', ''
+    elif state == 'subagent-done':
+        entry[2], entry[4] = 'done', ''
     if entry != before or int(now) - int(entry[3]) >= 60:
         entry[3] = now
 
@@ -79,10 +83,13 @@ def resolve_cursor_stop_id(event, current_text):
 
 
 def next_entries(current, agent, event, state, now):
-    # Drop entries left by older versions that retained completed children.
-    entries = [entry for entry in parse_subagents(current) if entry[2] != 'done']
+    entries = parse_subagents(current)
     if state == 'session-ended':
         entries = []
     elif agent:
         update_subagent(entries, agent, event, state, now)
+    else:
+        # Completed children remain visible until the parent advances, then a
+        # fresh parent event clears the previous turn's finished child rows.
+        entries = [entry for entry in entries if entry[2] != 'done']
     return format_subagents(entries)

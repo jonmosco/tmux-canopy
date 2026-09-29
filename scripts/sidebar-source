@@ -58,7 +58,7 @@ trap 'exit 143' TERM HUP
 # Cache tree/Agents rows for the opt-in WORKING animator and keep one worker
 # alive only while a working badge is visible.
 schedule_animate() {
-  local sidebar="${TMUX_PANE:-}" token cache
+  local sidebar="${TMUX_PANE:-}" token cache cache_tmp
   [[ "$TMUX_CANOPY_NUL" == 1 && -n "$state_file" && "$sidebar" =~ ^%[0-9]+$ ]] || return 0
   cache="${state_file}.animate"
   if ! command -v perl >/dev/null 2>&1; then
@@ -73,7 +73,13 @@ schedule_animate() {
     return 0
   fi
   if ((${#records[@]})) && printf '%s\0' "${records[@]}" | grep -aEq 'WORKING|wrk|▷'; then
-    printf '%s\0' "${records[@]}" > "$cache"
+    cache_tmp="$(mktemp "${cache}.XXXXXX")" || return 0
+    chmod 600 "$cache_tmp" 2>/dev/null || { rm -f -- "$cache_tmp"; return 0; }
+    if ! printf '%s\0' "${records[@]}" > "$cache_tmp"; then
+      rm -f -- "$cache_tmp"
+      return 0
+    fi
+    mv -f -- "$cache_tmp" "$cache"
     token="$$.$RANDOM"
     tmux set-option -p -t "$sidebar" @tmux_canopy_animate_token "$token" 2>/dev/null || true
     # shellcheck disable=SC2091 # tmux_shell builds a quoted argv for run-shell.

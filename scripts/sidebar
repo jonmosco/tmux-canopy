@@ -22,6 +22,7 @@ export TMUX_CANOPY_STATE="$STATE_FILE"
 
 # shellcheck disable=SC2317,SC2329 # Invoked by EXIT, including signal-driven exits.
 cleanup() {
+  rm -f -- "${STATE_FILE}.animate" "${STATE_FILE}.animate.frame"
   rm -f -- "$STATE_FILE"
   clear_sidebar_cache "$owner"
   if [[ "${TMUX_CANOPY_TRANSITION:-move}" == slot ]]; then

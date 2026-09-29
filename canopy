@@ -410,6 +410,16 @@ def change(kind, action, dry_run=False):
         print(f"removed: {path}")
     else:
         write_safely(path, content)
+        if kind == "opencode" and action == "install":
+            pkg = path.parent.parent / "package.json"
+            try:
+                pkg_data = json.loads(pkg.read_text()) if pkg.exists() else {}
+            except (OSError, ValueError):
+                pkg_data = {}
+            if pkg_data.get("type") != "module":
+                pkg_data["type"] = "module"
+                write_safely(pkg, json.dumps(pkg_data, indent=2) + "\n")
+                print(f"  set type: module in {pkg}")
         print(f"{action}ed: {kind} -> {path}")
 
 

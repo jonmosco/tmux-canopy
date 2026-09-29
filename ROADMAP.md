@@ -14,8 +14,8 @@ Remaining work for tmux-canopy. This list does not promise a release date. The
 
 ## Additional subagent integrations
 
-- [ ] Report Gemini CLI and OpenCode subagents if their integrations expose
-  enough lifecycle and identity information.
+- [ ] Report Gemini CLI subagents if its integration exposes enough lifecycle
+  and identity information.
 
 ## Agent request panel and responses (backlog)
 

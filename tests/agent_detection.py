@@ -50,7 +50,7 @@ def test_process_name_prefers_argv0():
         check(process_name(44, proc_root=str(proc)) == "node",
               "ordinary node process stays node")
         fake_proc(proc, 45, comm="node",
-                  cmdline=b"/usr/bin/node\0/Users/jmosco/.pi/agent/install/releases/0.87.1/node_modules/.bin/pi\0")
+                  cmdline=b"/usr/bin/node\0/Users/testuser/.pi/agent/install/releases/0.87.1/node_modules/.bin/pi\0")
         check(process_name(45, proc_root=str(proc)) == "pi",
               "node hosting the pi launcher is pi")
         fake_proc(proc, 46, comm="node",

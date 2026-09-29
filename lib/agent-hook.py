@@ -10,8 +10,8 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from subagent_state import (agent_id, list_field, next_entries, resolve_cursor_stop_id,
-                            with_cursor_subagent_fields)
+from subagent_state import (agent_id, list_field, next_entries, parse_subagents,
+                             resolve_cursor_stop_id, with_cursor_subagent_fields)
 
 spec = importlib.util.spec_from_file_location('canopy_codex_hook', Path(__file__).with_name('codex-hook.py'))
 core = importlib.util.module_from_spec(spec)
@@ -63,9 +63,9 @@ def normalized(kind, event, event_name=None):
         if name == 'ui_prompt_end':
             return 'clear-request', name
     elif kind == 'opencode':
-        mapping = {'session.created': 'ready', 'session.idle': 'turn-ended',
-                   'session.error': 'interrupted', 'session.deleted': 'session-ended',
-                   'permission.asked': 'needs-input', 'permission.v2.asked': 'needs-input',
+        mapping = {'session.created': 'ready', 'session.updated': 'subagent-update', 'session.idle': 'turn-ended',
+                    'session.error': 'interrupted', 'session.deleted': 'session-ended',
+                    'permission.asked': 'needs-input', 'permission.updated': 'needs-input', 'permission.v2.asked': 'needs-input',
                    'question.asked': 'needs-input', 'question.v2.asked': 'needs-input',
                    'session.next.prompted': 'working', 'session.next.prompt.admitted': 'working',
                    'session.next.step.started': 'working', 'session.next.tool.called': 'working',
@@ -110,24 +110,39 @@ def opencode_directory(event):
     return directory if isinstance(directory, str) else ''
 
 
+def opencode_info(event):
+    info = opencode_payload(event).get('info')
+    return info if isinstance(info, dict) else {}
+
+
+def opencode_parent_session(event):
+    return core.field(opencode_info(event).get('parentID'), 128)
+
+
 def opencode_pane(session, event):
     """Resolve global OpenCode plugin events only to a uniquely verified pane."""
     directory = opencode_directory(event)
     rows = core.tmux('list-panes', '-a', '-F',
-                     '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_pane_pid}|#{@tmux_canopy_agent_process_pid}|#{@tmux_canopy_agent_process_birth}')
+                      '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_pane_pid}|#{@tmux_canopy_agent_process_pid}|#{@tmux_canopy_agent_process_birth}|#{@tmux_canopy_agent_subagents}')
     if rows.returncode:
         return ''
-    bound, new_session = set(), set()
+    bound, child, new_session = set(), set(), set()
     for line in rows.stdout.splitlines():
-        fields = (line.split('|') + [''] * 11)[:11]
-        pane, root, dead, sidebar, slot, path, source, bound_session, bound_pane_pid, bound_process, bound_birth = fields
+        fields = (line.split('|') + [''] * 12)[:12]
+        pane, root, dead, sidebar, slot, path, source, bound_session, bound_pane_pid, bound_process, bound_birth, subagents = fields
         if not root.isdigit() or dead == '1' or sidebar == '1' or slot == '1':
             continue
         if source == 'opencode-hook' and bound_session == session and bound_pane_pid == root:
             identity = core.process_identity(root, 'opencode')
             if identity and identity == (bound_process, bound_birth):
                 bound.add(pane)
-        elif not bound_session and directory:
+        elif source == 'opencode-hook' and any(entry[0] == session for entry in parse_subagents(subagents)):
+            identity = core.process_identity(root, 'opencode')
+            if identity and identity == (bound_process, bound_birth):
+                child.add(pane)
+        elif (not bound_session or
+              (source == 'opencode-hook' and bound_process and
+               core.process_identity(root, 'opencode') != (bound_process, bound_birth))) and directory:
             identity = core.process_identity(root, 'opencode')
             if not identity:
                 continue
@@ -139,7 +154,7 @@ def opencode_pane(session, event):
             except (OSError, TypeError):
                 continue
             new_session.add(pane)
-    candidates = bound or new_session
+    candidates = bound or child or new_session
     return next(iter(candidates)) if len(candidates) == 1 else ''
 
 
@@ -162,7 +177,30 @@ def subagent_id(kind, event, current=None):
         return agent_id(event)
     if kind == 'cursor-agent':
         return resolve_cursor_stop_id(event, current['subagents'] if current else '')
+    if kind == 'opencode' and current:
+        session = session_id(kind, event)
+        info = opencode_info(event)
+        if session and info.get('parentID') == current['session']:
+            return session
+        if session and any(entry[0] == session for entry in parse_subagents(current['subagents'])):
+            return session
     return ''
+
+
+def with_opencode_subagent_fields(event):
+    """Copy OpenCode child-session metadata into the shared subagent schema."""
+    out = dict(event)
+    info = opencode_info(event)
+    label = list_field(info.get('agent'), 40)
+    title = list_field(info.get('title'), 40)
+    if label and title:
+        label = list_field(f'{label}: {title}', 40)
+    if label or title:
+        out['agent_type'] = label or title
+    props = opencode_payload(event)
+    if not out.get('tool_name') and isinstance(props, dict):
+        out['tool_name'] = props.get('permission') or props.get('action') or props.get('tool') or ''
+    return out
 
 
 def report(kind, event, event_name=None):
@@ -188,7 +226,9 @@ def report(kind, event, event_name=None):
         return
     state, name = result
     if kind == 'opencode':
-        target = opencode_pane(session, event)
+        # A child session is owned by its already-verified parent pane. Creation
+        # supplies parentID; later child events resolve through stored child IDs.
+        target = opencode_pane(opencode_parent_session(event) or session, event)
         if not target:
             return
         core.PANE = target
@@ -214,15 +254,36 @@ def report(kind, event, event_name=None):
     # associated with a pane, only a fresh start may replace its identity.
     start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation', 'sessionStart') or \
         (is_contract and state == 'ready')
-    if current['session'] and current['session'] != session and not start:
-        return
-    if current['session'] != session and start:
-        current = {key: '' for key in core.FIELDS}
-    now = str(int(time.time()))
     agent = subagent_id(kind, event, current)
-    subagent_event = with_cursor_subagent_fields(event) if kind == 'cursor-agent' else event
+    child_event = kind == 'opencode' and bool(agent)
+    if kind == 'opencode' and name == 'session.updated' and not child_event:
+        return
+    if not child_event:
+        if current['session'] and current['session'] != session and not start:
+            return
+        if current['session'] != session and start:
+            current = {key: '' for key in core.FIELDS}
+    now = str(int(time.time()))
+    stored_session = current['session'] if child_event else session
+    if kind == 'opencode' and agent:
+        if name in ('session.created', 'session.updated'):
+            state = 'subagent-update'
+        elif name == 'session.deleted':
+            state = 'subagent-stop'
+        elif name in ('session.idle', 'session.error') or (name == 'session.status' and state == 'turn-ended'):
+            state = 'subagent-done'
+    if kind == 'cursor-agent':
+        subagent_event = with_cursor_subagent_fields(event)
+    elif kind == 'opencode':
+        subagent_event = with_opencode_subagent_fields(event)
+        if state == 'clear-request' and agent:
+            entry = next((item for item in parse_subagents(current['subagents']) if item[0] == agent), None)
+            if entry:
+                subagent_event['tool_name'] = entry[4]
+    else:
+        subagent_event = event
     values = dict(current)
-    values.update(source=kind + '-hook', session=session, pane_pid=pid,
+    values.update(source=kind + '-hook', session=stored_session, pane_pid=pid,
                   process_pid=process_pid, process_birth=process_birth,
                   subagents=next_entries(current['subagents'], agent, subagent_event, state, now))
     # Only a request's own agent (or the main thread) can clear it.
@@ -330,11 +391,10 @@ def main():
     # Exactly one emit() must run past this point, however report() exits:
     # a single try/except/finally, followed by one unconditional emit().
     try:
-        lock = 'tmux-canopy-agent-' + core.PANE[1:]
-        locked = core.tmux('wait-for', '-L', lock).returncode == 0
-    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
-        locked = False
-    if not locked:
+        lock_fd = core.pane_lock(core.PANE[1:])
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        lock_fd = None
+    if not lock_fd:
         emit()
         return
     try:
@@ -342,10 +402,7 @@ def main():
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
         pass
     finally:
-        try:
-            core.tmux('wait-for', '-U', lock)
-        except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
-            pass
+        core.pane_unlock(lock_fd)
     emit()
 
 

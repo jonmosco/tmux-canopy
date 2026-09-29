@@ -55,7 +55,7 @@ width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
 : "${silence_seconds:=30}"
 : "${icon_theme:=auto}"
 : "${appearance:=default}"
-: "${animate:=off}"
+: "${animate:=on}"
 : "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
 
@@ -94,7 +94,7 @@ case "$appearance" in
   *) appearance=places ;;
 esac
 if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
-  animate=off
+  animate=on
 fi
 
 sidebar_notification_sources="$notification_sources"

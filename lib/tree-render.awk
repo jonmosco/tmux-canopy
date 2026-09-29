@@ -434,7 +434,7 @@ function place_name(value,    n,parts) {
     n=split(value, parts, "/")
     return parts[n] == "" ? value : parts[n]
 }
-function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pcount,label,wcount,windex,wlast,pt,cmd,icon,pm,line,dir_stem,win_stem,dir_branch) {
+function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pcount,label,wcount,windex,wlast,pt,wt,cmd,icon,pm,wm,line,dir_stem,win_stem,dir_branch) {
     n=0
     for (wpos=1; wpos<=nw[s]; wpos++) {
         w=windows[s,wpos]; key=s SUBSEP w
@@ -481,11 +481,13 @@ function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pco
         for (windex=1; windex<=wc; windex++) {
             w=win_ids[windex]; wlast=(windex == wc)
             win_stem=dir_stem (wlast ? "   " : stem_mid)
-            row("W:" w ":" s, dim dir_stem (wlast ? branch_end : branch_mid) reset " " fold_open win_names[windex] reset, "W:" w ":" s)
+            wt="W:" w ":" s
+            wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : " ")
+            row(wt, dim dir_stem (wlast ? branch_end : branch_mid) reset " " fold_open (wm != " " ? mark(wm) " " : "") win_names[windex] reset, wt)
             for (idx=win_first[windex]; idx<=win_last[windex]; idx++) {
                 p=place_pane[id, idx]; pt="P:" p
                 cmd=command[p]; icon=appicon(cmd)
-                pm=(pt == del ? "✕" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
+                pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
                 line=lazy_prefix(win_stem, idx == win_last[windex] ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd hook_glyph(p)
                 row(pt, edge_colored(line, pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"), width-3), pt ":" s)
             }

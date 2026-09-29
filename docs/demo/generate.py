@@ -17,7 +17,7 @@ import threading
 import time
 from PIL import Image, ImageDraw, ImageFont
 
-COLS, ROWS = 96, 26
+COLS, ROWS, SIDEBAR_WIDTH = 96, 26, 34
 CW, CH, PAD, TOP = 11, 23, 24, 24
 # ANSI palettes from the themes' official Alacritty ports; see README.md.
 THEMES = {
@@ -138,12 +138,15 @@ def main():
     client_process = master = None
     with tempfile.TemporaryDirectory(prefix='canopy-demo-') as directory:
         temp = Path(directory)
+        action_state = temp / 'action-state'
+        action_state.touch()
+        shutil.copy(shutil.which('sleep'), temp / 'codex')
         home = temp / 'home'
         home.mkdir()
         web, api, docs = [temp / 'workspace' / name for name in ('web', 'api', 'handbook')]
         for folder in (web, api, docs):
             folder.mkdir(parents=True)
-        env = dict(PATH='/usr/local/bin:/usr/bin:/bin', HOME=str(home), USER='demo', LOGNAME='demo',
+        env = dict(PATH=f'{temp}:/usr/local/bin:/usr/bin:/bin', HOME=str(home), USER='demo', LOGNAME='demo',
                    SHELL='/bin/bash', TERM='xterm-256color', LANG='C.UTF-8', LC_ALL='C.UTF-8',
                    XDG_CONFIG_HOME=str(home / '.config'), XDG_DATA_HOME=str(home / '.local/share'),
                    XDG_CACHE_HOME=str(home / '.cache'))
@@ -174,10 +177,36 @@ def main():
                 panes.append(dict(left=int(left), top=int(top), width=int(width), height=int(height), text=text))
             return panes
 
-        def capture(chapter, title, detail, shortcut, duration=1500):
+        def assert_sidebar_persists():
+            current = tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}')
+            if not any(row == f'{sidebar}|1' for row in current.splitlines()):
+                raise RuntimeError('The sidebar pane changed or disappeared during navigation')
+
+        def set_agent_fixture_state(state, request=None):
+            pane_pid = tm('display-message', '-p', '-t', agent_pane, '#{pane_pid}')
+            proc_stat = Path(f'/proc/{pane_pid}/stat').read_text()
+            birth = proc_stat.rsplit(') ', 1)[1].split()[19]
+            values = {
+                'source': 'codex-hook', 'session': 'demo-codex-1', 'pane_pid': pane_pid,
+                'status': state, 'updated': str(int(time.time())), 'process_pid': pane_pid,
+                'process_birth': birth, 'tool': (request or {}).get('tool', ''),
+                'summary': (request or {}).get('summary', ''), 'command': (request or {}).get('command', ''),
+                'request': (request or {}).get('id', ''),
+            }
+            for key, value in values.items():
+                tm('set-option', '-p', '-q', '-t', agent_pane, f'@tmux_canopy_agent_{key}', value)
+            actual = tm('show-option', '-pqv', '-t', agent_pane, '@tmux_canopy_agent_status')
+            if actual != state:
+                raise RuntimeError(f'Agent fixture state mismatch: expected {state}, got {actual}')
+
+        def capture(chapter, title, detail, shortcut, duration=1500, smooth_transition=False):
             panes = screen()
-            captures.append(dict(chapter=chapter, title=title, panes=panes))
-            w, h = COLS * CW + PAD * 2, TOP + ROWS * CH + 92
+            active = tm('display-message', '-c', client, '-p',
+                        '#{session_name}|#{window_index}|#{window_name}|#{window_id}')
+            session_name, window_index, window_name, window_id = active.split('|', 3)
+            captures.append(dict(chapter=chapter, title=title, panes=panes, session=session_name,
+                                 window=window_name, smooth_transition=smooth_transition))
+            w, h = COLS * CW + PAD * 2, TOP + ROWS * CH + 132
             image = Image.new('RGB', (w, h), matte)
             draw = ImageDraw.Draw(image)
             draw.rectangle((PAD - 1, TOP - 1, w - PAD, TOP + ROWS * CH), outline=border)
@@ -190,7 +219,38 @@ def main():
                     draw.line((x, y - CH // 2, x + pane['width'] * CW - 1, y - CH // 2), fill=border)
                 for i, line in enumerate(pane['text'].splitlines()[:pane['height']]):
                     ansi_line(draw, line, x, y + i * CH, font, pane['width'], theme)
-            y = TOP + ROWS * CH + 16
+            status_y = TOP + ROWS * CH + 2
+            status_left, status_right = PAD, w - PAD - 1
+            status_height = 23
+            draw.rectangle((status_left, status_y, status_right, status_y + status_height), fill=theme['ansi'][0])
+            session_label = f' {session_name} '
+            session_width = int(small_font.getlength(session_label)) + 18
+            draw.rounded_rectangle((status_left + 5, status_y + 2, status_left + session_width,
+                                    status_y + status_height - 2), radius=3, fill=theme['ansi'][2])
+            draw.text((status_left + 14, status_y + 3), session_label, font=small_font, fill=theme['background'])
+            right_label = 'CANOPY  •  TMUX'
+            right_width = int(small_font.getlength(right_label)) + 14
+            tabs_x = status_left + session_width + 12
+            tabs_right = status_right - right_width - 8
+            window_rows = tm('list-windows', '-t', session_name, '-F',
+                             '#{window_id}|#{window_index}|#{window_name}').splitlines()
+            for item in window_rows:
+                wid, index, name = item.split('|', 2)
+                label = f' {index}:{name} '
+                label_width = int(small_font.getlength(label)) + 12
+                if tabs_x + label_width > tabs_right:
+                    break
+                if wid == window_id:
+                    draw.rounded_rectangle((tabs_x, status_y + 2, tabs_x + label_width,
+                                            status_y + status_height - 2), radius=3, fill=theme['ansi'][4])
+                    label_color = theme['background']
+                else:
+                    label_color = theme['dim']
+                draw.text((tabs_x + 6, status_y + 3), label, font=small_font, fill=label_color)
+                tabs_x += label_width + 3
+            draw.text((status_right - right_width, status_y + 3), right_label,
+                      font=small_font, fill=GREEN)
+            y = status_y + status_height + 10
             draw.text((PAD, y), title, font=font, fill=GREEN)
             draw.text((PAD, y + 27), detail, font=small_font, fill=theme['dim'])
             if shortcut:
@@ -198,8 +258,8 @@ def main():
                 x = w - PAD - label_width
                 draw.rounded_rectangle((x, y - 2, w - PAD, y + 26), radius=5, fill=theme['ansi'][0])
                 draw.text((x + 12, y + 1), shortcut, font=font, fill=FG)
-            for n in range(6):
-                x = w - PAD - 88 + n * 16
+            for n in range(7):
+                x = w - PAD - 104 + n * 16
                 draw.ellipse((x, y + 42, x + 5, y + 47), fill=GREEN if n == chapter else border)
             frames.append(image)
             durations.append(duration)
@@ -213,9 +273,13 @@ def main():
                 return shlex.join(['/bin/bash', '--noprofile', '--norc', str(path)])
             tests = fixture('tests', '\n  $ pytest -q\n\n  ......................          [100%]\n  \033[32m22 passed in 0.38s\033[0m\n\n  $ ')
             guide = fixture('guide', '\n  HANDBOOK\n  ========\n\n  01  Getting started\n  02  Local development\n  03  Running tests\n  04  Release checklist\n\n  Everything you need, one pane away.')
+            agent_window_script = temp / 'new-window.sh'
+            agent_window_script.write_text("#!/bin/bash\nprintf '\\033[2J\\033[H'\ncat <<'DEMO'\n  Codex\n  Working on the release notes...\n\n  Reviewing changes and tests.\nDEMO\nexec codex 600\n")
+            agent_window_script.chmod(0o755)
+            new_window = shlex.join([str(agent_window_script)])
             (api / 'server.py').write_text('import time\nprint("\\n  $ python3 server.py\\n\\n  Development server\\n  ------------------\\n\\n  Ready at http://localhost:8000\\n\\n  \\033[32mGET /health       200 OK\\n  GET /projects     200 OK\\n  GET /projects/1   200 OK\\033[0m\\n\\n  Waiting for requests...", flush=True)\ntime.sleep(300)\n')
             editor_cmd = shlex.join(['nvim', '--clean', '-n', '-u', str(temp / 'editor.vim'), 'app.py'])
-            editor = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'studio', '-n', 'web', '-x', str(COLS), '-y', str(ROWS), '-c', str(web), '-P', '-F', '#{pane_id}', editor_cmd)
+            editor = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'studio', '-n', 'Frontend', '-x', str(COLS), '-y', str(ROWS), '-c', str(web), '-P', '-F', '#{pane_id}', editor_cmd)
             env['TMUX'] = tm('display-message', '-p', '-t', editor, '#{socket_path},#{pid},0')
             env['TMUX_PANE'] = editor
             tm('set-option', '-g', 'default-shell', '/bin/bash')
@@ -223,16 +287,20 @@ def main():
             tm('set-option', '-g', 'automatic-rename', 'off')
             tm('set-option', '-g', 'allow-rename', 'off')
             tm('set-option', '-g', '@tmux-canopy-icon-theme', 'nerdfont')
+            # Hack Nerd Font misses this Codicons glyph on some installed builds.
+            tm('set-option', '-g', '@tmux-canopy-icon-codex', 'C')
+            tm('set-option', '-g', '@tmux-canopy-agents', 'on')
+            tm('set-option', '-g', '@tmux-canopy-animate', 'on')
             tm('set-option', '-g', '@tmux-canopy-notifications', 'none')
             tm('set-option', '-g', '@tmux-canopy-preview', 'off')
             tm('set-option', '-g', '@tmux-canopy-density', 'normal')
             test_pane = tm('split-window', '-d', '-v', '-l', '9', '-t', editor, '-c', str(web), '-P', '-F', '#{pane_id}', tests)
-            api_pane = tm('new-window', '-d', '-t', 'studio:', '-n', 'api', '-c', str(api), '-P', '-F', '#{pane_id}', 'python3 server.py')
-            doc_pane = tm('new-session', '-d', '-s', 'docs', '-n', 'handbook', '-x', str(COLS), '-y', str(ROWS), '-c', str(docs), '-P', '-F', '#{pane_id}', guide)
+            api_pane = tm('new-window', '-d', '-t', 'studio:', '-n', 'API', '-c', str(api), '-P', '-F', '#{pane_id}', 'python3 server.py')
+            doc_pane = tm('new-session', '-d', '-s', 'docs', '-n', 'Handbook', '-x', str(COLS), '-y', str(ROWS), '-c', str(docs), '-P', '-F', '#{pane_id}', guide)
             for pane, title in ((editor, 'editor'), (test_pane, 'tests'), (api_pane, 'server'), (doc_pane, 'guide')):
                 tm('set-option', '-p', '-t', pane, 'allow-set-title', 'off')
                 tm('select-pane', '-t', pane, '-T', title)
-            tm('select-window', '-t', 'studio:web')
+            tm('select-window', '-t', 'studio:Frontend')
             tm('select-pane', '-t', editor)
             tm('set-buffer', '-b', 'test-command', 'pytest -q')
             tm('set-buffer', '-b', 'health-check', 'curl http://localhost:8000/health')
@@ -251,33 +319,63 @@ def main():
             threading.Thread(target=drain, daemon=True).start()
             time.sleep(.4)
             client = tm('list-clients', '-F', '#{client_tty}')
-            run('toggle', client, editor, '42', 'global', 'T', 'Tab', 'slot')
+            run('toggle', client, editor, str(SIDEBAR_WIDTH), 'global', 'T', 'Tab', 'slot')
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             time.sleep(1)
             tm('set-option', '-g', '@tmux_canopy_notifications', 'all')
             keys(*(['Up'] * 12 + ['Down'] * 5))
-            overview = (0, 'Your workspace, in one tree', 'Sessions, windows, panes. Shared directories shown once.', '')
-            capture(*overview, duration=2600)
-            for _ in range(3):
-                keys('j')
-                capture(*overview, duration=180)
-            capture(*overview, duration=800)
-            # Exercise the real navigation wrapper, preserving the sidebar process.
-            run('navigate', client, 'next', '42', 'global', 'slot')
+            overview = (0, 'Your workspace, in one tree', 'Sessions, windows, panes—with working directories in context.', '')
+            capture(*overview, duration=1100)
+            # Create a new window through the actual Canopy tree action.
+            studio_session = tm('display-message', '-p', '-t', 'studio', '#{session_id}')
+            tm('set-option', '-g', 'default-command', new_window)
+            env.update(TMUX_CANOPY_STATE=str(action_state), TMUX_CANOPY_CLIENT=client,
+                       TMUX_CANOPY_WIDTH=str(SIDEBAR_WIDTH),
+                       TMUX_CANOPY_SCOPE='global', TMUX_CANOPY_TRANSITION='slot', TMUX_PANE=sidebar)
+            run('tree-action', 'create-window', f'S:{studio_session}')
+            time.sleep(.7)
+            assert_sidebar_persists()
+            agent_pane = tm('display-message', '-c', client, '-p', '#{pane_id}')
+            tm('rename-window', '-t', agent_pane, 'Agent')
+            set_agent_fixture_state('working')
+            if tm('show-option', '-pqv', '-t', agent_pane, '@tmux_canopy_agent_status') != 'working':
+                raise RuntimeError('Isolated agent working state was not stored on its demo pane')
+            tm('send-keys', '-t', sidebar, 'C-r')
             time.sleep(.6)
-            capture(1, 'A sidebar that follows you', 'Switch windows and keep the same tree and selection.', 'prefix + n', 2300)
-            run('navigate', client, 'previous', '42', 'global', 'slot')
+            capture(1, 'Create a window. Keep the tree.', 'A new Codex window inherits the project; activity stays in the tree.', 'a  →  New window', 1500, True)
+            # Start another session detached. Refresh while the client remains
+            # in the project, then switch to that background session.
+            tm('new-session', '-d', '-s', 'notes', '-x', str(COLS), '-y', str(ROWS), '-c', str(docs), guide)
+            tm('send-keys', '-t', sidebar, 'C-r')
+            time.sleep(.7)
+            assert_sidebar_persists()
+            capture(1, 'New sessions appear in the tree', 'The project stays active while another session runs in the background.', 'Ctrl-r', 1700, True)
+            tm('switch-client', '-c', client, '-t', 'notes')
+            time.sleep(.7)
+            assert_sidebar_persists()
+            capture(1, 'Switch sessions. Same sidebar.', 'Move into the background session without reopening Canopy.', 'switch session', 1700, True)
+            tm('switch-client', '-c', client, '-t', 'studio')
+            time.sleep(.6)
+            assert_sidebar_persists()
+            capture(1, 'And back again', 'Your original project and tree are right where you left them.', 'switch session', 1000, True)
+            # Exercise the real navigation wrapper, preserving the sidebar process.
+            run('navigate', client, 'previous', str(SIDEBAR_WIDTH), 'global', 'slot')
+            time.sleep(.6)
+            assert_sidebar_persists()
+            capture(1, 'The tree follows window changes too', 'The active-pane marker follows without moving the sidebar.', 'prefix + p', 1400, True)
+            run('navigate', client, 'next', str(SIDEBAR_WIDTH), 'global', 'slot')
             time.sleep(.5)
-            capture(1, 'A sidebar that follows you', 'Back to your editor, with its layout intact.', 'prefix + p', 1400)
+            assert_sidebar_persists()
             tm('select-pane', '-t', sidebar)
             keys('/')
-            search = (2, 'Find a pane in a few keystrokes', 'Search across your workspace without leaving the sidebar.', '/  api')
+            time.sleep(.35)
+            search = (2, 'Find a pane in a few keystrokes', 'Search across your workspace without leaving the sidebar.', '/  py')
             capture(*search, duration=250)
-            for letter in 'api':
+            for letter in 'py':
                 keys(letter)
                 capture(*search, duration=180)
             capture(*search, duration=1900)
-            keys('Escape')
+            keys('Escape', 'Escape')
             # Real notification providers on fictional background panes only.
             for pane, provider in ((api_pane, 'activity'), (doc_pane, 'bell')):
                 window = tm('display-message', '-p', '-t', pane, '#{window_id}')
@@ -304,6 +402,25 @@ def main():
             keys('1')
             keys(*(['Up'] * 12 + ['Down'] * 5))
             capture(*overview, duration=1700)
+            tm('select-pane', '-t', sidebar)
+            keys('Escape', 'Escape')
+            keys('1')
+            keys('4')
+            time.sleep(.5)
+            for _ in range(8):
+                capture(6, 'Agent activity, gently indicated', 'A breathing cyan dot marks a working agent.', '', 150)
+                time.sleep(.15)
+            set_agent_fixture_state('needs-input', {'id': 'demo-request', 'tool': 'shell',
+                                                     'summary': 'Confirm the release command',
+                                                     'command': 'make release-notes'})
+            keys('1')
+            keys('4')
+            time.sleep(.5)
+            agent_source = sp.run([str(root / 'scripts' / 'tree-source'), '--agents'], env=env,
+                                  capture_output=True, text=True, timeout=20, check=True).stdout
+            if '!' not in agent_source:
+                raise RuntimeError('Needs-input state did not render in the Agents view')
+            capture(6, 'Agent waiting for input', 'A steady amber marker identifies the pane that needs you.', 'NEEDS INPUT', 1800, True)
         finally:
             sp.run(['tmux', '-S', socket, 'kill-server'], env=env, capture_output=True)
             if client_process:
@@ -311,13 +428,23 @@ def main():
             if master is not None:
                 os.close(master)
     # One palette avoids per-frame color shimmer. No dithering keeps text crisp.
-    contact = Image.new('RGB', (frames[0].width, frames[0].height * len(frames)))
-    for i, frame in enumerate(frames):
+    contact = Image.new('RGB', (frames[0].width, frames[0].height * (len(frames) + 4 * sum(
+        1 for metadata in captures[1:] if metadata.get('smooth_transition')))))
+    timeline, timeline_durations = [], []
+    for i, (frame, duration) in enumerate(zip(frames, durations)):
+        if i and captures[i].get('smooth_transition'):
+            previous = frames[i - 1]
+            for step in range(1, 5):
+                timeline.append(Image.blend(previous, frame, step / 5))
+                timeline_durations.append(45)
+        timeline.append(frame)
+        timeline_durations.append(duration)
+    for i, frame in enumerate(timeline):
         contact.paste(frame, (0, i * frame.height))
     palette = contact.quantize(colors=128, method=Image.Quantize.MEDIANCUT)
-    indexed = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in frames]
-    indexed[0].save(args.output / 'canopy-demo.gif', save_all=True, append_images=indexed[1:], duration=durations, loop=0, optimize=True, disposal=1)
-    poster = next((frame for frame, metadata in zip(frames, captures) if metadata['chapter'] == 3), frames[0])
+    indexed = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in timeline]
+    indexed[0].save(args.output / 'canopy-demo.gif', save_all=True, append_images=indexed[1:], duration=timeline_durations, loop=0, optimize=True, disposal=1)
+    poster = next((frame for frame, metadata in zip(frames, captures) if metadata['chapter'] == 1), frames[0])
     poster.save(args.output / 'canopy-demo.png', optimize=True)
     (args.output / 'canopy-demo-captures.json').write_text(json.dumps(captures, indent=2))
     print(f'Wrote {len(frames)} frames, {sum(durations)/1000:.1f}s, {(args.output / "canopy-demo.gif").stat().st_size:,} bytes to {args.output}')

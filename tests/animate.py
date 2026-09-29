@@ -36,8 +36,12 @@ def main():
     plain = animate('just a shell row', 2)
     assert plain == 'just a shell row'
 
-    mark = animate('pi \x1b[1;36m▷\x1b[0m', 1)
-    assert '▷' in mark and mark != 'pi \x1b[1;36m▷\x1b[0m'
+    marks = [animate('pi \x1b[1;36m▷\x1b[0m', frame) for frame in range(8)]
+    plain_marks = [re.sub(r'\x1b\[[0-9;]*m', '', mark) for mark in marks]
+    assert plain_marks == ['pi ●'] * 8, plain_marks
+    assert len(set(marks)) > 1 and all('\x1b[7m' not in mark for mark in marks), marks
+    assert marks[0] == marks[1] and marks[1] == marks[7] and marks[3] == marks[5], marks
+    assert all('▷' not in mark for mark in plain_marks)
 
     multi = f'P:%1\tcodex {word}\tP:%1:$0\0P:%2\tshell\tP:%2:$0\0'
     result = sp.run(
@@ -78,19 +82,19 @@ def main():
             env['TMUX'] = tm('display-message', '-p', '-t', pane, '#{socket_path},#{pid},0')
             load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=env, capture_output=True, text=True, timeout=30)
             assert load.returncode == 0 and not load.stderr, load.stderr
-            assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'off'
-            tm('set-option', '-g', '@tmux-canopy-animate', 'on')
+            assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
+            tm('set-option', '-g', '@tmux-canopy-animate', 'off')
             load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=env, capture_output=True, text=True, timeout=30)
             assert load.returncode == 0, load.stderr
-            assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
+            assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'off'
             tm('set-option', '-g', '@tmux-canopy-animate', 'maybe')
             load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=env, capture_output=True, text=True, timeout=30)
-            assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'off'
-            print('ok - animate option defaults off and normalizes invalid values')
+            assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
+            print('ok - animate option defaults on and normalizes invalid values')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 
-    print('ok - WORKING/wrk highlight band advances across frames; plain rows stay static')
+    print('ok - WORKING/wrk highlight band advances; working mark breathes as a quiet cyan dot')
 
 
 if __name__ == '__main__':

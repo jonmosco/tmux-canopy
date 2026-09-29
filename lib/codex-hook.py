@@ -3,6 +3,7 @@
 
 Configured as a Codex command hook. Never returns a decision to Codex.
 """
+import fcntl
 import hashlib
 import json
 import os
@@ -30,6 +31,32 @@ FIELDS = ("source", "session", "turn", "pane_pid", "status", "tool",
 def tmux(*args):
     return subprocess.run(("tmux", *args), text=True, capture_output=True,
                           timeout=3, check=False)
+
+
+def pane_lock(pane_id):
+    """Acquire a per-pane file lock. The kernel releases it on process death."""
+    lock_dir = os.environ.get("TMPDIR", "/tmp")
+    try:
+        fd = open(os.path.join(lock_dir, f"tmux-canopy-agent-{pane_id}.lock"), "w")
+        for _ in range(6):
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return fd
+            except (OSError, IOError):
+                time.sleep(0.25)
+        fd.close()
+        return None
+    except (OSError, IOError):
+        return None
+
+
+def pane_unlock(fd):
+    if fd:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            fd.close()
+        except (OSError, IOError):
+            pass
 
 
 def field(value, limit=300):
@@ -127,7 +154,7 @@ def process_identity(root, kind="codex"):
             if current == root:
                 for pid, name, birth in chain:
                     if name in names:
-                        return pid, str(birth)
+                        return str(pid), str(birth)
                 break
             if stat[0] <= 0 or stat[0] == current:
                 break
@@ -320,13 +347,13 @@ def main():
         event = json.loads(raw)
         if not isinstance(event, dict):
             return
-        lock = "tmux-canopy-agent-" + PANE[1:]
-        if tmux("wait-for", "-L", lock).returncode:
+        lock_fd = pane_lock(PANE[1:])
+        if not lock_fd:
             return
         try:
             report(event)
         finally:
-            tmux("wait-for", "-U", lock)
+            pane_unlock(lock_fd)
         if event.get("hook_event_name") in ("Stop", "SubagentStop"):
             # Codex requires JSON from successful stop hooks.
             print("{}")

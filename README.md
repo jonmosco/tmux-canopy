@@ -80,7 +80,7 @@ Agent awareness is off by default. To show the Agents view, inline status, summa
 set -g @tmux-canopy-agents 'on'
 ```
 
-Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, Oh My Pi, and Cursor Agent (`agent`, shown as `cursor-agent` in the Agents view). `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`, `cursor-agent`). Adapters show `[state·hook]`; Claude Code, Codex, and Cursor Agent adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
+Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, Oh My Pi, and Cursor Agent (`agent`, shown as `cursor-agent` in the Agents view). `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`, `cursor-agent`). Adapters show `[state·hook]`; Claude Code, Codex, OpenCode, and Cursor Agent adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
 For Antigravity, install or update Canopy's adapter from the installation directory:
 
@@ -91,7 +91,7 @@ For Antigravity, install or update Canopy's adapter from the installation direct
 
 The installer adds a named Canopy entry to `~/.gemini/config/hooks.json` and removes older Canopy `agy` hooks from `~/.gemini/antigravity-cli/settings.json`. Restart `agy` inside tmux, check its `/hooks` view, and press `4` in Canopy to see the Agents view. Antigravity's hooks report active invocations, tool activity, clean turn ends, and interruptions; they do not expose dedicated permission-request or subagent lifecycle events to Canopy.
 
-OpenCode uses a plugin rather than a shell hook. `canopy integration install opencode` writes `~/.config/opencode/plugins/canopy-agent-state.js`. Restart OpenCode inside tmux afterward. The V2 plugin subscribes to session, permission, and question events and observes prompt, tool, and permission hooks. It does not approve a permission or block a tool. A report is kept only when the session's directory matches one OpenCode pane.
+OpenCode uses a plugin rather than a shell hook. `canopy integration install opencode` writes `~/.config/opencode/plugins/canopy-agent-state.js`. The plugin is ESM, so `~/.config/opencode/package.json` must contain `"type": "module"`. Restart OpenCode inside tmux afterward. The plugin subscribes to session, permission, and question events and observes prompt, tool, and permission hooks. It does not approve a permission or block a tool. A report is kept only when the session's directory matches one OpenCode pane.
 
 ### Defaults
 
@@ -109,7 +109,7 @@ set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
-set -g @tmux-canopy-animate 'off'         # on: WORKING status highlight band
+set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 ```
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
