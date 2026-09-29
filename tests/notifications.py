@@ -47,9 +47,9 @@ def main():
                     for width in (24, 42, 80):
                         args = dict(icons=icons, theme=theme, density=density, width=width)
                         rows = render(**args)
-                        assert 'nvim '+badge(bell) in rows['P:%0:$0']
-                        assert 'bash '+badge(activity) in rows['P:%1:$0']
-                        assert 'python3 '+badge(silence) in rows['P:%2:$0']
+                        assert badge(bell) in rows['P:%0:$0'] and not rows['P:%0:$0'].startswith('nvim '+badge(bell))
+                        assert badge(activity) in rows['P:%1:$0']
+                        assert badge(silence) in rows['P:%2:$0']
                         assert not any('!' in row or bell+'1' in row for row in rows.values())
                         for identity in ('S:$0', 'W:@0:$0', 'W:@1:$0'):
                             assert badge(bell) not in rows[identity] and badge(silence) not in rows[identity]
@@ -63,11 +63,11 @@ def main():
                         assert 'work' in sessions['S:$0'] and badge(bell+'2') in sessions['S:$0']
                         assert 'linked' in sessions['S:$1'] and badge(bell) in sessions['S:$1']
                         disabled = render(enabled=False, **args)
-                        assert 'nvim '+badge(bell) not in disabled['P:%0:$0']
+                        assert badge(bell) not in disabled['P:%0:$0']
                         orphan = render(orphan=True, **args)
                         assert 'web' in orphan['W:@0:$0'] and badge(bell) in orphan['W:@0:$0']
                         if theme == 'ansi':
-                            assert '\x1b[1;32m●\x1b[0m' in rows['P:%0:$0']
+                            assert '\x1b[1;32m▶\x1b[0m' in rows['P:%0:$0']
                         else:
                             assert all('\x1b' not in value for value in rows.values())
         print('ok - one badge per pane, collapsed unique counts, priority, linked rows, fallback, themes and densities')

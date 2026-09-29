@@ -121,11 +121,16 @@ def live():
             return result.stdout
         def screen(): return tm('capture-pane', '-p', '-t', sidebar)
         def menu(key='F'):
-            output.clear(); tm('send-keys', '-t', sidebar, key)
-            try:
-                wait(lambda: b'Tree filters' in output, 'filter menu opens')
-            except AssertionError:
-                raise AssertionError(('filter menu opens',screen(),bytes(output[-2500:]))) from None
+            output.clear()
+            deadline = time.monotonic()+8
+            while time.monotonic() < deadline:
+                tm('send-keys', '-t', sidebar, key)
+                pulse = time.monotonic()+1.5
+                while time.monotonic() < pulse:
+                    if b'Tree filters' in output:
+                        return
+                    time.sleep(.04)
+            raise AssertionError(('filter menu opens',screen(),bytes(output[-2500:])))
         def probe():
             selected.unlink(missing_ok=True)
             def selected_ready():

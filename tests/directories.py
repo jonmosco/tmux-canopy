@@ -74,7 +74,7 @@ def main():
             assert sum(row[0].startswith('P:') for row in rows) == 2
         notice_rows = render(['/work/project'], compact='on', notices=True, icons='ascii')
         compact_row = next(row[1] for row in notice_rows if row[0].startswith('W:'))
-        assert 'bash B' in compact_row and 'B1' not in compact_row and '*' not in compact_row
+        assert 'B' in compact_row and 'bash B' not in compact_row and 'B1' not in compact_row and '*' not in compact_row
         for compact in ('off', 'invalid', ''):
             assert any(row[0].startswith('P:') for row in render(['/work/project'], compact=compact))
         # A repeated subset gets one directory label; a different directory
@@ -93,7 +93,7 @@ def main():
                 assert pane_rows[1][1].count('\n') == 0
             assert '●' not in next(row[1] for row in rows if row[0] == 'S:$0')
             assert '●' not in next(row[1] for row in rows if row[0] == 'W:@0:$0')
-            assert sum('●' in row[1] for row in pane_rows) == 1
+            assert sum('▶' in row[1] for row in pane_rows) == 1
             assert ' [4p]' not in next(row[1] for row in rows if row[0] == 'W:@0:$0')
         minimal = render(['/work/project'], density='minimal')
         assert len(minimal) == 2 and [row[0] for row in minimal] == ['S:$0', 'W:@0:$0']
