@@ -150,7 +150,7 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
         assert "scripts/toggle" in keys
         doctor = run(cli, "doctor", env=env, ok=False)
         assert "Canopy-owned tmux configuration" in doctor.stdout
-        assert "Agent awareness: off" in doctor.stdout
+        assert "Agent awareness: default off" in doctor.stdout
         assert "Agent integrations:" in doctor.stdout
         assert "Reporter self-test (stubbed tmux, real report path):\n  OK" in doctor.stdout, doctor.stdout
         assert "Agents running in tmux panes:" in doctor.stdout
