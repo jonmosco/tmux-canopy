@@ -466,8 +466,9 @@ function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pco
         dir_key="DIR:" place_pane[id, 1]
         dir_open=!(dir_key in collapsed)
         if (icons == "nerdfont") folder=(dir_open ? "󰝰" : "󰉋")
+        else if (icons == "unicode") folder=(dir_open ? "📂" : "📁")
         else if (icons == "ascii") folder="/"
-        else folder=(dir_open ? "▾" : "▸")
+        else folder=(dir_open ? "📂" : "📁")
         folder_color=(theme == "mono" ? "" : "\033[38;5;74m")
         row(dir_key, dim dir_branch reset " " (dir_open ? fold_open : fold_closed) folder_color folder reset " " label, dir_key ":" s)
         if (!dir_open) continue

@@ -13,8 +13,9 @@ def main():
         state_file = Path(directory) / 'state'
 
         def render(paths, *, density='normal', nul=True, collapsed=False, linked=False,
-                   internal=False, width=42, icons='unicode', compact='off', switcher=False, notices=False):
-            state_file.write_text('W:@0:$0\n' if collapsed else '')
+                    internal=False, width=42, icons='unicode', compact='off', switcher=False, notices=False,
+                    appearance='classic', collapsed_dir=False):
+            state_file.write_text(('W:@0:$0\n' if collapsed else '') + ('DIR:%0\n' if collapsed_dir else ''))
             data = [
                 ['D', icons, 'activity,bell' if notices else 'none', 'mono', density, '', '', '', '%0', '@0', '$0', str(width), 'host', compact],
                 ['S', '$0', 'work', '1'],
@@ -29,6 +30,8 @@ def main():
                     ['P', '%90', '@0', '90', 'fzf', '', '/sidebar', '0', '1', '', '', '', '', '', '', ''],
                     ['P', '%91', '@0', '91', 'sleep', '', '/slot', '0', '', '1', '', '', '', '', '', ''],
                 ]
+            data[0].extend([''] * (35 - len(data[0])))
+            data[0].append(appearance)
             output = subprocess.check_output(
                 ['awk', '-v', f'switcher={int(switcher)}', '-v', 'stable=1', '-v', f'nul={int(nul)}', '-f', str(ROOT / 'lib/tree-render.awk'), str(state_file), '-'],
                 input='\n'.join('\x1f'.join(row) for row in data)+'\n', text=True,
@@ -49,6 +52,14 @@ def main():
                 assert sum(row[1].count('project') for row in rows) == (1 if width >= 32 else 0)
                 assert len(panes) == 3 and all('\n' not in row[1] for row in panes)
                 assert [row[2] for row in panes] == ['P:%0:$0', 'P:%1:$0', 'P:%2:$0']
+        for icons, opened, closed in (('unicode', '📂', '📁'), ('ascii', '/', '/'),
+                                      ('nerdfont', '󰝰', '󰉋')):
+            rows = render(['/work/project'], icons=icons, appearance='places')
+            folder = next(row[1] for row in rows if row[0].startswith('DIR:'))
+            assert opened in folder, (icons, folder)
+            rows = render(['/work/project'], icons=icons, appearance='places', collapsed_dir=True)
+            folder = next(row[1] for row in rows if row[0].startswith('DIR:'))
+            assert closed in folder, (icons, folder)
         for paths in (['/work/project'], ['/work/project', '/other/project'], ['', '/work/project'], ['', '']):
             rows = render(paths)
             assert all('\n' not in row[1] for row in rows if row[0].startswith('W:'))

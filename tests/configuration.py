@@ -88,13 +88,22 @@ def main():
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'auto')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'classic'
-        tm('set-option', '-g', '@tmux-canopy-appearance', 'lazygit')
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        tm('set-option', '-g', '@tmux-canopy-appearance', 'ascii')
         load()
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'lazygit'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'ascii'
+        tm('set-option', '-g', '@tmux-canopy-icon-theme', 'auto')
+        tm('set-option', '-g', '@tmux-canopy-appearance', 'default')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        tm('set-option', '-g', '@tmux-canopy-appearance', 'unexpected')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
         tm('set-option', '-g', '@tmux-canopy-appearance', 'nope')
         load()
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'classic'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
         assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'off'
         tm('set-option', '-g', '@tmux-canopy-animate', 'on')
         load()
