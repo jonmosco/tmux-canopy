@@ -6,6 +6,8 @@ A persistent sidebar for navigating tmux sessions, windows, and panes.
 
 Canopy moves the same sidebar pane as you switch windows and sessions, preserving your selection, search, and collapsed branches. It lives inside tmux and reserves space for your applications.
 
+The core stays navigation. Extra capabilities are optional and can be turned on or off without replacing the tree. Agent mode is one of those: press `A` to show agent status, an Agents view, and a jump to panes that need input. Lifecycle adapters for Claude, Codex, Cursor, Gemini, Antigravity, Pi, Oh My Pi, and OpenCode plug in the same way. They report state. They do not steer the agent, and the sidebar still works if none are installed.
+
 ## Preview
 
 [![Animated tmux-canopy demo showing navigation, readable notification badges, search, folding, and buffers](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)

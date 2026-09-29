@@ -128,16 +128,16 @@ def main():
             active_window = tm('display-message', '-p', '-t', pane_a, '#{window_id}')
             state.write_text(f'S:{sid_a}\n')
             folded_session = rows()
-            assert '●' in next(row[1] for row in folded_session if row[0] == f'S:{sid_a}')
-            assert sum('●' in row[1] for row in folded_session) == 1
+            assert '▶' in next(row[1] for row in folded_session if row[0] == f'S:{sid_a}')
+            assert sum('▶' in row[1] for row in folded_session) == 1
             state.write_text(f'W:{active_window}:{sid_a}\n')
             folded_window = rows()
-            assert '●' in next(row[1] for row in folded_window if row[0] == f'W:{active_window}:{sid_a}')
-            assert sum('●' in row[1] for row in folded_window) == 1
+            assert '▶' in next(row[1] for row in folded_window if row[0] == f'W:{active_window}:{sid_a}')
+            assert sum('▶' in row[1] for row in folded_window) == 1
             state.write_text('')
             expanded = rows()
-            assert '●' in next(row[1] for row in expanded if row[0] == f'P:{pane_a}')
-            assert sum('●' in row[1] for row in expanded) == 1
+            assert '▶' in next(row[1] for row in expanded if row[0] == f'P:{pane_a}')
+            assert sum('▶' in row[1] for row in expanded) == 1
             print('ok - snapshot identities, linked occurrences, control-byte sanitization and collapse state')
 
             preserved = f'VIEW\ttree\nMOVE\tP:{pane_a}\nLINK\tW:{window_b}:{sid_a}\nDELETE\tP:{pane_c}\t1\n'
@@ -220,9 +220,11 @@ def main():
             assert 'two' in frame[second_session_line] and all(icon not in frame[second_session_line] for icon in ('', '◈')), frame
             tm('send-keys', '-t', sidebar, 'M-c')
             wait_for(lambda: selection()[0] == f'S:{sid_b}', 'second session selection')
-            frame = tm('capture-pane', '-p', '-t', sidebar).splitlines()
+            frame = tm('capture-pane', '-e', '-p', '-t', sidebar).splitlines()
             second_session_line = next(i for i, line in enumerate(frame) if '▾' in line and 'two' in line)
-            assert '›' in frame[second_session_line] and '›' not in frame[second_session_line - 1], frame
+            def highlighted(line):
+                return '[7m' in line or '[1;7m' in line or '48;5;236' in line
+            assert highlighted(frame[second_session_line]) and not highlighted(frame[second_session_line - 1]), frame
             tm('send-keys', '-t', sidebar, 'M-a')
             assert selection()[0] == window_token
             tm('send-keys', '-t', sidebar, 'C-o')

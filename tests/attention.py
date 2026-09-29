@@ -29,7 +29,7 @@ def main():
                 ['P', '%1', '@0', '1', 'bash', '', '/work', '0', '', '', '0', '0', '0', '', '', '0', '', '', '', '', '', '', '', ''],
                 *extra_rows,
             ]
-            data[0].extend([''] * (35 - len(data[0])) + [agents])
+            data[0].extend([''] * (36 - len(data[0])) + [agents])
             result = sp.check_output(['awk', '-v', 'stable=1', '-v', 'nul=1', '-f', str(ROOT/'lib/tree-render.awk'), str(state), '-'],
                                      input='\n'.join('\x1f'.join(row) for row in data)+'\n', text=True,
                                      env=os.environ | {'TMUX_CANOPY_RENDER_CLIENT': '', 'TMUX_CANOPY_RENDER_HOME': '/home/test'})
@@ -112,7 +112,7 @@ def main():
             ['A', '%15', 'claude'], ['A', '%16', 'gemini'],
             verified_10, verified_11, verified_13, ['V', '%15'],
         ]
-        overview_data[0].extend([''] * (35 - len(overview_data[0])) + ['on'])
+        overview_data[0].extend([''] * (36 - len(overview_data[0])) + ['on'])
         state.write_text('')
 
         def overview(width, icons='unicode', theme='ansi', raw=False):
@@ -133,15 +133,15 @@ def main():
         ascii_header = overview(42, icons='ascii', theme='mono')
         state.write_text('MOVE\tP:%10\n')
         narrow_with_action = overview(24)
-        assert '[Agents] ◆2 ▷1 ✓1 ○1' in normal, normal
+        assert 'Tree [Agents] Proc Buff ◆2 ▷1 ✓1 ○1' in normal, normal
         assert '\x1b[0m\x1b[1;36m[Agents]' in overview(42, raw=True)
-        assert '[Agents] ◆2/5' in narrow, narrow
-        assert '[Agents] !2 +1 d1 o1' in ascii_header, ascii_header
-        assert '[A] ◆2/5' in narrow_with_action and narrow_with_action.endswith('MOVE'), narrow_with_action
+        assert 'T [Agents] P B ◆2/5' in narrow, narrow
+        assert 'Tree [Agents] Proc Buff !2 +1 d1 o1' in ascii_header, ascii_header
+        assert 'T [A] P B ◆2/5' in narrow_with_action and narrow_with_action.endswith('MOVE'), narrow_with_action
         overview_data = overview_data[:5]
         empty_with_action = overview(24)
-        assert '[A] 0 ' in empty_with_action and empty_with_action.endswith('MOVE'), empty_with_action
-        assert len(empty_with_action) <= 22, empty_with_action
+        assert 'T [A] P B 0' in empty_with_action and empty_with_action.endswith('MOVE'), empty_with_action
+        assert len(empty_with_action) <= 24, empty_with_action
 
         print('ok - agent attention summaries and unique-pane Agents overview with narrow and ASCII layouts')
 

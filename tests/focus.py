@@ -78,7 +78,7 @@ def main():
         def active_rows():
             # The pane has the single green dot; its session and window are bold.
             return [line.split('\t')[0] for line in run('sidebar-source', '--stable').splitlines()
-                    if '●' in line.split('\t')[1] or '\x1b[1m' in line.split('\t')[1]]
+                    if '●' in line.split('\t')[1] or '▶' in line.split('\t')[1] or '\x1b[1m' in line.split('\t')[1]]
 
         def probe(sidebar):
             selected.unlink(missing_ok=True)
@@ -92,7 +92,8 @@ def main():
             return selected.read_text().strip()
 
         def pointer_line(sidebar):
-            return next(i for i, line in enumerate(tm('capture-pane', '-p', '-t', sidebar).splitlines()) if line.startswith('›'))
+            lines = tm('capture-pane', '-e', '-p', '-t', sidebar).splitlines()
+            return next(i for i, line in enumerate(lines) if '[7m' in line or '[1;7m' in line or '48;5;236' in line)
 
         try:
             pane_a = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'one', '-x', '160', '-y', '44', '-P', '-F', '#{pane_id}', 'sleep 600')
@@ -214,7 +215,7 @@ def main():
             os.write(master, b'\x1b[19~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'return to collapsed window')
             capture = tm('capture-pane', '-p', '-t', sidebar)
-            assert '▸ ● 0:focus-collapse' in capture, capture
+            assert '▸ 0:focus-collapse' in capture, capture
             print('ok - window switches update markers without expanding collapsed branches')
 
             # Coalesce concurrent duplicate/stale requests and ignore a stale
