@@ -91,6 +91,8 @@ For Antigravity, install or update Canopy's adapter from the installation direct
 
 The installer adds a named Canopy entry to `~/.gemini/config/hooks.json` and removes older Canopy `agy` hooks from `~/.gemini/antigravity-cli/settings.json`. Restart `agy` inside tmux, check its `/hooks` view, and press `4` in Canopy to see the Agents view. Antigravity's hooks report active invocations, tool activity, clean turn ends, and interruptions; they do not expose dedicated permission-request or subagent lifecycle events to Canopy.
 
+OpenCode uses a plugin rather than a shell hook. `canopy integration install opencode` writes `~/.config/opencode/plugins/canopy-agent-state.js`. Restart OpenCode inside tmux afterward. The V2 plugin subscribes to session, permission, and question events and observes prompt, tool, and permission hooks. It does not approve a permission or block a tool. A report is kept only when the session's directory matches one OpenCode pane.
+
 ### Defaults
 
 Canopy opens on the **left**, follows its client across windows and sessions, and uses stable slots to keep application geometry steady when revisiting windows. It starts at 42 columns. Mouse resizing is live, with no fixed maximum; at least 40 columns are reserved for content.

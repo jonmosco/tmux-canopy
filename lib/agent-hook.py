@@ -64,14 +64,20 @@ def normalized(kind, event, event_name=None):
             return 'clear-request', name
     elif kind == 'opencode':
         mapping = {'session.created': 'ready', 'session.idle': 'turn-ended',
-                   'permission.asked': 'needs-input', 'session.error': 'interrupted',
-                   'session.deleted': 'session-ended'}
-        if name == 'permission.replied':
+                   'session.error': 'interrupted', 'session.deleted': 'session-ended',
+                   'permission.asked': 'needs-input', 'permission.v2.asked': 'needs-input',
+                   'question.asked': 'needs-input', 'question.v2.asked': 'needs-input',
+                   'session.next.prompted': 'working', 'session.next.prompt.admitted': 'working',
+                   'session.next.step.started': 'working', 'session.next.tool.called': 'working',
+                   'session.next.step.failed': 'interrupted'}
+        if name in ('permission.replied', 'permission.v2.replied',
+                    'question.replied', 'question.v2.replied',
+                    'question.rejected', 'question.v2.rejected'):
             return 'clear-request', name
         if name == 'session.status':
-            status = (event.get('properties') or {}).get('status') or {}
+            status = opencode_payload(event).get('status') or {}
             state = status.get('type') if isinstance(status, dict) else status
-            if state == 'busy':
+            if state in ('busy', 'retry'):
                 return 'working', name
             if state == 'idle':
                 return 'turn-ended', name
@@ -85,11 +91,28 @@ def normalized(kind, event, event_name=None):
     return (state, name) if state else None
 
 
+def opencode_payload(event):
+    """V1 bus events use properties; some V2 encodings use data."""
+    if not isinstance(event, dict):
+        return {}
+    for key in ('properties', 'data'):
+        body = event.get(key)
+        if isinstance(body, dict):
+            return body
+    return event
+
+
+def opencode_directory(event):
+    props = opencode_payload(event)
+    info = props.get('info') if isinstance(props.get('info'), dict) else {}
+    location = event.get('location') if isinstance(event.get('location'), dict) else {}
+    directory = info.get('directory') or location.get('directory') or props.get('directory') or ''
+    return directory if isinstance(directory, str) else ''
+
+
 def opencode_pane(session, event):
     """Resolve global OpenCode plugin events only to a uniquely verified pane."""
-    props = event.get('properties') or {}
-    if not isinstance(props, dict):
-        return ''
+    directory = opencode_directory(event)
     rows = core.tmux('list-panes', '-a', '-F',
                      '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_pane_pid}|#{@tmux_canopy_agent_process_pid}|#{@tmux_canopy_agent_process_birth}')
     if rows.returncode:
@@ -104,16 +127,12 @@ def opencode_pane(session, event):
             identity = core.process_identity(root, 'opencode')
             if identity and identity == (bound_process, bound_birth):
                 bound.add(pane)
-        elif event.get('type') == 'session.created':
+        elif not bound_session and directory:
             identity = core.process_identity(root, 'opencode')
             if not identity:
                 continue
-            info = props.get('info') or {}
-            directory = info.get('directory') if isinstance(info, dict) else ''
-            # Without the session's project directory there is no safe way to
-            # distinguish this server event from another OpenCode session.
-            if not isinstance(directory, str) or not directory:
-                continue
+            # Without a project directory there is no safe way to distinguish
+            # this server event from another OpenCode session.
             try:
                 if os.path.realpath(path) != os.path.realpath(directory):
                     continue
@@ -126,13 +145,9 @@ def opencode_pane(session, event):
 
 def session_id(kind, event):
     if kind == 'opencode':
-        props = event.get('properties') or {}
-        if not isinstance(props, dict):
-            return ''
-        info = props.get('info') or {}
-        if not isinstance(info, dict):
-            info = {}
-        return core.field(props.get('sessionID') or info.get('id'), 128)
+        props = opencode_payload(event)
+        info = props.get('info') if isinstance(props.get('info'), dict) else {}
+        return core.field(props.get('sessionID') or info.get('id') or event.get('sessionID'), 128)
     if kind in ('pi', 'omp'):
         return core.field(event.get('session_id'), 128)
     if kind == 'agy':
@@ -218,8 +233,8 @@ def report(kind, event, event_name=None):
             current['request_agent'] == agent and \
             (kind not in ('claude', 'gemini') or core.field(event.get('tool_name'), 80) == current['tool']):
         if kind == 'opencode':
-            props = event.get('properties') or {}
-            reply_id = core.field(props.get('permissionID') or props.get('requestID') or props.get('id'), 128) if isinstance(props, dict) else ''
+            props = opencode_payload(event)
+            reply_id = core.field(props.get('permissionID') or props.get('requestID') or props.get('id'), 128)
             if not reply_id or reply_id != current['request']:
                 return
         state = 'working'
@@ -237,14 +252,19 @@ def report(kind, event, event_name=None):
         detail = event.get('tool_input') or event.get('details') or {}
         if not isinstance(detail, dict):
             detail = {}
-        props = event.get('properties') or {}
-        if kind == 'opencode' and isinstance(props, dict):
-            tool = core.field(props.get('permission') or props.get('action'), 80)
+        props = opencode_payload(event) if kind == 'opencode' else {}
+        if kind == 'opencode':
+            tool = core.field(props.get('permission') or props.get('action') or props.get('tool'), 80)
             metadata = props.get('metadata') if isinstance(props.get('metadata'), dict) else {}
             detail = metadata
+            questions = props.get('questions')
+            if isinstance(questions, list) and questions and isinstance(questions[0], dict):
+                asked = questions[0].get('question') or questions[0].get('header') or ''
+                if asked and not detail.get('description'):
+                    detail = dict(detail, description=asked)
             if not event.get('message') and not detail.get('description') and tool:
                 values['summary'] = core.field(f"{tool} permission requested", 300)
-            patterns = props.get('patterns')
+            patterns = props.get('resources') if isinstance(props.get('resources'), list) else props.get('patterns')
             if not detail.get('command') and isinstance(patterns, list):
                 detail = dict(detail, command=', '.join(core.field(item, 120) for item in patterns if isinstance(item, str)))
         values['tool'] = tool

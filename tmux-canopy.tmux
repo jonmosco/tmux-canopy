@@ -233,7 +233,7 @@ tmux set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
 # later select-pane leaves the new pane missing until focus moves again.
 # Run synchronously so a slot split still sees the navigation transition guard
 # and skips the reload (background -b can outlive the guard).
-tmux set-hook -g 'after-split-window[9003]' "$(plugin_job '' cleanup refresh)"
+tmux set-hook -g 'after-split-window[9003]' "$(plugin_job '' cleanup split)"
 # client_tty may already resolve to a surviving client after a detach.
 tmux set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook_client}')"
 for hook in client-resized after-resize-window; do

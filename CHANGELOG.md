@@ -14,6 +14,7 @@
 
 ### Added
 
+- OpenCode's adapter loads in V2 as well as V1. It subscribes to the public event stream and observes prompt, tool, and permission hooks without approving a request or blocking a tool. Reinstall with `canopy integration install opencode` and restart OpenCode.
 - Pi and Oh My Pi adapters report tool execution, extension UI prompts as needs-input, and aborted or errored settles as interrupted. Reinstall with `canopy integration install pi` (and `omp`) so the extension file is replaced.
 - Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.
 - Opt-in `@tmux-canopy-animate` moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
@@ -62,6 +63,7 @@
 
 ### Fixed
 
+- Opening the sidebar no longer deletes parked slots in other windows. The split hook was treating the not-yet-tagged dock as "no sidebars" and discarding those slots, so a later visit could not restore the original split ratio.
 - A finished background subagent no longer disappears the moment its result is delivered: the turn that delivers it no longer drops its **DONE** line, which now stays until the next prompt at least 30 seconds later.
 - A subagent's permission request can no longer be cleared by an unrelated tool completion with the same tool name from the main thread or another subagent.
 - Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle reports were silently dropped after the Codex reporter's helpers changed; `canopy doctor` now exercises every reporter's real report path so such drift fails loudly.
