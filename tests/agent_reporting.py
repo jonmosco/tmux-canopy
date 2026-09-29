@@ -142,6 +142,30 @@ send("opencode", {"type": "session.created", "properties": {
     "sessionID": "ambiguous", "info": {"id": "ambiguous", "directory": "/repo"}}})
 check(not state.get("session"), "ambiguous OpenCode project panes are ignored")
 
+# OpenCode V2 public events use the same properties bag, plus permission/question
+# ids and a location directory when session info is absent.
+state = harness("opencode", "/repo")
+send("opencode", {"type": "session.next.prompted", "location": {"directory": "/repo"},
+                   "properties": {"sessionID": "v2"}})
+check(state["session"] == "v2" and state["status"] == "working", "OpenCode V2 prompt binds by location")
+send("opencode", {"type": "permission.v2.asked", "properties": {
+    "sessionID": "v2", "id": "per_1", "action": "bash", "resources": ["make test"]}})
+check(state["status"] == "needs-input" and state["request"] == "per_1" and
+      state["command"] == "make test", "OpenCode V2 permission keeps its request id")
+send("opencode", {"type": "permission.v2.replied", "properties": {
+    "sessionID": "v2", "requestID": "per_1", "reply": "once"}})
+check(state["status"] == "working" and not state["request"], "OpenCode V2 reply clears the matching request")
+send("opencode", {"type": "question.v2.asked", "properties": {
+    "sessionID": "v2", "id": "que_1", "questions": [{"question": "Which file?", "header": "file"}]}})
+check(state["status"] == "needs-input" and state["request"] == "que_1" and
+      state["summary"] == "Which file?", "OpenCode V2 question is needs-input")
+send("opencode", {"type": "question.v2.rejected", "properties": {"sessionID": "v2", "requestID": "que_1"}})
+check(state["status"] == "working" and not state["request"], "OpenCode V2 question rejection clears the request")
+send("opencode", {"type": "session.next.step.failed", "data": {"sessionID": "v2", "error": {"message": "nope"}}})
+check(state["status"] == "interrupted", "OpenCode V2 step failure is interrupted")
+send("opencode", {"type": "session.status", "data": {"sessionID": "v2", "status": {"type": "idle"}}})
+check(state["status"] == "turn-ended", "OpenCode V2 idle status ends the turn")
+
 # The optional common contract validates lifecycle/request shape, associates it
 # with the live supported process in this pane, and clears request data on state change.
 state = harness("pi")

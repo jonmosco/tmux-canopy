@@ -42,7 +42,11 @@ done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}' 2>/dev/null |
   awk -F '\t' '$2 == "1" { print $1 }')
 
 sidebar_count="$(tmux list-panes -a -F '#{@tmux_canopy}' 2>/dev/null | awk '$0 == "1" { count++ } END { print count + 0 }')"
-if ((sidebar_count == 0)); then
+# A new sidebar is not tagged until its process starts. after-split-window
+# therefore still sees zero docks and must not treat that as "no sidebars".
+if [[ "$mode" == 'split' ]]; then
+  [[ "$sidebar_count" == 0 ]] || refresh_sidebars
+elif ((sidebar_count == 0)); then
   cleanup_sidebar_slots
   tmux set-option -gu @tmux_canopy_runtime_width 2>/dev/null || true
 elif [[ "$mode" == 'refresh' ]]; then
