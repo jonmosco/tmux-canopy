@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
 state_file="${TMUX_CANOPY_STATE:?}"
 # ASCII unit separator is reserved for snapshot fields. Scrub control bytes
 # (including newlines, tabs, ESC and the separator) inside user-supplied text.
@@ -26,7 +28,14 @@ snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
   list-sessions -F "$sessions" \; list-windows -a -F "$windows" \; \
   list-panes -a -F "$panes" \; list-clients -F "$clients" 2>/dev/null)" || exit 1
 config_row="${snapshot%%$'\n'*}"
-agents_enabled="${config_row##*"$sep"}"
+if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
+config_row="${config_row%"$sep"*}${sep}${agents_enabled}"
+if [[ "$snapshot" == *$'\n'* ]]; then
+  snapshot="${config_row}"$'
+'"${snapshot#*$'\n'}"
+else
+  snapshot="$config_row"
+fi
 export TMUX_CANOPY_RENDER_CLIENT="${TMUX_CANOPY_CLIENT:-}"
 export TMUX_CANOPY_RENDER_HOME="$HOME"
 switcher=0 agent_view=0
@@ -42,6 +51,27 @@ while (($#)); do
   esac
   shift
 done
+# tmux reports Pi's executable (node). Show pi/omp when that process is the agent.
+if [[ "$snapshot" == *"${sep}node${sep}"* || "$snapshot" == *"${sep}nodejs${sep}"* ]]; then
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/../lib/agent-process.sh"
+  relabeled=''
+  while IFS= read -r line || [[ -n $line ]]; do
+    if [[ $line == P$sep* ]]; then
+      IFS="$sep" read -ra fields <<< "$line"
+      if [[ ${fields[4]:-} == node || ${fields[4]:-} == nodejs ]]; then
+        kind=$(canopy_pane_agent "${fields[16]:-}")
+        if [[ -n $kind ]]; then
+          fields[4]=$kind
+          line=${fields[0]}
+          for ((i=1; i<${#fields[@]}; i++)); do line+=$sep${fields[i]}; done
+        fi
+      fi
+    fi
+    relabeled+="$line"$'\n'
+  done <<< "$snapshot"
+  snapshot=${relabeled%$'\n'}
+fi
 if [[ "$agents_enabled" != on ]]; then
   [[ -z "$TMUX_CANOPY_NEEDS_INPUT" ]] || exit 0
   agent_view=0

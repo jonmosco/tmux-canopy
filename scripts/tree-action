@@ -622,7 +622,7 @@ case "$action" in
 
   collapse)
     case "$token" in
-      S:*|W:*) add_state "$token" ;;
+      S:*|W:*|DIR:*) add_state "$token" ;;
       P:*)
         parent="$(parent_window_token "$token")"
         [[ -n "$parent" ]] && add_state "$parent"
@@ -632,7 +632,7 @@ case "$action" in
 
   expand)
     case "$token" in
-      S:*|W:*) remove_state "$token" ;;
+      S:*|W:*|DIR:*) remove_state "$token" ;;
     esac
     ;;
 

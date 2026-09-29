@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directory marks</title>
+<style>
+  :root {
+    --bg: #101114; --ink: #d7dbe2; --dim: #8b93a1; --faint: #5c6472;
+    --line: #2a2e36; --cyan: #7fdbda; --amber: #e6c07b; --blue: #7aa2f7;
+    --pink: #d7a3c8; --yellow: #e5c07b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Palatino, Georgia, serif; }
+  header, main { max-width: 980px; margin: 0 auto; padding: 32px 28px; }
+  main { padding-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  h1 { font-weight: 500; font-size: 30px; margin: 0 0 8px; }
+  .lede { color: var(--dim); max-width: 68ch; }
+  figure { margin: 0; }
+  figcaption { color: var(--dim); font-size: 14px; margin-top: 8px; }
+  figcaption b { color: var(--ink); }
+  .term {
+    background: #0c0d10; border: 1px solid var(--line); border-radius: 10px;
+    min-height: 220px; padding: 12px 0; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .row { padding: 0 14px; white-space: nowrap; }
+  .dim { color: var(--faint); } .muted { color: var(--dim); }
+  .cyan { color: var(--cyan); } .blue { color: var(--blue); }
+  .amber { color: var(--amber); } .pink { color: var(--pink); } .yellow { color: var(--yellow); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Marking a directory row</h1>
+  <p class="lede">The fold chevron already says open or closed. A directory still needs its own mark so it is not another window. These stay one cell wide, so the tree does not shift.</p>
+</header>
+<main>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─ ▼</span> <span class="amber"></span> <span class="amber">tmux-canopy</span></div>
+      <div class="row"><span class="dim">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="dim">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="dim">│  │  ╰─</span> zsh</div>
+      <div class="row"><span class="dim">╰─ ▸</span> <span class="amber"></span> <span class="amber">.dotfiles</span></div>
+    </div>
+    <figcaption><b>Open and closed folder.</b> Nerd Font <span class="amber"></span> while expanded, <span class="amber"></span> while folded. The name is the same amber, so the place reads as a folder before you read the word. This is the clearest of the set.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─ ▼</span> <span class="blue"></span> tmux-canopy</div>
+      <div class="row"><span class="dim">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="dim">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="dim">╰─ ▸</span> <span class="blue"></span> .dotfiles</div>
+    </div>
+    <figcaption><b>Codicon folder.</b> <span class="blue"></span> opened and <span class="blue"></span> closed, in the same blue as editor icons. Familiar if you live in VS Code, quieter than coloring the whole name.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─ ▼</span> <span class="amber">tmux-canopy/</span></div>
+      <div class="row"><span class="dim">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="dim">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="dim">╰─ ▸</span> <span class="amber">.dotfiles/</span></div>
+    </div>
+    <figcaption><b>Trailing slash, no icon.</b> The way a shell prints a directory. No extra glyph, so it still works in the Unicode theme. Easier to miss than a folder icon.</figcaption>
+  </figure>
+  <figure>
+    <div class="term">
+      <div class="row"><span class="cyan">▼</span> test-session</div>
+      <div class="row"><span class="dim">├─</span> <span class="amber">▾ </span> <span class="amber">tmux-canopy</span></div>
+      <div class="row"><span class="dim">│  ├─ ▼</span> codex</div>
+      <div class="row"><span class="dim">│  │  ├─</span> <span class="cyan">❋</span> codex</div>
+      <div class="row"><span class="dim">╰─</span> <span class="amber">▸ </span> <span class="amber">.dotfiles</span></div>
+    </div>
+    <figcaption><b>Folder instead of the tree chevron.</b> Drops the second arrow. Cleaner, but then a directory no longer folds the same way a window does. I would not use this one.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

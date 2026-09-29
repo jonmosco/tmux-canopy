@@ -55,7 +55,13 @@ def normalized(kind, event, event_name=None):
             return 'clear-request', name
     elif kind in ('pi', 'omp'):
         mapping = {'session_start': 'ready', 'agent_start': 'working',
-                   'agent_end': 'turn-ended', 'session_shutdown': 'session-ended'}
+                   'tool_execution_start': 'working',
+                   'agent_end': 'turn-ended', 'agent_settled': 'turn-ended',
+                   'agent_interrupted': 'interrupted', 'session_shutdown': 'session-ended'}
+        if name == 'ui_prompt_start':
+            return 'needs-input', name
+        if name == 'ui_prompt_end':
+            return 'clear-request', name
     elif kind == 'opencode':
         mapping = {'session.created': 'ready', 'session.idle': 'turn-ended',
                    'permission.asked': 'needs-input', 'session.error': 'interrupted',

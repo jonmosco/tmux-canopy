@@ -13,18 +13,18 @@ CASES = [
     ('node', 93, ''), ('npm', 91, ''), ('python3', 93, ''),
     ('/usr/bin/git', 91, '󰊢'), ('lazygit', 91, '󰊢'),
     ('kubectl', 94, '󱃾'), ('k9s', 94, '󱃾'), ('oc', 91, '󱃾'),
-    ('ssh', 96, '󰢹'),     ('pi', 95, '󰚩'), ('claude', 93, '◇'),
-    ('codex', 96, '◈'), ('opencode', 95, '󰚩'), ('agent', 95, '󰚩'), ('btop', 96, '󰍛'),
-    ('gemini', 97, '󰊭'), ('agy', 96, '󰀘'),
-    ('claude.exe', 93, '◇'), ('codex.exe', 96, '◈'), ('agy.exe', 96, '\U000f0018'),
+    ('ssh', 96, '󰢹'),     ('pi', 95, 'π'), ('omp', 93, 'π'), ('claude', 93, ''),
+    ('codex', 96, ''), ('opencode', 39, ''), ('agent', 39, ''), ('btop', 96, '󰍛'),
+    ('gemini', 94, '󰫢'), ('agy', 96, '󰀘'),
+    ('claude.exe', 93, ''), ('codex.exe', 96, ''), ('agy.exe', 96, '\U000f0018'),
 ]
 UNICODE_ICONS = {
     'nvim': '✎', 'vim': '✎', 'node': '◆', 'npm': '◆',
     'python3': '◉', '/usr/bin/git': '◇', 'lazygit': '◇',
     'kubectl': '✣', 'k9s': '✣', 'oc': '✣', 'ssh': '⇄',
-    'pi': '◎', 'claude': '✦', 'codex': '◈', 'opencode': '◎', 'agent': '◎',
-    'btop': '▥', 'gemini': '✧', 'agy': '○',
-    'claude.exe': '✦', 'codex.exe': '◈', 'agy.exe': '○',
+    'pi': 'π', 'omp': 'π', 'claude': '✳', 'codex': '❋', 'opencode': '▦', 'agent': '▸',
+    'btop': '▥', 'gemini': '✧', 'agy': '◎',
+    'claude.exe': '✳', 'codex.exe': '❋', 'agy.exe': '◎',
 }
 
 
@@ -61,7 +61,7 @@ def main():
                     else:
                         assert glyph in row[1] and '\x1b' not in row[1], row
                 if theme == 'ansi':
-                    assert '\x1b[1;32m●\x1b[0m' in rows['P:%0'][1]
+                    assert '\x1b[1;32m▶\x1b[0m' in rows['P:%0'][1]
                 else:
                     assert '\x1b' not in result.stdout
 
@@ -113,7 +113,7 @@ def main():
             fold = 'v ' if icons == 'ascii' else '▼ '
             assert session_row.startswith(f'{fold}{session_glyph} test'), session_row
             window_row = re.sub(r'\x1b\[[0-9;]*m', '', rows['W:@0:$0'][1])
-            assert window_glyph in window_row, window_row
+            assert window_glyph not in window_row and 'tools' in window_row and '0:tools' not in window_row, window_row
             assert ('╰─' if icons != 'ascii' else '`-') in window_row or \
                    ('├─' if icons != 'ascii' else '|-') in window_row, window_row
             if icons != 'ascii':

@@ -8,7 +8,7 @@ FILENAME == ARGV[1] {
     else if (state[1] == "FILTER") { filter_set=1; filter=state[2] }
     else if (state[1] == "FILTER_WINDOW") { window_set=1; window_filter=state[2] }
     else if (state[1] == "FILTER_TITLE") { title_set=1; title_filter=state[2] }
-    else if (state[1] ~ /^[SW]:/) collapsed[state[1]]=1
+    else if (state[1] ~ /^([SW]:|DIR:)/) collapsed[state[1]]=1
     next
 }
 $1 == "D" {
@@ -17,7 +17,7 @@ $1 == "D" {
     custom_s=$6; custom_w=$7; custom_p=$8
     nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
-    appearance=($36 == "lazygit" ? "lazygit" : "classic")
+    appearance=($36 == "lazygit" || $36 == "pills" || $36 == "places" ? $36 : "classic")
     agents_enabled=($37 == "on")
     if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
@@ -174,6 +174,14 @@ function mark(value, color) {
     color=(value == "●" ? green : value == "⇢" || value == "⇉" ? accent : attention)
     return value == " " ? value : color value reset
 }
+# Lazygit pane rows should not reserve a blank column for an inactive marker
+# or a missing shell icon. That gap is what pushes the name off the guide.
+function lazy_prefix(stem, branch, pm, color, icon,    prefix) {
+    prefix=dim stem branch reset
+    if (pm != " " && pm != "●") prefix=prefix mark(pm)
+    if (icon != "" && icon != " ") prefix=prefix " " color icon reset
+    return prefix
+}
 # Keep an ordinary collapsed count at the edge, leaving a spare cell for fzf's
 # gutter/scrollbar and wide terminal glyphs. Skip it if the name needs the room.
 # Display columns, not bytes: macOS awk's length() counts UTF-8 bytes, but its
@@ -185,7 +193,34 @@ function edge_count(value,count,budget, plain,padding) {
     gsub(/\033\[[0-9;]*m/,"",plain)
     padding=budget-text_width(plain)-length(count)
     if (padding<2) return value
-    return value sprintf("%*s",padding,"") dim count reset
+    style=dim
+    if (count == "working" || count == "▷" || count == "+") style=accent
+    else if (count == "waiting" || count == "interrupted" || count == "!" || count == "●") style=attention
+    return value sprintf("%*s",padding,"") style count reset
+}
+function unread_glyph(a, b, z) {
+    if (notices == "none" || !(a || b || z)) return ""
+    return b ? bell_badge : a ? activity_badge : silence_badge
+}
+function status_mark(status,    style) {
+    if (status == "") return ""
+    style=(status == "!" || status == "waiting" || status == "interrupted" ? attention : status == "working" || status == "▷" || status == "+" ? accent : dim)
+    return " " style status reset
+}
+function pane_edge(unread, here,    arrow) {
+    arrow=(here ? green "▶" reset : "")
+    if (unread == "" && arrow == "") return ""
+    if (unread != "" && arrow != "") return attention unread reset " " arrow
+    if (arrow != "") return arrow
+    return attention unread reset
+}
+function edge_colored(value, suffix, budget,    plain,suffix_plain,padding) {
+    if (suffix == "") return value
+    plain=value; gsub(/\033\[[0-9;]*m/,"",plain)
+    suffix_plain=suffix; gsub(/\033\[[0-9;]*m/,"",suffix_plain)
+    padding=budget-text_width(plain)-text_width(suffix_plain)
+    if (padding<2) return value " " suffix
+    return value sprintf("%*s",padding,"") suffix
 }
 # One badge per visible target. Counts describe unread descendants, not events
 # or provider totals; multiple providers on one target never inflate the count.
@@ -349,8 +384,8 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
         style=(state == "working" ? bold accent : state == "needs-input" ? bold attention : dim)
         elapsed=sub_age[p,i]
         elapsed=(elapsed<0 ? "" : elapsed<60 ? "<1m" : elapsed<3600 ? int(elapsed/60) "m" : int(elapsed/3600) "h")
-        text=continuation dim (i == n ? branch_end : branch_mid) reset " " sub_type[p,i] (state == "unknown" ? "" : " " style subagent_word(state,width<36) reset)
-        lines=lines "\n" edge_count(text,elapsed,width-3)
+        text=continuation dim (i == n ? branch_end : branch_mid) reset " " sub_type[p,i] (appearance == "lazygit" || state == "unknown" ? "" : " " style subagent_word(state,width<36) reset)
+        lines=lines "\n" edge_count(text, appearance == "lazygit" ? quiet_mark(state == "working" ? "working" : state == "needs-input" ? "approval" : "") : elapsed, width-3)
     }
     return lines
 }
@@ -358,8 +393,112 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed) {
 # actionable tiers (needs-input, working), plain dim for unknown so
 # it recedes instead of competing for attention. Origin stays a small dim
 # suffix since ·plugin? still meaningfully flags an unconfirmed association.
+function quiet_mark(label) {
+    if (label == "working") return icons == "ascii" ? "+" : "▷"
+    if (label == "approval" || label == "interrupted") return "!"
+    return ""
+}
+function pill_word(p, label) {
+    label=agent_label(p)
+    if (label=="working") return "working"
+    if (label=="approval") return "waiting"
+    if (label=="interrupted") return "interrupted"
+    if (label=="ready") return "ready"
+    if (label=="turn ended" || label=="session ended") return "ended"
+    if (agent_view && agent_kind[p] != "") return "idle"
+    return ""
+}
+function place_name(value,    n,parts) {
+    if (value == "" || value == "(no directory)") return "(no directory)"
+    if (value == home) return "home"
+    n=split(value, parts, "/")
+    return parts[n] == "" ? value : parts[n]
+}
+function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pcount,label,wcount,windex,wlast,pt,cmd,icon,pm,line,dir_stem,win_stem,dir_branch) {
+    n=0
+    for (wpos=1; wpos<=nw[s]; wpos++) {
+        w=windows[s,wpos]; key=s SUBSEP w
+        if (!visible_w[key]) continue
+        for (ppos=1; ppos<=np[w]; ppos++) {
+            p=panes[w,ppos]
+            if (!visible_p[p]) continue
+            place=path[p]; if (place == "") place="(no directory)"
+            id=s SUBSEP place
+            if (!(id in place_seen)) { place_seen[id]=1; place_order[s, ++n]=place; place_count[id]=0 }
+            idx=++place_count[id]
+            place_pane[id, idx]=p
+            place_wid[id, idx]=w
+            place_wname[id, idx]=wn[key]
+        }
+    }
+    delete bases
+    for (i=1; i<=n; i++) bases[place_name(place_order[s, i])]++
+    for (i=1; i<=n; i++) {
+        place=place_order[s, i]; id=s SUBSEP place; cnt=place_count[id]
+        label=place_name(place)
+        if (bases[label] > 1 && place != home && place != "(no directory)") {
+            pn=split(place, parts, "/")
+            if (pn >= 2 && parts[pn-1] != "") label=parts[pn-1] "/" label
+        }
+        dir_last=(i == n)
+        dir_branch=(dir_last ? branch_end : branch_mid)
+        dir_stem=(dir_last ? "   " : stem_mid)
+        dir_key="DIR:" place_pane[id, 1]
+        dir_open=!(dir_key in collapsed)
+        if (icons == "nerdfont") folder=(dir_open ? "󰝰" : "󰉋")
+        else if (icons == "ascii") folder="/"
+        else folder=(dir_open ? "▾" : "▸")
+        folder_color=(theme == "mono" ? "" : "\033[38;5;74m")
+        row(dir_key, dim dir_branch reset " " (dir_open ? fold_open : fold_closed) folder_color folder reset " " label, dir_key ":" s)
+        if (!dir_open) continue
+        wc=0
+        for (idx=1; idx<=cnt; idx++) {
+            w=place_wid[id, idx]
+            if (wc == 0 || win_ids[wc] != w) { win_ids[++wc]=w; win_names[wc]=place_wname[id, idx]; win_first[wc]=idx }
+            win_last[wc]=idx
+        }
+        for (windex=1; windex<=wc; windex++) {
+            w=win_ids[windex]; wlast=(windex == wc)
+            win_stem=dir_stem (wlast ? "   " : stem_mid)
+            row("W:" w ":" s, dim dir_stem (wlast ? branch_end : branch_mid) reset " " fold_open win_names[windex] reset, "W:" w ":" s)
+            for (idx=win_first[windex]; idx<=win_last[windex]; idx++) {
+                p=place_pane[id, idx]; pt="P:" p
+                cmd=command[p]; icon=appicon(cmd)
+                pm=(pt == del ? "✕" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
+                line=lazy_prefix(win_stem, idx == win_last[windex] ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd status_mark(quiet_mark(agent_label(p)))
+                row(pt, edge_colored(line, pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"), width-3), pt ":" s)
+            }
+        }
+    }
+}
+function pills_session(s, st,    wpos,w,key,wt,ppos,p,pt,shown,name,icon,mark,line,note) {
+    note=(collapsed[st] ? nw[s] "w" : "")
+    row(st, edge_count(dim (collapsed[st] ? fold_closed : "") sname[s] reset, note, width-2), st)
+    if (collapsed[st]) return
+    for (wpos=1;wpos<=nw[s];wpos++) {
+        w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
+        if (!visible_w[key]) continue
+        shown=0
+        for (ppos=1;ppos<=np[w];ppos++) if (visible_p[panes[w,ppos]]) shown++
+        if (shown>1 || collapsed[wt]) {
+            row(wt, edge_count("  " dim wn[key] reset, collapsed[wt] ? shown "p" : "", width-2), wt)
+            if (collapsed[wt]) continue
+        }
+        for (ppos=1;ppos<=np[w];ppos++) {
+            p=panes[w,ppos]; pt="P:" p
+            if (!visible_p[p]) continue
+            name=(agent_view && agent_kind[p] != "" ? agent_name(agent_kind[p]) : command[p])
+            icon=appicon(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p])
+            mark=(p == current_p && s == current_s ? green "●" reset : dead[p]==1 ? dim "×" reset : " ")
+            line=mark " " appcolor(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p]) icon reset " " name
+            note=pill_word(p)
+            if (note == "" && (pa[p] || pb[p] || pz[p])) note="●"
+            row(pt, edge_count(line, note, width-2), pt ":" s)
+        }
+    }
+}
 function agent_badge(p, label,style,origin,word) {
-    if (!agents_enabled) return ""
+    if (!agents_enabled || appearance == "pills" || appearance == "lazygit") return ""
     label=agent_label(p)
     if (label=="stale") return agent_view ? " " dim "[process]" reset : ""
     if (label=="") return agent_view && agent_kind[p] != "" ? " " dim "[process]" reset : ""
@@ -388,7 +527,7 @@ function pathlabel(p,w,budget,    value,parts,n,depth,candidate,q,other,matches,
     value=path[p]
     if (value == "") return "(directory unavailable)"
     if (density == "detailed" || density == "compact") return shortpath(value,budget)
-    if (value == home) return "~"
+    if (value == home) return appearance == "lazygit" ? "home" : "~"
     n=split(value,parts,"/")
     depth=(width>=72 ? 2 : 1)
     if (depth>n) depth=n
@@ -408,7 +547,13 @@ function pathlabel(p,w,budget,    value,parts,n,depth,candidate,q,other,matches,
     }
     need=(depth<n ? "…/" : "") candidate
     if (budget>0 && length(need)>budget && depth>1) return "…/" parts[n]
+    if (appearance == "lazygit") return tidy_path(value, candidate)
     return need
+}
+# A directory is its own name. No tilde and no ellipsis, so it does not look relative.
+function tidy_path(value, candidate) {
+    if (candidate == "") return "home"
+    return candidate
 }
 function title_detail(p,    value,limit,label) {
     if (density == "compact" || width<38) return ""
@@ -440,9 +585,11 @@ function appcolor(value, n, parts) {
     if (value ~ /^(npm|npx|git|lazygit|oc|hunk)$/) return icon_red
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
     if (value ~ /^(ssh|codex|top|htop|btop|agy)$/) return icon_cyan
-    if (value ~ /^(pi|omp|opencode|agent|cursor-agent)$/) return icon_purple
+    if (value == "pi") return icon_purple
+    if (value == "omp") return icon_yellow
+    if (value == "opencode" || value == "agent" || value == "cursor-agent") return icon_neutral
     if (value ~ /^(claude|claude-code)$/) return icon_yellow
-    if (value == "gemini") return icon_white
+    if (value == "gemini") return icon_blue
     return icon_neutral
 }
 function app_key(value) {
@@ -480,11 +627,13 @@ function appicon(value, n, parts,key,override) {
         if (value ~ /^(git|lazygit|hunk)$/) return "◇"
         if (value == "ssh") return "⇄"
         if (value ~ /^(kubectl|oc|k9s)$/) return "✣"
-        if (value ~ /^(claude|claude-code)$/) return "✦"
-        if (value == "codex") return "◈"
+        if (value ~ /^(claude|claude-code)$/) return "✳"
+        if (value == "codex") return "❋"
         if (value == "gemini") return "✧"
-        if (value ~ /^(pi|omp|opencode|agent|cursor-agent)$/) return "◎"
-        if (value ~ /^(agy|antigravity)$/) return "○"
+        if (value == "pi" || value == "omp") return "π"
+        if (value == "opencode") return "▦"
+        if (value == "agent" || value == "cursor-agent") return "▸"
+        if (value ~ /^(agy|antigravity)$/) return "◎"
         if (value ~ /^(make|cmake|ninja)$/) return "✱"
         if (value ~ /^(top|htop|btop)$/) return "▥"
         return custom_p != "" ? pane_icon : " "
@@ -497,10 +646,12 @@ function appicon(value, n, parts,key,override) {
     if (value ~ /^(git|lazygit|hunk)$/) return "󰊢"
     if (value == "ssh") return "󰢹"
     if (value ~ /^(kubectl|oc|k9s)$/) return "󱃾"
-    if (value ~ /^(claude|claude-code)$/) return "◇"
-    if (value == "codex") return "◈"
-    if (value == "gemini") return "󰊭"
-    if (value ~ /^(pi|omp|opencode|agent|cursor-agent)$/) return "󰚩"
+    if (value ~ /^(claude|claude-code)$/) return ""
+    if (value == "codex") return ""
+    if (value == "gemini") return "󰫢"
+    if (value == "pi" || value == "omp") return "π"
+    if (value == "opencode") return ""
+    if (value == "agent" || value == "cursor-agent") return ""
     if (value ~ /^(agy|antigravity)$/) return "󰀘"
     if (value ~ /^(make|cmake|ninja)$/) return ""
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
@@ -530,10 +681,15 @@ END {
     if (custom_s != "") session_icon=custom_s
     if (custom_w != "") window_icon=custom_w
     if (custom_p != "") pane_icon=custom_p
-    if (appearance == "lazygit" && icons != "ascii") {
+    if (appearance == "pills") {
+        branch_mid="  "; branch_end="  "; stem_mid="  "
+        fold_open=(icons == "ascii" ? "> " : "▾ ")
+        fold_closed=(icons == "ascii" ? "> " : "▸ ")
+        show_session_glyph=0; show_window_glyph=0
+    } else if ((appearance == "lazygit" || appearance == "places") && icons != "ascii") {
         branch_mid="├─"; branch_end="╰─"; stem_mid="│  "
         fold_open="▼ "; fold_closed="▶ "
-    } else if (appearance == "lazygit") {
+    } else if (appearance == "lazygit" || appearance == "places") {
         branch_mid="|-"; branch_end="`-"; stem_mid="|  "
         fold_open="v "; fold_closed="> "
     } else {
@@ -545,7 +701,7 @@ END {
         fold_open=accent fold_open reset; fold_closed=accent fold_closed reset
     }
     show_session_glyph=(appearance == "lazygit" || custom_s != "")
-    show_window_glyph=(appearance == "lazygit" || custom_w != "")
+    show_window_glyph=(appearance == "lazygit" ? custom_w != "" : custom_w != "")
     filter_session=current_s
     if (sidebar[current_p] == 1) {
         last=last_content[pw[current_p]]
@@ -586,38 +742,48 @@ END {
         # Reserve fzf's pointer gutter and keep operation warnings visible.
         available=width-2
         filter_label=(filter == "session" ? "Session" : filter == "unread" ? "Unread" : "All")
-        filter_sep=(icons == "ascii" ? " | " : appearance == "lazygit" ? " ─ " : " · ")
+        filter_sep=(icons == "ascii" ? " | " : appearance == "lazygit" || appearance == "places" ? " ─ " : " · ")
         if (window_filter != "") filter_label=filter_label "+W"
         if (title_filter != "") filter_label=filter_label "+T"
         reserved=text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)
-        box_pad=(appearance == "lazygit" ? 3 : 0)
-        if (agent_view) {
+        box_pad=(appearance == "lazygit" || appearance == "places" ? 3 : 0)
+        if (appearance == "pills") {
+            place=(agent_view ? "agents" : (current_s in sname ? sname[current_s] : ""))
+            if (place == "" && ns > 0) place=sname[sessions[1]]
+            hints=(filter != "all" || window_filter != "" || title_filter != "" ? filter_label : "")
+            header_text=(agent_view ? accent : dim) place reset
+            if (hints != "" && text_width(place)+text_width(hints)+2 <= available)
+                header_text=header_text sprintf("%*s", available-text_width(place)-text_width(hints), "") dim hints reset
+            if (mode != "") header_text=header_text " " mode_color mode reset
+            row("H:",header_text,"H:tree")
+        } else if (agent_view) {
             agent_overview()
-            tabs="Tree Proc Buff [Agents]"
+            tabs="Tree [Agents] Proc Buff"
             if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) {
                 overview_plain=overview_short_plain; overview_color=overview_short_color
             }
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T P B [Agents]"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T P B [A]"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T [Agents] P B"
+            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T [A] P B"
             if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="[A]"
-        } else if (appearance == "lazygit") {
-            tabs=(agents_enabled ? "Tree Proc Buff Agents" : "Tree Proc Buff")
-            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "Tree P B A" : "Tree P B")
-            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "T P B A" : "T P B")
+        } else if (appearance == "lazygit" || appearance == "places") {
+            tabs=(agents_enabled ? "Tree Agents Proc Buff" : "Tree Proc Buff")
+            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "Tree A P B" : "Tree P B")
+            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "T A P B" : "T P B")
             if (text_width(tabs)+reserved+box_pad>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
             if (text_width(tabs)+text_width(filter_sep filter_label)+box_pad+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="Tree"
             tabs=tabs filter_sep filter_label
         } else {
-            tabs=(agents_enabled ? "[Tree] Proc Buff Agents" : "[Tree] Proc Buff")
+            tabs=(agents_enabled ? "[Tree] Agents Proc Buff" : "[Tree] Proc Buff")
             # Leave room for fzf's right edge and an active operation label.
-            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[Tree] P B A" : "[Tree] P B")
-            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[T] P B A" : "[T] P B")
+            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[Tree] A P B" : "[Tree] P B")
+            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[T] A P B" : "[T] P B")
             if (text_width(tabs)+reserved>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
             if (text_width(tabs)+text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="[T]"
             tabs=tabs filter_sep filter_label
         }
+        if (appearance != "pills") {
         padding=available-text_width(tabs)-length(mode)-box_pad-(agent_view ? text_width(overview_plain)+1 : 0); if (padding<1) padding=1
-        if (appearance == "lazygit" && !agent_view) {
+        if ((appearance == "lazygit" || appearance == "places") && !agent_view) {
             styled_tabs=tabs
             if (match(styled_tabs, /^(Tree|T|Proc|P|Buff|B|Agents|A)/)) {
                 active=substr(styled_tabs, RSTART, RLENGTH)
@@ -630,6 +796,7 @@ END {
             header_text=styled_tabs reset
         }
         row("H:",header_text (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
+        }
     }
     # A separate flat inventory ignores presentation folds without editing state.
     # Every linked occurrence retains its session, including pane targets.
@@ -656,10 +823,15 @@ END {
         if (!visible_s[s]) continue
         sm=(st == del ? "✕" : s == current_s && (collapsed[st] || !visible_w[s,current_w]) ? "●" : " ")
         meta=(agent_view ? " [" shown_agents_s[s] " agent" (shown_agents_s[s]==1 ? "" : "s") "]" : filtered ? " [" shown_w[s] "/" nw[s] "w]" : collapsed[st] ? " [" nw[s] "w]" : "")
+        if (appearance == "pills") {
+            pills_session(s, st)
+            continue
+        }
         session_glyph=(show_session_glyph ? dim session_icon reset " " : "")
         session_style=(s == current_s ? bold : "")
-        row(st,(collapsed[st] ? fold_closed : fold_open) (sm != " " ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset,st)
+        row(st,edge_colored((collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset, sm == "●" ? green "▶" reset : "", width-3),st)
         if (collapsed[st]) continue
+        if (appearance == "places") { places_panes(s); continue }
         visible_wpos=0
         for (wpos=1;wpos<=nw[s];wpos++) {
             w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
@@ -684,14 +856,15 @@ END {
                 compact_path=(density == "minimal" || width<56 ? "" : " " pathlabel(p,w,width-24))
                 if (p == current_p && s == current_s && wm == " ") wm="●"
                 compact_label=agent_label(p)
-                compact_duration=(compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
-                row(wt,edge_count(dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] agent_badge(p) badge dim meta compact_path reset,compact_duration,width-3),wt)
+                compact_duration=(appearance == "pills" ? pill_word(p) : appearance == "lazygit" ? quiet_mark(compact_label) : compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
+                row(wt,edge_colored(dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style (appearance == "pills" || appearance == "lazygit" ? wn[key] : wi[key] ":" wn[key]) reset "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] agent_badge(p) status_mark(compact_duration) dim meta compact_path reset,pane_edge(unread_glyph(pa[p]||vwa[w], pb[p]||vwb[w], pz[p]||vwz[w]), p == current_p && s == current_s),width-3),wt)
                 continue
             }
             grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
                 group_count[first_p[w]] == shown_p[w] && path[first_p[w]] != "" && !collapsed[wt])
-            window_text=dim branch reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " ? mark(wm) " " : "") window_glyph window_style wi[key] ":" wn[key] reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_work[w],w_done[w]) : "") dim meta reset
-            window_text=edge_count(window_text,collapsed_count,width-3)
+            window_text=dim branch reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " && wm != "●" ? mark(wm) " " : "") window_glyph window_style (appearance == "pills" || appearance == "lazygit" ? wn[key] : wi[key] ":" wn[key]) reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (appearance == "lazygit" ? "" : (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_work[w],w_done[w]) : "")) dim meta reset
+            window_edge=(appearance == "lazygit" && collapsed[wt] ? (w_need[w] > 0 ? "!" : w_work[w] > 0 ? quiet_mark("working") : collapsed_count) : collapsed_count)
+            window_text=edge_colored(edge_count(window_text,window_edge,width-3), wm == "●" ? green "▶" reset : "", width-3)
             if (grouped) {
                 continuation=dim stem stem_mid "   "
                 window_text=window_text "\n" continuation pathlabel(panes[w,1],w,width-12) reset
@@ -706,22 +879,24 @@ END {
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p]==1 ? "×" : " ")
                 details=title_detail(p)
                 compact_label=agent_label(p)
-                duration=(compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
+                duration=(appearance == "pills" ? pill_word(p) : appearance == "lazygit" ? quiet_mark(compact_label) : compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
                 display_command=(agent_view ? agent_name(agent_kind[p]) : command[p])
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
-                prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " mark(pm) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
+                if (appearance == "lazygit")
+                    prefix=lazy_prefix(stem, visible_ppos == shown_p[w] ? branch_end : branch_mid, pm, appcolor(agent_view ? agent_kind[p] : command[p]), icon)
+                else prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " (pm == "●" ? " " : mark(pm)) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
                 show_path=(density == "detailed" || density == "compact" || (density == "normal" && width>=32))
                 pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-text_width(icon)) : "")
                 if (nul && density != "compact") {
                     inline_path=(density == "normal" && width<56 && pane_path != "" ? " " path_color pane_path reset : "")
-                    primary=edge_count(prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) dim details reset inline_path,duration,width-3)
+                    primary=edge_colored(prefix " " display_command agent_badge(p) status_mark(duration) dim details reset inline_path,pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"),width-3)
                     continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+text_width(icon),"")
                     secondary=continuation path_color pane_path reset
                     row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : "") subagent_lines(p,continuation),pt ":" s)
                 } else {
                     # Legacy newline consumers stay one line per object.
                     path_text=(show_path && pane_path != "" ? " " path_color pane_path reset : "")
-                    row(pt,edge_count(prefix " " display_command agent_badge(p) notice(pa[p],pb[p],pz[p]) path_text dim details reset,duration,width-3),pt ":" s)
+                    row(pt,edge_colored(prefix " " display_command agent_badge(p) status_mark(duration) path_text dim details reset,pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"),width-3),pt ":" s)
                 }
             }
         }

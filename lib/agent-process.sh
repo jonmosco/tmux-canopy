@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Process identity and ancestry helpers. Linux uses /proc without spawning ps.
 canopy_ps_loaded=0
-declare -gA CANOPY_PPID CANOPY_LSTART CANOPY_COMM
+declare -gA CANOPY_PPID CANOPY_LSTART CANOPY_COMM CANOPY_KIND
 # Non-Linux (no /proc) fallback: read the whole process table in one ps call
 # and cache it for the lifetime of this process, instead of spawning ps per
 # ancestor per pane. Safe to call repeatedly; only the first call forks ps.
@@ -19,8 +19,58 @@ canopy_load_ps_snapshot() {
     CANOPY_LSTART[$pid]="$w1 $w2 $w3 $w4 $w5"
     argv0=${argv0##*/}
     CANOPY_COMM[$pid]=${argv0%.exe}
+    CANOPY_KIND[$pid]=$(canopy_hosted_agent "${CANOPY_COMM[$pid]}" $rest)
   done <<< "$raw"
   return "$canopy_ps_status"
+}
+# Pi and Oh My Pi exec through Node. A node/nodejs argv0 is those agents only
+# when a later argument is their launcher; every other Node process stays node.
+canopy_hosted_agent() {
+  local host=${1:-} token base
+  shift || true
+  host=${host##*/}
+  host=${host%.exe}
+  case "$host" in
+    pi|omp) printf '%s' "$host"; return 0 ;;
+    node|nodejs) ;;
+    *) return 1 ;;
+  esac
+  for token in "$@"; do
+    [[ $token == -* ]] && continue
+    base=${token##*/}
+    base=${base%.exe}
+    case "$base" in
+      pi|omp) printf '%s' "$base"; return 0 ;;
+    esac
+    case "$token" in
+      *pi-coding-agent*) printf 'pi'; return 0 ;;
+      *oh-my-pi*) printf 'omp'; return 0 ;;
+    esac
+  done
+  return 1
+}
+# Closest pi/omp descendant of a pane root, if Node is only hosting that CLI.
+canopy_pane_agent() {
+  local root=$1 pid current depth=0 best=129 found='' kind
+  [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
+  canopy_load_ps_snapshot || return 1
+  for pid in "${!CANOPY_PPID[@]}"; do
+    kind=${CANOPY_KIND[$pid]:-}
+    [[ -n $kind ]] || continue
+    current=$pid
+    depth=0
+    while ((depth < 128)); do
+      [[ $current == "$root" ]] && break
+      current=${CANOPY_PPID[$current]:-}
+      [[ $current =~ ^[1-9][0-9]*$ ]] || { depth=128; break; }
+      depth=$((depth + 1))
+    done
+    if [[ $current == "$root" && $depth -lt $best ]]; then
+      best=$depth
+      found=$kind
+    fi
+  done
+  [[ -n $found ]] && printf '%s' "$found"
 }
 # Emits "pid ppid comm" lines from the cached snapshot, for callers that only
 # need a full-process-table scan (loads the snapshot on demand).
@@ -43,15 +93,21 @@ canopy_proc_stat() {
 }
 # Prefer argv0 basename from cmdline so Node-based CLIs still match.
 canopy_process_name() {
-  local pid=$1 argv0 name
+  local pid=$1 argv0 name arg
+  local -a args=()
   [[ $pid =~ ^[1-9][0-9]*$ ]] || return 1
   if [[ -r /proc/$pid/cmdline ]]; then
-    IFS= read -r -d '' argv0 < "/proc/$pid/cmdline" 2>/dev/null || true
-    name=${argv0##*/}
-    name=${name%.exe}
-    if [[ -n $name ]]; then
-      printf '%s\n' "$name"
-      return 0
+    while IFS= read -r -d '' arg; do
+      args+=("$arg")
+    done < "/proc/$pid/cmdline"
+    if ((${#args[@]})); then
+      name=$(canopy_hosted_agent "${args[@]}") && { printf '%s\n' "$name"; return 0; }
+      argv0=${args[0]##*/}
+      name=${argv0%.exe}
+      if [[ -n $name ]]; then
+        printf '%s\n' "$name"
+        return 0
+      fi
     fi
   fi
   [[ -r /proc/$pid/comm ]] || return 1

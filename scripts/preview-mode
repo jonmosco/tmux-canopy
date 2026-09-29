@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Sidebar-local drawer choice. The existing p binding still hides/shows it.
 set -u
-[[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]] || exit 0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/launch-lib.sh"
+canopy_agents_enabled || exit 0
 sidebar="${TMUX_PANE:-}"
 [[ "$sidebar" =~ ^%[0-9]+$ ]] || exit 0
 [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0

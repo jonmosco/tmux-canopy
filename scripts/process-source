@@ -15,10 +15,10 @@ panes="$(tmux list-panes -a -F '#{session_name}|#{window_index}|#{window_name}|#
 awk -v heading="$heading" -v process_color="$process_color" -v dim="$dim" -v reset="$reset" '
   FILENAME == ARGV[1] {
     if (NF < 6 || $1 !~ /^[1-9][0-9]*$/ || $2 !~ /^[0-9]+$/) next
-    pid=$1; parent=$2
+    pid=$1; ppid[pid]=$2
     if (known[pid]++) next
     user[pid]=$3; stat[pid]=$4; elapsed[pid]=elapsed_seconds($5); command[pid]=$6
-    children[parent,++child_count[parent]]=pid
+    children[ppid[pid],++child_count[ppid[pid]]]=pid
     # Remove the six metadata columns without rebuilding $0: preserve spaces
     # and literal backslashes in the command arguments.
     value=$0
@@ -35,6 +35,39 @@ awk -v heading="$heading" -v process_color="$process_color" -v dim="$dim" -v res
     for (i=1;i<=n;i++) total=total*60+parts[i]
     return days*86400+total
   }
+  function hosted_name(value,    n,i,token,base) {
+    n=split(value,token,/[[:space:]]+/)
+    for (i=1;i<=n;i++) {
+      if (token[i] == "" || substr(token[i],1,1) == "-") continue
+      base=token[i]; sub(/^.*\//,"",base); sub(/\.exe$/,"",base)
+      if (base == "pi" || base == "omp") return base
+      if (index(token[i],"pi-coding-agent") > 0) return "pi"
+      if (index(token[i],"oh-my-pi") > 0) return "omp"
+      if (i == 1 && base != "node" && base != "nodejs") return ""
+    }
+    return ""
+  }
+  function shown_command(pid,    hosted) {
+    hosted=hosted_name(command[pid] " " args[pid])
+    return hosted != "" ? hosted : command[pid]
+  }
+  function hosted_agent(root,    p,current,depth,best,found,hosted) {
+    best=129; found=""
+    for (p in command) {
+      hosted=hosted_name(command[p] " " args[p])
+      if (hosted == "") continue
+      current=p
+      for (depth=0; depth<128 && current>0; depth++) {
+        if (current == root) {
+          if (depth < best) { best=depth; found=hosted }
+          break
+        }
+        if (seen_host[root,p,current]++) break
+        current=ppid[current]
+      }
+    }
+    return found
+  }
   function emit(root, pane,    depth,parent,p) {
     # An explicit stack preserves sibling order without recursive shared-array
     # bugs or a recursion limit. A per-pane generation guards against cycles in
@@ -48,7 +81,7 @@ awk -v heading="$heading" -v process_color="$process_color" -v dim="$dim" -v res
       p=children[parent,positions[depth]++]
       if (visited[p] == generation) continue
       visited[p]=generation
-      printf "X:%s:%s\t    %*s%s%s%s  %s%-7s %-5s %ss%s  %s\n", p, pane, depth*2, "", process_color, command[p], reset, dim, user[p], stat[p], elapsed[p], reset, args[p]
+      printf "X:%s:%s\t    %*s%s%s%s  %s%-7s %-5s %ss%s  %s\n", p, pane, depth*2, "", process_color, shown_command(p), reset, dim, user[p], stat[p], elapsed[p], reset, args[p]
       depth++; parents[depth]=p; positions[depth]=1
     }
   }
@@ -61,7 +94,12 @@ awk -v heading="$heading" -v process_color="$process_color" -v dim="$dim" -v res
       sub(/^.*\//, "", path)
       if (index(pane[8],home "/") == 1) path="…/" path
     }
-    printf "Q:%s\t%s󰆍 %s%s %s/ 󰖯 %s:%s /  %s %s%s  %s%s%s\n", pane[4], heading, pane[1], reset, dim, pane[2], pane[3], pane[5], pane[7], reset, dim, path, reset
+    shown=pane[7]
+    if (shown == "node" || shown == "nodejs") {
+      hosted=hosted_agent(pane[6])
+      if (hosted != "") shown=hosted
+    }
+    printf "Q:%s\t%s󰆍 %s%s %s/ 󰖯 %s:%s /  %s %s%s  %s%s%s\n", pane[4], heading, pane[1], reset, dim, pane[2], pane[3], pane[5], shown, reset, dim, path, reset
     if (pane[6] ~ /^[1-9][0-9]*$/) emit(pane[6],pane[4])
   }
 ' <(printf '%s\n' "$snapshot") - <<< "$panes"

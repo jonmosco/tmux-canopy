@@ -8,6 +8,11 @@ source "$SCRIPT_DIR/buffer-lib.sh"
 source "$SCRIPT_DIR/launch-lib.sh"
 action="${1:-}"
 token="${2:-}"
+# A directory row is a fold of panes, not a new tmux object. Fold it in place;
+# every other action applies to the pane it stands in for.
+if [[ "$token" == DIR:* && "$action" != collapse && "$action" != expand ]]; then
+  token="P:${token#DIR:}"
+fi
 state_file="${TMUX_CANOPY_STATE:?}"
 sidebar="${TMUX_PANE:-}"
 row_identity="${3:-}"
@@ -91,7 +96,19 @@ case "$action" in
   view-processes) set_view processes ;;
   view-buffers) set_view buffers ;;
   view-agents)
-    [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" != on ]] || set_view agents
+    canopy_agents_enabled && set_view agents
+    ;;
+  toggle-agents)
+    client="$(canopy_agents_client)"
+    [[ -n "$client" ]] || exit 0
+    option="$(canopy_agents_option "$client")"
+    if canopy_agents_enabled "$client"; then
+      tmux set-option -gq "$option" off
+      view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null)"
+      [[ "$view" == agents ]] && set_view tree
+    else
+      tmux set-option -gq "$option" on
+    fi
     ;;
 
   activate)

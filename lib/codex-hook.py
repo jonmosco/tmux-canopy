@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from agent_kinds import process_name
+from agent_kinds import name_from_args, process_name
 from subagent_state import agent_id, list_field, next_entries
 
 SEP = "\x1f"
@@ -162,8 +162,7 @@ def process_identity(root, kind="codex"):
             fields = line.split(None, 2)
             if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
                 parents[int(fields[0])] = int(fields[1])
-                argv0 = fields[2].split(None, 1)[0]
-                if os.path.basename(argv0).removesuffix(".exe") in names:
+                if name_from_args(fields[2].split()) in names:
                     candidates.append((int(fields[0]), ""))
         def stat_for(pid):
             return (parents[pid], "") if pid in parents else None

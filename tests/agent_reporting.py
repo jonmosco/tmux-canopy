@@ -79,16 +79,29 @@ send("gemini", {"hook_event_name": "SessionStart", "session_id": "g2"})
 send("gemini", {"hook_event_name": "AfterAgent", "session_id": "g1"})
 check(state["session"] == "g2" and state["status"] == "ready", "late Gemini event cannot overwrite new session")
 
-# Pi and OMP expose only coarse lifecycle events, but every transition and
-# session restart must replace state rather than retain stale request metadata.
+# Pi and OMP report lifecycle, tool progress, extension UI prompts, and
+# interrupted settles. Session restart must replace state rather than retain
+# stale request metadata.
 for kind in ("pi", "omp"):
     state = harness(kind)
     send(kind, {"type": "session_start", "session_id": kind + "-1"})
     check(state["status"] == "ready", f"{kind} startup")
     send(kind, {"type": "agent_start", "session_id": kind + "-1"})
     check(state["status"] == "working", f"{kind} turn start")
+    send(kind, {"type": "tool_execution_start", "session_id": kind + "-1", "tool_name": "bash"})
+    check(state["status"] == "working", f"{kind} tool execution keeps the turn fresh")
+    send(kind, {"type": "ui_prompt_start", "session_id": kind + "-1", "tool_name": "confirm",
+                "message": "Allow command?"})
+    check(state["status"] == "needs-input" and state["summary"] == "Allow command?", f"{kind} UI prompt")
+    send(kind, {"type": "ui_prompt_end", "session_id": kind + "-1"})
+    check(state["status"] == "working" and not state["request"], f"{kind} prompt end clears request")
+    send(kind, {"type": "agent_interrupted", "session_id": kind + "-1", "outcome": "aborted"})
+    check(state["status"] == "interrupted", f"{kind} aborted settle")
+    send(kind, {"type": "agent_start", "session_id": kind + "-1"})
     send(kind, {"type": "agent_end", "session_id": kind + "-1"})
     check(state["status"] == "turn-ended", f"{kind} turn end")
+    send(kind, {"type": "agent_settled", "session_id": kind + "-1"})
+    check(state["status"] == "turn-ended", f"{kind} settled turn")
     send(kind, {"type": "session_start", "session_id": kind + "-2"})
     check(state["session"] == kind + "-2" and state["status"] == "ready", f"{kind} new session replaces old")
     send(kind, {"type": "agent_end", "session_id": kind + "-1"})

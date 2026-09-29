@@ -19,6 +19,40 @@ tmux_quote() {
   printf '"%s"' "$value"
 }
 
+# Per-client agent awareness. Unset means the global @tmux-canopy-agents default.
+canopy_agents_client() {
+  if [[ -n "${TMUX_CANOPY_CLIENT:-}" ]]; then
+    printf '%s' "$TMUX_CANOPY_CLIENT"
+    return
+  fi
+  if [[ -n "${TMUX_CANOPY_RENDER_CLIENT:-}" ]]; then
+    printf '%s' "$TMUX_CANOPY_RENDER_CLIENT"
+    return
+  fi
+  if [[ "${TMUX_PANE:-}" =~ ^%[0-9]+$ ]]; then
+    tmux show-option -pqv -t "$TMUX_PANE" @tmux_canopy_client 2>/dev/null || true
+  fi
+}
+canopy_agents_option() {
+  local client="${1:-}"
+  [[ -n "$client" ]] || client="$(canopy_agents_client)"
+  [[ -n "$client" ]] || return 0
+  printf '@tmux_canopy_agents_%s' "$(printf '%s' "$client" | cksum | awk '{ print $1 }')"
+}
+canopy_agents_enabled() {
+  local client="${1:-}" option saved
+  [[ -n "$client" ]] || client="$(canopy_agents_client)"
+  if [[ -n "$client" ]]; then
+    option="$(canopy_agents_option "$client")"
+    saved="$(tmux show-option -gqv "$option" 2>/dev/null || true)"
+    if [[ "$saved" == on || "$saved" == off ]]; then
+      [[ "$saved" == on ]]
+      return
+    fi
+  fi
+  [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]
+}
+
 # run-shell performs one tmux format expansion before executing its shell.
 tmux_shell() {
   local command

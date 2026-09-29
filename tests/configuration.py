@@ -62,15 +62,25 @@ def main():
 
             assert 'Agents' not in source() and 'Agents' not in source('--agents')
             assert source('--needs-input') == ''
-            assert '--bind=4:' not in ui_options() and '--bind=n:' not in ui_options()
+            binds = ui_options()
+            assert '--bind=4:' in binds and '--bind=n:' in binds and '--bind=A:' in binds
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             load()
             assert 'Agents' in source() and '[Agents]' in source('--agents')
-            assert '--bind=4:' in ui_options() and '--bind=n:' in ui_options()
+            client = '/dev/ttys-agent-test'
+            key = sp.check_output(['cksum'], input=client.encode()).split()[0].decode()
+            tm('set-option', '-g', '@tmux_canopy_agents_' + key, 'off')
+            hidden = sp.run([str(ROOT / 'scripts/tree-source')], env=source_env | {'TMUX_CANOPY_CLIENT': client},
+                            capture_output=True, text=True, timeout=15)
+            assert hidden.returncode == 0 and 'Agents' not in hidden.stdout, hidden.stderr
+            tm('set-option', '-g', '@tmux_canopy_agents_' + key, 'on')
             tm('set-option', '-g', '@tmux-canopy-agents', 'off')
             load()
-            assert 'Agents' not in source() and '--bind=4:' not in ui_options()
-            print('ok - agent view, scan and bindings are opt-in and reversible')
+            shown = sp.run([str(ROOT / 'scripts/tree-source')], env=source_env | {'TMUX_CANOPY_CLIENT': client},
+                           capture_output=True, text=True, timeout=15)
+            assert shown.returncode == 0 and 'Agents' in shown.stdout, shown.stderr
+            assert 'Agents' not in source()
+            print('ok - agent mode follows the client toggle and the global default')
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'nerdfont')
         load()
