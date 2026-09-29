@@ -74,7 +74,7 @@ if [[ "$mode" == incompatible ]]; then echo NOT_FOR_DIAGNOSTICS >&2; exit 2; fi
 if [[ "$mode" == crash && " $* " != *' --filter=probe '* ]]; then
   sleep .25; echo NOT_FOR_DIAGNOSTICS >&2; exit 42
 fi
-exec REAL --bind BINDING --bind LOAD "$@"
+exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
 '''.replace('REAL', shlex.quote(fzf)).replace('MODE', shlex.quote(str(mode))).replace('BINDING', shlex.quote(ui_binding)).replace('LOAD', shlex.quote('load:execute-silent(printf x >> ' + str(loads) + ')')))
         wrapper.chmod(0o755)
         state = temp / 'state'
@@ -101,7 +101,15 @@ exec REAL --bind BINDING --bind LOAD "$@"
                 if predicate():
                     return
                 time.sleep(.05)
-            raise AssertionError((message, tm('list-panes', '-a', '-F', '#{pane_id}|#{pane_dead}|#{pane_current_command}|mode=#{pane_in_mode}'), [tm('capture-pane', '-p', '-M', '-t', side) for side in sidebars()]))
+            kids = ''
+            try:
+                side = sidebars()[0]
+                pid = tm('display-message', '-p', '-t', side, '#{pane_pid}')
+                kids = sp.check_output(['ps', '-o', 'command=', '-g', pid], text=True, stderr=sp.STDOUT)
+                Path('/tmp/canopy-fzf-cmd').write_text(kids)
+            except Exception as exc:
+                kids = str(exc)
+            raise AssertionError((message, loads.stat().st_size, kids[:1500]))
 
         def sidebars():
             return tm('list-panes', '-a', '-f', '#{==:#{@tmux_canopy},1}', '-F', '#{pane_id}').splitlines()
