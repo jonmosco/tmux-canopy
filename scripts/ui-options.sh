@@ -103,6 +103,7 @@ sidebar_ui_options() {
     --bind="S:execute-silent($action_cmd create-session {1})+reload-sync($source_cmd --stable)"
     --bind="N:execute-silent($action_cmd create-session-prompt {1})+reload-sync($source_cmd --stable)"
     --bind="z:execute-silent($action_cmd zoom {1})+reload-sync($source_cmd --stable)"
+    --bind="b:execute-silent($action_cmd break-window {1})+reload-sync($source_cmd --stable)"
     --bind="ctrl-r:clear-screen+reload-sync($source_cmd --stable)"
     --bind='ctrl-l:clear-screen'
     --bind="ctrl-t:reload-sync($animate_cmd)"
