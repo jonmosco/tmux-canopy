@@ -65,8 +65,9 @@ def main():
             binds = ui_options()
             assert '--bind=4:' in binds and '--bind=n:' in binds and '--bind=A:' in binds
             assert '--bind=z:' in binds and '--bind=N:' in binds and '--bind=b:' in binds
-            assert 'unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?,ctrl-t)' in binds
-            assert 'rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?,ctrl-t)' in binds
+            assert 'unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)' in binds
+            assert 'rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)' in binds
+            assert '--bind=ctrl-t:' in binds
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             load()
             assert 'Agents' in source() and '[Agents]' in source('--agents')

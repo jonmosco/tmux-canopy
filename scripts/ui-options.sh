@@ -63,25 +63,25 @@ sidebar_ui_options() {
     --bind="ctrl-f:execute-silent($filter_cmd)"
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
-    --bind='load:+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?,ctrl-t)'
-    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?,ctrl-t)'
+    --bind='load:+execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.ready")+change-header-lines(0)+change-header-lines(1)'
+    --bind='/:execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.search")+show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
+    --bind='esc:execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     --bind="g:execute-silent($help_cmd --legend)"
     # View changes must work even when the current view has no selectable row.
-    --bind="1:execute-silent($action_cmd view-tree)+reload-sync($source_cmd --stable)"
-    --bind="2:execute-silent($action_cmd view-processes)+reload-sync($source_cmd --stable)"
-    --bind="3:execute-silent($action_cmd view-buffers)+reload-sync($source_cmd --stable)"
-    --bind="4:execute-silent($action_cmd view-agents)+reload-sync($source_cmd --stable)"
+    --bind="1:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-tree)+reload-sync($source_cmd --stable)"
+    --bind="2:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-processes)+reload-sync($source_cmd --stable)"
+    --bind="3:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-buffers)+reload-sync($source_cmd --stable)"
+    --bind="4:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-agents)+reload-sync($source_cmd --stable)"
     --bind="A:execute-silent($action_cmd toggle-agents)+reload-sync($source_cmd --stable)"
     --bind="n:execute-silent($jump_agent_cmd)"
     --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
     --bind="a:execute-silent($action_cmd actions {1})"
     --bind='p:toggle-preview'
     --bind="P:execute-silent($popup_cmd {1})"
-    --bind="enter:execute-silent($action_cmd activate {1} {3})"
-    --bind="double-click:execute-silent($action_cmd activate {1} {3})"
+    --bind="enter:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})"
+    --bind="double-click:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})"
     --bind="m:execute-silent($action_cmd move-toggle {1})+reload-sync($source_cmd --stable)"
     --bind="c:execute-silent($action_cmd move-cancel {1})+reload-sync($source_cmd --stable)"
     --bind="r:execute-silent($action_cmd rename {1})+reload-sync($source_cmd --stable)"
@@ -103,8 +103,8 @@ sidebar_ui_options() {
     --bind="S:execute-silent($action_cmd create-session {1})+reload-sync($source_cmd --stable)"
     --bind="N:execute-silent($action_cmd create-session-prompt {1})+reload-sync($source_cmd --stable)"
     --bind="z:execute-silent($action_cmd zoom {1})+reload-sync($source_cmd --stable)"
-    --bind="b:execute-silent($action_cmd break-window {1})+reload-sync($source_cmd --stable)"
-    --bind="ctrl-r:reload-sync($source_cmd --stable)"
+    --bind="ctrl-r:clear-screen+reload-sync($source_cmd --stable)"
+    --bind='ctrl-l:clear-screen'
     --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'
   )
