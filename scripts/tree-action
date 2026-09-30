@@ -158,6 +158,10 @@ create_split() {
   local token="$1" direction="$2" target_pane cwd new_pane
   target_pane="$(pane_for_token "$token")"
   [[ -n "$target_pane" ]] || return 0
+  if [[ "$(tmux show-option -pqv -t "$target_pane" @tmux_canopy 2>/dev/null || true)" == '1' || \
+        "$(tmux show-option -pqv -t "$target_pane" @tmux_canopy_slot 2>/dev/null || true)" == '1' ]]; then
+    return 0
+  fi
   cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
 
   new_pane="$(tmux split-window -d "$direction" -P -F '#{pane_id}' -t "$target_pane" -c "$cwd")"
@@ -469,6 +473,33 @@ swap_window_direction() {
   fi
 }
 
+swap_pane_direction() {
+  local token="$1" direction="$2" pane_id window_id index adjacent
+  pane_id="${token#P:}"
+  [[ "$pane_id" =~ ^%[0-9]+$ ]] || return 0
+  if [[ "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy 2>/dev/null || true)" == '1' || \
+        "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy_slot 2>/dev/null || true)" == '1' ]]; then
+    return 0
+  fi
+  window_id="$(tmux display-message -p -t "$pane_id" '#{window_id}' 2>/dev/null || true)"
+  [[ -n "$window_id" ]] || return 0
+  index="$(tmux display-message -p -t "$pane_id" '#{pane_index}' 2>/dev/null || true)"
+  [[ -n "$index" ]] || return 0
+
+  if [[ "$direction" == 'up' ]]; then
+    adjacent="$(tmux list-panes -t "$window_id" -F '#{pane_id}|#{pane_index}|#{@tmux_canopy}|#{@tmux_canopy_slot}' 2>/dev/null |
+      sort -t '|' -k2,2n |
+      awk -F '|' -v idx="$index" '$3 != "1" && $4 != "1" && $2 < idx { id=$1 } END { print id }')"
+  else
+    adjacent="$(tmux list-panes -t "$window_id" -F '#{pane_id}|#{pane_index}|#{@tmux_canopy}|#{@tmux_canopy_slot}' 2>/dev/null |
+      sort -t '|' -k2,2n |
+      awk -F '|' -v idx="$index" '$3 != "1" && $4 != "1" && $2 > idx { print $1; exit }')"
+  fi
+  if [[ -n "$adjacent" ]]; then
+    tmux swap-pane -d -s "$pane_id" -t "$adjacent" 2>/dev/null || true
+  fi
+}
+
 layout_menu() {
   local token="$1" tiled even_h even_v main_h main_v next previous rotate
   tiled="$(action_menu_command layout "$token" tiled)"
@@ -773,18 +804,20 @@ case "$action" in
     ;;
 
   pane-up)
-    tmux swap-pane -d -U -t "${token#P:}" 2>/dev/null || true
+    swap_pane_direction "$token" up
     ;;
 
   pane-down)
-    tmux swap-pane -d -D -t "${token#P:}" 2>/dev/null || true
+    swap_pane_direction "$token" down
     ;;
 
   zoom)
     case "$token" in
       P:*|W:*)
         target_pane="$(pane_for_token "$token")"
-        if [[ -n "$target_pane" ]]; then
+        if [[ -n "$target_pane" ]] && \
+           [[ "$(tmux show-option -pqv -t "$target_pane" @tmux_canopy 2>/dev/null || true)" != '1' && \
+              "$(tmux show-option -pqv -t "$target_pane" @tmux_canopy_slot 2>/dev/null || true)" != '1' ]]; then
           tmux resize-pane -Z -t "$target_pane" 2>/dev/null || true
         fi
         ;;
@@ -795,9 +828,12 @@ case "$action" in
     case "$token" in
       P:*)
         pane_id="${token#P:}"
-        session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
-        if [[ -n "$session_id" ]]; then
-          tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
+        if [[ "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy 2>/dev/null || true)" != '1' && \
+              "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy_slot 2>/dev/null || true)" != '1' ]]; then
+          session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
+          if [[ -n "$session_id" ]]; then
+            tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
+          fi
         fi
         ;;
     esac
@@ -826,6 +862,10 @@ case "$action" in
 
   respawn)
     pane_id="${token#P:}"
+    if [[ "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy 2>/dev/null || true)" == '1' || \
+          "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy_slot 2>/dev/null || true)" == '1' ]]; then
+      exit 0
+    fi
     if [[ "$(tmux display-message -p -t "$pane_id" '#{pane_dead}' 2>/dev/null || true)" == '1' ]]; then
       tmux respawn-pane -t "$pane_id" 2>/dev/null || true
     else

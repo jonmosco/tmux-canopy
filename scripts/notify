@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/launch-lib.sh"
 action="${1:-}"
 subject="${2:-}"
-printf -v now '%(%s)T' -1
+if ! printf -v now '%(%s)T' -1 2>/dev/null || [[ -z "$now" ]]; then
+  now="$(date +%s)"
+fi
 
 # The claim is evaluated inside tmux's command queue, not in competing shells.
 # One short-lived worker per burst; an expired claim can recover after SIGKILL.
@@ -25,7 +27,7 @@ if [[ "$action" == refresh ]]; then
   release_claim() { tmux if-shell -F "$match" "$release" 2>/dev/null || true; }
   trap release_claim EXIT
   trap 'exit 130' INT
-  trap 'exit 143' TERM
+  trap 'exit 143' TERM HUP
   sleep 0.12
   delivery=''
   while IFS= read -r sidebar; do

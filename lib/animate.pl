@@ -24,6 +24,7 @@ sub animate_word {
     my $length = length $word;
     my $band = $length <= 3 ? 1 : 2;
     my $positions = $length - $band + 1;
+    return $word if $positions <= 1;
     my $cycle = 2 * ($positions - 1);
     my $phase = $frame % $cycle;
     my $start = $phase < $positions ? $phase : $cycle - $phase;

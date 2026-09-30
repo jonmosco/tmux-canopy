@@ -93,7 +93,7 @@ if [[ "$mode" == worker ]]; then
   [[ "$expected_sidebar" =~ ^%[0-9]+$ && "$token" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 0
   trap release EXIT
   trap 'exit 130' INT
-  trap 'exit 143' TERM
+  trap 'exit 143' TERM HUP
   # Trailing-edge debounce: extend the wait when the live target changes.
   # The bounded worker is event-driven, not a persistent poller/daemon.
   for ((attempt=0; attempt<20; attempt++)); do

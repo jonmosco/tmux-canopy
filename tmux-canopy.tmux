@@ -175,6 +175,8 @@ tmux set-hook -gu 'after-resize-window[9003]' 2>/dev/null || true
 tmux set-hook -gu 'after-rename-session[9003]' 2>/dev/null || true
 tmux set-hook -gu 'after-rename-window[9003]' 2>/dev/null || true
 tmux set-hook -gu 'window-layout-changed[9005]' 2>/dev/null || true
+tmux set-hook -gu 'window-unlinked[9005]' 2>/dev/null || true
+tmux set-hook -gu 'after-resize-pane[9006]' 2>/dev/null || true
 tmux set-hook -gu 'window-layout-changed[9007]' 2>/dev/null || true
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
   tmux set-hook -gu "${focus_hook}[9004]" 2>/dev/null || true
