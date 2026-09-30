@@ -43,6 +43,9 @@ def main():
     assert marks[0] == marks[1] and marks[1] == marks[7] and marks[3] == marks[5], marks
     assert all('▷' not in mark for mark in plain_marks)
 
+    agy_marks = [animate('agy \x1b[1;36m▷\x1b[0m', frame) for frame in range(8)]
+    assert [re.sub(r'\x1b\[[0-9;]*m', '', m) for m in agy_marks] == ['agy ●'] * 8
+
     multi = f'P:%1\tcodex {word}\tP:%1:$0\0P:%2\tshell\tP:%2:$0\0'
     result = sp.run(
         ['perl', str(ROOT / 'lib/animate.pl'), '1'],
@@ -66,6 +69,26 @@ def main():
         text = result.stdout.split(b'\t', 2)[1]
         assert b'WORKING' in text.replace(b'\x1b[7m', b'').replace(b'\x1b[27m', b'')
         assert b'\x1b[7m' in text
+
+    with tempfile.TemporaryDirectory(prefix='canopy-animate-mark-') as directory:
+        state = Path(directory) / 'state'
+        cache = Path(f'{state}.animate')
+        frame_file = Path(f'{state}.animate.frame')
+        cache.write_bytes('P:%124\t\x1b[96m󰀘\x1b[0m agy \x1b[1;36m▷\x1b[0m\tP:%124:$0\0'.encode('utf-8'))
+        frame_file.write_text('4\n')
+        result = sp.run(
+            [str(ROOT / 'scripts/animate-frame')],
+            env={**os.environ, 'TMUX_CANOPY_STATE': str(state)},
+            capture_output=True, check=True,
+        )
+        assert result.stdout.endswith(b'\0')
+        text = result.stdout.split(b'\t', 2)[1].decode('utf-8')
+        assert '●' in text and '▷' not in text
+        mark_check = sp.run(
+            ['bash', '-c', 'mark=$\'\\xe2\\x96\\xb7\'; LC_ALL=C grep -aEq "WORKING|wrk|$mark" "$1"', '_', str(cache)],
+            capture_output=True,
+        )
+        assert mark_check.returncode == 0, mark_check.stderr
 
     with tempfile.TemporaryDirectory(prefix='canopy-animate-') as directory:
         env = os.environ.copy()

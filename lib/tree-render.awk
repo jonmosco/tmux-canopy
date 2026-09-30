@@ -57,6 +57,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
     if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy") agent_process[pid]=name
+    else if (name=="antigravity") agent_process[pid]="agy"
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     else if (name=="agent") agent_process[pid]="cursor-agent"
     next
@@ -316,6 +317,7 @@ function canonical_agent(value) {
     sub(/\.exe$/,"",value)
     if (value == "claude-code") return "claude"
     if (value == "agent") return "cursor-agent"
+    if (value == "antigravity") return "agy"
     if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent") return value
     return ""
 }

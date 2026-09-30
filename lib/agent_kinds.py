@@ -7,7 +7,7 @@ KINDS = {
     'opencode': 'opencode',
     'gemini': 'gemini',
     'pi': 'pi', 'omp': 'omp',
-    'agy': 'agy',
+    'agy': 'agy', 'antigravity': 'agy',
     'agent': 'cursor-agent',
 }
 
