@@ -24,7 +24,7 @@ The core stays navigation. Extra capabilities are optional and can be turned on 
 - Create, rename, move, link, and delete tmux objects with native menus and direct keys.
 - Zoom badges (`[Z]`), native pane/window zoom toggle, and automatic sidebar width balance when closing panes.
 - Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
-- Optional agent awareness adds an Agents view, status labels, a summary drawer, and a jump to panes needing input.
+- AI agent monitoring: Track active agents across sessions with animated status badges, a dedicated Agents view (`4`), summary drawer (`i`), subagent trees, and a one-key jump (`n`) to panes waiting for user input or approval.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets.
 - One sidebar owned by the client that opened it; no daemon or agent service.
@@ -73,15 +73,26 @@ Press **prefix + T** to open it. With the default prefix, press **Ctrl-b**, rele
 
 Run `~/.tmux/plugins/tmux-canopy/canopy doctor` to check requirements and see every active tmux binding, option, and hook Canopy installs. Add the repository root to your `PATH` if you prefer the short `canopy` command.
 
-### Optional agent awareness
+### AI agent monitoring and navigation
 
-Agent awareness is off by default. To show the Agents view, inline status, summary drawer, and jump control, add this **before** the Canopy `run-shell` line in your tmux configuration:
+Canopy includes built-in tracking for AI coding agents (Claude Code, OpenAI Codex, Google Antigravity `agy`, Cursor Agent, Gemini CLI, OpenCode, Pi, and Oh My Pi). It turns tmux into a unified cockpit for multi-agent workflows:
+
+- **Track all running agents:** The dedicated **Agents view** (`4`) aggregates active agent panes across all windows and sessions.
+- **Jump to blockers (`n`):** Press `n` from anywhere in Canopy to jump directly to the next pane waiting for user input, questions, or command approval.
+- **Live status & subagents:** Real-time animated status pulses (`WORKING`, `WAITING`, `DONE`) and subagent hierarchy tracking in the summary drawer (`i`).
+- **Two tiers of visibility:**
+  - **Zero-config process detection:** Automatically identifies running agent processes with zero extra tools or configuration (`[process]`).
+  - **Rich lifecycle adapters:** Optional lightweight hooks (`canopy integration install <agent>`) report exact turn states, tool executions, and child subagents without polling (`[state·hook]`).
+
+To enable agent monitoring, add this **before** the Canopy `run-shell` line in your tmux configuration:
 
 ```tmux
 set -g @tmux-canopy-agents 'on'
 ```
 
-Reload the tmux configuration, then close and reopen any existing sidebar. This enables process detection for Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (`agy`), Pi, Oh My Pi, and Cursor Agent (`agent`, shown as `cursor-agent` in the Agents view). `[process]` means detection only. To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`, `cursor-agent`). Adapters show `[state·hook]`; Claude Code, Codex, OpenCode, and Cursor Agent adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
+Reload the tmux configuration, then close and reopen any existing sidebar. You can also toggle agent mode on the fly per client by pressing `A` in the sidebar.
+
+To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`, `cursor-agent`). Adapters show `[state·hook]`; Claude Code, Codex, OpenCode, and Cursor Agent adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
 
 For Antigravity, install or update Canopy's adapter from the installation directory:
 
@@ -149,7 +160,7 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
 When you leave the sidebar for a content pane, its selection pointer follows the active pane automatically.
 
-With agent awareness enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
+With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
 
 The default Tree view uses one active-pane dot, shorter branch prefixes, and
 directory labels that adapt to sidebar width. For the leanest view, set
