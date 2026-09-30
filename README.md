@@ -1,12 +1,12 @@
 # tmux-canopy
 
-A persistent sidebar for navigating tmux sessions, windows, and panes.
+A persistent sidebar for tmux that organizes your sessions, windows, and panes into a navigable tree - and optionally monitors AI coding agents across all of them.
 
-**One tree. One persistent sidebar. Every tmux session.**
+**One sidebar follows you everywhere. No daemon. No config server. Just tmux.**
 
-Canopy moves the same sidebar pane as you switch windows and sessions, preserving your selection, search, and collapsed branches. It lives inside tmux and reserves space for your applications.
+Canopy adds a persistent sidebar to tmux. It shows your sessions, windows, and panes as a tree and follows you as you switch between them - same sidebar, same selection, same collapsed branches.
 
-The core stays navigation. Extra capabilities are optional and can be turned on or off without replacing the tree. Agent mode is one of those: press `A` to show agent status, an Agents view, and a jump to panes that need input. Lifecycle adapters for Claude, Codex, Cursor, Gemini, Antigravity, Pi, Oh My Pi, and OpenCode plug in the same way. They report state. They do not steer the agent, and the sidebar still works if none are installed.
+Optionally, turn on agent awareness to monitor AI coding agents (Claude, Codex, OpenCode, Gemini, Cursor, and more) with live status, animated working indicators, and a one-key jump to any pane waiting for input.
 
 ## Preview
 
@@ -198,6 +198,12 @@ bash tests/run.sh
 ```
 
 The same gate runs in GitHub Actions using pinned tmux/fzf versions. Tests use private tmux servers and do not modify your active sessions. See the [release checklist](docs/releasing.md) and [changelog](CHANGELOG.md).
+
+## Contributing
+
+Canopy is in active development. Bug reports, feature requests, and pull requests
+are welcome - open an issue at
+[github.com/jonmosco/tmux-canopy/issues](https://github.com/jonmosco/tmux-canopy/issues).
 
 ## License
 
