@@ -50,19 +50,6 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - A procps-compatible `ps` for the Processes view
 - `less` for the optional enlarged preview popup
 
-### Upgrading from tmux-tree-sidebar
-
-Update the startup path to `tmux-canopy/tmux-canopy.tmux` and change configuration
-options from `@tmux-tree-sidebar-*` to `@tmux-canopy-*`. The previous
-`tmux-tree-sidebar.tmux` entrypoint remains as a compatibility launcher. On load,
-legacy settings are copied only when the corresponding Canopy option is unset;
-explicit Canopy settings take precedence. Subsequent configuration changes should
-use the new option names.
-
-Internal environment variables now use `TMUX_CANOPY_*` and runtime options use
-`@tmux_canopy*`. Close existing sidebars before upgrading, then reload the plugin
-and reopen them. Application panes can remain running throughout the upgrade.
-
 ## Usage
 
 The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b`, then `Shift-t`.

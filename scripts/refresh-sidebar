@@ -42,21 +42,17 @@ snapshot() {
     esac
   done < <(tmux list-clients -F "C|#{client_tty}|#{session_id}|#{window_id}|#{pane_id}|#{$guard}" \; \
     list-panes -a -F 'P|#{pane_id}|#{window_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_client}|#{pane_last}|#{@tmux_canopy_target}|#{@tmux_canopy_target_session}|#{@tmux_canopy_focus_pending}' 2>/dev/null)
-  [[ -n "$sidebar" && -n "$current" && -n "${windows[$current]:-}" ]] || return 1
-  # Validate this exact client at commit time too. A newer event can overtake
-  # an older background request; the older snapshot must not overwrite it.
-  # Client loops retain the explicitly targeted pane context. Use their
-  # client_session field plus the targeted pane/window's active flags instead
-  # of assuming #{pane_id} inside an L loop is the client's selected pane.
-  # Explicit pane component, not session:window (which can fall back to active).
+  _snapshot_resolve
+}
+
+_snapshot_resolve() {
+  [[ -n "$sidebar" && -n "$current" ]] || return 1
   live_target="$session:.$current"
   live="#{L:#{?#{==:#{client_tty},$client},#{client_session},}}"
   valid="#{&&:#{==:$live,#{session_name}},#{&&:#{window_active},#{pane_active}}}"
   owner="#{&&:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_client},$client}}"
   if [[ "$current" == "$sidebar" ]]; then
     returned=1
-    # pane_last survives even a content->sidebar click faster than a worker
-    # could run. Never mistake another sidebar or a placeholder for content.
     last="${last_panes[$window]:-}"
     if [[ -n "$last" ]]; then
       target="$last"
@@ -71,6 +67,35 @@ snapshot() {
   else
     return 1
   fi
+  location="$session|$window|$target"
+}
+
+worker_snapshot() {
+  sidebar='' current='' session='' window='' location='' target='' valid='' guarded=''
+  returned=''
+  local kind a b c d e f
+  local sb_canopy='' sb_client='' p_canopy='' p_slot=''
+  while IFS='|' read -r kind a b c d e f; do
+    case "$kind" in
+      C) session="$a"; window="$b"; current="$c"; guarded="$d" ;;
+      S) [[ "$a" == "$expected_sidebar" && "$b" == 1 && "$c" == "$client" ]] || return 1
+         sidebar="$expected_sidebar"; saved="$d"; saved_session="$e"; pending="$f" ;;
+      P) p_canopy="$a"; p_slot="$b" ;;
+    esac
+  done < <(tmux display-message -c "$client" -p "C|#{session_id}|#{window_id}|#{pane_id}|#{$guard}" \; \
+    display-message -p -t "$expected_sidebar" "S|#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_client}|#{@tmux_canopy_target}|#{@tmux_canopy_target_session}|#{@tmux_canopy_focus_pending}" \; \
+    display-message -c "$client" -p "P|#{@tmux_canopy}|#{@tmux_canopy_slot}" 2>/dev/null)
+  [[ -n "$sidebar" && -n "$current" ]] || return 1
+  if [[ "$current" == "$sidebar" ]]; then
+    snapshot
+    return
+  fi
+  [[ "$p_canopy" != 1 && "$p_slot" != 1 ]] || return 1
+  target="$current"
+  live_target="$session:.$current"
+  live="#{L:#{?#{==:#{client_tty},$client},#{client_session},}}"
+  valid="#{&&:#{==:$live,#{session_name}},#{&&:#{window_active},#{pane_active}}}"
+  owner="#{&&:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_client},$client}}"
   location="$session|$window|$target"
 }
 
@@ -98,7 +123,7 @@ if [[ "$mode" == worker ]]; then
   # The bounded worker is event-driven, not a persistent poller/daemon.
   for ((attempt=0; attempt<20; attempt++)); do
     sleep 0.075
-    snapshot || exit 0
+    worker_snapshot || exit 0
     [[ "$sidebar" == "$expected_sidebar" && "$pending" == "$token" ]] || exit 0
     [[ "$guarded" != 1 ]] || continue
     if [[ "$location" != "$previous" && "$attempt" -lt 19 ]]; then
