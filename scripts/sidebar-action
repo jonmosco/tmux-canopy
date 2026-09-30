@@ -149,6 +149,28 @@ case "$action" in
     esac
     ;;
 
+  zoom)
+    case "$token" in
+      X:*)
+        rest="${token#X:}"; pane="${rest#*:}"
+        "$SCRIPT_DIR/tree-action" zoom "P:$pane"
+        ;;
+      Q:*) "$SCRIPT_DIR/tree-action" zoom "P:${token#Q:}" ;;
+      *) "$SCRIPT_DIR/tree-action" zoom "$token" ;;
+    esac
+    ;;
+
+  break-window)
+    case "$token" in
+      X:*)
+        rest="${token#X:}"; pane="${rest#*:}"
+        "$SCRIPT_DIR/tree-action" break-window "P:$pane"
+        ;;
+      Q:*) "$SCRIPT_DIR/tree-action" break-window "P:${token#Q:}" ;;
+      *) "$SCRIPT_DIR/tree-action" break-window "$token" ;;
+    esac
+    ;;
+
   yank)
     case "$token" in
       B:*|B2:*)

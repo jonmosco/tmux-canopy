@@ -19,7 +19,7 @@ sidebar_width="${TMUX_CANOPY_WIDTH:-42}"
 sidebar_scope="${TMUX_CANOPY_SCOPE:-window}"
 sidebar_transition="${TMUX_CANOPY_TRANSITION:-move}"
 
-[[ -n "$token" || "$action" == collapse-all || "$action" == expand-all ]] || exit 0
+[[ -n "$token" || "$action" == collapse-all || "$action" == expand-all || "$action" == toggle-status ]] || exit 0
 
 remove_state() {
   local value="$1"
@@ -192,6 +192,32 @@ create_session() {
   name="session-$number"
   new_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -c "$cwd")"
   [[ -n "$new_pane" ]] && show_target "$new_pane"
+}
+
+create_session_prompt() {
+  local token="$1" target_pane cwd prompt_target='' response response_key new_pane clean_name
+  target_pane="$(pane_for_token "$token")"
+  [[ -n "$target_pane" ]] || return 0
+  cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
+
+  response_key="@tmux_canopy_new_session_${BASHPID}_${RANDOM}"
+  [[ -n "$client" ]] && prompt_target="-t $(tmux_quote "$client")"
+
+  # shellcheck disable=SC2064
+  trap "$(shell_join tmux set-option -gu "$response_key") 2>/dev/null || true" EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+
+  tmux if-shell -F 1 \
+    "command-prompt -l $prompt_target -p $(tmux_quote "New session name:") { set-option -g $response_key %% }"
+  if response="$(tmux show-option -gv "$response_key" 2>/dev/null)"; then
+    tmux set-option -gu "$response_key" 2>/dev/null || true
+    if [[ -n "$response" ]]; then
+      clean_name="${response//#/##}"
+      new_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$clean_name" -c "$cwd" 2>/dev/null || true)"
+      [[ -n "$new_pane" ]] && show_target "$new_pane"
+    fi
+  fi
 }
 
 session_for_token() {
@@ -481,7 +507,9 @@ show_action_menu() {
     S:*)
       tmux display-menu "${client_args[@]}" -t "$sidebar_pane" -x C -y C -T ' Session actions ' \
         'New window' n "$(action_menu_command create-window "$target")" \
+        'New session (named)' N "$(action_menu_command create-session-prompt "$target")" \
         'Rename' r "$(action_menu_command rename "$target")" \
+        'Toggle status bar' B "$(action_menu_command toggle-status "$target")" \
         'Information' i "$(action_menu_command info "$target")" \
         'Delete (arm)' x "$(action_menu_command delete "$target")" \
         'Diagnostics' D "$(action_menu_command diagnostics "$target")" \
@@ -490,6 +518,7 @@ show_action_menu() {
     W:*)
       tmux display-menu "${client_args[@]}" -t "$sidebar_pane" -x C -y C -T ' Window actions ' \
         'Focus' f "$(action_menu_command activate "$target")" \
+        'Zoom/unzoom' z "$(action_menu_command zoom "$target")" \
         'Rename' r "$(action_menu_command rename "$target")" \
         'Move up' k "$(action_menu_command window-up "$target")" \
         'Move down' j "$(action_menu_command window-down "$target")" \
@@ -498,6 +527,7 @@ show_action_menu() {
         'Unlink from this session' u "$(action_menu_command unlink "$target")" \
         'Layouts…' l "$(action_menu_command layout-menu "$target")" \
         'Toggle synchronized input' y "$(action_menu_command sync-toggle "$target")" \
+        'Toggle status bar' B "$(action_menu_command toggle-status "$target")" \
         'Information' i "$(action_menu_command info "$target")" \
         'Delete (arm)' x "$(action_menu_command delete "$target")" \
         'Diagnostics' D "$(action_menu_command diagnostics "$target")" \
@@ -694,6 +724,10 @@ case "$action" in
     create_session "$token"
     ;;
 
+  create-session-prompt)
+    create_session_prompt "$token"
+    ;;
+
   rename)
     rename_token "$token"
     ;;
@@ -747,15 +781,26 @@ case "$action" in
     ;;
 
   zoom)
-    tmux resize-pane -Z -t "${token#P:}" 2>/dev/null || true
+    case "$token" in
+      P:*|W:*)
+        target_pane="$(pane_for_token "$token")"
+        if [[ -n "$target_pane" ]]; then
+          tmux resize-pane -Z -t "$target_pane" 2>/dev/null || true
+        fi
+        ;;
+    esac
     ;;
 
   break-window)
-    pane_id="${token#P:}"
-    session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
-    if [[ -n "$session_id" ]]; then
-      tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
-    fi
+    case "$token" in
+      P:*)
+        pane_id="${token#P:}"
+        session_id="$(tmux display-message -p -t "$pane_id" '#{session_id}' 2>/dev/null || true)"
+        if [[ -n "$session_id" ]]; then
+          tmux break-pane -d -s "$pane_id" -t "${session_id}:" >/dev/null 2>&1 || true
+        fi
+        ;;
+    esac
     ;;
 
   layout-menu)
@@ -786,5 +831,9 @@ case "$action" in
     else
       sidebar_message 'tmux-canopy: respawn is limited to dead panes'
     fi
+    ;;
+
+  toggle-status)
+    tmux set-option -g status 2>/dev/null || true
     ;;
 esac

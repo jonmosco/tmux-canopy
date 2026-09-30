@@ -82,6 +82,8 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `L` / Shift-l | Expand all sessions and windows in Tree or Agents view |
 | `Enter` | Focus a tree/process target, paste a buffer, or complete move/link placement |
 | `a` | Open the selected object's native action menu |
+| `z` | Toggle zoom on the selected pane or window |
+| `b` | Break the selected pane into its own window |
 | `A` | Turn agent mode on or off for this client; Tree stays on `1` |
 | `p` | Toggle the preview drawer on/off without closing the sidebar |
 | `Shift-p` | Open an enlarged read-only preview popup (`q` closes; arrows scroll) |
@@ -98,6 +100,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `v` | Create a vertical split from the selected node |
 | `t` | Create a window in the selected node's session |
 | `S` | Create the next available `session-N` session |
+| `N` | Create a named session with a prompt |
 | `/` | Enter fuzzy-filter mode |
 | `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
@@ -200,7 +203,7 @@ Press `a` for a context-sensitive `tmux display-menu`.
 - **Window:** focus, rename, reorder, move/link marking, unlink, layouts, rotate panes, guarded synchronized input, information, and deletion.
 - **Pane:** focus, zoom, swap, move, break into a window, dead-pane respawn, information, and deletion.
 
-Linked window occurrences carry both stable window and session IDs internally, so unlink removes only the selected session occurrence. Linked and synchronized windows display `[linked:N]` and `[SYNC]` badges. Enabling synchronized input requires confirmation; disabling it is immediate. Respawn is limited to panes tmux reports as dead.
+Linked window occurrences carry both stable window and session IDs internally, so unlink removes only the selected session occurrence. Linked, synchronized, and zoomed windows display `[linked:N]`, `[SYNC]`, and `[Z]` badges, and zoomed content panes display `[Z]`. Enabling synchronized input requires confirmation; disabling it is immediate. Respawn is limited to panes tmux reports as dead.
 
 ### Views
 
@@ -596,6 +599,7 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `scripts/responsive-width` | Re-clamp fixed/percentage widths after terminal resizing |
 | `scripts/cleanup` | Repair stale ownership/targets and remove orphan slots |
 | `scripts/reap-empty` | Finish content-empty windows while preserving the dock and native successor selection |
+| `scripts/balance-window` | Restore sidebar width and resize remaining content pane when multiple panes are closed down to one |
 | `scripts/notify` | Validate/deduplicate events, batch unread clears, and coalesce refresh workers |
 | `scripts/notification-lib.sh` | Native hook predicates and expiring clear claims |
 | `scripts/tree-filter` | Tree filter menu, literal text prompts, and per-sidebar overrides |
@@ -691,7 +695,7 @@ None of these suites alters the developer's active tmux server.
 - Tree expansion is session/window based; panes are leaves.
 - Multi-selection, bulk movement, and undo are not implemented.
 - Deletion is intentionally irreversible after the second `x`; there is no trash or undo layer.
-- New sessions currently use the first available automatic name (`session-1`, `session-2`, and so on); rename it afterward with `r`.
+- New sessions created with `S` use the first available automatic name (`session-1`, `session-2`, and so on) and are styled dimmed; press `N` to create a session with an immediate name prompt, or rename any session afterward with `r`.
 
 ## License
 

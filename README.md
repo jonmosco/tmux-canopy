@@ -125,6 +125,8 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `/`, then `Esc` | Search, then clear the search query |
 | `1` / `2` / `3` | Tree / Processes / Buffers |
 | `a` | Actions for the selected object |
+| `z` | Toggle zoom on the selected pane or window |
+| `b` | Break selected pane into its own window |
 | `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |

@@ -64,8 +64,8 @@ sidebar_ui_options() {
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     --bind='load:+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
-    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,n,?,ctrl-t)'
+    --bind='/:show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?,ctrl-t)'
+    --bind='esc:disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?,ctrl-t)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     --bind="g:execute-silent($help_cmd --legend)"
@@ -101,6 +101,9 @@ sidebar_ui_options() {
     --bind="v:execute-silent($action_cmd split-vertical {1})+reload-sync($source_cmd --stable)"
     --bind="t:execute-silent($action_cmd create-window {1})+reload-sync($source_cmd --stable)"
     --bind="S:execute-silent($action_cmd create-session {1})+reload-sync($source_cmd --stable)"
+    --bind="N:execute-silent($action_cmd create-session-prompt {1})+reload-sync($source_cmd --stable)"
+    --bind="z:execute-silent($action_cmd zoom {1})+reload-sync($source_cmd --stable)"
+    --bind="b:execute-silent($action_cmd break-window {1})+reload-sync($source_cmd --stable)"
     --bind="ctrl-r:reload-sync($source_cmd --stable)"
     --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'
