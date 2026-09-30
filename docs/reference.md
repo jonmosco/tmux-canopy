@@ -402,8 +402,7 @@ band across visible `WORKING` / `wrk` status words while an agent is working. Th
 compact working marker breathes as a low-contrast cyan dot rather than flashing an
 arrow.
 Frames come from a cached tree snapshot, not a full tmux rescan, at
-about 6–7 updates per second. Perl preserves fzf's NUL-delimited rows; without
-Perl the sidebar stays static. A short-lived worker starts only when a working
+about 6-7 updates per second. A short-lived worker starts only when a working
 row is drawn and exits when none remain, the sidebar closes, the view leaves
 Tree/Agents, the theme is `mono`, or the option is off — no permanent ticker.
 Requires agent awareness. Set the option to `off` and reopen the sidebar to

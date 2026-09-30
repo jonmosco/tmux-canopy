@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def animate(text, frame):
     record = f'P:%1\t{text}\tP:%1:$0\0'
     result = sp.run(
-        ['perl', str(ROOT / 'lib/animate.pl'), str(frame)],
+        ['python3', str(ROOT / 'lib/animate.py'), str(frame)],
         input=record, text=True, capture_output=True, check=True,
     )
     assert result.stdout.endswith('\0'), repr(result.stdout)
@@ -48,7 +48,7 @@ def main():
 
     multi = f'P:%1\tcodex {word}\tP:%1:$0\0P:%2\tshell\tP:%2:$0\0'
     result = sp.run(
-        ['perl', str(ROOT / 'lib/animate.pl'), '1'],
+        ['python3', str(ROOT / 'lib/animate.py'), '1'],
         input=multi, text=True, capture_output=True, check=True,
     )
     assert result.stdout.count('\0') == 2, repr(result.stdout)
