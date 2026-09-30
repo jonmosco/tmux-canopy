@@ -48,6 +48,25 @@ sidebar.
 - [ ] Test stale requests, focus and cancellation, literal response text, duplicate
   submissions, concurrent clients, acknowledgement failures, and narrow terminals.
 
+## Send prompt to pane (backlog)
+
+Allow sending text or prompts directly into a selected pane from the sidebar
+without switching focus away from the active application.
+
+- [ ] Add a **Send prompt to pane** item to the pane action menu and define an
+  optional shortcut.
+- [ ] Use a native tmux prompt (`command-prompt -p 'Prompt:'`) to accept the input,
+  with an option to select or prefill from recent tmux paste buffers.
+- [ ] Revalidate target pane existence and alive state (`pane_dead != 1`) before
+  sending; safely ignore vanished or dead targets.
+- [ ] Deliver input using native `send-keys -l` followed by `Enter` to preserve
+  exact literal text, whitespace, and Unicode characters without command
+  injection or shell expansion.
+- [ ] Keep the invoking client's focus, sidebar geometry, selection, query, and
+  preview state completely unchanged throughout the operation.
+- [ ] Test prompt delivery with special characters, multiline input, cancelled
+  prompts, dead panes, and background panes across multiple windows and sessions.
+
 ## Working-state animation
 
 - [x] Animate the **WORKING** status word with a moving highlight band while an

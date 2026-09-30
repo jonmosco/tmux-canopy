@@ -27,4 +27,4 @@ client="${TMUX_CANOPY_CLIENT:-}"
 # commands. Explicit client targeting prevents a second client taking the popup.
 tmux display-popup -c "$client" -t "$TMUX_PANE" -w '85%' -h '80%' \
   -T ' Preview · q close · arrows scroll ' -E \
-  -e "TMUX_CANOPY_PREVIEW_TOKEN=$token" "$SCRIPT_DIR/preview-popup" --render
+  -e "TMUX_CANOPY_PREVIEW_TOKEN=$token" "$BASH" "$SCRIPT_DIR/preview-popup" --render

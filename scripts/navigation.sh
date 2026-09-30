@@ -170,7 +170,7 @@ sidebar_navigate() (
   }
   trap navigation_cleanup EXIT
   trap 'exit 130' INT
-  trap 'exit 143' TERM
+  trap 'exit 143' TERM HUP
   nav_locked=1
   # Refresh after acquiring the lock; another transition may have completed
   # while this request waited. Slot/client decisions must use this snapshot.

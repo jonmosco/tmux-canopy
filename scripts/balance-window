@@ -6,15 +6,17 @@ source "$SCRIPT_DIR/lib.sh"
 
 target_window="${1:-}"
 
-balance_one_window() {
+active_lock=''
+release_lock() {
+  if [[ -n "$active_lock" ]]; then
+    tmux wait-for -U "$active_lock" 2>/dev/null || true
+    active_lock=''
+  fi
+}
+trap release_lock EXIT INT TERM HUP
+
+_balance_one_window_body() {
   local window_id="$1"
-  [[ -n "$window_id" ]] || return 0
-
-  local lock="tmux-canopy-balance-${window_id#@}"
-  tmux wait-for -L "$lock" 2>/dev/null || return 0
-  # shellcheck disable=SC2329
-  trap 'tmux wait-for -U "$lock" 2>/dev/null || true' RETURN
-
   local snapshot
   snapshot="$(tmux display-message -p -t "$window_id" \
     "#{window_width}|#{window_zoomed_flag}|#{@tmux_canopy_drag_native}|#{@tmux_canopy_staged_sidebar}" 2>/dev/null)" || return 0
@@ -26,23 +28,25 @@ balance_one_window() {
 
   local panes_data
   panes_data="$(tmux list-panes -t "$window_id" \
-    -F "#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_width}|#{@tmux_canopy_client}" 2>/dev/null)" || return 0
+    -F "#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_width}|#{@tmux_canopy_client}|#{pane_dead}" 2>/dev/null)" || return 0
 
-  local sidebar_pane="" sidebar_width="" sidebar_client="" content_count=0
-  local pid canopy slot pwidth client
-  while IFS="|" read -r pid canopy slot pwidth client; do
+  local sidebar_pane="" sidebar_width="" sidebar_client="" sidebar_dead=0 sidebar_count=0 content_count=0
+  local pid canopy slot pwidth client pdead
+  while IFS="|" read -r pid canopy slot pwidth client pdead; do
     [[ -n "$pid" ]] || continue
     if [[ "$canopy" == "1" || "$slot" == "1" ]]; then
       sidebar_pane="$pid"
       sidebar_width="$pwidth"
       sidebar_client="$client"
+      sidebar_dead="${pdead:-0}"
+      ((sidebar_count++))
     else
       ((content_count++))
     fi
   done <<< "$panes_data"
 
-  # Must have exactly one dock pane and exactly one content pane
-  [[ -n "$sidebar_pane" && "$content_count" -eq 1 ]] || return 0
+  # Must have exactly one live dock pane and exactly one content pane
+  [[ -n "$sidebar_pane" && "$sidebar_dead" != "1" && "$sidebar_count" -eq 1 && "$content_count" -eq 1 ]] || return 0
 
   if [[ -n "$sidebar_client" ]] && sidebar_transition_active "$sidebar_client"; then
     return 0
@@ -68,6 +72,17 @@ balance_one_window() {
   if [[ "$sidebar_width" != "$target_width" ]]; then
     tmux resize-pane -t "$sidebar_pane" -x "$target_width" 2>/dev/null || true
   fi
+}
+
+balance_one_window() {
+  local window_id="$1"
+  [[ -n "$window_id" ]] || return 0
+
+  local lock="tmux-canopy-balance-${window_id#@}"
+  tmux wait-for -L "$lock" 2>/dev/null || return 0
+  active_lock="$lock"
+  _balance_one_window_body "$window_id"
+  release_lock
 }
 
 if [[ -n "$target_window" ]]; then

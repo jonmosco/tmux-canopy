@@ -13,7 +13,7 @@ lock="tmux-canopy-content-layout-$window"
 tmux wait-for -L "$lock" || exit 0
 trap 'tmux wait-for -U "$lock" 2>/dev/null || true' EXIT
 trap 'exit 130' INT
-trap 'exit 143' TERM
+trap 'exit 143' TERM HUP
 snapshot="$(tmux display-message -p -t "$window" 'M|#{window_width}|#{window_height}|#{main-pane-width}|#{main-pane-height}|#{@tmux_canopy_content_layout}|#{window_zoomed_flag}' \; \
   list-panes -t "$window" -F 'P|#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_width}|#{pane_index}|#{pane_left}|#{pane_top}|#{pane_height}' 2>/dev/null)" || exit 0
 if ! awk -F '|' '$1=="P" && ($3==1 || $4==1) { found=1 } END { exit !found }' <<< "$snapshot"; then
