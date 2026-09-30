@@ -23,6 +23,12 @@ while sleep 0.15; do
   view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null || true)"
   [[ "$view" == tree || "$view" == agents || -z "$view" ]] || exit 0
   [[ -r "$cache" ]] || exit 0
+  # Suppress animation until fzf has completed startup/load
+  [[ -e "${state_file}.ready" ]] || continue
+  # Suppress animation while search mode is open to prevent key leakage and typing disruption
+  [[ ! -e "${state_file}.search" ]] || continue
+  # Suppress animation if the pane is in copy-mode
+  [[ "$(tmux display-message -p -t "$sidebar" '#{pane_in_mode}' 2>/dev/null || true)" == 0 ]] || continue
   # NUL-framed cache; LC_ALL=C keeps BSD/GNU grep from treating multibyte UTF-8 as non-matching with NUL.
   mark=$'\xe2\x96\xb7'
   LC_ALL=C grep -aEq "WORKING|wrk|$mark" "$cache" 2>/dev/null || exit 0

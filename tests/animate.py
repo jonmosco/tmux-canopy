@@ -114,6 +114,51 @@ def main():
             load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=env, capture_output=True, text=True, timeout=30)
             assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
             print('ok - animate option defaults on and normalizes invalid values')
+
+            # Test agent-animate readiness guard and search mode suppression
+            import time
+            tm('set-option', '-p', '-t', pane, '@tmux_canopy', '1')
+            token = 'test-token-123'
+            tm('set-option', '-p', '-t', pane, '@tmux_canopy_animate_token', token)
+            state_file = Path(directory) / 'sidebar-state'
+            cache_file = Path(f'{state_file}.animate')
+            frame_file = Path(f'{state_file}.animate.frame')
+            ready_file = Path(f'{state_file}.ready')
+            search_file = Path(f'{state_file}.search')
+            state_file.write_text('VIEW\ttree\n')
+            cache_file.write_bytes(b'P:%1\tcodex WORKING\tP:%1\0')
+
+            animator = sp.Popen(
+                ['bash', str(ROOT / 'scripts/agent-animate'), pane, token, str(state_file)],
+                env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL,
+            )
+            try:
+                # 1. While ready_file does not exist, animator must NOT advance frames
+                time.sleep(0.35)
+                assert frame_file.read_text().strip() == '0'
+
+                # 2. Once ready_file exists, animator begins advancing frames
+                ready_file.touch()
+                time.sleep(0.35)
+                frame_after_ready = int(frame_file.read_text().strip())
+                assert frame_after_ready > 0, frame_after_ready
+
+                # 3. When search_file exists, animator suppresses animation
+                search_file.touch()
+                time.sleep(0.15)
+                frame_frozen = int(frame_file.read_text().strip())
+                time.sleep(0.35)
+                assert int(frame_file.read_text().strip()) == frame_frozen
+
+                # 4. When search_file is removed, animation resumes
+                search_file.unlink()
+                time.sleep(0.35)
+                assert int(frame_file.read_text().strip()) != frame_frozen
+                print('ok - agent-animate respects ready guard and suppresses during search mode')
+            finally:
+                tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
+                animator.terminate()
+                animator.wait(timeout=5)
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 

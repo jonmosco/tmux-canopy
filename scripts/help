@@ -285,7 +285,7 @@ trap restore_terminal EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 trap 'dirty=1' WINCH
-stty -echo -icanon min 1 time 0 </dev/tty
+stty -echo -icanon min 1 time 0 status undef discard undef </dev/tty 2>/dev/null || stty -echo -icanon min 1 time 0 </dev/tty
 printf '\033[?1049h\033[?25l'
 offset=0; dirty=1; lines=()
 while :; do

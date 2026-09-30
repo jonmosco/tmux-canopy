@@ -14,6 +14,7 @@ if [[ "${1:-}" == --render ]]; then
   theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
   colors='fg:-1,bg:-1,hl:6:bold,hl+:6:bold,pointer:6,prompt:6,header:-1:dim'
   [[ "$theme" != mono ]] || colors=bw
+  stty status undef discard undef 2>/dev/null || true
   # No sidebar editing bindings or ambient fzf options in this navigation popup.
   # shellcheck disable=SC2016 # Expanded by fzf's explicit action shell.
   env -u FZF_DEFAULT_OPTS -u FZF_DEFAULT_OPTS_FILE -u FZF_DEFAULT_COMMAND \
