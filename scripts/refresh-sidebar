@@ -74,7 +74,7 @@ worker_snapshot() {
   sidebar='' current='' session='' window='' location='' target='' valid='' guarded=''
   returned=''
   local kind a b c d e f
-  local sb_canopy='' sb_client='' p_canopy='' p_slot=''
+  local p_canopy='' p_slot=''
   while IFS='|' read -r kind a b c d e f; do
     case "$kind" in
       C) session="$a"; window="$b"; current="$c"; guarded="$d" ;;
