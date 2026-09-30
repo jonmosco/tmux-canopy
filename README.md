@@ -1,5 +1,7 @@
 # tmux-canopy
 
+[![Test](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml/badge.svg)](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml)
+
 A persistent sidebar for tmux that organizes your sessions, windows, and panes into a navigable tree - and optionally monitors AI coding agents across all of them.
 
 **One sidebar follows you everywhere. No daemon. No config server. Just tmux.**
