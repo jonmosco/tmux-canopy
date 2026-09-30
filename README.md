@@ -21,7 +21,8 @@ The core stays navigation. Extra capabilities are optional and can be turned on 
 - Width-aware directory grouping, optional minimal and compact views, previews, and scrollable popup help.
 - Global quick switching, including panes inside collapsed branches.
 - Tree filters for the current session, unread notifications, window names, and pane titles.
-- Create, rename, move, link, and delete tmux objects with native menus.
+- Create, rename, move, link, and delete tmux objects with native menus and direct keys.
+- Zoom badges (`[Z]`), native pane/window zoom toggle, and automatic sidebar width balance when closing panes.
 - Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
 - Optional agent awareness adds an Agents view, status labels, a summary drawer, and a jump to panes needing input.
 - Activity and bell notifications; optional silence monitoring.
@@ -110,6 +111,7 @@ set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
+set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 ```
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
@@ -127,6 +129,13 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `a` | Actions for the selected object |
 | `z` | Toggle zoom on the selected pane or window |
 | `b` | Break selected pane into its own window |
+| `s` / `v` | Create horizontal / vertical split from selected node |
+| `t` | Create new window in selected session |
+| `S` / `N` | Create session / create named session with prompt |
+| `r` | Rename selected session or window |
+| `x`, then `x` | Confirm deletion of a pane, window, or session |
+| `m` / `c` | Mark move source / cancel move mode |
+| `u` / `U` | Clear selected / all notifications |
 | `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
