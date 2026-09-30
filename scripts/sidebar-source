@@ -66,13 +66,17 @@ schedule_animate() {
     tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
     return 0
   fi
-  if [[ "$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)" != on ||
+  local animate
+  animate="$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)"
+  [[ -n "$animate" ]] || animate="$(tmux show-option -gqv @tmux-canopy-animate 2>/dev/null || true)"
+  if [[ "${animate:-on}" != on ||
         "$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)" == mono ]]; then
     rm -f -- "$cache" "${state_file}.animate.frame"
     tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
     return 0
   fi
-  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | grep -aEq 'WORKING|wrk|▷'; then
+  local mark=$'\xe2\x96\xb7'
+  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | LC_ALL=C grep -aEq "WORKING|wrk|$mark"; then
     cache_tmp="$(mktemp "${cache}.XXXXXX")" || return 0
     chmod 600 "$cache_tmp" 2>/dev/null || { rm -f -- "$cache_tmp"; return 0; }
     if ! printf '%s\0' "${records[@]}" > "$cache_tmp"; then

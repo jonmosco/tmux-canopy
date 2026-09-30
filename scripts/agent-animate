@@ -16,13 +16,16 @@ printf '%s\n' "$frame" > "$frame_file"
 while sleep 0.15; do
   [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0
   [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true)" == "$token" ]] || exit 0
-  [[ "$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)" == on ]] || exit 0
+  animate="$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)"
+  [[ -n "$animate" ]] || animate="$(tmux show-option -gqv @tmux-canopy-animate 2>/dev/null || true)"
+  [[ "${animate:-on}" == on ]] || exit 0
   [[ "$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)" != mono ]] || exit 0
   view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null || true)"
   [[ "$view" == tree || "$view" == agents || -z "$view" ]] || exit 0
   [[ -r "$cache" ]] || exit 0
-  # NUL-framed cache; -a keeps GNU grep from treating it as binary.
-  grep -aEq 'WORKING|wrk|▷' "$cache" 2>/dev/null || exit 0
+  # NUL-framed cache; LC_ALL=C keeps BSD/GNU grep from treating multibyte UTF-8 as non-matching with NUL.
+  mark=$'\xe2\x96\xb7'
+  LC_ALL=C grep -aEq "WORKING|wrk|$mark" "$cache" 2>/dev/null || exit 0
   frame=$(( (frame + 1) % 10 ))
   printf '%s\n' "$frame" > "$frame_file"
   tmux send-keys -t "$sidebar" C-t 2>/dev/null || exit 0

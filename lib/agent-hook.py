@@ -19,6 +19,8 @@ spec.loader.exec_module(core)
 
 
 def normalized(kind, event, event_name=None):
+    if kind in ('agy', 'antigravity'):
+        kind = 'agy'
     name = (event_name if kind == 'agy' else
             event.get('hook_event_name') if kind in ('claude', 'gemini', 'cursor-agent') else event.get('type'))
     if not isinstance(name, str):
@@ -28,14 +30,16 @@ def normalized(kind, event, event_name=None):
             return 'working', name
         if name == 'PostInvocation' and 'invocationNum' in event:
             return 'working', name
-        if name == 'PostToolUse' and isinstance(event.get('toolCall'), dict):
+        if name == 'PostToolUse' and ('stepIdx' in event or isinstance(event.get('toolCall'), dict)):
             return 'working', name
-        if name == 'Stop' and isinstance(event.get('fullyIdle'), bool):
-            if not event['fullyIdle']:
+        if name == 'Stop':
+            if event.get('fullyIdle') is False:
                 return 'working', name
             if event.get('error') or event.get('terminationReason') in ('error', 'max_steps_exceeded'):
                 return 'interrupted', name
-            return 'turn-ended', name
+            if isinstance(event.get('fullyIdle'), bool) or 'executionNum' in event or 'terminationReason' in event:
+                return 'turn-ended', name
+            return None
         return None
     if kind == 'claude':
         mapping = {'SessionStart': 'ready', 'UserPromptSubmit': 'working',
@@ -204,6 +208,8 @@ def with_opencode_subagent_fields(event):
 
 
 def report(kind, event, event_name=None):
+    if kind in ('agy', 'antigravity'):
+        kind = 'agy'
     is_contract = kind == 'contract'
     if kind == 'contract':
         agent_kind = event.get('agent')
@@ -352,6 +358,8 @@ def report(kind, event, event_name=None):
 
 def main():
     kind = sys.argv[1] if len(sys.argv) > 1 else ''
+    if kind == 'antigravity':
+        kind = 'agy'
     agy_event = sys.argv[2] if kind == 'agy' and len(sys.argv) > 2 else ''
     # The adapter is observational. It never registers PreToolUse and never
     # returns a permission decision that could authorize a tool.
