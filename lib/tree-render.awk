@@ -31,7 +31,7 @@ $1 == "W" {
     s=$2; w=$3; key=s SUBSEP w
     if (seen_w[key]++) next
     windows[s,++nw[s]]=w; wi[key]=$4; wn[key]=$5; links[w]=$6; sync[w]=$7
-    wa[w]=$8+0; wb[w]=$9+0; wz[w]=$10+0
+    wa[w]=$8+0; wb[w]=$9+0; wz[w]=$10+0; w_zoomed[w]=$11+0
     sa[s]+=wa[w]; sb[s]+=wb[w]; sz[s]+=wz[w]
     if (wa[w] || wb[w] || wz[w]) unread_windows[s]++
 }
@@ -40,7 +40,7 @@ $1 == "P" {
     pw[p]=$3; pi[p]=$4; command[p]=$5; title[p]=$6; path[p]=$7; dead[p]=$8
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
     pane_pid[p]=$17; report_source[p]=$18; report_session[p]=$19; report_pid[p]=$20; report_status[p]=$21; report_updated[p]=$22
-    subagent_list[p]=$25
+    subagent_list[p]=$25; pane_zoomed[p]=($26+0 == 1)
     if (sidebar[p] != 1 && slot[p] != 1) {
         panes[$3,++np[$3]]=p
         if (pa[p] || pb[p] || pz[p]) unread_panes[$3]++
@@ -485,12 +485,12 @@ function places_panes(s,    wpos,wid,wkey,ppos,pid,place,gid,nplaces,gi,pidx,pco
             win_stem=dir_stem (wlast ? "   " : stem_mid)
             wt="W:" w ":" s
             wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : " ")
-            row(wt, dim dir_stem (wlast ? branch_end : branch_mid) reset " " fold_open (wm != " " ? mark(wm) " " : "") win_names[windex] reset, wt)
+            row(wt, dim dir_stem (wlast ? branch_end : branch_mid) reset " " fold_open (wm != " " ? mark(wm) " " : "") win_names[windex] (w_zoomed[w] ? " [Z]" : "") reset, wt)
             for (idx=win_first[windex]; idx<=win_last[windex]; idx++) {
                 p=place_pane[id, idx]; pt="P:" p
                 cmd=command[p]; icon=appicon(cmd)
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
-                line=lazy_prefix(win_stem, idx == win_last[windex] ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd hook_glyph(p)
+                line=lazy_prefix(win_stem, idx == win_last[windex] ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd (pane_zoomed[p] ? " " dim "[Z]" reset : "") hook_glyph(p)
                 row(pt, edge_colored(line, pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"), width-3), pt ":" s)
             }
         }
@@ -506,7 +506,7 @@ function pills_session(s, st,    wpos,w,key,wt,ppos,p,pt,shown,name,icon,mark,li
         shown=0
         for (ppos=1;ppos<=np[w];ppos++) if (visible_p[panes[w,ppos]]) shown++
         if (shown>1 || collapsed[wt]) {
-            row(wt, edge_count("  " dim wn[key] reset, collapsed[wt] ? shown "p" : "", width-2), wt)
+            row(wt, edge_count("  " dim wn[key] (w_zoomed[w] ? " [Z]" : "") reset, collapsed[wt] ? shown "p" : "", width-2), wt)
             if (collapsed[wt]) continue
         }
         for (ppos=1;ppos<=np[w];ppos++) {
@@ -515,7 +515,7 @@ function pills_session(s, st,    wpos,w,key,wt,ppos,p,pt,shown,name,icon,mark,li
             name=(agent_view && agent_kind[p] != "" ? agent_name(agent_kind[p]) : command[p])
             icon=appicon(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p])
             mark=(p == current_p && s == current_s ? green "●" reset : dead[p]==1 ? dim "×" reset : " ")
-            line=mark " " appcolor(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p]) icon reset " " name
+            line=mark " " appcolor(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p]) icon reset " " name (pane_zoomed[p] ? " " dim "[Z]" reset : "")
             note=pill_word(p)
             if (note == "" && (pa[p] || pb[p] || pz[p])) note="●"
             row(pt, edge_count(line, note, width-2), pt ":" s)
@@ -586,6 +586,7 @@ function title_detail(p,    value,limit,label) {
     if (density == "detailed") return " " pi[p] (value != "" ? " " value : "")
     if (value == "") return ""
     limit=width-25-length(command[p])
+    if (pane_zoomed[p]) limit-=4
     label=agent_label(p)
     if (label!="" && label!="stale") limit-=length(agent_status_word(label,width<36))+3
     if (density == "normal" && width<56 && width>=32)
@@ -684,6 +685,9 @@ function appicon(value, n, parts,key,override) {
 }
 END {
     if (ns == 0) exit
+    for (w in np) {
+        if (w_zoomed[w] && np[w] == 1) pane_zoomed[panes[w, 1]] = 1
+    }
     if (agent_view) find_agents()
     if (theme != "mono") {
         reset="\033[0m"; bold="\033[1m"; dim="\033[2m"
@@ -832,10 +836,10 @@ END {
             for (wpos=1;wpos<=nw[s];wpos++) {
                 w=windows[s,wpos]; key=s SUBSEP w; wt="W:" w ":" s
                 context=sname[s] ":" wi[key] ":" wn[key]
-                row(wt,"Window   " context,wt)
+                row(wt,"Window   " context (w_zoomed[w] ? " [Z]" : ""),wt)
                 for (ppos=1;ppos<=np[w];ppos++) {
                     p=panes[w,ppos]; pt="P:" p
-                    row(pt,"Pane     " context "." pi[p] "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] " " useful_title(p) "  " path[p] (dead[p] == 1 ? " [exited]" : ""),pt ":" s)
+                    row(pt,"Pane     " context "." pi[p] "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] (pane_zoomed[p] ? " [Z]" : "") " " useful_title(p) "  " path[p] (dead[p] == 1 ? " [exited]" : ""),pt ":" s)
                 }
             }
         }
@@ -853,7 +857,7 @@ END {
             continue
         }
         session_glyph=(show_session_glyph ? dim session_icon reset " " : "")
-        session_style=(s == current_s ? bold : "")
+        session_style=(sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim (s == current_s ? bold : "") : (s == current_s ? bold : ""))
         row(st,edge_colored((collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset, sm == "●" ? green "▶" reset : "", width-3),st)
         if (collapsed[st]) continue
         if (appearance == "places") { places_panes(s); continue }
@@ -869,6 +873,7 @@ END {
             collapsed_count=(!agent_view && !filtered && collapsed[wt] && np[w]>1 ? np[w] "p" : "")
             if (links[w]>=2) meta=meta " linked:" links[w]
             if (sync[w]=="on") meta=meta " SYNC"
+            if (w_zoomed[w]) meta=meta " [Z]"
             window_glyph=(show_window_glyph ? dim window_icon reset " " : "")
             window_style=(w == current_w && s == current_s ? bold : "")
             if (!agent_view && compact_single && np[w] == 1 && shown_p[w] == 1) {
@@ -907,6 +912,7 @@ END {
                 duration=(appearance == "pills" ? pill_word(p) : appearance == "lazygit" ? quiet_mark(compact_label) : compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
                 display_command=(agent_view ? agent_name(agent_kind[p]) : command[p])
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
+                zoom_badge=(pane_zoomed[p] ? " " dim "[Z]" reset : "")
                 if (appearance == "lazygit")
                     prefix=lazy_prefix(stem, visible_ppos == shown_p[w] ? branch_end : branch_mid, pm, appcolor(agent_view ? agent_kind[p] : command[p]), icon)
                 else prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " (pm == "●" ? " " : mark(pm)) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
@@ -914,14 +920,14 @@ END {
                 pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-text_width(icon)) : "")
                 if (nul && density != "compact") {
                     inline_path=(density == "normal" && width<56 && pane_path != "" ? " " path_color pane_path reset : "")
-                    primary=edge_colored(prefix " " display_command agent_badge(p) status_mark(duration) dim details reset inline_path,pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"),width-3)
+                    primary=edge_colored(prefix " " display_command zoom_badge agent_badge(p) status_mark(duration) dim details reset inline_path,pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"),width-3)
                     continuation=dim stem (visible_ppos == shown_p[w] ? "   " : stem_mid) reset sprintf("%*s",3+text_width(icon),"")
                     secondary=continuation path_color pane_path reset
                     row(pt,primary (show_path && pane_path != "" && (density == "detailed" || width>=56) ? "\n" secondary : "") subagent_lines(p,continuation),pt ":" s)
                 } else {
                     # Legacy newline consumers stay one line per object.
                     path_text=(show_path && pane_path != "" ? " " path_color pane_path reset : "")
-                    row(pt,edge_colored(prefix " " display_command agent_badge(p) status_mark(duration) path_text dim details reset,pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"),width-3),pt ":" s)
+                    row(pt,edge_colored(prefix " " display_command zoom_badge agent_badge(p) status_mark(duration) path_text dim details reset,pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●"),width-3),pt ":" s)
                 }
             }
         }

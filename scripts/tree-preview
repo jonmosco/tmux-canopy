@@ -21,7 +21,7 @@ case "$token" in
     tmux display-message -p -t "$target" \
       "Session: #{${clean}:session_name} · #{session_windows}w · #{session_attached} clients"$'\nWindows' 2>/dev/null
     tmux list-windows -t "$target" -F \
-      "#{?window_active,●,○} #{window_index}:#{${clean}:window_name}  #{window_panes} panes$window_notices" 2>/dev/null
+      "#{?window_active,●,○} #{window_index}:#{${clean}:window_name}  #{window_panes} panes#{?window_zoomed_flag, [Z],}$window_notices" 2>/dev/null
     ;;
 
   W:*)
@@ -29,10 +29,10 @@ case "$token" in
     target="${window_body%%:*}"
     [[ "$window_body" != *:* ]] || target="${window_body#*:}:$target"
     tmux display-message -p -t "$target" \
-      "Window: #{${clean}:session_name}:#{window_index} #{${clean}:window_name}"$'\n'"#{window_width}x#{window_height} · #{window_panes} panes · #{window_linked_sessions} links$window_notices" 2>/dev/null
+      "Window: #{${clean}:session_name}:#{window_index} #{${clean}:window_name}"$'\n'"#{window_width}x#{window_height} · #{window_panes} panes · #{window_linked_sessions} links#{?window_zoomed_flag, · zoomed,}$window_notices" 2>/dev/null
     tmux list-panes -t "$target" \
       -f '#{&&:#{!=:#{@tmux_canopy},1},#{!=:#{@tmux_canopy_slot},1}}' -F \
-      "#{?pane_active,●,·} #{pane_id}  #{${clean}:pane_current_command}$pane_notices  #{${clean}:pane_current_path}" 2>/dev/null
+      "#{?pane_active,●,·} #{pane_id}  #{${clean}:pane_current_command}#{?#{&&:#{window_zoomed_flag},#{pane_active}}, [Z],}$pane_notices  #{${clean}:pane_current_path}" 2>/dev/null
     ;;
 
   P:*)

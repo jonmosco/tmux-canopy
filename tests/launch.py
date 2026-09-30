@@ -123,7 +123,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             wait(lambda: len(sidebars()) == 1, 'sidebar creation')
             side = sidebars()[0]
             script_env['TMUX_PANE'] = side
-            wait(lambda: loads.stat().st_size >= 1, 'initial UI load')
+            wait(lambda: loads.stat().st_size >= 1 or '[Tree]' in tm('capture-pane', '-p', '-t', side), 'initial UI load')
             assert display(side, '#{pane_in_mode}') == '0'
             return side
 
@@ -159,10 +159,11 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env | {'TMUX': display(pane, '#{socket_path},#{pid},0'), 'TMUX_PANE': pane,
                                 'TMUX_CANOPY_STATE': str(state), 'TMPDIR': str(tmpdir),
-                                'PATH': str(binary_dir) + ':' + env['PATH']}
+                                'PATH': str(binary_dir) + ':' + env['PATH'],
+                                'TMUX_CANOPY_FZF_BINARY': str(wrapper)}
             ambient = '--bind=start:execute-silent(touch ' + str(marker) + ')+abort --height=3'
             script_env.update(FZF_DEFAULT_OPTS=ambient, FZF_DEFAULT_OPTS_FILE=str(defaults), SHELL='/bin/false')
-            for key in ('PATH', 'FZF_DEFAULT_OPTS', 'FZF_DEFAULT_OPTS_FILE', 'SHELL', 'TMPDIR'):
+            for key in ('PATH', 'FZF_DEFAULT_OPTS', 'FZF_DEFAULT_OPTS_FILE', 'SHELL', 'TMPDIR', 'TMUX_CANOPY_FZF_BINARY'):
                 tm('set-environment', '-g', key, script_env[key])
             sp.run([str(project / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=20)
             literal = 'START "double" \'single\' $literal #{version} 中文\nsecond\tfield END'
@@ -378,7 +379,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             mode.write_text('ok')
             loads.write_text('')
             os.write(master, b'\x02T')
-            wait(lambda: len(sidebars()) == 1 and loads.stat().st_size >= 1, 'native toggle binding')
+            wait(lambda: len(sidebars()) == 1 and (loads.stat().st_size >= 1 or '[Tree]' in tm('capture-pane', '-p', '-t', sidebars()[0])), 'native toggle binding')
             sidebar = sidebars()[0]
             assert display(sidebar, '#{pane_in_mode}') == '0'
             os.write(master, b'\x02T')

@@ -118,6 +118,22 @@ def main():
                    ('├─' if icons != 'ascii' else '|-') in window_row, window_row
             if icons != 'ascii':
                 assert '\x1b[1;36m' in rows['S:$0'][1], rows['S:$0']  # cyan fold
+
+        records_zoom = [
+            ['D', 'unicode', 'none', 'ansi', 'normal', '', '', '', '%0', '@0', '$0', '42', 'host'],
+            ['S', '$0', 'test', '0'],
+            ['W', '$0', '@0', '0', 'tools', '1', 'off', '', '', '', '1'],
+            ['P', '%0', '@0', '0', 'bash', '', '/test', '0', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '1'],
+            ['P', '%1', '@0', '1', 'nvim', '', '/test', '0', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '0'],
+        ]
+        res_zoom = subprocess.run(['awk', '-v', 'stable=1', '-v', 'header=1', '-f',
+                                   str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
+                                  input='\n'.join('\x1f'.join(r) for r in records_zoom) + '\n',
+                                  text=True, capture_output=True, env=env, check=True)
+        rows_zoom = {parts[0]: parts for line in res_zoom.stdout.splitlines() if (parts := line.split('\t'))}
+        assert '[Z]' in rows_zoom['W:@0:$0'][1], rows_zoom['W:@0:$0']
+        assert '[Z]' in rows_zoom['P:%0'][1], rows_zoom['P:%0']
+        assert '[Z]' not in rows_zoom['P:%1'][1], rows_zoom['P:%1']
     print('ok - command-aware icon colors, active green marker, all glyph themes and monochrome output')
     print('ok - lazygit appearance header, structural glyphs, and rounded branches')
 

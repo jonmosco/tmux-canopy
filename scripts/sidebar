@@ -32,6 +32,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 0' INT TERM HUP
 
+stty status undef discard undef 2>/dev/null || true
 sidebar_ui_options "${TMUX_PANE:-}"
 "$SCRIPT_DIR/sidebar-source" --stable | env -u FZF_DEFAULT_OPTS -u FZF_DEFAULT_OPTS_FILE -u FZF_DEFAULT_COMMAND "${TMUX_CANOPY_FZF_BINARY:-fzf}" "${SIDEBAR_FZF_ARGS[@]}"
 statuses=("${PIPESTATUS[@]}")

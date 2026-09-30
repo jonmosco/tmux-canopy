@@ -221,13 +221,64 @@ run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='cl
 assert_eq "$first_index" "$("${TMUX_TEST[@]}" display-message -p -t "$pane_ops_second" '#{pane_index}')" 'pane-up swaps panes natively'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' zoom 'P:$pane_ops_second'"
 assert_eq '1' "$("${TMUX_TEST[@]}" display-message -p -t "$pane_ops_second" '#{window_zoomed_flag}')" 'zoom action zooms the selected pane'
+zoom_file="$(mktemp)"
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/tree-source' > '$zoom_file'"
+grep -Fq '[Z]' "$zoom_file" || fail 'zoomed window and pane display [Z] badge in tree-source'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' zoom 'P:$pane_ops_second'"
+assert_eq '0' "$("${TMUX_TEST[@]}" display-message -p -t "$pane_ops_second" '#{window_zoomed_flag}')" 'zoom action unzooms the selected pane'
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/tree-source' > '$zoom_file'"
+! grep -Fq '[Z]' "$zoom_file" || fail 'unzoomed window removes [Z] badge'
+rm -f "$zoom_file"
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' zoom 'W:$pane_ops_window:\$0'"
+assert_eq '1' "$("${TMUX_TEST[@]}" display-message -p -t "$pane_ops_second" '#{window_zoomed_flag}')" 'zoom action zooms the window active pane'
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' zoom 'W:$pane_ops_window:\$0'"
+assert_eq '0' "$("${TMUX_TEST[@]}" display-message -p -t "$pane_ops_second" '#{window_zoomed_flag}')" 'zoom action unzooms the window active pane'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' layout 'W:$pane_ops_window:\$0' even-horizontal"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' sync-confirm 'W:$pane_ops_window:\$0'"
 assert_eq 'on' "$("${TMUX_TEST[@]}" show-window-option -v -t "$pane_ops_window" synchronize-panes)" 'sync confirmation enables synchronized panes'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' sync-toggle 'W:$pane_ops_window:\$0'"
 assert_eq 'off' "$("${TMUX_TEST[@]}" show-window-option -v -t "$pane_ops_window" synchronize-panes)" 'sync toggle disables broadcasting without confirmation'
 printf 'ok - zooms, swaps, lays out, and synchronizes panes\n'
+
+# Break pane into dedicated window
+break_target="$("${TMUX_TEST[@]}" split-window -d -h -t "$pane_ops" -P -F '#{pane_id}')"
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' break-window 'P:$break_target'"
+assert_eq '1' "$("${TMUX_TEST[@]}" display-message -p -t "$break_target" '#{window_panes}')" 'break-window moves pane into a dedicated window'
+
+# Toggle status bar preserves native experience and toggles cleanly
+initial_status="$("${TMUX_TEST[@]}" show-option -gv status)"
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' toggle-status"
+assert_eq 'off' "$("${TMUX_TEST[@]}" show-option -gv status)" 'toggle-status turns status bar off'
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' toggle-status"
+assert_eq "$initial_status" "$("${TMUX_TEST[@]}" show-option -gv status)" 'toggle-status restores status bar'
+printf 'ok - breaks pane to window and toggles status bar\n'
+
+# When a window has multiple content panes and they are all closed but one,
+# the remaining window is resized so the sidebar stays its original size.
+expected_dock_width="$("${TMUX_TEST[@]}" show-option -gqv @tmux_canopy_runtime_width)"
+: "${expected_dock_width:=42}"
+expected_content_width=$((160 - expected_dock_width - 1))
+
+balance_win="$("${TMUX_TEST[@]}" new-window -d -t test -P -F '#{window_id}' -n 'balance-test')"
+balance_content="$("${TMUX_TEST[@]}" list-panes -t "$balance_win" -F '#{pane_id}' | head -n 1)"
+balance_sidebar="$("${TMUX_TEST[@]}" split-window -b -f -h -l "$expected_dock_width" -t "$balance_content" -P -F '#{pane_id}')"
+"${TMUX_TEST[@]}" set-option -p -t "$balance_sidebar" @tmux_canopy 1
+# Split content pane horizontally
+balance_split="$("${TMUX_TEST[@]}" split-window -d -h -t "$balance_content" -P -F '#{pane_id}')"
+# Kill the first content pane (adjacent to sidebar) which would natively expand sidebar to ~101
+"${TMUX_TEST[@]}" kill-pane -t "$balance_content"
+sleep 0.3
+assert_eq "$expected_dock_width" "$("${TMUX_TEST[@]}" display-message -p -t "$balance_sidebar" '#{pane_width}')" 'closing content pane keeps sidebar at original size'
+assert_eq "$expected_content_width" "$("${TMUX_TEST[@]}" display-message -p -t "$balance_split" '#{pane_width}')" 'remaining window is resized to fill remaining width'
+# Test natural process exit: split again and exit
+"${TMUX_TEST[@]}" split-window -d -h -t "$balance_split" 'exit 0'
+sleep 0.3
+assert_eq "$expected_dock_width" "$("${TMUX_TEST[@]}" display-message -p -t "$balance_sidebar" '#{pane_width}')" 'natural pane exit preserves original sidebar size'
+assert_eq "$expected_content_width" "$("${TMUX_TEST[@]}" display-message -p -t "$balance_split" '#{pane_width}')" 'remaining window stays full width after natural exit'
+"${TMUX_TEST[@]}" kill-window -t "$balance_win"
+printf 'ok - resizes remaining window and preserves original sidebar size when panes close\n'
+
+
 
 # Dead-pane respawn is permitted without exposing forced live-pane respawn.
 "${TMUX_TEST[@]}" set-window-option -t "$pane_ops_window" remain-on-exit on

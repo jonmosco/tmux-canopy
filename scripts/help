@@ -50,6 +50,8 @@ help_records() {
 
   section 'Manage'
   key 'a' 'Open actions for the selected object'
+  key 'z' 'Toggle zoom on the selected pane or window'
+  key 'b' 'Break selected pane into its own window'
   key 'r' 'Rename a session or window'
   key 'x, then x' 'Confirm deletion of a pane, window or session'
   key 'a, then D' 'Open diagnostics'
@@ -64,7 +66,8 @@ help_records() {
   key 's' 'Split into stacked panes'
   key 'v' 'Split into panes side by side'
   key 't' 'Create a window in the selected session'
-  key 'Shift-s' 'Create a new session'
+  key 'Shift-s' 'Create an unnamed session (session-N)'
+  key 'Shift-n' 'Create a named session with a prompt'
   note "New objects use the selected pane's working directory."
 
   section 'Move'
@@ -157,6 +160,7 @@ legend_records() {
   legend_item '✕' 'Deletion waiting for confirmation.' amber
   legend_item 'linked:2' 'Window is linked into two sessions.' dim
   legend_item 'SYNC' 'Synchronized input is on for this window.' dim
+  legend_item '[Z]' 'Window is in zoom mode, or pane is zoomed to full size.' dim
   if [[ "$agents_enabled" == on ]]; then
     legend_item '[2 agents]' 'Two detected agent panes in this window, shown in Agents view.' dim
     note 'Agent icons, unread badges, and [process] do not establish whether an agent is working or waiting. Press i for the agent drawer.'

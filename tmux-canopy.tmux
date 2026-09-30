@@ -174,6 +174,8 @@ tmux set-hook -gu 'client-resized[9003]' 2>/dev/null || true
 tmux set-hook -gu 'after-resize-window[9003]' 2>/dev/null || true
 tmux set-hook -gu 'after-rename-session[9003]' 2>/dev/null || true
 tmux set-hook -gu 'after-rename-window[9003]' 2>/dev/null || true
+tmux set-hook -gu 'window-layout-changed[9005]' 2>/dev/null || true
+tmux set-hook -gu 'window-layout-changed[9007]' 2>/dev/null || true
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
   tmux set-hook -gu "${focus_hook}[9004]" 2>/dev/null || true
 done
@@ -231,6 +233,9 @@ empty_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?$(sidebar_empty_win
 tmux set-hook -g 'window-layout-changed[9005]' \
   "if-shell -F $(tmux_quote "$empty_event") $(tmux_quote "$(plugin_job -b reap-empty)")"
 tmux set-hook -g 'window-unlinked[9005]' "$(plugin_job -b reap-empty)"
+balance_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?#{==:#{P:#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},,1}},1},1,},}}}"
+tmux set-hook -g 'window-layout-changed[9007]' \
+  "if-shell -F $(tmux_quote "$balance_event") $(tmux_quote "$(plugin_job -b balance-window '#{hook_window}')")"
 tmux set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
 # Native and Canopy splits must repaint the tree immediately; waiting for a
 # later select-pane leaves the new pane missing until focus moves again.
