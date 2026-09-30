@@ -19,16 +19,6 @@ plugin_job() {
   printf 'run-shell %s %s' "$flag" "$(tmux_quote "$(plugin_command "$@")")"
 }
 
-# Import settings from the previous project name once per option. Explicit
-# canopy options (including empty values) always take precedence.
-while read -r legacy_option _legacy_value; do
-  [[ "$legacy_option" == @tmux-tree-sidebar-* ]] || continue
-  canopy_option="@tmux-canopy-${legacy_option#@tmux-tree-sidebar-}"
-  if [[ -z "$(tmux show-option -gq "$canopy_option")" ]]; then
-    tmux set-option -gq "$canopy_option" "$(tmux show-option -gqv "$legacy_option")"
-  fi
-done < <(tmux show-options -g)
-
 sidebar_key="$(tmux show-option -gqv @tmux-canopy-key)"
 sidebar_width="$(tmux show-option -gqv @tmux-canopy-width)"
 sidebar_scope="$(tmux show-option -gqv @tmux-canopy-scope)"

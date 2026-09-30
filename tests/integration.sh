@@ -44,18 +44,12 @@ printf 'ok - renders built-in quick help\n'
 "${TMUX_TEST[@]}" set-option -g base-index 1
 "${TMUX_TEST[@]}" set-window-option -g pane-base-index 1
 "${TMUX_TEST[@]}" move-window -s test:0 -t test:1
-# Existing installations retain settings; explicit Canopy options win.
-"${TMUX_TEST[@]}" set-option -g @tmux-tree-sidebar-width 37
-"${TMUX_TEST[@]}" set-option -g @tmux-tree-sidebar-preview off
 "${TMUX_TEST[@]}" set-option -g @tmux-canopy-width 42
 "${TMUX_TEST[@]}" set-option -g @tmux-canopy-scope global
 "${TMUX_TEST[@]}" set-option -g @tmux-canopy-transition slot
 "${TMUX_TEST[@]}" set-option -g @tmux-canopy-notifications none
-run_in_server test:1 "'$PROJECT_DIR/tmux-tree-sidebar.tmux'"
-assert_eq '42' "$("${TMUX_TEST[@]}" show-option -gqv @tmux-canopy-width)" 'Canopy setting takes precedence over legacy setting'
-assert_eq 'off' "$("${TMUX_TEST[@]}" show-option -gqv @tmux-canopy-preview)" 'legacy launcher imports existing settings'
+run_in_server test:1 "'$PROJECT_DIR/tmux-canopy.tmux'"
 "${TMUX_TEST[@]}" set-option -gu @tmux-canopy-notifications
-printf 'ok - legacy launcher migrates settings without overriding Canopy options\n'
 
 "${TMUX_TEST[@]}" split-window -h -t test:1
 "${TMUX_TEST[@]}" split-window -v -t test:1.1
