@@ -170,7 +170,7 @@ A sidebar with agent mode on, two Claude Code sessions, and a folded session:
 | ⑨ | **Subagents** of the pane above, with their state and age. They disappear when they finish. | |
 | ⑩ | **Unread output** (amber `●`); a bell or a silence alert has its own mark. | `u` clear, `U` clear all |
 | ⑪ | **Folded session**, with the number of windows inside. | `l` unfold |
-| ⑫ | **Agent footer:** every agent on the server, whatever the tree's filters and folds. | `n` jump to the one waiting |
+| ⑫ | **Footer.** With agent mode on, every agent on the server, whatever the tree's filters and folds. With it off, your sessions, windows, and panes (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`), shown as visible/total while a filter hides some. | `n` jump to the agent waiting, `f` hide or show |
 
 Press `g` in the sidebar for every symbol and color, and `?` for every key.
 
@@ -198,6 +198,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `Ctrl-g` | Search all sessions, windows and panes, including collapsed branches |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
 | `p` / `P` | Toggle preview / open enlarged terminal preview |
+| `f` | Show / hide the footer |
 | `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |
 | `?` | Scrollable help popup |

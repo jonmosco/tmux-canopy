@@ -106,9 +106,9 @@ try:
         assert plain(footer.read_text()) == 'Agents  ▷ 1\n', footer.read_text()
         tm('set-option', '-g', '@tmux-canopy-agents', 'off')
         sidebar_source()
-        assert footer.read_text() == '\n', 'agent mode off hides the footer'
+        assert 'Agents' not in footer.read_text() and 'session' in footer.read_text(), footer.read_text()
         tm('set-option', '-g', '@tmux-canopy-agents', 'on')
-        print('ok - the Tree view footer summarizes every agent and hides without agent mode')
+        print('ok - the Tree view footer summarizes every agent, and the workspace without agent mode')
 
         # The default appearance (places, folders and icons) and pills draw the
         # same child lines; the plugin sets this option, so set it as it does.

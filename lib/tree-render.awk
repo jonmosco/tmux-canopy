@@ -6,6 +6,7 @@ FILENAME == ARGV[1] {
     else if (state[1] == "LINK" && link == "") link=state[2]
     else if (state[1] == "DELETE" && now-state[3] <= 5) del=state[2]
     else if (state[1] == "FILTER") { filter_set=1; filter=state[2] }
+    else if (state[1] == "FOOTER") footer_hidden=(state[2] == "off")
     else if (state[1] == "FILTER_WINDOW") { window_set=1; window_filter=state[2] }
     else if (state[1] == "FILTER_TITLE") { title_set=1; title_filter=state[2] }
     else if (state[1] ~ /^([SW]:|DIR:)/) collapsed[state[1]]=1
@@ -298,6 +299,42 @@ function footer_add(glyph,count,color, space) {
     space=(footer_plain == "" ? "" : "  ")
     footer_plain=footer_plain space glyph " " count
     footer_color=footer_color space color glyph reset " " count
+}
+# Without agent mode, the Tree view's footer summarizes the workspace instead:
+# sessions, windows, and content panes, each counted once (linked windows,
+# sidebars, and reserve panes excluded). A tree filter shows visible/total.
+function workspace_footer( si,s,wpos,w,ppos,p,sessions_n,windows_n,panes_n,sessions_v,windows_v,panes_v,seen_w,seen_p,full,short,text) {
+    for (si=1;si<=ns;si++) {
+        s=sessions[si]
+        sessions_n++
+        if (visible_s[s]) sessions_v++
+        for (wpos=1;wpos<=nw[s];wpos++) {
+            w=windows[s,wpos]
+            if (!np[w]) continue
+            if (!(w in seen_w)) { seen_w[w]=0; windows_n++ }
+            if (visible_w[s SUBSEP w] && !seen_w[w]) { seen_w[w]=1; windows_v++ }
+            for (ppos=1;ppos<=np[w];ppos++) {
+                p=panes[w,ppos]
+                if (p in seen_p) continue
+                seen_p[p]=1; panes_n++
+                if (visible_p[p]) panes_v++
+            }
+        }
+    }
+    if (!sessions_n) return
+    full=footer_count(session_icon, sessions_v, sessions_n, "session") "  " \
+        footer_count(window_icon, windows_v, windows_n, "window") "  " \
+        footer_count(pane_icon, panes_v, panes_n, "pane")
+    short=footer_count(session_icon, sessions_v, sessions_n, "") "  " \
+        footer_count(window_icon, windows_v, windows_n, "") "  " \
+        footer_count(pane_icon, panes_v, panes_n, "")
+    text=(text_width(full) <= width-4 ? full : short)
+    row("F:", dim text reset, "F:")
+}
+# "◈ 3 sessions", or "◈ 1/3 sessions" while a tree filter hides some.
+function footer_count(icon, shown, total, noun,    count) {
+    count=(filtered && shown != total ? shown "/" total : total)
+    return icon " " count (noun == "" ? "" : " " noun (total == 1 ? "" : "s"))
 }
 function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,count) {
     overview_plain=""; overview_color=""
@@ -940,7 +977,10 @@ END {
         }
         row("H:",header_text (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
         }
-        if (!agent_view && agents_enabled) agent_footer()
+        if (!agent_view && !footer_hidden) {
+            if (agents_enabled) agent_footer()
+            else workspace_footer()
+        }
     }
     # A separate flat inventory ignores presentation folds without editing state.
     # Every linked occurrence retains its session, including pane targets.
