@@ -92,6 +92,7 @@ With agent mode on, Canopy finds agents running in any pane of any session and s
 - **Agents view (`4`):** only the sessions, windows, and panes that contain an agent, with a summary such as `◆1 ▷2` in the header.
 - **Status on every agent pane:** working (an animated `▷`) and needs input (`!`). Folded windows and sessions roll these up as `◆` and `▷` counts.
 - **Subagents:** listed under their parent pane while they run, each with its own status.
+- **Summary footer:** the bottom of the Tree view counts every agent on the server, such as `Agents ◆1 ▷2`, so you can see who needs you without leaving your place in the tree.
 - **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
 - **Summary drawer (`i`):** the selected agent's state, its age, and the pending request when the agent reports one.
 

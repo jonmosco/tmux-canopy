@@ -252,6 +252,37 @@ function overview_add(glyph,count,color, space) {
     overview_plain=overview_plain space glyph count
     overview_color=overview_color space color glyph count reset
 }
+# The Tree view's footer: every agent pane on the server, whatever the tree's
+# filters and folds, counted like the Agents header. sidebar-source moves this
+# record into fzf's footer; nothing is emitted when no agent is running.
+function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,seen,hint) {
+    for (si=1;si<=ns;si++) {
+        s=sessions[si]
+        for (wpos=1;wpos<=nw[s];wpos++) {
+            w=windows[s,wpos]
+            for (ppos=1;ppos<=np[w];ppos++) {
+                p=panes[w,ppos]
+                if ((p in seen) || dead[p] == 1 || canonical_agent(command[p]) == "") continue
+                seen[p]=1; total++
+                label=agent_label(p)
+                load_subagents(p)
+                if (label == "approval" || label == "interrupted" || sub_need[p]) need++
+                else if (label == "working" || sub_work[p]) work++
+                else if (label == "ready" || label == "turn ended" || label == "session ended") settled++
+                else unknown++
+            }
+        }
+    }
+    if (!total) return
+    overview_plain=""; overview_color=""
+    overview_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
+    overview_add(agent_work_badge,work,accent)
+    overview_add(agent_done_badge,settled,dim)
+    overview_add(icons == "ascii" ? "o" : "○",unknown,dim)
+    # The jump hint appears only when it fits beside the counts.
+    hint=(need && text_width("Agents " overview_plain "  n jumps to input") <= width-4 ? dim "  n jumps to input" reset : "")
+    row("F:", dim "Agents" reset " " overview_color hint, "F:")
+}
 function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,count) {
     overview_plain=""; overview_color=""
     for (p in agent_kind) {
@@ -893,6 +924,7 @@ END {
         }
         row("H:",header_text (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
         }
+        if (!agent_view && agents_enabled) agent_footer()
     }
     # A separate flat inventory ignores presentation folds without editing state.
     # Every linked occurrence retains its session, including pane targets.

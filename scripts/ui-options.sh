@@ -53,7 +53,7 @@ sidebar_ui_options() {
     --color="$fzf_colors" --delimiter=$'\t' --with-nth=2 --nth=1..
     --no-sort --track --id-nth=3 --disabled --layout=reverse --border=none
     --gutter=' ' --scrollbar="$scrollbar"
-    --no-input --info=hidden --no-separator --prompt="$prompt" --pointer="$pointer" --marker="$marker" --header-lines=1
+    --footer-border=line --no-input --info=hidden --no-separator --prompt="$prompt" --pointer="$pointer" --marker="$marker" --header-lines=1
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'
@@ -63,7 +63,9 @@ sidebar_ui_options() {
     --bind="ctrl-f:execute-silent($filter_cmd)"
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
-    --bind='load:+execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.ready")+change-header-lines(0)+change-header-lines(1)'
+    # The same shell shows the agent summary sidebar-source stored for this
+    # load; an empty one hides the footer and its separator.
+    --bind='load:+transform([ -n "$TMUX_CANOPY_STATE" ] || exit 0; touch "$TMUX_CANOPY_STATE.ready"; f=; [ -r "$TMUX_CANOPY_STATE.footer" ] && IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; printf "change-footer:%s" "$f")+change-header-lines(0)+change-header-lines(1)'
     --bind='/:execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.search")+show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
     --bind='esc:execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
     # Help owns a separate popup terminal; keep the current sidebar painted.

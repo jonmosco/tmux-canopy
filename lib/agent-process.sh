@@ -154,7 +154,10 @@ canopy_process_identity() {
   # ancestor (see canopy_load_ps_snapshot above).
   canopy_load_ps_snapshot
   canopy_agent_name_matches "${CANOPY_COMM[$pid]:-}" "$kind" || return 1
-  [[ "${CANOPY_LSTART[$pid]:-}" == "$birth" ]] || return 1
+  # ps pads single-digit days ("Oct  1"); the snapshot keeps single spaces.
+  local -a birth_fields
+  read -ra birth_fields <<< "$birth"
+  [[ "${CANOPY_LSTART[$pid]:-}" == "${birth_fields[*]}" ]] || return 1
   current=$pid
   while ((depth++ < 128)); do
     [[ $current == "$root" ]] && return 0
