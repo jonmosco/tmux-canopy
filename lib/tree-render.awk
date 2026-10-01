@@ -274,14 +274,30 @@ function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,
         }
     }
     if (!total) return
-    overview_plain=""; overview_color=""
-    overview_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
-    overview_add(agent_work_badge,work,accent)
-    overview_add(agent_done_badge,settled,dim)
-    overview_add(icons == "ascii" ? "o" : "○",unknown,dim)
+    # The footer has room the header lacks: "◆ 1  ▷ 2" reads more easily than
+    # "◆1 ▷2". Fall back to the header's compact form when it would not fit.
+    footer_plain=""; footer_color=""
+    footer_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
+    footer_add(agent_work_badge,work,accent)
+    footer_add(agent_done_badge,settled,dim)
+    footer_add(icons == "ascii" ? "o" : "○",unknown,dim)
+    if (text_width("Agents  " footer_plain) > width-4) {
+        overview_plain=""; overview_color=""
+        overview_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
+        overview_add(agent_work_badge,work,accent)
+        overview_add(agent_done_badge,settled,dim)
+        overview_add(icons == "ascii" ? "o" : "○",unknown,dim)
+        footer_plain=overview_plain; footer_color=overview_color
+    }
     # The jump hint appears only when it fits beside the counts.
-    hint=(need && text_width("Agents " overview_plain "  n jumps to input") <= width-4 ? dim "  n jumps to input" reset : "")
-    row("F:", dim "Agents" reset " " overview_color hint, "F:")
+    hint=(need && text_width("Agents  " footer_plain "   n jumps to input") <= width-4 ? dim "   n jumps to input" reset : "")
+    row("F:", dim "Agents" reset "  " footer_color hint, "F:")
+}
+function footer_add(glyph,count,color, space) {
+    if (!count) return
+    space=(footer_plain == "" ? "" : "  ")
+    footer_plain=footer_plain space glyph " " count
+    footer_color=footer_color space color glyph reset " " count
 }
 function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,count) {
     overview_plain=""; overview_color=""
