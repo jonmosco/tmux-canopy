@@ -21,7 +21,7 @@
 
 ### Added
 
-- With agent mode on, a footer at the bottom of the Tree view counts every agent on the server (`Agents ◆1 ▷2`) and reminds you that `n` jumps to the one waiting. It lives only in the sidebar; your status line is untouched.
+- With agent mode on, a footer at the bottom of the Tree view counts every agent on the server (`Agents ◆1 ▷2`) and reminds you that `n` jumps to the one waiting. Without agent mode, the footer counts your sessions, windows, and panes instead (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`), showing visible/total while a tree filter hides some. Press `f` to hide or show it, or set `@tmux-canopy-footer 'off'`. It lives only in the sidebar; your status line is untouched.
 - OpenCode's adapter loads in V2 as well as V1. It subscribes to the public event stream and observes prompt, tool, and permission hooks without approving a request or blocking a tool. Reinstall with `canopy integration install opencode` and restart OpenCode.
 - Pi and Oh My Pi adapters report tool execution, extension UI prompts as needs-input, and aborted or errored settles as interrupted. Reinstall with `canopy integration install pi` (and `omp`) so the extension file is replaced.
 - Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.

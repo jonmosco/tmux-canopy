@@ -98,6 +98,14 @@ case "$action" in
   view-agents)
     canopy_agents_enabled && set_view agents
     ;;
+  toggle-footer)
+    # Per sidebar, in its private state; the renderer reads it on every refresh.
+    footer="$(awk -F '\t' '$1 == "FOOTER" { print $2; exit }' "$state_file" 2>/dev/null)"
+    tmp="$(mktemp "${state_file}.XXXXXX")"
+    awk -F '\t' '$1 != "FOOTER"' "$state_file" > "$tmp" 2>/dev/null || true
+    [[ "$footer" == off ]] && printf 'FOOTER\ton\n' >> "$tmp" || printf 'FOOTER\toff\n' >> "$tmp"
+    mv "$tmp" "$state_file"
+    ;;
   toggle-agents)
     client="$(canopy_agents_client)"
     [[ -n "$client" ]] || exit 0

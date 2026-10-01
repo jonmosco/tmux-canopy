@@ -295,6 +295,13 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             sidebar = open_sidebar()
             parent = display(sidebar, '#{pane_pid}')
             ui_pid = sp.check_output(['pgrep', '-P', parent, '-x', 'fzf'], text=True).strip()
+            # Opening moves the pointer to the current pane with a reload, and
+            # fzf ignores keys while a reload-sync runs. Let loads settle first.
+            def loads_settled():
+                count = loads.stat().st_size
+                time.sleep(.3)
+                return count > 0 and loads.stat().st_size == count
+            wait(loads_settled, 'sidebar loads settle')
             tm('send-keys', '-t', sidebar, '/')
             wait(lambda: tm('capture-pane', '-p', '-t', sidebar).startswith('search'), 'search mode')
             tm('send-keys', '-t', sidebar, '-l', 'bash')

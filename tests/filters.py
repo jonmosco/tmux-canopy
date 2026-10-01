@@ -53,7 +53,8 @@ def snapshots():
             return rows
 
         def ids(rows):
-            return [row[2] for row in rows]
+            # The footer record (F:) becomes fzf's footer, not a list row.
+            return [row[2] for row in rows if row[0] != 'F:']
 
         all_ids = ids(render())
         assert 'P:%0:$0' in all_ids and 'P:%1:$1' in all_ids and 'P:%90:$0' not in all_ids

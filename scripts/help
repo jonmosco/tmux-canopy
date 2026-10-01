@@ -41,6 +41,7 @@ help_records() {
   key '2' 'Processes grouped by their pane'
   key '3' 'Paste buffers; Enter pastes into the target pane'
   key 'Shift-a' 'Turn agent mode on or off for this client; Tree stays on 1'
+  key 'f' 'Show or hide the Tree view footer (agent or workspace summary) in this sidebar'
   [[ "$agents_enabled" != on ]] || key '4' 'Detected agent panes, grouped by session and window'
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
   [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'
@@ -158,6 +159,10 @@ legend_records() {
     legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
     note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
     note 'Hook labels require a matching live agent process, pane PID, session, and recent report. Screen hints appear only in the drawer and say unverified.'
+  fi
+
+  if [[ "$agents_enabled" != on ]]; then
+    legend_item '◈ 3  ▣ 8  ▹ 14' 'Tree view footer: sessions, windows, and panes. A filter shows visible/total, such as ◈ 1/3.' dim
   fi
 
   section 'Other tree markers'

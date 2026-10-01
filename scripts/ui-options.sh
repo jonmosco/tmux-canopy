@@ -66,8 +66,8 @@ sidebar_ui_options() {
     # The same shell shows the agent summary sidebar-source stored for this
     # load; an empty one hides the footer and its separator.
     --bind='load:+transform([ -n "$TMUX_CANOPY_STATE" ] || exit 0; touch "$TMUX_CANOPY_STATE.ready"; f=; [ -r "$TMUX_CANOPY_STATE.footer" ] && IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; printf "change-footer:%s" "$f")+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.search")+show-input+enable-search+clear-query+unbind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
-    --bind='esc:execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
+    --bind='/:execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.search")+show-input+enable-search+clear-query+unbind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
+    --bind='esc:execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     --bind="g:execute-silent($help_cmd --legend)"
@@ -77,6 +77,7 @@ sidebar_ui_options() {
     --bind="3:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-buffers)+reload-sync($source_cmd --stable)"
     --bind="4:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-agents)+reload-sync($source_cmd --stable)"
     --bind="A:execute-silent($action_cmd toggle-agents)+reload-sync($source_cmd --stable)"
+    --bind="f:execute-silent($action_cmd toggle-footer)+reload-sync($source_cmd --stable)"
     --bind="n:execute-silent($jump_agent_cmd)"
     --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
     --bind="a:execute-silent($action_cmd actions {1})"
