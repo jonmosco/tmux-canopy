@@ -37,13 +37,22 @@ Requirements: tmux, fzf, Bash 4.4+, Python 3, and ShellCheck. On macOS, agent fi
 ## Design principles
 
 - **No daemon.** Work happens in response to tmux hooks or keys. A background worker must be short-lived and exit when it has nothing to do.
-- **Enhance, never take over.** Canopy does not change the user's status line, their own options, or their key bindings. Hooks and bindings use Canopy's own indexes and restore what they replaced.
-- **Respect the hot paths.** Refreshes, focus changes, and resize hooks run often:
-  - Batch tmux queries into one `tmux` call (`\;`-separated) rather than one call per value.
-  - Avoid `$(...)` in loops; helpers such as `canopy_client_key` and `canopy_pane_agent` return results in variables (`CANOPY_KEY`, `CANOPY_REPLY`) for this reason.
-  - Filter hooks inside tmux with `if-shell -F` so unrelated events start no shell.
+- **Enhance, never take over.** Canopy does not change what the user's status line shows. Where a feature needs a tmux option set, such as alert monitoring for sidebar notifications, save the user's value, keep the visible result the same, and restore it when the feature is turned off (`canopy_owned_option` in `scripts/config-lib.sh` does this). Hooks and bindings use Canopy's own indexes and restore what they replaced.
+- **Light on the user's system.** Start as few processes as possible and call external tools only when Bash, awk, or tmux itself cannot do the job. See [Keep processes and tools to a minimum](#keep-processes-and-tools-to-a-minimum).
 - **Bash 3.2 must still load `scripts/launch-lib.sh`**, so it can report the "Bash 4.4 required" error on stock macOS. Keep Bash 4-only syntax out of its top level.
 - **Portable across macOS and Linux:** BSD and GNU tools, `ps` output differences (for example, `lstart` pads single-digit days), and no reliance on `/proc` outside the Linux paths.
+
+## Keep processes and tools to a minimum
+
+Canopy runs on every refresh, focus change, and resize, on the user's own machine, so every process it starts is paid for over and over. Treat a new fork or a new tool as a cost that needs a reason.
+
+- **Prefer Bash builtins and awk** to external commands: parameter expansion and `[[ ]]` instead of `sed`, `cut`, `basename`, or `grep` on a variable; `read` and `mapfile` instead of `cat` or `head`; `printf -v now '%(%s)T' -1` or `$EPOCHREALTIME` instead of `date`.
+- **No `$(...)` in loops or per-row code.** Each one forks a subshell, and a subshell also throws away anything the function cached. Return results in variables instead, as `canopy_client_key` (`CANOPY_KEY`) and `canopy_pane_agent` (`CANOPY_REPLY`) do.
+- **One tmux call per batch.** Chain commands with `\;`, and read several values with one `display-message` format, rather than one `show-option` per value. Let `tree-render.awk` do aggregation instead of looping over tmux in the shell.
+- **Decide inside tmux when you can.** Gate hooks with `if-shell -F` and tmux formats so events that do not concern Canopy start no shell at all, and debounce bursts with the existing claim pattern (`scripts/notify`, `scripts/agent-refresh`).
+- **No new runtime dependencies.** The sidebar needs only tmux, fzf, Bash, awk, and standard system tools such as `ps`. Python 3 is optional and limited to agent adapters, the animation, and the tests; check for an optional tool with `command -v` and degrade gracefully without it.
+- **No polling.** React to events; a background worker must be bounded and exit when it has nothing left to do.
+- **Measure when it matters.** Time a path with `$EPOCHREALTIME` on a private tmux server with realistic panes, and count forks or tmux calls before and after; the tests' tmux wrappers show how to count calls.
 
 ## Style
 

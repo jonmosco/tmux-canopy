@@ -20,8 +20,8 @@ Open an issue describing what you're trying to do. For larger changes, such as a
 Canopy aims to stay:
 
 - **Daemon-free:** everything runs in response to tmux events or keys.
-- **Additive:** it enhances your tmux workflow without changing your status line, your options, or your key bindings.
-- **Quick:** the sidebar refreshes often, so the common paths stay cheap.
+- **Additive:** it enhances your tmux workflow without changing what your status line shows or taking over your key bindings. Where a feature needs a tmux option set, such as alert monitoring for sidebar notifications, Canopy saves your value, keeps the visible result the same, and restores it when the feature is turned off.
+- **Light on your system:** the sidebar refreshes often, on your own machine, so Canopy starts as few processes as it can and relies only on tmux, fzf, Bash, awk, and standard system tools. A change that adds a new dependency, or a command run for every pane or every refresh, needs a good reason. [AGENTS.md](AGENTS.md#keep-processes-and-tools-to-a-minimum) lists the specific techniques.
 
 Ideas that fit these are the easiest to take on.
 
