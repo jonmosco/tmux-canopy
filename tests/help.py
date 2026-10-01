@@ -47,7 +47,7 @@ def main():
         assert '\x1b' not in legend
         compact = re.sub(r'\s+', ' ', legend)
         if width >= 24:
-            for phrase in ('Sidebar legend', 'Selected row', 'Current content pane',
+            for phrase in ('Sidebar legend', 'Selected row', 'current content pane', 'grouped by working directory',
                            'Unread terminal output', 'does not mean an agent needs input', 'Session and window names',
                            'Recognized apps have icons', 'Working directory', 'Window-name / pane-title'):
                 assert phrase in compact, (width, phrase)

@@ -132,6 +132,48 @@ set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
 
+## The sidebar at a glance
+
+A sidebar with agent mode on, two Claude Code sessions, and a folded session:
+
+```text
+╭─ Tree Agents Proc Buff ─ All       ① ②
+  ▼ app                              ③
+  ├─ ▼ 📂 api                        ④
+  │  ╰─ ▼ server                     ⑤
+  │     ├─ ✳ claude !            ▶   ⑥ ⑦ ⑧
+  │     │    ├─ Explore ●      <1m   ⑨
+  │     │    ╰─ Plan !         <1m
+  │     ╰─ zsh
+  ├─ ▼ 📂 web
+  │  ╰─ ▼ ui
+  │     ╰─ ✳ claude ●
+  ╰─ ▼ 📂 projects
+     ╰─ ▼ notes
+        ├─ zsh                   ●   ⑩
+        ╰─ zsh
+  ▶ scratch [2w]                     ⑪
+───────────────────────────────────
+  Agents ◆1 ▷1  n jumps to input     ⑫
+```
+
+| | What it shows | Keys |
+|---|---|---|
+| ① | **Views.** Tree, Agents, Processes, and Buffers; the highlighted one is open. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers |
+| ② | **Tree filter:** `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `F` or `Ctrl-f` |
+| ③ | **Session.** Bold when it is the one you are in. `▼` open, `▶` folded. | `h` / `l` fold and unfold, `H` / `L` all |
+| ④ | **Folder.** Panes grouped by their working directory. | |
+| ⑤ | **Window.** | `Enter` focus, `r` rename, `t` new window, `a` actions |
+| ⑥ | **Pane:** application icon and the command running in it. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
+| ⑦ | **Agent state:** `!` needs input, a pulsing `●` working, `✓` turn ended. | `n` next agent that needs input, `i` agent summary |
+| ⑧ | **Your current pane** (green `▶`). The highlighted row is what you are browsing; it can differ. | `Ctrl-o` jump back to your pane |
+| ⑨ | **Subagents** of the pane above, with their state and age. They disappear when they finish. | |
+| ⑩ | **Unread output** (amber `●`); a bell or a silence alert has its own mark. | `u` clear, `U` clear all |
+| ⑪ | **Folded session**, with the number of windows inside. | `l` unfold |
+| ⑫ | **Agent footer:** every agent on the server, whatever the tree's filters and folds. | `n` jump to the one waiting |
+
+Press `g` in the sidebar for every symbol and color, and `?` for every key.
+
 ## Essential controls
 
 | Key | Action |
@@ -167,31 +209,11 @@ When you leave the sidebar for a content pane, its selection pointer follows the
 
 With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
 
-### Understanding the sidebar header
+## Customizing the look
 
-The top bar displays the available views and the active tree filter:
+By default, panes are grouped by working directory with folder and application icons, and labels adapt to the sidebar's width. Set `@tmux-canopy-appearance 'ascii'` for the same layout without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows, then press `Ctrl-r` in the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).
 
-```text
-╭─ Tree Agents Proc Buff ─ All
-```
-
-- **Views (`1`–`4`):** The highlighted name indicates the active view. Switch views with `1` (**Tree**), `4` (**Agents**), `2` (**Proc**), and `3` (**Buff**).
-- **Scope filter (`─ All`):** Indicates the visibility filter currently applied to the tree. Press **`F`** or **`Ctrl-f`** to cycle or configure:
-  - **`All`** — Display all sessions and panes across the entire tmux server.
-  - **`Session`** — Filter the tree to display only the current session.
-  - **`Unread`** — Display only windows and panes with unread activity, bell, or silence alerts.
-  - **`+W` / `+T`** — Appended when an active window name (`+W`) or pane title (`+T`) search rule is applied (e.g., `All+W`).
-
-The default Tree view uses one active-pane dot, shorter branch prefixes, and
-directory labels that adapt to sidebar width. For the leanest view, set
-`@tmux-canopy-density 'minimal'` and press `Ctrl-r` in the sidebar.
-The default appearance groups panes by working directory and uses folder and
-application icons. Set `@tmux-canopy-appearance 'ascii'` for an ASCII-only view
-without glyph-font requirements. Recognized app icons can be changed with
-options such as `@tmux-canopy-icon-codex`; use `none` to hide one. See
-[Icons](docs/reference.md#icons).
-
-See the [configuration and command reference](docs/reference.md) for all controls, appearance settings, notifications, and architecture.
+See the [configuration and command reference](docs/reference.md) for every control, appearance setting, notification option, and the architecture.
 
 ## How it works
 

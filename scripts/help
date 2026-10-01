@@ -114,12 +114,13 @@ help_records() {
 legend_records() {
   section 'Location and selection'
   legend_item '›' 'Selected row and highlight. Move with j/k; Enter focuses it. It may differ from the active pane.' cyan
-  legend_item '● green' 'Current content pane. On a folded branch, the dot moves to its window or session.' green
+  legend_item '▶ green' 'Your current content pane, at the right edge of its row. On a folded branch it moves to the window or session.' green
   legend_item 'bold name' 'Current session or window.'
-  legend_item '▾ / ▸' 'Expanded / collapsed session or window.'
+  legend_item '▼ / ▶' 'Open / folded branch, left of its name (▾ / ▸ in the classic appearance).'
+  legend_item '📂 api' 'Folder: panes grouped by working directory. h / l fold and unfold it.'
   note 'Session and window names use the tree guides; they have no default icon.'
-  legend_item '├─ └─ │' 'Tree guides show which pane belongs to which window and session.' dim
-  legend_item '1:dotfiles' 'Tmux window index and name.'
+  legend_item '├─ ╰─ │' 'Tree guides show which pane belongs to which window and session.' dim
+  legend_item 'dotfiles' 'Window name. The classic appearance adds the index, as in 1:dotfiles.'
   legend_item '2p' 'Two content panes hidden in a collapsed window. Sidebar and reserve panes are excluded.' dim
   legend_item '[11w]' 'Eleven windows inside a collapsed session.' dim
   legend_item '[1/2p]' 'With a filter, one of two panes matches inside a collapsed window.' dim
@@ -143,13 +144,17 @@ legend_records() {
     section 'Agent state labels'
     legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
     note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
+    legend_item 'Agents ◆1 ▷2' 'Tree view footer: every agent on the server, whatever the filters and folds. n jumps to one needing input.' amber
+    legend_item '! / ▷ / ✓' 'Agent state on a pane: needs input, working (pulses while animation is on), ready or turn ended.' amber
+    legend_item '├─ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
+    note 'The classic appearance spells states out instead, as the labels below show.'
     legend_item '[process]' 'An agent process was found in this pane; no lifecycle state is available.' dim
     legend_item '[working·hook]' 'A live agent recently reported a running turn.' cyan
     legend_item '[approval·hook]' 'An agent reported an approval request. Another reviewer may handle it.' amber
     legend_item '[ready·hook]' 'An agent reported session start and is ready for a prompt.' dim
     legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
     legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
-    legend_item '├─ Explore WORKING' 'A running Claude Code or Codex subagent of the pane above: WORKING or NEEDS INPUT. It disappears when it stops.' cyan
+    legend_item '├─ Explore WORKING' 'Classic subagent line: WORKING or NEEDS INPUT.' cyan
     legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
     note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
     note 'Hook labels require a matching live agent process, pane PID, session, and recent report. Screen hints appear only in the drawer and say unverified.'
