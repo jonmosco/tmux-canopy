@@ -372,7 +372,12 @@ def main():
             assert tm('show-option', '-wqv', '-t', window_b, '@tmux_canopy_notice_bell') == ''
             print('ok - expired refresh claims recover and clear-all removes notification state')
 
+            # Returning to the sidebar jumps the pointer to the current pane via
+            # a reload. Wait for that reload to land before moving the pointer,
+            # or the jump can override the test's selection.
+            count = loads.stat().st_size
             tm('select-pane', '-t', sidebar)
+            wait_for(lambda: loads.stat().st_size > count, 'focus jump reload')
             time.sleep(.2)
             def linked_selection_ready():
                 tm('send-keys', '-t', sidebar, 'M-b')

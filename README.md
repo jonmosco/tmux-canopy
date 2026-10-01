@@ -254,6 +254,8 @@ The same gate runs in GitHub Actions using pinned tmux/fzf versions. Tests use p
 Canopy is in active development. Bug reports, feature requests, and pull requests
 are welcome - open an issue at
 [github.com/jonmosco/tmux-canopy/issues](https://github.com/jonmosco/tmux-canopy/issues).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report bugs and run the tests, and
+[AGENTS.md](AGENTS.md) for notes aimed at AI coding agents.
 
 ## License
 
