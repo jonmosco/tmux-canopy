@@ -43,10 +43,11 @@ fi
 target="${pane_position:-${window_position:-$session_position}}"
 if [[ "$target" =~ ^[1-9][0-9]*$ ]]; then
   # If a search hides the target, clear the query before moving the pointer.
-  # --track would return the pointer to the old row once the reload lands, so
-  # this one reload skips it (later reloads still track). Reloads and query
-  # changes search asynchronously; wait before applying an absolute position.
-  printf 'change-query()+untrack-current+%swait+pos(%s)\n' "${reload:+$reload+}" "$target"
+  # Query changes search asynchronously; wait before applying an absolute
+  # position. The pointer moves at once, before the reload: --track then keeps
+  # it on that row through the reload, and nothing typed meanwhile can land
+  # between a reload and a late jump.
+  printf 'change-query()+wait+pos(%s)%s\n' "$target" "${reload:++$reload}"
 else
   printf '%sbell\n' "${reload:+$reload+}"
 fi
