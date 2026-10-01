@@ -29,7 +29,7 @@ def main():
                 ['P', '%1', '@0', '1', 'bash', '', '/work', '0', '', '', '0', '0', '0', '', '', '0', '', '', '', '', '', '', '', ''],
                 *extra_rows,
             ]
-            data[0].extend([''] * (36 - len(data[0])) + [agents])
+            data[0].extend([''] * (37 - len(data[0])) + [agents])
             result = sp.check_output(['awk', '-v', 'stable=1', '-v', 'nul=1', '-f', str(ROOT/'lib/tree-render.awk'), str(state), '-'],
                                      input='\n'.join('\x1f'.join(row) for row in data)+'\n', text=True,
                                      env=os.environ | {'TMUX_CANOPY_RENDER_CLIENT': '', 'TMUX_CANOPY_RENDER_HOME': '/home/test'})
@@ -112,7 +112,7 @@ def main():
             ['A', '%15', 'claude'], ['A', '%16', 'gemini'],
             verified_10, verified_11, verified_13, ['V', '%15'],
         ]
-        overview_data[0].extend([''] * (36 - len(overview_data[0])) + ['on'])
+        overview_data[0].extend([''] * (37 - len(overview_data[0])) + ['on'])
         state.write_text('')
 
         def overview(width, icons='unicode', theme='ansi', raw=False):
