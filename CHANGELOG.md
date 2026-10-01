@@ -11,6 +11,13 @@
 - Pi and Oh My Pi are no longer labeled `node` when Node is only the runtime. Other Node processes stay `node`.
 - Pi's sidebar icon is π, the mark used on [pi.dev](https://pi.dev/). Oh My Pi uses the same π in yellow, matching the orange accent on its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg).
 - Nerd Font agent icons use Codicons where those marks exist: Claude, OpenAI/Codex, Cursor, and Gemini's four-point star. OpenCode stays a code glyph because its logo is a pixel wordmark. Antigravity keeps an orbit glyph.
+- Refreshes are faster. With Pi or other Node panes open, a refresh no longer re-reads the process table once per Node pane (about 870 ms down to about 60 ms with three such panes), and every refresh makes fewer tmux calls.
+- Moving focus renders the tree once instead of twice, and `Ctrl-o` also refreshes the list as it moves the pointer.
+- Resizing or splitting ordinary panes no longer starts a shell; Canopy's hooks check for a sidebar inside tmux first. Bursts of pane-command changes in agent mode share one refresh.
+- The `WORKING` animation precomputes its frames, starts far fewer processes per frame, loops without a visible jump, and keeps its position across refreshes.
+- Subagent lines in the default appearance use the same marks as their pane: `▷` working (animated) and `!` needs input, with the age at the edge. `classic` keeps the status words.
+- In the Buffers view, `x` arms deletion and a second `x` within five seconds deletes the buffer, as for panes, windows, and sessions. The actions menu item is now **Delete (arm)**.
+- Unnamed windows and panes show a dimmed placeholder name.
 
 ### Added
 
@@ -18,7 +25,7 @@
 - Pi and Oh My Pi adapters report tool execution, extension UI prompts as needs-input, and aborted or errored settles as interrupted. Reinstall with `canopy integration install pi` (and `omp`) so the extension file is replaced.
 - Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.
 - Opt-in `@tmux-canopy-animate` moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
-- `@tmux-canopy-appearance` with `classic` (default) and `lazygit` presets for sidebar chrome, structural glyphs, and tree guides.
+- `@tmux-canopy-appearance`: `default` groups panes by working directory with folder and application icons, `ascii` is the same layout without glyph-font requirements, and `classic` keeps the older tree for existing setups.
 - Tree reload on `after-split-window` so newly created panes appear without waiting for another focus change.
 - TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.
 - Doctor output lists Canopy-owned tmux bindings, options, hooks, and optional agent integration states.
@@ -68,6 +75,9 @@
 - A subagent's permission request can no longer be cleared by an unrelated tool completion with the same tool name from the main thread or another subagent.
 - Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle reports were silently dropped after the Codex reporter's helpers changed; `canopy doctor` now exercises every reporter's real report path so such drift fails loudly.
 - Native Claude Code installs (`claude.exe`) are recognized as Claude agents on macOS.
+- Subagents now appear in the default appearance; they were only drawn in `classic`. Compact density shows a count such as `+2` on the pane row instead.
+- Text that merely contains `wrk` or `WORKING`, such as a `~/wrk` directory or a window title, no longer starts or animates the working indicator.
+- The animation now requires `python3` rather than checking for `perl`, which it no longer uses.
 - A global `detach-on-destroy on` is honored when the last session ends, so the dock is no longer briefly parked in an unrelated session (which resized its applications). The synchronize-panes toggle likewise reads an inherited global value.
 - Right-aligned counts and pane continuation lines align correctly on macOS, whose awk measures UTF-8 text in bytes.
 
