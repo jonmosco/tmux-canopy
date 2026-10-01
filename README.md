@@ -2,19 +2,29 @@
 
 [![Test](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml/badge.svg)](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml)
 
-A persistent sidebar for tmux that organizes your sessions, windows, and panes into a navigable tree - and optionally monitors AI coding agents across all of them.
+**A tmux workspace tree and AI-agent monitor in one sidebar, with no daemon.**
 
-**One sidebar follows you everywhere. No daemon. No config server. Just tmux.**
-
-Canopy adds a persistent sidebar to tmux. It shows your sessions, windows, and panes as a tree and follows you as you switch between them - same sidebar, same selection, same collapsed branches.
-
-Optionally, turn on agent awareness to monitor AI coding agents (Claude, Codex, OpenCode, Gemini, Cursor, and more) with live status, animated working indicators, and a one-key jump to any pane waiting for input.
+Canopy keeps your sessions, windows, and panes in a persistent tree that follows you as you switch windows and sessions, with the same selection and the same folded branches. Turn on agent mode and the same tree shows what every Claude Code, Codex, OpenCode, Gemini, Cursor, Antigravity, and Pi session is doing: which agents are working, which subagents they started, and which are waiting for you. Press `n` to jump straight to the next one that needs input.
 
 ## Preview
 
 [![Animated tmux-canopy demo showing navigation, readable notification badges, search, folding, and buffers](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)
 
 [View a still image](docs/assets/canopy-demo.png).
+
+## Quick start
+
+1. Install [tmux](https://github.com/tmux/tmux), [fzf](https://github.com/junegunn/fzf), and Bash 4.4+ (see [Requirements](#requirements-and-support)). With [TPM](https://github.com/tmux-plugins/tpm), add this before its `run '~/.tmux/plugins/tpm/tpm'` line:
+
+   ```tmux
+   set -g @plugin 'jonmosco/tmux-canopy'
+   set -g @tmux-canopy-agents 'on'   # optional: monitor AI coding agents
+   ```
+
+2. Press **prefix + I** to install.
+3. Press **prefix + T** to open the sidebar (with the default prefix: **Ctrl-b**, then **Shift-t**). Press `?` inside it for every key.
+
+For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/canopy setup` and pick your agents (see [AI agent monitoring](#ai-agent-monitoring)). [Manual installation](#install) needs no plugin manager.
 
 ## Features
 
@@ -51,7 +61,7 @@ Install the requirements first. If you use [TPM](https://github.com/tmux-plugins
 set -g @plugin 'jonmosco/tmux-canopy'
 ```
 
-Press **prefix + I** to install, then **prefix + T** to open Canopy. Canopy's old and current `*.tmux` entrypoints coexist for older manual installations; TPM loads both safely.
+Press **prefix + I** to install, then **prefix + T** to open Canopy.
 
 For a manual installation, clone the project:
 
@@ -75,37 +85,29 @@ Press **prefix + T** to open it. With the default prefix, press **Ctrl-b**, rele
 
 Run `~/.tmux/plugins/tmux-canopy/canopy doctor` to check requirements and see every active tmux binding, option, and hook Canopy installs. Add the repository root to your `PATH` if you prefer the short `canopy` command.
 
-### AI agent monitoring and navigation
+### AI agent monitoring
 
-Canopy includes built-in tracking for AI coding agents (Claude Code, OpenAI Codex, Google Antigravity `agy`, Cursor Agent, Gemini CLI, OpenCode, Pi, and Oh My Pi). It turns tmux into a unified cockpit for multi-agent workflows:
+With agent mode on, Canopy finds agents running in any pane of any session and shows their state in the tree:
 
-- **Track all running agents:** The dedicated **Agents view** (`4`) aggregates active agent panes across all windows and sessions.
-- **Jump to blockers (`n`):** Press `n` from anywhere in Canopy to jump directly to the next pane waiting for user input, questions, or command approval.
-- **Live status & subagents:** Real-time animated status pulses (`WORKING`, `WAITING`, `DONE`) and subagent hierarchy tracking in the summary drawer (`i`).
-- **Two tiers of visibility:**
-  - **Zero-config process detection:** Automatically identifies running agent processes with zero extra tools or configuration (`[process]`).
-  - **Rich lifecycle adapters:** Optional lightweight hooks (`canopy integration install <agent>`) report exact turn states, tool executions, and child subagents without polling (`[state·hook]`).
+- **Agents view (`4`):** only the sessions, windows, and panes that contain an agent, with a summary such as `◆1 ▷2` in the header.
+- **Status on every agent pane:** working (an animated `▷`) and needs input (`!`). Folded windows and sessions roll these up as `◆` and `▷` counts.
+- **Subagents:** listed under their parent pane while they run, each with its own status.
+- **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
+- **Summary drawer (`i`):** the selected agent's state, its age, and the pending request when the agent reports one.
 
-To enable agent monitoring, add this **before** the Canopy `run-shell` line in your tmux configuration:
+Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in your tmux configuration, then reload and reopen the sidebar. Press `A` in the sidebar to switch it on or off for just your client.
 
-```tmux
-set -g @tmux-canopy-agents 'on'
-```
+| Agent | Found by process | Lifecycle adapter | Needs input | Subagents |
+|---|---|---|---|---|
+| Claude Code | ✅ | ✅ hooks | ✅ | ✅ |
+| Codex | ✅ | ✅ hooks | ✅ | ✅ |
+| OpenCode | ✅ | ✅ plugin | ✅ permissions and questions | ✅ |
+| Gemini CLI | ✅ | ✅ hooks | ✅ tool permissions | – |
+| Cursor Agent (`agent`) | ✅ | ✅ hooks, partial | – no permission event | ✅ |
+| Antigravity (`agy`) | ✅ | ✅ hooks | – no permission event | – |
+| Pi and Oh My Pi | ✅ | ✅ extension | ✅ extension prompts | – |
 
-Reload the tmux configuration, then close and reopen any existing sidebar. You can also toggle agent mode on the fly per client by pressing `A` in the sidebar.
-
-To add reported lifecycle state, install only the adapters you want with `canopy setup` or `canopy integration install codex` (also `claude`, `gemini`, `agy`, `pi`, `omp`, `opencode`, `cursor-agent`). Adapters show `[state·hook]`; Claude Code, Codex, OpenCode, and Cursor Agent adapters can also show subagents. The integration manager and reporters require Python 3. Use `canopy integration status` to inspect adapters or `canopy integration uninstall codex` to remove one. See [Agent integrations](docs/reference.md#agent-lifecycle-adapters).
-
-For Antigravity, install or update Canopy's adapter from the installation directory:
-
-```bash
-./canopy integration install agy
-./canopy integration status
-```
-
-The installer adds a named Canopy entry to `~/.gemini/config/hooks.json` and removes older Canopy `agy` hooks from `~/.gemini/antigravity-cli/settings.json`. Restart `agy` inside tmux, check its `/hooks` view, and press `4` in Canopy to see the Agents view. Antigravity's hooks report active invocations, tool activity, clean turn ends, and interruptions; they do not expose dedicated permission-request or subagent lifecycle events to Canopy.
-
-OpenCode uses a plugin rather than a shell hook. `canopy integration install opencode` writes `~/.config/opencode/plugins/canopy-agent-state.js`. The plugin is ESM, so `~/.config/opencode/package.json` must contain `"type": "module"`. Restart OpenCode inside tmux afterward. The plugin subscribes to session, permission, and question events and observes prompt, tool, and permission hooks. It does not approve a permission or block a tool. A report is kept only when the session's directory matches one OpenCode pane.
+Process detection needs no setup: a running agent shows as `[process]` in the Agents view. An adapter adds its exact state (working, needs input, turn ended, and so on). Adapters are optional and observational: they never approve a request or block a tool. Install only the ones you want with `canopy setup`, or `canopy integration install <agent>` using `claude`, `codex`, `opencode`, `gemini`, `cursor-agent`, `agy`, `pi`, or `omp`, then restart that agent inside tmux. `canopy integration status` lists what is installed. Adapters need Python 3. Agent-specific notes, including OpenCode's plugin and Antigravity's hook file, are in [Agent lifecycle adapters](docs/reference.md#agent-lifecycle-adapters).
 
 ### Defaults
 
@@ -190,11 +192,19 @@ options such as `@tmux-canopy-icon-codex`; use `none` to hide one. See
 
 See the [configuration and command reference](docs/reference.md) for all controls, appearance settings, notifications, and architecture.
 
+## How it works
+
+- **No daemon.** Canopy is Bash, awk, and fzf, driven by tmux hooks. Between events, only bounded helpers run: the animation while an agent is visibly working, and a sleeping timer per agent report that marks it stale.
+- **One snapshot per refresh.** A single tmux call collects every session, window, pane, and client. awk renders the tree, and fzf reloads in place, keeping your selection, search, and folded branches. A refresh typically takes tens of milliseconds.
+- **Event-driven updates.** Focus changes, splits, renames, activity alerts, and agent reports trigger a short debounced reload. Hooks for ordinary panes are filtered inside tmux, so they start no shell at all.
+- **Verified agent state.** A hook report counts only while its process ID and start time still match a live process in that pane, so a restarted or replaced agent never inherits old status. A report with no update for 15 minutes is shown as stale.
+- **Owned by one client.** Each sidebar belongs to the client that opened it and follows that client across windows and sessions.
+
+See [Architecture](docs/reference.md#architecture) for the details.
+
 ## Integration with your tmux configuration
 
 Canopy wraps `prefix + n`, `p`, `0`–`9`, and `Tab` for smooth window navigation, `prefix + Space` for sidebar-aware layouts, and border mouse bindings for resizing. Set `@tmux-canopy-smooth-navigation 'off'` to opt out of navigation wrappers. Disabled or renamed bindings restore their previous definitions; later user changes are preserved. Notification monitors are also restored when disabled.
-
-This restoration applies to settings first installed by the current version. When upgrading an older development checkout that already replaced bindings, start a fresh tmux server to establish clean ownership. Existing sessions can continue using the plugin; schedule that restart when convenient.
 
 ## Current limitations
 
