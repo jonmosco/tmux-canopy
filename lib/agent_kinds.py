@@ -9,12 +9,14 @@ KINDS = {
     'pi': 'pi', 'omp': 'omp',
     'agy': 'agy', 'antigravity': 'agy',
     'agent': 'cursor-agent',
+    'crush': 'crush',
 }
 
 NAMES = {
     'codex': 'Codex', 'claude': 'Claude Code', 'opencode': 'OpenCode',
     'gemini': 'Gemini CLI', 'pi': 'Pi', 'omp': 'Oh My Pi',
     'agy': 'Antigravity', 'cursor-agent': 'cursor-agent',
+    'crush': 'Crush',
 }
 
 

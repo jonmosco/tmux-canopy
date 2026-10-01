@@ -16,10 +16,10 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
-    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top",icon_keys," ")
+    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
-    appearance=($36 == "lazygit" || $36 == "pills" || $36 == "places" ? $36 : "classic")
-    agents_enabled=($37 == "on")
+    appearance=($37 == "lazygit" || $37 == "pills" || $37 == "places" ? $37 : "classic")
+    agents_enabled=($38 == "on")
     if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
@@ -57,7 +57,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     split(process_line,process_field,/[[:space:]]+/)
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
-    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy") agent_process[pid]=name
+    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush") agent_process[pid]=name
     else if (name=="antigravity") agent_process[pid]="agy"
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     else if (name=="agent") agent_process[pid]="cursor-agent"
@@ -403,7 +403,7 @@ function canonical_agent(value) {
     if (value == "claude-code") return "claude"
     if (value == "agent") return "cursor-agent"
     if (value == "antigravity") return "agy"
-    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent") return value
+    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent" || value == "crush") return value
     return ""
 }
 function agent_name(kind) {
@@ -415,6 +415,7 @@ function agent_name(kind) {
     if (kind == "omp") return "Oh My Pi"
     if (kind == "agy") return "Antigravity"
     if (kind == "cursor-agent") return "cursor-agent"
+    if (kind == "crush") return "Crush"
     return kind
 }
 # The displayed status word, shared with title_detail()'s width budgeting so
@@ -737,7 +738,7 @@ function appcolor_lookup(value, n, parts) {
     if (value ~ /^(npm|npx|git|lazygit|oc|hunk)$/) return icon_red
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
     if (value ~ /^(ssh|codex|top|htop|btop|agy)$/) return icon_cyan
-    if (value == "pi") return icon_purple
+    if (value == "pi" || value == "crush") return icon_purple
     if (value == "omp") return icon_yellow
     if (value == "opencode" || value == "agent" || value == "cursor-agent") return icon_neutral
     if (value ~ /^(claude|claude-code)$/) return icon_yellow
@@ -763,6 +764,7 @@ function app_key(value) {
     if (value ~ /^(agy|antigravity)$/) return "antigravity"
     if (value ~ /^(make|cmake|ninja)$/) return "make"
     if (value ~ /^(top|htop|btop)$/) return "top"
+    if (value == "crush") return "crush"
     return ""
 }
 function appicon(value) {
@@ -790,6 +792,7 @@ function appicon_lookup(value, n, parts,key,override) {
         if (value == "opencode") return "▦"
         if (value == "agent" || value == "cursor-agent") return "▸"
         if (value ~ /^(agy|antigravity)$/) return "◎"
+        if (value == "crush") return "❖"
         if (value ~ /^(make|cmake|ninja)$/) return "✱"
         if (value ~ /^(top|htop|btop)$/) return "▥"
         return custom_p != "" ? pane_icon : " "
@@ -809,6 +812,7 @@ function appicon_lookup(value, n, parts,key,override) {
     if (value == "opencode") return ""
     if (value == "agent" || value == "cursor-agent") return ""
     if (value ~ /^(agy|antigravity)$/) return "󰀘"
+    if (value == "crush") return "❖"
     if (value ~ /^(make|cmake|ninja)$/) return ""
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
     return custom_p != "" ? pane_icon : " "

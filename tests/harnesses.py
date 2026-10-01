@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Live tmux checks for distinct process, screen, and lifecycle evidence."""
 import json
+import re
 import os
 from pathlib import Path
 from support import install_agent_fixture
@@ -26,7 +27,7 @@ try:
         temp = Path(directory)
         state = temp / 'state'
         state.touch()
-        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'agent')
+        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'agent', 'crush')
         for name in names:
             install_agent_fixture(temp / name)
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '100', '-y', '30',
@@ -69,6 +70,16 @@ try:
             row = next(line for line in agent_view.splitlines() if line.startswith('P:' + pane_id + '\t'))
             assert '[process]' in row and '·hook' not in row, (name, row)
             assert 'Source: visible terminal text' in run('agent-preview', pane, ['P:' + pane_id])
+        # Crush is detected by process only (it has no lifecycle adapter yet).
+        crush_row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes['crush'] + '\t'))
+        assert 'Crush' in crush_row and '❖' in crush_row, crush_row
+        assert 'Crush' in run('agent-preview', pane, ['P:' + panes['crush']])
+        tm('set-option', '-g', '@tmux-canopy-icon-crush', 'C')
+        crush_row = next(line for line in run('tree-source', pane, ['--agents']).splitlines()
+                         if line.startswith('P:' + panes['crush'] + '\t'))
+        crush_text = re.sub(r'\x1b\[[0-9;]*m', '', crush_row)
+        assert ' C Crush' in crush_text and '❖' not in crush_text, crush_text
+        tm('set-option', '-gu', '@tmux-canopy-icon-crush')
 
         event('claude', panes['claude'], {'hook_event_name': 'SessionStart', 'session_id': 'c1'})
         event('claude', panes['claude'], {'hook_event_name': 'UserPromptSubmit', 'session_id': 'c1'})
