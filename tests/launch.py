@@ -16,7 +16,30 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_client_key_matches_cksum():
+    """Per-client option names must keep the keys that printf | cksum produced."""
+    values = ['', 'a', '/dev/ttys003', '/dev/pts/12', "/dev/tty 'quoted' $x", 'é☃ü', 'x' * 300]
+    script = f"""
+source {shlex.quote(str(ROOT / 'scripts/launch-lib.sh'))}
+for value in "$@"; do
+  canopy_client_key "$value"; first=$CANOPY_KEY
+  canopy_client_key "$value"
+  expected=$(printf '%s' "$value" | cksum); expected=${{expected%% *}}
+  [[ $first == "$expected" && $CANOPY_KEY == "$expected" ]] || {{ printf 'mismatch %q %s %s\\n' "$value" "$first" "$expected"; exit 1; }}
+done
+"""
+    shells = ['bash']
+    # launch-lib.sh must still load on the system Bash 3.2 to report the version failure.
+    if Path('/bin/bash').exists():
+        shells.append('/bin/bash')
+    for shell in shells:
+        result = sp.run([shell, '-c', script, '_', *values], capture_output=True, text=True, timeout=10)
+        assert result.returncode == 0 and not result.stderr, (shell, result.stdout, result.stderr)
+    print('ok - in-shell client keys match cksum on every supported bash')
+
+
 def main():
+    test_client_key_matches_cksum()
     tmux, fzf = shutil.which('tmux'), shutil.which('fzf')
     socket = f'tree-launch-test-{os.getpid()}'
     env = os.environ.copy()

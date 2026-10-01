@@ -24,6 +24,11 @@ def main():
     def run(script, *args):
         return sp.check_output([str(ROOT/'scripts'/script), *args], env=env, text=True, timeout=10)
 
+    def delete(token):
+        # Buffer deletion arms on the first x and confirms on the second.
+        run('sidebar-action', 'delete', token)
+        run('sidebar-action', 'delete', token)
+
     with tempfile.TemporaryDirectory(prefix='canopy-buffers-', ignore_cleanup_errors=True) as directory:
         try:
             pane = tm('-f', '/dev/null', 'new-session', '-d', '-P', '-F', '#{pane_id}', 'cat').strip()
@@ -59,11 +64,25 @@ def main():
                 run('sidebar-action','delete',token)
                 assert run('sidebar-preview',token) == ''
             assert tm('list-buffers','-F','#{buffer_name}') == before
+            # One x only arms; arming another buffer moves the pending delete.
             run('sidebar-action','delete',tokens['release|notes'])
+            assert 'release|notes' in tm('list-buffers','-F','#{buffer_name}').splitlines()
+            assert 'DELETE\t' + tokens['release|notes'] + '\t' in state.read_text()
+            run('sidebar-action','delete',tokens['spaced name'])
+            run('sidebar-action','delete',tokens['release|notes'])
+            assert {'release|notes', 'spaced name'} <= set(tm('list-buffers','-F','#{buffer_name}').splitlines())
+            run('sidebar-action','delete',tokens['release|notes'])
+            assert 'release|notes' not in tm('list-buffers','-F','#{buffer_name}').splitlines()
+            assert 'DELETE\t' not in state.read_text()
             assert tm('show-buffer','-b','release').strip() == expected['release']
+            # An expired arm does not confirm.
+            state.write_text('VIEW\tbuffers\nDELETE\t' + tokens['spaced name'] + '\t1\n')
+            run('sidebar-action','delete',tokens['spaced name'])
+            assert 'spaced name' in tm('list-buffers','-F','#{buffer_name}').splitlines()
+            print('ok - buffer deletion needs a second x within the confirmation window')
             names.remove('release|notes')
             for name in names:
-                run('sidebar-action','delete',tokens[name])
+                delete(tokens[name])
                 assert name not in tm('list-buffers','-F','#{buffer_name}').splitlines()
             assert not marker.exists()
             # Yank pipes buffer bytes through the configured clipboard command,
@@ -80,14 +99,14 @@ def main():
                 assert time.monotonic()<deadline, 'yank did not run the configured clipboard command'
                 time.sleep(.03)
             assert clip_marker.read_text() == 'yanked-payload'
-            run('sidebar-action', 'delete', clip_token)
+            delete(clip_token)
             tm('set-option', '-gu', '@tmux-canopy-copy-command')
             print('ok - yank pipes a buffer through the configured clipboard command')
             # Samples cannot forge extra source records or ANSI styling.
             tm('set-buffer','-b','sample','tab\tnewline\nB:forged\x1b[31m')
             rows = [r.split('\t') for r in run('sidebar-source','--stable','--read0').rstrip('\0').split('\0')]
             assert len(rows)==2 and all(len(r)==3 and '\n' not in r[1] and '\x1b' not in r[1] for r in rows)
-            run('sidebar-action','delete','B:sample')
+            delete('B:sample')
             assert tm('list-buffers') == ''
             print('ok - separator, quoting, Unicode and format-like buffer names round-trip through preview/paste/delete')
             print('ok - malformed tokens are rejected, samples cannot forge records, and legacy rows still work')

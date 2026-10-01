@@ -19,6 +19,14 @@ def animate(text, frame):
     return result.stdout[:-1].split('\t', 2)[1]
 
 
+# The same pattern sidebar-source uses to decide whether to start the animator.
+BADGE_GREP = r'''badge=$'\e\\[[0-9;]*m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'; LC_ALL=C grep -aEq "$badge" "$1"'''
+
+
+def badge_grep(path):
+    return sp.run(['bash', '-c', BADGE_GREP, '_', str(path)], capture_output=True).returncode == 0
+
+
 def main():
     word = '\x1b[1m\x1b[1;36mWORKING\x1b[0m\x1b[2m ·hook\x1b[0m'
     frames = [animate(f'codex {word}', frame) for frame in range(11)]
@@ -43,6 +51,26 @@ def main():
     assert marks[0] == marks[1] and marks[1] == marks[7] and marks[3] == marks[5], marks
     assert all('▷' not in mark for mark in plain_marks)
 
+    # Only styled badges animate; plain text that happens to say wrk or
+    # WORKING (a directory, a window title) stays untouched.
+    for text in ('zsh ~/wrk', 'WORKING notes', 'vim \x1b[2m~/wrk\x1b[0m x', 'pi ▷ plain'):
+        assert all(animate(text, frame) == text for frame in range(3)), text
+    with tempfile.TemporaryDirectory(prefix='canopy-animate-grep-') as directory:
+        plain = Path(directory) / 'plain'
+        plain.write_bytes('P:%1\tzsh ~/wrk WORKING ▷\tP:%1\0'.encode())
+        assert not badge_grep(plain), 'plain text must not start the animator'
+        for styled in ('\x1b[1;36mwrk\x1b[0m', '\x1b[1;36m▷3\x1b[0m'):
+            plain.write_bytes(f'P:%1\tx {styled}\tP:%1\0'.encode())
+            assert badge_grep(plain), styled
+
+    # A summary mark keeps its count.
+    counted = animate('W \x1b[1;36m▷3\x1b[0m', 2)
+    assert re.sub(r'\x1b\[[0-9;]*m', '', counted) == 'W ●3', counted
+
+    # Every element repeats within the 40-frame period, so wrapping to 0 is seamless.
+    busy = f'codex {word} x \x1b[1;36mwrk\x1b[0m \x1b[1;36m▷2\x1b[0m'
+    assert animate(busy, 0) == animate(busy, 40) and animate(busy, 39) == animate(busy, 79)
+
     agy_marks = [animate('agy \x1b[1;36m▷\x1b[0m', frame) for frame in range(8)]
     assert [re.sub(r'\x1b\[[0-9;]*m', '', m) for m in agy_marks] == ['agy ●'] * 8
 
@@ -58,7 +86,7 @@ def main():
         state = Path(directory) / 'state'
         cache = Path(f'{state}.animate')
         frame_file = Path(f'{state}.animate.frame')
-        cache.write_bytes(b'P:%1\tcodex WORKING\tP:%1\0')
+        cache.write_bytes(b'P:%1\tcodex \x1b[1m\x1b[1;36mWORKING\x1b[0m\tP:%1\0')
         frame_file.write_text('2\n')
         result = sp.run(
             [str(ROOT / 'scripts/animate-frame')],
@@ -69,6 +97,30 @@ def main():
         text = result.stdout.split(b'\t', 2)[1]
         assert b'WORKING' in text.replace(b'\x1b[7m', b'').replace(b'\x1b[27m', b'')
         assert b'\x1b[7m' in text
+
+    with tempfile.TemporaryDirectory(prefix='canopy-animate-frames-') as directory:
+        state = Path(directory) / 'state'
+        cache = Path(f'{state}.animate')
+        rows = f'P:%1\tcodex {word}\tP:%1\0P:%2\tshell\tP:%2\0'.encode()
+        cache.write_bytes(rows)
+        prefix = f'{cache}.f.test'
+        sp.run(['python3', str(ROOT / 'lib/animate.py'), '--frames', '40', prefix],
+               input=rows, capture_output=True, check=True)
+        assert sorted(int(p.name.rsplit('.', 1)[1]) for p in Path(directory).glob('state.animate.f.test.*')) == list(range(40))
+        Path(f'{cache}.prefix').write_text(prefix + '\n')
+        env = {**os.environ, 'TMUX_CANOPY_STATE': str(state)}
+        for frame in (0, 7, 39):
+            Path(f'{state}.animate.frame').write_text(f'{frame}\n')
+            served = sp.run([str(ROOT / 'scripts/animate-frame')], env=env, capture_output=True, check=True).stdout
+            direct = sp.run(['python3', str(ROOT / 'lib/animate.py'), str(frame)],
+                            input=rows, capture_output=True, check=True).stdout
+            assert served == direct == Path(f'{prefix}.{frame}').read_bytes(), frame
+        # A precomputed frame is served as-is; missing frames fall back to Python.
+        Path(f'{prefix}.7').write_bytes(b'precomputed\0')
+        Path(f'{state}.animate.frame').write_text('7\n')
+        assert sp.run([str(ROOT / 'scripts/animate-frame')], env=env, capture_output=True, check=True).stdout == b'precomputed\0'
+        Path(f'{prefix}.7').unlink()
+        assert b'\x1b[7m' in sp.run([str(ROOT / 'scripts/animate-frame')], env=env, capture_output=True, check=True).stdout
 
     with tempfile.TemporaryDirectory(prefix='canopy-animate-mark-') as directory:
         state = Path(directory) / 'state'
@@ -84,11 +136,7 @@ def main():
         assert result.stdout.endswith(b'\0')
         text = result.stdout.split(b'\t', 2)[1].decode('utf-8')
         assert '●' in text and '▷' not in text
-        mark_check = sp.run(
-            ['bash', '-c', 'mark=$\'\\xe2\\x96\\xb7\'; LC_ALL=C grep -aEq "WORKING|wrk|$mark" "$1"', '_', str(cache)],
-            capture_output=True,
-        )
-        assert mark_check.returncode == 0, mark_check.stderr
+        assert badge_grep(cache), 'styled working mark must start the animator'
 
     with tempfile.TemporaryDirectory(prefix='canopy-animate-') as directory:
         env = os.environ.copy()
@@ -126,7 +174,7 @@ def main():
             ready_file = Path(f'{state_file}.ready')
             search_file = Path(f'{state_file}.search')
             state_file.write_text('VIEW\ttree\n')
-            cache_file.write_bytes(b'P:%1\tcodex WORKING\tP:%1\0')
+            cache_file.write_bytes(b'P:%1\tcodex \x1b[1m\x1b[1;36mWORKING\x1b[0m\tP:%1\0')
 
             animator = sp.Popen(
                 ['bash', str(ROOT / 'scripts/agent-animate'), pane, token, str(state_file)],
@@ -136,6 +184,10 @@ def main():
                 # 1. While ready_file does not exist, animator must NOT advance frames
                 time.sleep(0.35)
                 assert frame_file.read_text().strip() == '0'
+                # Frames are precomputed once and published under this token.
+                prefix_file = Path(f'{cache_file}.prefix')
+                assert prefix_file.read_text().strip().endswith('.f.' + token.replace('-', '_')), prefix_file
+                assert len(list(Path(directory).glob('sidebar-state.animate.f.*'))) == 40
 
                 # 2. Once ready_file exists, animator begins advancing frames
                 ready_file.touch()
@@ -157,8 +209,25 @@ def main():
                 print('ok - agent-animate respects ready guard and suppresses during search mode')
             finally:
                 tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
-                animator.terminate()
                 animator.wait(timeout=5)
+            # Losing the token ends the animator, which removes its own frames.
+            assert not Path(f'{cache_file}.prefix').exists()
+            assert not list(Path(directory).glob('sidebar-state.animate.f.*'))
+
+            # A new animator continues from the previous frame instead of 0.
+            frame_file.write_text('17\n')
+            tm('set-option', '-p', '-t', pane, '@tmux_canopy_animate_token', token)
+            animator = sp.Popen(
+                ['bash', str(ROOT / 'scripts/agent-animate'), pane, token, str(state_file)],
+                env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL,
+            )
+            try:
+                time.sleep(0.35)
+                assert int(frame_file.read_text().strip()) >= 17
+            finally:
+                tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
+                animator.wait(timeout=5)
+            print('ok - agent-animate precomputes frames, cleans them up, and keeps the frame across restarts')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 

@@ -297,6 +297,8 @@ printf 'VIEW\tbuffers\n' > "$state_file"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/sidebar-source' > '$view_file'"
 grep -Fq 'B2:747265652d746573742d627566666572' "$view_file" || fail 'buffer view lists native tmux buffers'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/sidebar-action' delete 'B:tree-test-buffer'"
+"${TMUX_TEST[@]}" list-buffers -F '#{buffer_name}' | grep -Fqx tree-test-buffer || fail 'buffer delete action only arms on the first press'
+run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/sidebar-action' delete 'B:tree-test-buffer'"
 if "${TMUX_TEST[@]}" list-buffers -F '#{buffer_name}' | grep -Fqx tree-test-buffer; then fail 'buffer delete action removes the native buffer'; fi
 printf 'VIEW\ttree\n' > "$state_file"
 rm -f "$view_file"

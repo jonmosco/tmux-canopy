@@ -3,15 +3,18 @@
 source "${BASH_SOURCE[0]%/*}/launch-lib.sh"
 
 sidebar_client_key() {
-  printf '%s' "${1:-}" | cksum | awk '{ print $1 }'
+  canopy_client_key "${1:-}"
+  printf '%s\n' "$CANOPY_KEY"
 }
 
 sidebar_cache_option() {
-  printf '@tmux_canopy_client_%s\n' "$(sidebar_client_key "${1:-}")"
+  canopy_client_key "${1:-}"
+  printf '@tmux_canopy_client_%s\n' "$CANOPY_KEY"
 }
 
 sidebar_transition_option() {
-  printf '@tmux_canopy_transition_%s\n' "$(sidebar_client_key "${1:-}")"
+  canopy_client_key "${1:-}"
+  printf '@tmux_canopy_transition_%s\n' "$CANOPY_KEY"
 }
 
 begin_sidebar_transition() {

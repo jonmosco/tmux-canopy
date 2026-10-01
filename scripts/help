@@ -53,7 +53,7 @@ help_records() {
   key 'z' 'Toggle zoom on the selected pane or window'
   key 'b' 'Break selected pane into its own window'
   key 'r' 'Rename a session or window'
-  key 'x, then x' 'Confirm deletion of a pane, window or session'
+  key 'x, then x' 'Confirm deletion of a pane, window, session or buffer'
   key 'a, then D' 'Open diagnostics'
   if [[ "$agents_enabled" == on ]]; then
     note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'

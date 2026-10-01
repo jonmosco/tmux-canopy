@@ -11,8 +11,20 @@ if [[ ! "$session" =~ ^\$[0-9]+$ || ! "$window" =~ ^@[0-9]+$ || ! "$pane" =~ ^%[
   printf 'bell\n'
   exit 0
 fi
+# Render once and keep the rows: fzf reloads this same list below, so the
+# position computed here is exact and no second render (Ctrl-r) is needed.
+# The suffix keeps concurrent jumps apart; it is plain text because the path
+# itself reaches fzf's reload shell only through $TMUX_CANOPY_STATE.
+rows=''
+suffix="rows.$$.$RANDOM"
+if [[ -n "${TMUX_CANOPY_STATE:-}" ]]; then
+  umask 077
+  rows="$TMUX_CANOPY_STATE.$suffix"
+  exec {rows_fd}> "$rows" 2>/dev/null || rows=''
+fi
 position=0 pane_position='' window_position='' session_position=''
 while IFS= read -r -d '' record; do
+  [[ -z "$rows" ]] || printf '%s\0' "$record" >&"$rows_fd"
   token="${record%%$'\t'*}"
   [[ "$token" == H:* ]] && continue
   ((position+=1))
@@ -23,12 +35,18 @@ while IFS= read -r -d '' record; do
     "S:$session") session_position="$position" ;;
   esac
 done < <("$SCRIPT_DIR/sidebar-source" --stable --read0)
+reload=''
+if [[ -n "$rows" ]]; then
+  exec {rows_fd}>&-
+  reload="clear-screen+reload-sync(cat \"\$TMUX_CANOPY_STATE.$suffix\"; rm -f \"\$TMUX_CANOPY_STATE.$suffix\")"
+fi
 target="${pane_position:-${window_position:-$session_position}}"
 if [[ "$target" =~ ^[1-9][0-9]*$ ]]; then
   # If a search hides the target, clear the query before moving the pointer.
-  # Query changes search asynchronously; wait before applying an absolute row
-  # position or fzf may clamp it to the old, filtered result set.
-  printf 'change-query()+wait+pos(%s)\n' "$target"
+  # --track would return the pointer to the old row once the reload lands, so
+  # this one reload skips it (later reloads still track). Reloads and query
+  # changes search asynchronously; wait before applying an absolute position.
+  printf 'change-query()+untrack-current+%swait+pos(%s)\n' "${reload:+$reload+}" "$target"
 else
-  printf 'bell\n'
+  printf '%sbell\n' "${reload:+$reload+}"
 fi

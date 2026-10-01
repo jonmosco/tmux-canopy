@@ -139,6 +139,26 @@ canopy_pane_agent 10
 """], capture_output=True, text=True, timeout=10)
     check(probe.returncode == 0 and probe.stdout.strip() == "pi", probe.stderr or probe.stdout)
     print("ok - process_name prefers argv0 over Node MainThread comm")
+    # Several node panes share one ps snapshot: lookups return through
+    # CANOPY_REPLY, so no subshell discards the cache and re-runs ps.
+    probe = subprocess.run(["bash", "-c", f"""
+set -u
+source {script}
+counter=$(mktemp)
+ps() {{ printf x >> "$counter"; printf '%s\n' \
+  '10 1 Mon Sep 28 18:47:49 2026 -zsh' '11 10 Mon Sep 28 18:54:08 2026 node /opt/bin/pi --x' \
+  '20 1 Mon Sep 28 18:47:49 2026 -zsh' '21 20 Mon Sep 28 18:54:08 2026 node /lib/oh-my-pi/cli.js' \
+  '30 1 Mon Sep 28 18:47:49 2026 -zsh' '31 30 Mon Sep 28 18:54:08 2026 node server.js'; }}
+canopy_load_ps_snapshot
+out=''
+for root in 10 20 30; do canopy_pane_agent "$root" >/dev/null; out+="$root=$CANOPY_REPLY "; done
+canopy_ps_snapshot_lines >/dev/null
+calls=$(<"$counter"); rm -f "$counter"
+printf '%scalls=%s pids=%s' "$out" "${{#calls}}" "${{#CANOPY_KIND_PIDS[@]}}"
+"""], capture_output=True, text=True, timeout=10)
+    check(probe.returncode == 0 and probe.stdout == "10=pi 20=omp 30= calls=1 pids=2",
+          probe.stderr or probe.stdout)
+    print("ok - node pane relabeling reads the process table once")
     test_live_cursor_agent_identity()
     print("ok - process_identity finds live cursor-agent panes")
     test_live_agent_process_scan()

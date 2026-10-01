@@ -85,7 +85,7 @@ buffer_menu() {
   sidebar_display_menu "${TMUX_CANOPY_CLIENT:-}" "$sidebar" -x C -y C -T ' Buffer actions ' \
     'Paste into target pane' p "$paste" \
     'Yank to system clipboard' y "$yank" \
-    'Delete buffer' x "$delete" \
+    'Delete (arm)' x "$delete" \
     'Diagnostics' D "$(menu_command diagnostics "$buffer_token")" \
     'Cancel' q ''
 }
@@ -142,7 +142,8 @@ case "$action" in
 
   delete)
     case "$token" in
-      B:*|B2:*) buffer_decode_token "$token" || exit 0; tmux delete-buffer -b "$BUFFER_NAME" 2>/dev/null || true ;;
+      # Buffers arm first like every other deletion; a second x confirms.
+      B:*|B2:*) buffer_decode_token "$token" || exit 0; "$SCRIPT_DIR/tree-action" delete "$token" ;;
       X:*) process_menu "$token" ;;
       Q:*) "$SCRIPT_DIR/tree-action" delete "P:${token#Q:}" ;;
       *) "$SCRIPT_DIR/tree-action" delete "$token" ;;

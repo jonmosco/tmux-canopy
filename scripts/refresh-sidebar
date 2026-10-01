@@ -13,7 +13,8 @@ else
   client="${2:-}"; hook="${3:-}"
 fi
 [[ -n "$client" ]] || exit 0
-key="$(sidebar_client_key "$client")"
+canopy_client_key "$client"
+key=$CANOPY_KEY
 guard="@tmux_canopy_transition_$key"
 
 snapshot() {
@@ -131,7 +132,7 @@ if [[ "$mode" == worker ]]; then
       continue
     fi
     commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
-    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o ; send-keys -t $sidebar C-r\" ; "
+    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o\" ; "
     commands+="set-option -pu -t $sidebar @tmux_canopy_focus_pending ; set-option -pu -t $sidebar @tmux_canopy_focus_deadline"
     committed="$(commit "#{&&:#{==:#{@tmux_canopy_focus_pending},$token},#{!=:#{$guard},1}}" "$commands ; display-message -p focus-committed")"
     if [[ "$committed" == focus-committed ]]; then
@@ -158,7 +159,7 @@ if [[ "$hook" == settled ]]; then
   # below, which exists to wait out focus that may still be settling.
   commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
   if [[ "$location" != "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)" ]]; then
-    commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o ; send-keys -t $sidebar C-r"
+    commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o"
   else
     commands+="send-keys -t $sidebar C-o"
   fi
@@ -169,7 +170,7 @@ if [[ "$hook" == after-select-pane && "$returned" == 1 ]]; then
   # A deliberate return to the sidebar selects the live content row. The
   # location is settled at this point, so publish it before the fzf jump.
   commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
-  commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o ; send-keys -t $sidebar C-r"
+  commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o"
   commit "#{!=:#{$guard},1}" "$commands"
   exit 0
 fi

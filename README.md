@@ -146,7 +146,7 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 | `t` | Create new window in selected session |
 | `S` / `N` | Create session / create named session with prompt |
 | `r` | Rename selected session or window |
-| `x`, then `x` | Confirm deletion of a pane, window, or session |
+| `x`, then `x` | Confirm deletion of a pane, window, session, or paste buffer |
 | `m` / `c` | Mark move source / cancel move mode |
 | `u` / `U` | Clear selected / all notifications |
 | `F` / `Ctrl-f` | Tree filters: All / Current session / Unread, plus window name and pane title |
@@ -163,6 +163,21 @@ Use your usual tmux pane navigation to return to the sidebar after focusing an a
 When you leave the sidebar for a content pane, its selection pointer follows the active pane automatically.
 
 With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
+
+### Understanding the sidebar header
+
+The top bar displays the available views and the active tree filter:
+
+```text
+╭─ Tree Agents Proc Buff ─ All
+```
+
+- **Views (`1`–`4`):** The highlighted name indicates the active view. Switch views with `1` (**Tree**), `4` (**Agents**), `2` (**Proc**), and `3` (**Buff**).
+- **Scope filter (`─ All`):** Indicates the visibility filter currently applied to the tree. Press **`F`** or **`Ctrl-f`** to cycle or configure:
+  - **`All`** — Display all sessions and panes across the entire tmux server.
+  - **`Session`** — Filter the tree to display only the current session.
+  - **`Unread`** — Display only windows and panes with unread activity, bell, or silence alerts.
+  - **`+W` / `+T`** — Appended when an active window name (`+W`) or pane title (`+T`) search rule is applied (e.g., `All+W`).
 
 The default Tree view uses one active-pane dot, shorter branch prefixes, and
 directory labels that adapt to sidebar width. For the leanest view, set

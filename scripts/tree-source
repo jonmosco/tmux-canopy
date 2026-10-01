@@ -16,7 +16,16 @@ for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp
 done
 # Appearance before agents so agents remains the final D field for tree-source.
 config+="${sep}#{@tmux_canopy_appearance}"
-config+="${sep}#{@tmux-canopy-agents}"
+# The client's effective agents setting (saved on/off, else the global
+# default) resolves inside this same tmux call when the client is known.
+agents_client="${TMUX_CANOPY_CLIENT:-${TMUX_CANOPY_RENDER_CLIENT:-}}"
+if [[ -n "$agents_client" ]]; then
+  canopy_client_key "$agents_client"
+  agents_option="@tmux_canopy_agents_$CANOPY_KEY"
+  config+="${sep}#{?#{==:#{$agents_option},on},on,#{?#{==:#{$agents_option},off},off,#{@tmux-canopy-agents}}}"
+else
+  config+="${sep}#{@tmux-canopy-agents}"
+fi
 sessions="S${sep}#{session_id}${sep}$(text session_name)${sep}#{session_attached}"
 windows="W${sep}#{session_id}${sep}#{window_id}${sep}#{window_index}${sep}$(text window_name)${sep}#{window_linked_sessions}${sep}#{synchronize-panes}${sep}#{@tmux_canopy_notice_activity}${sep}#{@tmux_canopy_notice_bell}${sep}#{@tmux_canopy_notice_silence}${sep}#{window_zoomed_flag}"
 panes="P${sep}#{pane_id}${sep}#{window_id}${sep}#{pane_index}${sep}$(text pane_current_command)${sep}$(text pane_title)${sep}$(text pane_current_path)${sep}#{pane_dead}${sep}#{@tmux_canopy}${sep}#{@tmux_canopy_slot}${sep}#{@tmux_canopy_notice_pane_activity}${sep}#{@tmux_canopy_notice_pane_bell}${sep}#{@tmux_canopy_notice_pane_silence}${sep}#{@tmux_canopy_target}${sep}#{@tmux_canopy_target_session}${sep}#{pane_last}${sep}#{pane_pid}${sep}#{@tmux_canopy_agent_source}${sep}$(text @tmux_canopy_agent_session)${sep}#{@tmux_canopy_agent_pane_pid}${sep}#{@tmux_canopy_agent_status}${sep}#{@tmux_canopy_agent_updated}${sep}#{@tmux_canopy_agent_process_pid}${sep}$(text @tmux_canopy_agent_process_birth)${sep}$(text @tmux_canopy_agent_subagents)${sep}#{?window_zoomed_flag,#{pane_active},0}"
@@ -30,7 +39,14 @@ snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
   list-sessions -F "$sessions" \; list-windows -a -F "$windows" \; \
   list-panes -a -F "$panes" \; list-clients -F "$clients" 2>/dev/null)" || exit 1
 config_row="${snapshot%%$'\n'*}"
-if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
+if [[ -n "$agents_client" ]]; then
+  agents_enabled=${config_row##*"$sep"}
+  [[ "$agents_enabled" == on ]] || agents_enabled=off
+else
+  # No client in the environment: canopy_agents_enabled finds the sidebar's
+  # owner from its pane option.
+  if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
+fi
 config_row="${config_row%"$sep"*}${sep}${agents_enabled}"
 if [[ "$snapshot" == *$'\n'* ]]; then
   snapshot="${config_row}"$'
@@ -54,15 +70,21 @@ while (($#)); do
   shift
 done
 # tmux reports Pi's executable (node). Show pi/omp when that process is the agent.
-if [[ "$snapshot" == *"${sep}node${sep}"* || "$snapshot" == *"${sep}nodejs${sep}"* ]]; then
+# Only a pane row's command field counts; a window or title named node does not.
+field="[^${sep}]*${sep}"
+node_row="(^|"$'\n'")P${sep}${field}${field}${field}(node|nodejs)${sep}"
+if [[ "$snapshot" =~ $node_row ]]; then
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/../lib/agent-process.sh"
+  # Load once in this shell; every pane lookup below reuses the cached table.
+  canopy_load_ps_snapshot
   relabeled=''
   while IFS= read -r line || [[ -n $line ]]; do
     if [[ $line == P$sep* ]]; then
       IFS="$sep" read -ra fields <<< "$line"
       if [[ ${fields[4]:-} == node || ${fields[4]:-} == nodejs ]]; then
-        kind=$(canopy_pane_agent "${fields[16]:-}")
+        canopy_pane_agent "${fields[16]:-}" >/dev/null
+        kind=$CANOPY_REPLY
         if [[ -n $kind ]]; then
           fields[4]=$kind
           line=${fields[0]}
@@ -103,7 +125,8 @@ else
       # shellcheck disable=SC1091
       source "$SCRIPT_DIR/../lib/agent-process.sh"
     fi
-    processes="$(canopy_ps_snapshot_lines)" || exit 1
+    canopy_ps_snapshot_lines >/dev/null || exit 1
+    processes=${CANOPY_REPLY%$'\n'}
     [[ -z "$processes" ]] || snapshot+=$'\n'"$processes"
   fi
 fi
