@@ -125,8 +125,15 @@ def main():
                 except OSError:
                     pass
             threading.Thread(target=drain, args=(master,), daemon=True).start()
-            time.sleep(.2)
-            client = tm('list-clients', '-F', '#{client_tty}')
+            # A slow machine can take longer than a fixed pause to attach; an
+            # empty client name would make every navigation look foreign.
+            deadline = time.monotonic() + 10
+            client = ''
+            while not client and time.monotonic() < deadline:
+                client = tm('list-clients', '-F', '#{client_tty}')
+                if not client:
+                    time.sleep(.05)
+            assert client, 'pty client attached'
             tm('select-pane', '-t', pane_a)
             action_env = env.copy()
             action_env['TMUX'] = tm('display-message', '-p', '#{socket_path},#{pid},0')
