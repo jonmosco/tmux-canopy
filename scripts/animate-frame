@@ -9,5 +9,10 @@ frame_file="${state_file}.animate.frame"
 frame=0
 [[ -r "$frame_file" ]] && frame="$(<"$frame_file")"
 [[ "$frame" =~ ^[0-9]+$ ]] || frame=0
+# agent-animate precomputes every frame once and publishes their prefix last,
+# so a published prefix always names a complete set for the current cache.
+prefix=''
+[[ -r "${cache}.prefix" ]] && prefix="$(<"${cache}.prefix")"
+[[ -n "$prefix" && -r "${prefix}.${frame}" ]] && exec cat -- "${prefix}.${frame}"
 export TMUX_CANOPY_STABLE=1 TMUX_CANOPY_NUL=1
 exec python3 "$SCRIPT_DIR/../lib/animate.py" "$frame" < "$cache"

@@ -4,9 +4,12 @@
 set -u
 pane="${1:-}"
 [[ "$pane" =~ ^%[0-9]+$ ]] || exit 0
-[[ "$(tmux show-option -pqv -t "$pane" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0
-nonce="$(date +%s%N)-$$"
-tmux set-option -pq -t "$pane" @tmux_canopy_edge_nonce "$nonce"
+# $$ separates concurrent workers; date +%N is not portable (macOS prints N).
+nonce="${EPOCHREALTIME:-$SECONDS}-$$-$RANDOM"
+# Claim only a live sidebar; any other pane never receives a nonce, so the
+# comparison below exits without a reload.
+tmux if-shell -F -t "$pane" '#{==:#{@tmux_canopy},1}' \
+  "set-option -pq -t $pane @tmux_canopy_edge_nonce '$nonce'" 2>/dev/null || exit 0
 sleep 0.06
 [[ "$(tmux show-option -pqv -t "$pane" @tmux_canopy_edge_nonce 2>/dev/null || true)" == "$nonce" ]] || exit 0
 tmux send-keys -t "$pane" C-r 2>/dev/null || true

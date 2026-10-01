@@ -19,6 +19,43 @@ tmux_quote() {
   printf '"%s"' "$value"
 }
 
+# POSIX cksum of a client name, computed in-shell: per-client option names are
+# keyed by it on every refresh, and printf|cksum|awk costs three processes.
+# The result is left in CANOPY_KEY (no subshell) and memoized per process.
+# This file must still load under Bash 3.2 to report the version failure, so
+# the associative memo exists only on Bash 4+.
+CANOPY_KEY=''
+canopy_key_memo=0
+if ((BASH_VERSINFO[0] >= 4)); then
+  declare -gA CANOPY_KEY_CACHE=()
+  canopy_key_memo=1
+fi
+canopy_client_key() {
+  local value="${1:-}"
+  if ((canopy_key_memo)) && [[ -n "${CANOPY_KEY_CACHE[x$value]+set}" ]]; then
+    CANOPY_KEY=${CANOPY_KEY_CACHE[x$value]}
+    return 0
+  fi
+  local LC_ALL=C crc=0 length i byte bit
+  length=${#value}
+  for ((i = 0; i < length; i++)); do
+    printf -v byte '%d' "'${value:i:1}"
+    ((byte &= 255, crc ^= byte << 24))
+    for ((bit = 0; bit < 8; bit++)); do
+      ((crc = crc & 0x80000000 ? ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF : (crc << 1) & 0xFFFFFFFF))
+    done
+  done
+  # cksum appends the length, least significant byte first.
+  for ((; length > 0; length >>= 8)); do
+    ((crc ^= (length & 255) << 24))
+    for ((bit = 0; bit < 8; bit++)); do
+      ((crc = crc & 0x80000000 ? ((crc << 1) ^ 0x04C11DB7) & 0xFFFFFFFF : (crc << 1) & 0xFFFFFFFF))
+    done
+  done
+  CANOPY_KEY=$((~crc & 0xFFFFFFFF))
+  if ((canopy_key_memo)); then CANOPY_KEY_CACHE[x$value]=$CANOPY_KEY; fi
+}
+
 # Per-client agent awareness. Unset means the global @tmux-canopy-agents default.
 canopy_agents_client() {
   if [[ -n "${TMUX_CANOPY_CLIENT:-}" ]]; then
@@ -37,20 +74,23 @@ canopy_agents_option() {
   local client="${1:-}"
   [[ -n "$client" ]] || client="$(canopy_agents_client)"
   [[ -n "$client" ]] || return 0
-  printf '@tmux_canopy_agents_%s' "$(printf '%s' "$client" | cksum | awk '{ print $1 }')"
+  canopy_client_key "$client"
+  printf '@tmux_canopy_agents_%s' "$CANOPY_KEY"
+}
+# A tmux format that expands to the client's effective setting: its saved
+# on/off choice, else the global default. Lets callers fold the lookup into a
+# tmux call they already make.
+canopy_agents_format() {
+  local client="${1:-}" option
+  [[ -n "$client" ]] || { printf '#{@tmux-canopy-agents}'; return 0; }
+  canopy_client_key "$client"
+  option="@tmux_canopy_agents_$CANOPY_KEY"
+  printf '#{?#{==:#{%s},on},on,#{?#{==:#{%s},off},off,#{@tmux-canopy-agents}}}' "$option" "$option"
 }
 canopy_agents_enabled() {
-  local client="${1:-}" option saved
+  local client="${1:-}"
   [[ -n "$client" ]] || client="$(canopy_agents_client)"
-  if [[ -n "$client" ]]; then
-    option="$(canopy_agents_option "$client")"
-    saved="$(tmux show-option -gqv "$option" 2>/dev/null || true)"
-    if [[ "$saved" == on || "$saved" == off ]]; then
-      [[ "$saved" == on ]]
-      return
-    fi
-  fi
-  [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]]
+  [[ "$(tmux display-message -p "$(canopy_agents_format "$client")" 2>/dev/null || true)" == on ]]
 }
 
 # run-shell performs one tmux format expansion before executing its shell.
@@ -77,10 +117,11 @@ sidebar_display_menu() {
 }
 
 sidebar_failure() {
-  local owner="${1:-}" code="$2" message="$3" key='' stamp candidate _rest
+  local owner="${1:-}" code="$2" message="$3" key='' stamp candidate
   [[ -n "$owner" ]] || { printf 'tmux-canopy: %s\n' "$message" >&2; return 0; }
   message="${message:0:256}"
-  read -r key _rest < <(printf '%s' "$owner" | cksum 2>/dev/null) || true
+  canopy_client_key "$owner"
+  key=$CANOPY_KEY
   stamp="$(date -u +%FT%TZ 2>/dev/null || printf 'time-unavailable')"
   if [[ "$key" =~ ^[0-9]+$ ]]; then
     tmux set-option -gq "@tmux_canopy_failure_$key" "$stamp [$code] $message" 2>/dev/null || true

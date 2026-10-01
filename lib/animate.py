@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-"""Animate WORKING / wrk status words in NUL-delimited fzf rows."""
+"""Animate WORKING / wrk status words in NUL-delimited fzf rows.
+
+Usage: animate.py FRAME < cache            one frame to stdout
+       animate.py --frames N PREFIX < cache  write PREFIX.0 .. PREFIX.N-1
+"""
+import os
 import re
 import sys
 
-frame = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 0
-WORKING_RE = re.compile(r'WORKING|wrk')
-MARK = b'\xe2\x96\xb7'.decode('utf-8')
+# Only the renderer's styled badges animate: an SGR start, the word (or the
+# working mark with an optional count), then a reset. Plain text such as a
+# ~/wrk directory or a WORKING window title never matches.
+BADGE_RE = re.compile(r'(\x1b\[[0-9;]*m)(WORKING|wrk|▷)([0-9]*)(\x1b\[0m)')
 STYLES = ['\033[2;36m', '\033[2;36m', '\033[36m', '\033[36m',
           '\033[1;36m', '\033[36m', '\033[36m', '\033[2;36m']
+# LCM of the WORKING band (10), wrk band (4) and STYLES (8) periods.
+PERIOD = 40
 
 
-def animate_word(word):
+def animate_word(word, frame):
     length = len(word)
     band = 1 if length <= 3 else 2
     positions = length - band + 1
@@ -28,19 +36,48 @@ def animate_word(word):
     return ''.join(out)
 
 
-def animate_mark():
-    return f'{STYLES[frame % 8]}●\033[0m'
+def animate_badge(match, frame):
+    style, word, count, reset = match.groups()
+    if word == '▷':
+        return f'{style}{STYLES[frame % 8]}●{count}{reset}'
+    return f'{style}{animate_word(word, frame)}{count}{reset}'
 
 
-data = sys.stdin.buffer.read().decode('utf-8', errors='replace')
-rows = data.split('\0')
-if rows and rows[-1] == '':
-    rows.pop()
-for row in rows:
-    fields = row.split('\t', 2)
-    if len(fields) >= 2:
-        fields[1] = WORKING_RE.sub(lambda m: animate_word(m.group()), fields[1])
-        fields[1] = fields[1].replace(MARK, animate_mark())
-        row = '\t'.join(fields)
-    sys.stdout.write(row + '\0')
-sys.stdout.flush()
+def render(rows, frame):
+    out = []
+    for row in rows:
+        fields = row.split('\t', 2)
+        if len(fields) >= 2:
+            fields[1] = BADGE_RE.sub(lambda m: animate_badge(m, frame), fields[1])
+            row = '\t'.join(fields)
+        out.append(row + '\0')
+    return ''.join(out)
+
+
+def read_rows():
+    data = sys.stdin.buffer.read().decode('utf-8', errors='replace')
+    rows = data.split('\0')
+    if rows and rows[-1] == '':
+        rows.pop()
+    return rows
+
+
+def main(argv):
+    if len(argv) > 3 and argv[1] == '--frames':
+        count = int(argv[2]) if argv[2].isdigit() else PERIOD
+        prefix = argv[3]
+        rows = read_rows()
+        for frame in range(count):
+            path = f'{prefix}.{frame}'
+            tmp = f'{path}.tmp'
+            with open(tmp, 'wb') as handle:
+                handle.write(render(rows, frame).encode('utf-8'))
+            os.replace(tmp, path)
+        return
+    frame = int(argv[1]) if len(argv) > 1 and argv[1].isdigit() else 0
+    sys.stdout.write(render(read_rows(), frame))
+    sys.stdout.flush()
+
+
+if __name__ == '__main__':
+    main(sys.argv)

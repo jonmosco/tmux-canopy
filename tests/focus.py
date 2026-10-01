@@ -28,7 +28,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='tree-focus-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
         selected, deliveries, state = (temp / name for name in ('selected', 'deliveries', 'state'))
+        renders = temp / 'renders'
         deliveries.touch()
+        renders.touch()
         state.touch()
 
         def tm(*args):
@@ -123,9 +125,15 @@ def main():
             bindings = [f'alt-a:pos({pos})', f"alt-z:execute-silent(printf '%s|%s|%s\\n' {{1}} {{3}} {{q}} > {selected})"]
             install_fzf_probe(temp, bindings, script_env)
             wrapper = temp / 'tmux'
-            wrapper.write_text('#!/bin/bash\nif [[ "$1" == if-shell && "$*" == *tmux_canopy_focus_pending* && "$*" == *send-keys* ]]; then printf "%s\\n" "$6" >> ' + shlex.quote(str(deliveries)) + '; fi\nexec ' + shlex.join([executable, '-L', socket]) + ' "$@"\n')
+            # Log focus deliveries, and count tree renders by tree-source's one
+            # batched snapshot call.
+            wrapper.write_text('#!/bin/bash\nif [[ "$1" == if-shell && "$*" == *tmux_canopy_focus_pending* && "$*" == *send-keys* ]]; then printf "%s\\n" "$6" >> ' + shlex.quote(str(deliveries)) + '; fi\n'
+                               'if [[ "$*" == *list-sessions*list-windows*list-panes* ]]; then printf x >> ' + shlex.quote(str(renders)) + '; fi\n'
+                               'exec ' + shlex.join([executable, '-L', socket]) + ' "$@"\n')
             wrapper.chmod(0o755)
             tm('set-environment', '-g', 'PATH', str(temp) + ':' + env['PATH'])
+            # The sidebar inherits this PATH, so its renders pass the wrapper too.
+            script_env['PATH'] = str(temp) + ':' + script_env['PATH']
             master, client = attach('one')
             script_env['TMUX_CANOPY_CLIENT'] = client
             run('toggle', client, pane_a, '42', 'global', 'T', 'Tab', 'slot')
@@ -150,11 +158,16 @@ def main():
             os.write(master, b'\x1b[15~')
             wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'same-pane departure selects active row')
             assert pointer_line(sidebar) != row_before
+            time.sleep(.3)
+            rendered = renders.stat().st_size
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'native pane focus marker')
+            wait(lambda: probe(sidebar).startswith('P:' + peer + '|'), 'native pane focus selects active row')
+            time.sleep(.3)
+            # The pointer jump and the list refresh share one render.
+            assert renders.stat().st_size - rendered == 1, renders.stat().st_size - rendered
             assert display(sidebar, '#{@tmux_canopy_target}') == peer
             assert set(active_rows()) == {'S:' + session, f'W:{wa}:{session}', 'P:' + peer}
-            wait(lambda: probe(sidebar).startswith('P:' + peer + '|'), 'native pane focus selects active row')
             print('ok - native pane focus updates hierarchy and selects active row')
 
             # Real SGR mouse click selects the other content pane.

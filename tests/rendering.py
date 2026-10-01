@@ -238,8 +238,7 @@ def main():
                 count = loads.stat().st_size
                 tm('send-keys', '-t', sidebar, key)
                 wait_for(lambda: loads.stat().st_size > count, 'bulk fold reload')
-                screen = tm('capture-pane', '-p', '-t', sidebar)
-                assert ('stable-beta' not in screen) == collapsed, screen
+                wait_for(lambda: ('stable-beta' not in tm('capture-pane', '-p', '-t', sidebar)) == collapsed, 'bulk fold screen update')
                 assert selection()[0].startswith('S:')
             # In search mode these uppercase letters must be literal input,
             # even when the query produces no selected row.

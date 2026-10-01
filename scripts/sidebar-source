@@ -57,40 +57,47 @@ trap 'exit 143' TERM HUP
 
 # Cache tree/Agents rows for the opt-in WORKING animator and keep one worker
 # alive only while a working badge is visible.
+clear_animate() {
+  local cache=$1 sidebar=$2
+  # Most refreshes have nothing to clear; skip the rm and tmux forks.
+  [[ -e "$cache" || -e "${cache}.prefix" ]] || return 0
+  rm -f -- "$cache" "${cache}.prefix" "${cache}".f.* "${state_file}.animate.frame"
+  tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+}
 schedule_animate() {
-  local sidebar="${TMUX_PANE:-}" token cache cache_tmp
+  local sidebar="${TMUX_PANE:-}" token cache cache_tmp settings animate theme
   [[ "$TMUX_CANOPY_NUL" == 1 && -n "$state_file" && "$sidebar" =~ ^%[0-9]+$ ]] || return 0
   cache="${state_file}.animate"
-  if ! command -v perl >/dev/null 2>&1; then
-    rm -f -- "$cache" "${state_file}.animate.frame"
-    tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+  if ! command -v python3 >/dev/null 2>&1; then
+    clear_animate "$cache" "$sidebar"
     return 0
   fi
-  local animate
-  animate="$(tmux show-option -gqv @tmux_canopy_animate 2>/dev/null || true)"
-  [[ -n "$animate" ]] || animate="$(tmux show-option -gqv @tmux-canopy-animate 2>/dev/null || true)"
-  if [[ "${animate:-on}" != on ||
-        "$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)" == mono ]]; then
-    rm -f -- "$cache" "${state_file}.animate.frame"
-    tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+  settings="$(tmux display-message -p -t "$sidebar" '#{?@tmux_canopy_animate,#{@tmux_canopy_animate},#{@tmux-canopy-animate}}|#{@tmux-canopy-theme}' 2>/dev/null || true)"
+  animate=${settings%%|*} theme=${settings#*|}
+  if [[ "${animate:-on}" != on || "$theme" == mono ]]; then
+    clear_animate "$cache" "$sidebar"
     return 0
   fi
-  local mark=$'\xe2\x96\xb7'
-  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | LC_ALL=C grep -aEq "WORKING|wrk|$mark"; then
+  # Match the styled badge the renderer emits (SGR, word or mark, reset), not
+  # plain text such as a ~/wrk directory; lib/animate.py uses the same pattern.
+  local badge=$'\e\\[[0-9;]*m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'
+  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | LC_ALL=C grep -aEq "$badge"; then
     cache_tmp="$(mktemp "${cache}.XXXXXX")" || return 0
     chmod 600 "$cache_tmp" 2>/dev/null || { rm -f -- "$cache_tmp"; return 0; }
     if ! printf '%s\0' "${records[@]}" > "$cache_tmp"; then
       rm -f -- "$cache_tmp"
       return 0
     fi
-    mv -f -- "$cache_tmp" "$cache"
+    # Retire the previous animator first, then drop its frames: they were
+    # precomputed for the old cache and must not be served for this one.
     token="$$.$RANDOM"
     tmux set-option -p -t "$sidebar" @tmux_canopy_animate_token "$token" 2>/dev/null || true
+    rm -f -- "${cache}.prefix"
+    mv -f -- "$cache_tmp" "$cache"
     # shellcheck disable=SC2091 # tmux_shell builds a quoted argv for run-shell.
     tmux run-shell -b "$(tmux_shell "$SCRIPT_DIR/agent-animate" "$sidebar" "$token" "$state_file")" 2>/dev/null || true
   else
-    rm -f -- "$cache" "${state_file}.animate.frame"
-    tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
+    clear_animate "$cache" "$sidebar"
   fi
 }
 

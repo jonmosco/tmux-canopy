@@ -69,6 +69,44 @@ def main():
             tm('set-option', '-gu', guard)
 
             print('ok - split refresh hook installed; refresh_sidebars respects transition guards')
+
+            # Server-wide hooks are gated inside tmux: splits with no sidebar and
+            # resizes of ordinary panes start no shell.
+            hook_lines = tm('show-hooks', '-g').splitlines()
+            for name in ('after-split-window[9003]', 'after-resize-pane[9001]', 'after-resize-pane[9006]'):
+                line = next((line for line in hook_lines if line.startswith(name)), '')
+                assert line.startswith(name + ' if-shell -F '), line
+            marker = temp / 'split-ran'
+            tm('set-hook', '-g', 'after-split-window[9003]',
+               f"if-shell -F '#{{S:#{{W:#{{P:#{{?#{{==:#{{@tmux_canopy}},1}},1,}}}}}}}}' 'run-shell \"touch {marker}\"'")
+            tm('set-option', '-pu', '-t', sidebar, '@tmux_canopy')
+            tm('kill-pane', '-t', tm('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600'))
+            assert not marker.exists(), 'split hook ran with no sidebar on the server'
+            tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
+            tm('kill-pane', '-t', tm('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600'))
+            assert marker.exists(), 'split hook skipped although a sidebar exists'
+            print('ok - split and resize hooks are gated inside tmux')
+
+            # A burst of pane-command events (zsh -> ls -> zsh ...) shares one
+            # delayed worker and one reload per agent-mode sidebar.
+            import time
+            tm('set-option', '-g', '@tmux-canopy-agents', 'on')
+            tm('set-environment', '-g', 'PATH', wrapped['PATH'])
+            before = sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines())
+            for _ in range(6):
+                sp.run([str(ROOT / 'scripts/agent-refresh')], env=wrapped, check=True, timeout=15)
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline and tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending'):
+                time.sleep(.05)
+            time.sleep(.2)
+            after = sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines())
+            assert after - before == 1, deliveries.read_text()
+            assert tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending') == ''
+            # A later event after the claim is released starts a new refresh.
+            sp.run([str(ROOT / 'scripts/agent-refresh')], env=wrapped, check=True, timeout=15)
+            time.sleep(.5)
+            assert sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()) - after == 1
+            print('ok - pane-command refresh bursts coalesce into one reload')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 

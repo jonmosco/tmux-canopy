@@ -179,9 +179,12 @@ if [[ "$sidebar_scope" == 'global' ]]; then
   done
 fi
 
+# Resize hooks fire for every pane on the server. Test the resized pane inside
+# tmux so ordinary content resizes start no shell at all.
+sidebar_pane_event="#{==:#{@tmux_canopy},1}"
 if [[ "$sidebar_transition" == 'slot' && "$resize_mode" == 'live' ]]; then
   tmux set-hook -g 'after-resize-pane[9001]' \
-    "$(plugin_job -b sync-width '#{pane_id}' '#{pane_width}')"
+    "if-shell -F $(tmux_quote "$sidebar_pane_event") $(tmux_quote "$(plugin_job -b sync-width '#{pane_id}' '#{pane_width}')")"
 fi
 
 # A staged drag leaves the physical border in place, so subsequent events
@@ -233,7 +236,11 @@ tmux set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
 # later select-pane leaves the new pane missing until focus moves again.
 # Run synchronously so a slot split still sees the navigation transition guard
 # and skips the reload (background -b can outlive the guard).
-tmux set-hook -g 'after-split-window[9003]' "$(plugin_job '' cleanup split)"
+# With no sidebar anywhere on the server there is nothing to repaint, so the
+# synchronous job is skipped inside tmux.
+any_sidebar_event="#{S:#{W:#{P:#{?#{==:#{@tmux_canopy},1},1,}}}}"
+tmux set-hook -g 'after-split-window[9003]' \
+  "if-shell -F $(tmux_quote "$any_sidebar_event") $(tmux_quote "$(plugin_job '' cleanup split)")"
 # client_tty may already resolve to a surviving client after a detach.
 tmux set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook_client}')"
 for hook in client-resized after-resize-window; do
@@ -242,7 +249,8 @@ done
 # Right-edge marks are padded to the sidebar width at render time. One reload
 # after the width settles, not a tree rebuild on every column of a drag.
 tmux set-hook -gu 'after-resize-pane[9006]' 2>/dev/null || true
-tmux set-hook -g 'after-resize-pane[9006]' "$(plugin_job -b edge-refresh '#{pane_id}')"
+tmux set-hook -g 'after-resize-pane[9006]' \
+  "if-shell -F $(tmux_quote "$sidebar_pane_event") $(tmux_quote "$(plugin_job -b edge-refresh '#{pane_id}')")"
 for hook in after-rename-session after-rename-window; do
   tmux set-hook -g "${hook}[9003]" "$(plugin_job -b cleanup refresh)"
 done

@@ -44,7 +44,8 @@ while IFS= read -r window; do
 
   while IFS='|' read -r sidebar owner position; do
     [[ -n "$sidebar" ]] || continue
-    key="$(sidebar_client_key "$owner")"
+    canopy_client_key "$owner"
+    key=$CANOPY_KEY
     pending_lock="tmux-canopy-follow-$key"
     tmux wait-for -L "$pending_lock" 2>/dev/null || continue
     owner_lock="$pending_lock"

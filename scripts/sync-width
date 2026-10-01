@@ -7,34 +7,45 @@ source "$SCRIPT_DIR/lib.sh"
 pane_id="${1:-}"
 width="${2:-}"
 [[ -n "$pane_id" && "$width" =~ ^[1-9][0-9]*$ ]] || exit 0
-[[ "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy 2>/dev/null || true)" == '1' ]] || exit 0
+
+# One tmux call for everything this worker needs before it resizes. Unset
+# global options print nothing, so each line is matched by its name.
+sidebar='' drag_native='' minimum='' maximum='' min_content='' current_width='' total=''
+while read -r name value; do
+  case "$name" in
+    @tmux-canopy-min-width) minimum=$value ;;
+    @tmux-canopy-max-width) maximum=$value ;;
+    @tmux-canopy-min-content-width) min_content=$value ;;
+    pane:*) IFS='|' read -r sidebar drag_native current_width total <<< "${name#pane:}" ;;
+  esac
+done < <(tmux show-options -gq @tmux-canopy-min-width \; show-options -gq @tmux-canopy-max-width \; \
+  show-options -gq @tmux-canopy-min-content-width \; \
+  display-message -p -t "$pane_id" 'pane:#{@tmux_canopy}|#{@tmux_canopy_drag_native}|#{pane_width}|#{window_width}' 2>/dev/null)
+[[ "$sidebar" == '1' ]] || exit 0
 
 # Native mouse callbacks keep moving after the initial resize command. Its
 # after-resize hook carries an intermediate width; the release handler owns
 # the final commit and must not race a worker restoring that earlier width.
-[[ "$(tmux display-message -p -t "$pane_id" '#{@tmux_canopy_drag_native}' 2>/dev/null)" != 1 ]] || exit 0
+[[ "$drag_native" != 1 ]] || exit 0
 
-minimum="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
-maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
-min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
 : "${min_content:=40}"
 : "${minimum:=24}"
 : "${maximum:=0}"
 requested="$width"
-width="$(clamp_sidebar_width "$pane_id" "$requested" "$minimum" "$maximum" "$min_content")" || exit 0
-current_width="$(tmux display-message -p -t "$pane_id" '#{pane_width}' 2>/dev/null || true)"
+width="$(clamp_sidebar_width_for_total "$total" "$requested" "$minimum" "$maximum" "$min_content")" || exit 0
 if [[ "$current_width" != "$width" ]]; then
   tmux resize-pane -t "$pane_id" -x "$width" 2>/dev/null || true
 fi
 
-nonce="$(date +%s%N)-$$"
-tmux set-option -gq @tmux_canopy_resize_nonce "$nonce"
-tmux set-option -gq @tmux_canopy_runtime_width "$requested"
+# $$ separates concurrent workers; date +%N is not portable (macOS prints N).
+nonce="${EPOCHREALTIME:-$SECONDS}-$$-$RANDOM"
+tmux set-option -gq @tmux_canopy_resize_nonce "$nonce" \; set-option -gq @tmux_canopy_runtime_width "$requested"
 
 # Interactive dragging can emit many resize hooks. Only the most recent width
 # is propagated to inactive slot panes.
 sleep 0.2
-[[ "$(tmux show-option -gqv @tmux_canopy_resize_nonce 2>/dev/null || true)" == "$nonce" ]] || exit 0
-
-[[ "$(tmux display-message -p -t "$pane_id" '#{@tmux_canopy_drag_native}' 2>/dev/null)" != 1 ]] || exit 0
+IFS='|' read -r latest drag_native < <(
+  tmux display-message -p -t "$pane_id" '#{@tmux_canopy_resize_nonce}|#{@tmux_canopy_drag_native}' 2>/dev/null
+) || exit 0
+[[ "${latest:-}" == "$nonce" && "${drag_native:-}" != 1 ]] || exit 0
 sync_sidebar_slots "$requested" "$minimum" "$maximum" "$min_content"

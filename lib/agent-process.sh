@@ -2,6 +2,11 @@
 # Process identity and ancestry helpers. Linux uses /proc without spawning ps.
 canopy_ps_loaded=0
 declare -gA CANOPY_PPID CANOPY_LSTART CANOPY_COMM CANOPY_KIND
+# PIDs with a CANOPY_KIND entry, so pane lookups skip the rest of the table.
+declare -ga CANOPY_KIND_PIDS=()
+# Helpers also leave their result here so callers can avoid a $(...) subshell,
+# which would discard the snapshot cache along with the fork.
+CANOPY_REPLY=''
 # Non-Linux (no /proc) fallback: read the whole process table in one ps call
 # and cache it for the lifetime of this process, instead of spawning ps per
 # ancestor per pane. Safe to call repeatedly; only the first call forks ps.
@@ -20,8 +25,14 @@ canopy_load_ps_snapshot() {
     CANOPY_LSTART[$pid]="$w1 $w2 $w3 $w4 $w5"
     argv0=${argv0##*/}
     CANOPY_COMM[$pid]=${argv0%.exe}
+    case "${CANOPY_COMM[$pid]}" in
+      node|nodejs|pi|omp) ;;
+      *) continue ;;
+    esac
     read -ra rest_args <<< "$rest"
-    CANOPY_KIND[$pid]=$(canopy_hosted_agent "${CANOPY_COMM[$pid]}" "${rest_args[@]}")
+    canopy_hosted_agent "${CANOPY_COMM[$pid]}" "${rest_args[@]}" >/dev/null || continue
+    CANOPY_KIND[$pid]=$CANOPY_REPLY
+    CANOPY_KIND_PIDS+=("$pid")
   done <<< "$raw"
   return "$canopy_ps_status"
 }
@@ -29,11 +40,12 @@ canopy_load_ps_snapshot() {
 # when a later argument is their launcher; every other Node process stays node.
 canopy_hosted_agent() {
   local host=${1:-} token base
+  CANOPY_REPLY=''
   shift || true
   host=${host##*/}
   host=${host%.exe}
   case "$host" in
-    pi|omp) printf '%s' "$host"; return 0 ;;
+    pi|omp) CANOPY_REPLY=$host; printf '%s' "$host"; return 0 ;;
     node|nodejs) ;;
     *) return 1 ;;
   esac
@@ -42,11 +54,11 @@ canopy_hosted_agent() {
     base=${token##*/}
     base=${base%.exe}
     case "$base" in
-      pi|omp) printf '%s' "$base"; return 0 ;;
+      pi|omp) CANOPY_REPLY=$base; printf '%s' "$base"; return 0 ;;
     esac
     case "$token" in
-      *pi-coding-agent*) printf 'pi'; return 0 ;;
-      *oh-my-pi*) printf 'omp'; return 0 ;;
+      *pi-coding-agent*) CANOPY_REPLY=pi; printf 'pi'; return 0 ;;
+      *oh-my-pi*) CANOPY_REPLY=omp; printf 'omp'; return 0 ;;
     esac
   done
   return 1
@@ -54,9 +66,10 @@ canopy_hosted_agent() {
 # Closest pi/omp descendant of a pane root, if Node is only hosting that CLI.
 canopy_pane_agent() {
   local root=$1 pid current depth=0 best=129 found='' kind
+  CANOPY_REPLY=''
   [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
   canopy_load_ps_snapshot || return 1
-  for pid in "${!CANOPY_PPID[@]}"; do
+  for pid in "${CANOPY_KIND_PIDS[@]}"; do
     kind=${CANOPY_KIND[$pid]:-}
     [[ -n $kind ]] || continue
     current=$pid
@@ -72,16 +85,20 @@ canopy_pane_agent() {
       found=$kind
     fi
   done
+  CANOPY_REPLY=$found
   [[ -n $found ]] && printf '%s' "$found"
 }
 # Emits "pid ppid comm" lines from the cached snapshot, for callers that only
-# need a full-process-table scan (loads the snapshot on demand).
+# need a full-process-table scan (loads the snapshot on demand). The lines are
+# also left in CANOPY_REPLY for callers that must keep the cache.
 canopy_ps_snapshot_lines() {
   canopy_load_ps_snapshot || return 1
   local pid
+  CANOPY_REPLY=''
   for pid in "${!CANOPY_PPID[@]}"; do
-    printf '%s %s %s\n' "$pid" "${CANOPY_PPID[$pid]}" "${CANOPY_COMM[$pid]}"
+    CANOPY_REPLY+="$pid ${CANOPY_PPID[$pid]} ${CANOPY_COMM[$pid]}"$'\n'
   done
+  printf '%s' "$CANOPY_REPLY"
 }
 canopy_proc_stat() {
   local line fields

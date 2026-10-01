@@ -77,12 +77,46 @@ try:
         assert option('status') == 'working'
         print('ok - subagents appear as child lines of their pane in Tree and Agents views')
 
+        # The default appearance (places, folders and icons) and pills draw the
+        # same child lines; the plugin sets this option, so set it as it does.
+        import re
+        plain = lambda text: re.sub(r'\x1b\[[0-9;]*m', '', text)
+        for appearance in ('places', 'pills'):
+            tm('set-option', '-g', '@tmux_canopy_appearance', appearance)
+            # Child status matches the parent row: places uses its quiet glyph.
+            working = '▷' if appearance == 'places' else 'WORKING'
+            for view in ((), ('--agents',)):
+                lines = [plain(line) for line in pane_row(*view).split('\n')]
+                assert any('Explore ' + working in line for line in lines[1:]), (appearance, view, lines)
+                assert any('general-purpose ' + working in line for line in lines[1:]), (appearance, view, lines)
+                if appearance == 'places':
+                    assert not any('WORKING' in line for line in lines[1:]), lines
+                if appearance == 'places':
+                    # Each child branch starts in the pane's command column.
+                    command = lines[0].index('claude')
+                    branches = [re.search(r'[├╰]─', line).start() for line in lines[1:]]
+                    assert branches == [command] * len(branches), (lines, command, branches)
+            # Compact density has no room for child lines; the pane row counts them.
+            tm('set-option', '-g', '@tmux-canopy-density', 'compact')
+            lines = [plain(line) for line in pane_row().split('\n')]
+            assert len(lines) == 1 and '+2' in lines[0], (appearance, lines)
+            tm('set-option', '-gu', '@tmux-canopy-density')
+        tm('set-option', '-gu', '@tmux_canopy_appearance')
+        print('ok - places and pills appearances draw subagents under their pane, or count them when compact')
+
         # A subagent's permission request is attributed to it and marks the pane.
         event(session | {'hook_event_name': 'PermissionRequest', 'agent_id': 'a2', 'agent_type': 'general-purpose',
                          'tool_name': 'Bash', 'tool_input': {'command': 'make'}})
         lines = pane_row('--agents').split('\n')
         assert any('general-purpose' in line and 'NEEDS INPUT' in line for line in lines[1:]), lines
         assert any('Explore' in line and 'WORKING' in line for line in lines[1:]), lines
+        tm('set-option', '-g', '@tmux_canopy_appearance', 'places')
+        lines = [plain(line) for line in pane_row().split('\n')]
+        assert any('general-purpose !' in line for line in lines[1:]), lines
+        assert any('Explore ▷' in line for line in lines[1:]), lines
+        # Each child line keeps its age at the edge.
+        assert all(re.search(r'(<1m|[0-9]+[mh])$', line) for line in lines[1:]), lines
+        tm('set-option', '-gu', '@tmux_canopy_appearance')
         assert 'Request: general-purpose: Approval requested' in preview()
         assert f'P:{pane}\t' in needs_input()
         # Neither the main thread nor another subagent may clear it.

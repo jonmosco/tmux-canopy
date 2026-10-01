@@ -117,7 +117,8 @@ sidebar_navigate() (
   local -A nav_windows=() nav_sidebars=() nav_slots=() nav_widths=() nav_targets=() nav_actives=() nav_totals=() nav_lasts=() nav_heights=()
   local -a commands=() placement=()
   [[ -n "$nav_spec" ]] || exit 0
-  nav_key="$(sidebar_client_key "$nav_client")"
+  canopy_client_key "$nav_client"
+  nav_key=$CANOPY_KEY
   nav_guard="@tmux_canopy_transition_$nav_key"
   nav_lock="tmux-canopy-follow-$nav_key"
 

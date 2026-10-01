@@ -20,33 +20,48 @@ if [[ "$mode" == 'client' && -n "$client" ]]; then
   clear_sidebar_cache "$client"
 fi
 
+# A split cannot invalidate caches or targets; it only needs a repaint. The
+# hook already confirmed inside tmux that some sidebar exists (a new sidebar
+# is not tagged until its process starts, so zero docks here is not "none").
+if [[ "$mode" == 'split' ]]; then
+  refresh_sidebars
+  exit 0
+fi
+
+# One pane inventory replaces a list-panes | grep per cache entry and target.
+declare -A live=() is_sidebar=() sidebar_target=() sidebar_window=()
+sidebar_count=0
+while IFS=$'\t' read -r pane flag target window; do
+  [[ -n "$pane" ]] || continue
+  live[$pane]=1
+  if [[ "$flag" == 1 ]]; then
+    is_sidebar[$pane]=1
+    sidebar_target[$pane]=$target
+    sidebar_window[$pane]=$window
+    ((sidebar_count += 1))
+  fi
+done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}\t#{@tmux_canopy_target}\t#{window_id}' 2>/dev/null)
+
 # Remove cache entries whose pane vanished or no longer identifies itself as a
 # sidebar. This also repairs interrupted toggles and killed sidebar processes.
-while IFS= read -r option; do
-  [[ -n "$option" ]] || continue
-  pane="$(tmux show-option -gqv "$option" 2>/dev/null || true)"
-  if [[ -z "$pane" ]] || ! pane_exists "$pane" || [[ "$(tmux show-option -pqv -t "$pane" @tmux_canopy 2>/dev/null || true)" != '1' ]]; then
+while read -r option pane; do
+  [[ "$option" =~ ^@tmux_canopy_client_[0-9]+$ ]] || continue
+  # show-options quotes values; pane ids themselves never contain quotes.
+  pane=${pane//[\"\']/}
+  if [[ -z "$pane" || -z "${is_sidebar[$pane]:-}" ]]; then
     tmux set-option -gu "$option" 2>/dev/null || true
   fi
-done < <(tmux show-options -g 2>/dev/null | awk '$1 ~ /^@tmux_canopy_client_[0-9]+$/ { print $1 }')
+done < <(tmux show-options -g 2>/dev/null)
 
-while IFS= read -r sidebar; do
-  [[ -n "$sidebar" ]] || continue
-  target="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_target 2>/dev/null || true)"
-  if [[ -z "$target" ]] || ! pane_exists "$target"; then
-    sidebar_window="$(tmux display-message -p -t "$sidebar" '#{window_id}' 2>/dev/null || true)"
-    replacement="$(content_pane_for_window "$sidebar_window" 2>/dev/null || true)"
+for sidebar in "${!is_sidebar[@]}"; do
+  target=${sidebar_target[$sidebar]}
+  if [[ -z "$target" || -z "${live[$target]:-}" ]]; then
+    replacement="$(content_pane_for_window "${sidebar_window[$sidebar]}" 2>/dev/null || true)"
     [[ -n "$replacement" ]] && tmux set-option -p -t "$sidebar" @tmux_canopy_target "$replacement"
   fi
-done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}' 2>/dev/null |
-  awk -F '\t' '$2 == "1" { print $1 }')
+done
 
-sidebar_count="$(tmux list-panes -a -F '#{@tmux_canopy}' 2>/dev/null | awk '$0 == "1" { count++ } END { print count + 0 }')"
-# A new sidebar is not tagged until its process starts. after-split-window
-# therefore still sees zero docks and must not treat that as "no sidebars".
-if [[ "$mode" == 'split' ]]; then
-  [[ "$sidebar_count" == 0 ]] || refresh_sidebars
-elif ((sidebar_count == 0)); then
+if ((sidebar_count == 0)); then
   cleanup_sidebar_slots
   tmux set-option -gu @tmux_canopy_runtime_width 2>/dev/null || true
 elif [[ "$mode" == 'refresh' ]]; then
