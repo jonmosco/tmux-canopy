@@ -159,6 +159,18 @@ printf '%scalls=%s pids=%s' "$out" "${{#calls}}" "${{#CANOPY_KIND_PIDS[@]}}"
     check(probe.returncode == 0 and probe.stdout == "10=pi 20=omp 30= calls=1 pids=2",
           probe.stderr or probe.stdout)
     print("ok - node pane relabeling reads the process table once")
+    # macOS ps pads single-digit days in lstart ("Oct  1"); a hook-recorded
+    # start time must still match the parsed snapshot on days 1-9.
+    if not Path("/proc/self").exists():
+        probe = subprocess.run(["bash", "-c", f"""
+set -u
+source {script}
+ps() {{ printf '%s\n' '10 1 Thu Oct  1 07:06:21 2026 -zsh' '11 10 Thu Oct  1 07:06:22 2026 claude'; }}
+canopy_process_identity 10 11 'Thu Oct  1 07:06:22 2026' claude && echo padded
+canopy_process_identity 10 11 'Thu Oct  1 07:06:23 2026' claude || echo different
+"""], capture_output=True, text=True, timeout=10)
+        check(probe.stdout.split() == ["padded", "different"], probe.stderr or probe.stdout)
+        print("ok - process identity matches ps start times with padded single-digit days")
     test_live_cursor_agent_identity()
     print("ok - process_identity finds live cursor-agent panes")
     test_live_agent_process_scan()

@@ -21,6 +21,7 @@
 
 ### Added
 
+- With agent mode on, a footer at the bottom of the Tree view counts every agent on the server (`Agents ◆1 ▷2`) and reminds you that `n` jumps to the one waiting. It lives only in the sidebar; your status line is untouched.
 - OpenCode's adapter loads in V2 as well as V1. It subscribes to the public event stream and observes prompt, tool, and permission hooks without approving a request or blocking a tool. Reinstall with `canopy integration install opencode` and restart OpenCode.
 - Pi and Oh My Pi adapters report tool execution, extension UI prompts as needs-input, and aborted or errored settles as interrupted. Reinstall with `canopy integration install pi` (and `omp`) so the extension file is replaced.
 - Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.
@@ -75,6 +76,7 @@
 - A subagent's permission request can no longer be cleared by an unrelated tool completion with the same tool name from the main thread or another subagent.
 - Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle reports were silently dropped after the Codex reporter's helpers changed; `canopy doctor` now exercises every reporter's real report path so such drift fails loudly.
 - Native Claude Code installs (`claude.exe`) are recognized as Claude agents on macOS.
+- On macOS, hook-reported agent states were ignored on days 1–9 of each month, because `ps` pads single-digit days in process start times and the identity check compared them literally.
 - Subagents now appear in the default appearance; they were only drawn in `classic`. Compact density shows a count such as `+2` on the pane row instead.
 - Text that merely contains `wrk` or `WORKING`, such as a `~/wrk` directory or a window title, no longer starts or animates the working indicator.
 - The animation now requires `python3` rather than checking for `perl`, which it no longer uses.

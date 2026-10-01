@@ -77,6 +77,39 @@ try:
         assert option('status') == 'working'
         print('ok - subagents appear as child lines of their pane in Tree and Agents views')
 
+        # The sidebar's Tree view carries a server-wide agent summary for fzf's
+        # sticky footer; sidebar-source keeps it out of the list and stores it.
+        import re
+        plain = lambda text: re.sub(r'\x1b\[[0-9;]*m', '', text)
+        header_env = {'TMUX_CANOPY_HEADER': '1'}
+
+        def header_rows(*args):
+            result = sp.run([str(ROOT / 'scripts/tree-source'), *args], env=base | header_env | {
+                'TMUX_PANE': other, 'TMUX_CANOPY_NUL': '1'}, capture_output=True, text=True, timeout=10)
+            assert result.returncode == 0, result.stderr
+            return {record.split('\t', 1)[0]: record.split('\t', 1)[1]
+                    for record in result.stdout.split('\0') if '\t' in record}
+
+        assert plain(header_rows()['F:']) == 'Agents ▷1', header_rows()
+        assert 'F:' not in header_rows('--agents'), 'the Agents header already has the counts'
+        assert 'F:' not in rows(), 'only the sidebar render carries a footer'
+        footer = Path(str(state) + '.footer')
+
+        def sidebar_source():
+            result = sp.run([str(ROOT / 'scripts/sidebar-source'), '--stable', '--read0'], env=base | {
+                'TMUX_PANE': other, 'TMUX_CANOPY_RECORD_FORMAT': 'nul'}, capture_output=True, text=True, timeout=10)
+            assert result.returncode == 0, result.stderr
+            return result.stdout
+
+        listed = sidebar_source()
+        assert '\0F:\t' not in '\0' + listed and 'H:\t' in listed, listed[:200]
+        assert plain(footer.read_text()) == 'Agents ▷1\n', footer.read_text()
+        tm('set-option', '-g', '@tmux-canopy-agents', 'off')
+        sidebar_source()
+        assert footer.read_text() == '\n', 'agent mode off hides the footer'
+        tm('set-option', '-g', '@tmux-canopy-agents', 'on')
+        print('ok - the Tree view footer summarizes every agent and hides without agent mode')
+
         # The default appearance (places, folders and icons) and pills draw the
         # same child lines; the plugin sets this option, so set it as it does.
         import re

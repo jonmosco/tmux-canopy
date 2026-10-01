@@ -101,6 +101,24 @@ schedule_animate() {
   fi
 }
 
+# The Tree renderer may add an F: record for fzf's sticky footer (the agent
+# summary). Keep it out of the list and store it for the load binding, which
+# shows it; any other view clears it.
+take_footer() {
+  local record footer='' current='' index
+  for index in "${!records[@]}"; do
+    record=${records[index]}
+    [[ "$record" == F:$'\t'* ]] || continue
+    footer=${record#F:$'\t'}
+    footer=${footer%$'\t'F:}
+    unset 'records[index]'
+  done
+  records=("${records[@]}")
+  [[ -n "$state_file" && "$TMUX_CANOPY_NUL" == 1 ]] || return 0
+  [[ -r "${state_file}.footer" ]] && IFS= read -r current < "${state_file}.footer"
+  [[ "$current" == "$footer" && -e "${state_file}.footer" ]] || printf '%s\n' "$footer" > "${state_file}.footer"
+}
+
 exec {source_fd}< <(render_source 2>/dev/null)
 source_pid=$!
 if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then
@@ -113,6 +131,7 @@ wait "$source_pid"
 rc=$?
 source_pid=''
 if ((rc == 0)); then
+  take_footer
   if ((${#records[@]})); then
     if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then printf '%s\0' "${records[@]}"
     else printf '%s\n' "${records[@]}"
