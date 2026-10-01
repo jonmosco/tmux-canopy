@@ -8,7 +8,7 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Animated tmux-canopy demo showing navigation, readable notification badges, search, folding, and buffers](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)
+[![Animated tmux-canopy demo: opening the sidebar, moving through and folding the tree, searching, turning on agent mode, subagents appearing, and jumping to an agent that needs approval](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)
 
 [View a still image](docs/assets/canopy-demo.png).
 
