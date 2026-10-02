@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot sessionStart", "timeoutSec": 3}],
+    "userPromptSubmitted": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot userPromptSubmitted", "timeoutSec": 3}],
+    "postToolUse": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot postToolUse", "timeoutSec": 3}],
+    "postToolUseFailure": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot postToolUseFailure", "timeoutSec": 3}],
+    "notification": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot notification", "timeoutSec": 3}],
+    "agentStop": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot agentStop", "timeoutSec": 3}],
+    "errorOccurred": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot errorOccurred", "timeoutSec": 3}],
+    "sessionEnd": [{"type": "command", "bash": "/absolute/path/to/tmux-canopy/scripts/agent-hook copilot sessionEnd", "timeoutSec": 3}]
+  }
+}

@@ -11,7 +11,7 @@ text() { printf '#{s/[\001-\037\177]/ /:%s}' "$1"; }
 config="D${sep}#{@tmux_canopy_icon_theme}${sep}#{@tmux_canopy_notifications}${sep}#{@tmux-canopy-theme}${sep}#{@tmux-canopy-density}${sep}$(text @tmux-canopy-icon-session)${sep}$(text @tmux-canopy-icon-window)${sep}$(text @tmux-canopy-icon-pane)${sep}#{pane_id}${sep}#{window_id}${sep}#{session_id}${sep}#{pane_width}${sep}$(text host)${sep}#{@tmux-canopy-compact-single-panes}${sep}$(text @tmux-canopy-filter)${sep}$(text @tmux-canopy-filter-window)${sep}$(text @tmux-canopy-filter-title)"
 # Keep overrides in the same batched tmux snapshot as the tree. The renderer
 # reads these fields in this order, after the existing configuration fields.
-for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush; do
+for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush copilot grok; do
   config+="${sep}$(text "@tmux-canopy-icon-$app")"
 done
 # Appearance before agents so agents remains the final D field for tree-source.

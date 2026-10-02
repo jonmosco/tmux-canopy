@@ -34,7 +34,7 @@ base=${command##*/}; base=${base%.exe}
 case "$base" in
   codex) kind=codex ;;
   claude|claude-code) kind=claude ;;
-  opencode|gemini|pi|omp|agy|crush) kind=$base ;;
+  opencode|gemini|pi|omp|agy|crush|copilot|grok) kind=$base ;;
   antigravity) kind=agy ;;
   agent) kind=cursor-agent ;;
 esac
@@ -43,9 +43,9 @@ if [[ -z "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
   # pane, and prefer the closest matching process when there is more than one.
   kind="$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$pid" '
     function carrier(n) { sub(/^-/,"",n)
-      return n ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|codex|claude|claude-code|opencode|gemini|pi|omp|agy|antigravity|agent|crush)$/ }
+      return n ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare|codex|claude|claude-code|opencode|gemini|pi|omp|agy|antigravity|agent|crush|copilot|grok)$/ }
     { parent[$1]=$2; name=$3; sub(/^.*\//,"",name); sub(/\.exe$/,"",name); comm[$1]=name
-      if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush") kind[$1]=name
+      if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush" || name=="copilot" || name=="grok") kind[$1]=name
       else if (name=="claude" || name=="claude-code") kind[$1]="claude"
       else if (name=="antigravity") kind[$1]="agy"
       else if (name=="agent") kind[$1]="cursor-agent" }
@@ -67,6 +67,8 @@ case "$kind" in
   agy) agent='Antigravity' ;;
   cursor-agent) agent='cursor-agent' ;;
   crush) agent='Crush' ;;
+  copilot) agent='Copilot CLI' ;;
+  grok) agent='Grok Build' ;;
 esac
 if [[ -z "$agent" ]]; then
   printf 'No supported agent process found in pane %s.\n' "$pane"

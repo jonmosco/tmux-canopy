@@ -58,6 +58,78 @@ def check(condition, message):
     assert condition, message
 
 
+# Claude's Stop ends the turn, but listed background work keeps it working.
+state = harness("claude")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "bg1"})
+send("claude", {"hook_event_name": "Stop", "session_id": "bg1", "background_tasks": [
+    {"id": "b1", "type": "shell", "status": "running", "command": "sleep 25"}]})
+check(state["status"] == "working", f"Claude Stop with a running background task stays working: {state}")
+send("claude", {"hook_event_name": "Stop", "session_id": "bg1", "background_tasks": [
+    {"id": "b1", "type": "shell", "status": "completed"}], "session_crons": [{"id": "c1"}]})
+check(state["status"] == "turn-ended", f"finished background work and crons end the turn: {state}")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "bg1"})
+send("claude", {"hook_event_name": "Stop", "session_id": "bg1", "background_tasks": []})
+check(state["status"] == "turn-ended", "Claude Stop with no background work ends the turn")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "bg1"})
+send("claude", {"hook_event_name": "Stop", "session_id": "bg1"})
+check(state["status"] == "turn-ended", "Claude Stop from versions without the field ends the turn")
+
+# Copilot CLI passes the event name as an argument; its payload is camelCase.
+state = harness("copilot")
+for name, event, expected in [
+    ("sessionStart", {"sessionId": "k1", "source": "new"}, "ready"),
+    ("userPromptSubmitted", {"sessionId": "k1", "prompt": "fix"}, "working"),
+    ("notification", {"sessionId": "k1", "notification_type": "permission_prompt",
+                      "message": "Allow shell command?"}, "needs-input"),
+]:
+    hook.report("copilot", event, name)
+    check(state.get("status") == expected, f"Copilot {name} -> {expected}: {state}")
+check(state["summary"] == "Allow shell command?", f"Copilot request summary: {state}")
+hook.report("copilot", {"sessionId": "k1", "notification_type": "agent_idle"}, "notification")
+check(state["status"] == "needs-input", "other Copilot notifications are not requests")
+hook.report("copilot", {"sessionId": "k1", "toolName": "bash"}, "postToolUse")
+check(state["status"] == "working" and not state["request"], "Copilot tool completion clears the request")
+hook.report("copilot", {"sessionId": "k1", "error": "rate limited", "recoverable": True}, "errorOccurred")
+check(state["status"] == "working", "a recoverable Copilot error keeps working")
+hook.report("copilot", {"sessionId": "k1", "stopReason": "end_turn"}, "agentStop")
+check(state["status"] == "turn-ended", "Copilot agentStop ends the turn")
+hook.report("copilot", {"sessionId": "k1", "error": "fatal", "recoverable": False}, "errorOccurred")
+check(state["status"] == "interrupted", "an unrecoverable Copilot error interrupts")
+hook.report("copilot", {"sessionId": "k1", "reason": "user_exit"}, "sessionEnd")
+check(state["status"] == "session-ended", "Copilot sessionEnd")
+
+# Grok Build: Claude-style event names, camelCase fields, promptId per turn.
+state = harness("grok")
+send("grok", {"hook_event_name": "SessionStart", "sessionId": "x1"})
+check(state.get("status") == "ready", f"Grok SessionStart: {state}")
+send("grok", {"hook_event_name": "UserPromptSubmit", "sessionId": "x1", "promptId": "p1"})
+check(state["status"] == "working" and state["turn"] == "p1", f"Grok prompt starts turn p1: {state}")
+send("grok", {"hook_event_name": "Notification", "sessionId": "x1", "notificationType": "permission_prompt",
+              "message": "Run npm test?"})
+check(state["status"] == "needs-input" and state["summary"] == "Run npm test?", f"Grok permission prompt: {state}")
+send("grok", {"hook_event_name": "PostToolUse", "sessionId": "x1", "promptId": "p1", "toolName": "run_terminal_command"})
+check(state["status"] == "working", "Grok tool completion clears the request")
+send("grok", {"hook_event_name": "Stop", "sessionId": "x1", "promptId": "p1", "reason": "end_turn",
+              "backgroundTasks": [{"id": "t1", "type": "shell", "status": "running"}]})
+check(state["status"] == "working", "Grok Stop with background work stays working")
+send("grok", {"hook_event_name": "Stop", "sessionId": "x1", "promptId": "p1", "reason": "end_turn",
+              "backgroundTasks": []})
+check(state["status"] == "turn-ended", "Grok Stop ends the turn")
+send("grok", {"hook_event_name": "UserPromptSubmit", "sessionId": "x1", "promptId": "p2"})
+send("grok", {"hook_event_name": "StopCancelled", "sessionId": "x1", "promptId": "p1", "reason": "user_interrupt"})
+check(state["status"] == "working", "a late report for an older Grok turn is ignored")
+send("grok", {"hook_event_name": "Stop", "sessionId": "x1", "promptId": "p2", "reason": "end_turn",
+              "subagentType": "explore"})
+check(state["status"] == "working", "a Grok subagent's stop is not the pane's")
+send("grok", {"hook_event_name": "StopCancelled", "sessionId": "x1", "promptId": "p2", "reason": "user_interrupt"})
+check(state["status"] == "interrupted", "Grok StopCancelled interrupts the current turn")
+send("grok", {"hook_event_name": "Stop", "sessionId": "x1", "reason": "shutdown"})
+check(state["status"] == "interrupted", "Grok's session-closing Stop is not a turn end")
+send("grok", {"hook_event_name": "SessionEnd", "sessionId": "x1"})
+check(state["status"] == "session-ended", "Grok SessionEnd")
+send("claude", {"hook_event_name": "UserPromptSubmit", "sessionId": "x1"})
+check(state["status"] == "session-ended", "Grok runs Claude's hooks too; Claude-shaped reports without session_id are ignored")
+
 # Gemini permission requests clear only on the matching tool completion.
 state = harness("gemini")
 for event, expected in [

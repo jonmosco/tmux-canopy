@@ -16,10 +16,10 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
-    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush",icon_keys," ")
+    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush copilot grok",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
-    appearance=($37 == "lazygit" || $37 == "pills" || $37 == "places" ? $37 : "classic")
-    agents_enabled=($38 == "on")
+    appearance=($39 == "lazygit" || $39 == "pills" || $39 == "places" ? $39 : "classic")
+    agents_enabled=($40 == "on")
     if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
@@ -58,18 +58,18 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
     process_name[pid]=name
-    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush") agent_process[pid]=name
+    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush" || name=="copilot" || name=="grok") agent_process[pid]=name
     else if (name=="antigravity") agent_process[pid]="agy"
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     else if (name=="agent") agent_process[pid]="cursor-agent"
     next
 }
-# Shells, launchers, and runtimes an agent may run under and still belong to
-# its pane. Any other process in between (an editor such as nvim, or lazygit)
+# Shells, launchers, runtimes, and sandbox wrappers an agent may run under and
+# still belong to its pane. Any other process in between (an editor such as nvim, or lazygit)
 # owns the agent itself, so the pane is not reported as that agent.
 function agent_carrier(name) {
     sub(/^-/,"",name)
-    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just)$/ ||
+    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare)$/ ||
         canonical_agent(name) != ""
 }
 function find_agents( pid,current,depth,p,root) {
@@ -426,7 +426,7 @@ function canonical_agent(value) {
     if (value == "claude-code") return "claude"
     if (value == "agent") return "cursor-agent"
     if (value == "antigravity") return "agy"
-    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent" || value == "crush") return value
+    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent" || value == "crush" || value == "copilot" || value == "grok") return value
     return ""
 }
 function agent_name(kind) {
@@ -439,6 +439,8 @@ function agent_name(kind) {
     if (kind == "agy") return "Antigravity"
     if (kind == "cursor-agent") return "cursor-agent"
     if (kind == "crush") return "Crush"
+    if (kind == "copilot") return "Copilot CLI"
+    if (kind == "grok") return "Grok Build"
     return kind
 }
 # The displayed status word, shared with title_detail()'s width budgeting so
@@ -763,7 +765,7 @@ function appcolor_lookup(value, n, parts) {
     if (value ~ /^(ssh|codex|top|htop|btop|agy)$/) return icon_cyan
     if (value == "pi" || value == "crush") return icon_purple
     if (value == "omp") return icon_yellow
-    if (value == "opencode" || value == "agent" || value == "cursor-agent") return icon_neutral
+    if (value == "opencode" || value == "agent" || value == "cursor-agent" || value == "copilot" || value == "grok") return icon_neutral
     if (value ~ /^(claude|claude-code)$/) return icon_yellow
     if (value == "gemini") return icon_blue
     return icon_neutral
@@ -788,6 +790,8 @@ function app_key(value) {
     if (value ~ /^(make|cmake|ninja)$/) return "make"
     if (value ~ /^(top|htop|btop)$/) return "top"
     if (value == "crush") return "crush"
+    if (value == "copilot") return "copilot"
+    if (value == "grok") return "grok"
     return ""
 }
 function appicon(value) {
@@ -816,6 +820,8 @@ function appicon_lookup(value, n, parts,key,override) {
         if (value == "agent" || value == "cursor-agent") return "▸"
         if (value ~ /^(agy|antigravity)$/) return "◎"
         if (value == "crush") return "❖"
+        if (value == "copilot") return "⊚"
+        if (value == "grok") return "⨯"
         if (value ~ /^(make|cmake|ninja)$/) return "✱"
         if (value ~ /^(top|htop|btop)$/) return "▥"
         return custom_p != "" ? pane_icon : " "
@@ -836,6 +842,8 @@ function appicon_lookup(value, n, parts,key,override) {
     if (value == "agent" || value == "cursor-agent") return ""
     if (value ~ /^(agy|antigravity)$/) return "󰀘"
     if (value == "crush") return "❖"
+    if (value == "copilot") return ""
+    if (value == "grok") return "⨯"
     if (value ~ /^(make|cmake|ninja)$/) return ""
     if (value ~ /^(top|htop|btop)$/) return "󰍛"
     return custom_p != "" ? pane_icon : " "

@@ -36,6 +36,9 @@ the pane shows `[process]` but no lifecycle state or subagents.
 
 - [ ] Report Gemini CLI subagents if its integration exposes enough lifecycle
   and identity information.
+- [ ] Report GitHub Copilot CLI and Grok Build subagents. Copilot's
+  `subagentStart` has no agent ID to pair with `subagentStop`; Grok's
+  subagents report from their own sessions with `subagentType`.
 
 ## Agent request panel and responses (backlog)
 
