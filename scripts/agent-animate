@@ -39,9 +39,9 @@ if [[ -r "$cache" ]] && python3 "$SCRIPT_DIR/../lib/animate.py" --frames "$FRAME
 fi
 
 # One tmux query per tick covers ownership, token, options and copy-mode.
-status_format='#{@tmux_canopy}|#{@tmux_canopy_animate_token}|#{?@tmux_canopy_animate,#{@tmux_canopy_animate},#{@tmux-canopy-animate}}|#{@tmux-canopy-theme}|#{pane_in_mode}'
+status_format='#{@tmux_canopy}|#{@tmux_canopy_animate_token}|#{?@tmux_canopy_animate,#{@tmux_canopy_animate},#{@tmux-canopy-animate}}|#{@tmux-canopy-theme}|#{pane_in_mode}|#{&&:#{pane_active},#{window_active}}'
 while sleep 0.15; do
-  IFS='|' read -r owned current animate theme in_mode \
+  IFS='|' read -r owned current animate theme in_mode focused \
     < <(tmux display-message -p -t "$sidebar" "$status_format" 2>/dev/null || true)
   [[ "${owned:-}" == 1 && "${current:-}" == "$token" ]] || exit 0
   [[ "${animate:-on}" == on ]] || exit 0
@@ -59,6 +59,10 @@ while sleep 0.15; do
   [[ ! -e "${state_file}.search" ]] || continue
   # Suppress animation if the pane is in copy-mode
   [[ "${in_mode:-}" == 0 ]] || continue
+  # Pause while the sidebar has focus: every frame is an fzf reload, and fzf
+  # drops clicks, scrolls, and keys that arrive during a reload. The animation
+  # is for catching the eye from another pane; it resumes when focus leaves.
+  [[ "${focused:-}" != 1 ]] || continue
   frame=$(( (frame + 1) % FRAMES ))
   printf '%s\n' "$frame" > "$frame_file"
   tmux send-keys -t "$sidebar" C-t 2>/dev/null || exit 0

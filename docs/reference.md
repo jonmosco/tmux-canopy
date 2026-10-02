@@ -110,6 +110,10 @@ Help opens in an overlay sized for your terminal, with highlighted command keys 
 
 Press `g` in the sidebar to open the same responsive overlay as a legend. It explains the selection pointer, active-location dot, unread badges, tree guides, pane command/title/directory, and filter markers. An amber dot means unread terminal output, not that an agent needs input. Run `scripts/help --legend --print 80` to read the legend outside tmux.
 
+### Mouse
+
+With tmux's `mouse` option on, a click selects a row (on either line of a two-line pane row) and a double-click focuses its target. The wheel scrolls the tree without moving the selection, which follows only when it reaches the edge of the view; when the whole tree fits, the wheel moves the selection instead. Dragging the sidebar's border resizes it. Set `set -g mouse on` in your tmux configuration so every session has the mouse; `set mouse on` typed in one session applies to that session only.
+
 ### Tree filters
 
 Press **F** (or **Ctrl-f**, including while searching) to choose:
@@ -406,6 +410,8 @@ Frames come from a cached tree snapshot, not a full tmux rescan, at
 about 6-7 updates per second. A short-lived worker starts only when a working
 row is drawn and exits when none remain, the sidebar closes, the view leaves
 Tree/Agents, the theme is `mono`, or the option is off — no permanent ticker.
+The animation pauses while the sidebar has focus, so clicks, scrolling, and keys
+are never lost to a frame reload, and resumes when you move to another pane.
 Requires agent awareness. Set the option to `off` and reopen the sidebar to
 disable it.
 

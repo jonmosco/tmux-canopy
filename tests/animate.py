@@ -166,6 +166,9 @@ def main():
             # Test agent-animate readiness guard and search mode suppression
             import time
             tm('set-option', '-p', '-t', pane, '@tmux_canopy', '1')
+            # The animation runs while focus is in another pane.
+            content = tm('split-window', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 120')
+            tm('select-pane', '-t', content)
             token = 'test-token-123'
             tm('set-option', '-p', '-t', pane, '@tmux_canopy_animate_token', token)
             state_file = Path(directory) / 'sidebar-state'
@@ -207,6 +210,18 @@ def main():
                 time.sleep(0.35)
                 assert int(frame_file.read_text().strip()) != frame_frozen
                 print('ok - agent-animate respects ready guard and suppresses during search mode')
+
+                # 5. A focused sidebar pauses the animation, since each frame is a
+                # reload that would drop clicks and keys; leaving it resumes.
+                tm('select-pane', '-t', pane)
+                time.sleep(0.2)
+                frame_frozen = int(frame_file.read_text().strip())
+                time.sleep(0.45)
+                assert int(frame_file.read_text().strip()) == frame_frozen
+                tm('select-pane', '-t', content)
+                time.sleep(0.45)
+                assert int(frame_file.read_text().strip()) != frame_frozen
+                print('ok - agent-animate pauses while the sidebar has focus')
             finally:
                 tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
                 animator.wait(timeout=5)
