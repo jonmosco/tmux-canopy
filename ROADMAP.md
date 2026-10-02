@@ -12,6 +12,22 @@ Remaining work for tmux-canopy. This list does not promise a release date. The
   OpenCode, Cursor Agent, and Antigravity still need the same real-process
   checks.
 
+## Claude Code background sessions
+
+A Claude Code session can run in the background and be viewed from a tmux pane
+with `claude attach <id>`. Its hooks then run in the background process, which
+has no `TMUX_PANE` or `TMUX`, so the reporter cannot tell which pane to update:
+the pane shows `[process]` but no lifecycle state or subagents.
+
+- [ ] When a hook report has no pane, find the pane whose process tree runs
+  `claude attach` with the report's session ID (the attach argument is a
+  prefix of `session_id`), using the default tmux server.
+- [ ] Accept that attach client as the report's process identity, since the
+  agent process itself is not under the pane.
+- [ ] Test with a fake attach client: state and subagents reach the right pane,
+  nothing is reported when no client is attached, and an attach client for a
+  different session is ignored.
+
 ## Jump to an agent needing input
 
 - [ ] Test stale targets, agent exits, linked windows, and multiple clients.
