@@ -57,6 +57,12 @@ sidebar_ui_options() {
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'
+    # The mouse wheel scrolls the view and leaves the selection where it is;
+    # by default each wheel event would move the selection one row. A
+    # one-line scroll-off keeps the wheel from dragging the selection until it
+    # reaches the edge, while j/k still show a row of context there. When the
+    # list cannot scroll, fzf moves the selection instead.
+    --bind='scroll-up:offset-up,scroll-down:offset-down' --scroll-off=1
     --bind="ctrl-g:execute-silent($switcher_cmd)"
     --bind="ctrl-o:transform($jump_cmd)"
     --bind="F:execute-silent($filter_cmd)"

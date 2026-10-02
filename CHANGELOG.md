@@ -4,6 +4,7 @@
 
 ### Changed
 
+- The mouse wheel scrolls the sidebar's tree without moving the selection; previously every wheel event moved the selection one row, which made trackpad scrolling race through the list.
 - The preview drawer starts hidden. Press `p` to open it. `@tmux-canopy-preview auto` still shows it when the sidebar is tall enough.
 - Press `A` in the sidebar to turn agent mode on or off for this client. Tree stays available. `@tmux-canopy-agents` is only the default until a client chooses. Integrations stay installed when the mode is off.
 - The Agents tab sits beside Tree (`Tree Agents Proc Buff`) instead of after Buffers.
@@ -81,6 +82,7 @@
 - Subagents now appear in the default appearance; they were only drawn in `classic`. Compact density shows a count such as `+2` on the pane row instead.
 - Text that merely contains `wrk` or `WORKING`, such as a `~/wrk` directory or a window title, no longer starts or animates the working indicator.
 - The animation now requires `python3` rather than checking for `perl`, which it no longer uses.
+- Mouse clicks, scrolling, and keys in the sidebar were sometimes ignored while an agent was working: each frame of the `WORKING` animation reloads the list, and fzf drops input that arrives during a reload (about one click in five). The animation now pauses while the sidebar has focus.
 - A global `detach-on-destroy on` is honored when the last session ends, so the dock is no longer briefly parked in an unrelated session (which resized its applications). The synchronize-panes toggle likewise reads an inherited global value.
 - Right-aligned counts and pane continuation lines align correctly on macOS, whose awk measures UTF-8 text in bytes.
 

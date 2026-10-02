@@ -204,6 +204,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `Ctrl-r` | Refresh |
 | `?` | Scrollable help popup |
 | `g` | Scrollable symbol and color legend |
+| Mouse | Click selects, double-click focuses, the wheel scrolls (needs `set -g mouse on`) |
 | `Ctrl-q` | Close the sidebar |
 
 Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
