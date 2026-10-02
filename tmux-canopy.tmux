@@ -19,20 +19,21 @@ plugin_job() {
   printf 'run-shell %s %s' "$flag" "$(tmux_quote "$(plugin_command "$@")")"
 }
 
-sidebar_key="$(tmux show-option -gqv @tmux-canopy-key)"
-sidebar_width="$(tmux show-option -gqv @tmux-canopy-width)"
-sidebar_scope="$(tmux show-option -gqv @tmux-canopy-scope)"
-smooth_navigation="$(tmux show-option -gqv @tmux-canopy-smooth-navigation)"
-last_window_key="$(tmux show-option -gqv @tmux-canopy-last-window-key)"
-sidebar_transition="$(tmux show-option -gqv @tmux-canopy-transition)"
-notification_sources="$(tmux show-option -gqv @tmux-canopy-notifications)"
-notification_target="$(tmux show-option -gqv @tmux-canopy-notification-target)"
-silence_seconds="$(tmux show-option -gqv @tmux-canopy-silence-seconds)"
-icon_theme="$(tmux show-option -gqv @tmux-canopy-icon-theme)"
-appearance="$(tmux show-option -gqv @tmux-canopy-appearance)"
-animate="$(tmux show-option -gqv @tmux-canopy-animate)"
-resize_mode="$(tmux show-option -gqv @tmux-canopy-resize-mode)"
-width_presets="$(tmux show-option -gqv @tmux-canopy-width-presets)"
+# Read every setting, Canopy's ownership records, and the options it may own
+# in two tmux calls (see canopy_load_state); unset settings read as empty.
+settings=(key width scope smooth-navigation last-window-key transition notifications notification-target
+  silence-seconds icon-theme appearance animate resize-mode width-presets)
+canopy_load_state "${settings[@]/#/@tmux-canopy-}" \
+  window:window-status-activity-style window:window-status-bell-style \
+  session:activity-action session:bell-action session:silence-action \
+  window:monitor-activity window:monitor-bell window:monitor-silence
+setting() { printf -v "$1" '%s' "${CANOPY_STATE["@tmux-canopy-$2"]:-}"; }
+setting sidebar_key key; setting sidebar_width width; setting sidebar_scope scope
+setting smooth_navigation smooth-navigation; setting last_window_key last-window-key
+setting sidebar_transition transition; setting notification_sources notifications
+setting notification_target notification-target; setting silence_seconds silence-seconds
+setting icon_theme icon-theme; setting appearance appearance; setting animate animate
+setting resize_mode resize-mode; setting width_presets width-presets
 
 : "${sidebar_key:=T}"
 : "${sidebar_width:=42}"
@@ -92,13 +93,13 @@ if [[ "$notification_target" == 'status' ]]; then
   sidebar_notification_sources=none
 fi
 
-tmux set-option -gq @tmux_canopy_notifications "$sidebar_notification_sources"
-tmux set-option -gq @tmux_canopy_notification_target "$notification_target"
-tmux set-option -gq @tmux_canopy_icon_theme "$icon_theme"
-tmux set-option -gq @tmux_canopy_appearance "$appearance"
-tmux set-option -gq @tmux_canopy_animate "$animate"
-tmux set-option -gq @tmux_canopy_resize_mode "$resize_mode"
-tmux set-option -gq @tmux_canopy_width_presets "$width_presets"
+canopy_queue set-option -gq @tmux_canopy_notifications "$sidebar_notification_sources"
+canopy_queue set-option -gq @tmux_canopy_notification_target "$notification_target"
+canopy_queue set-option -gq @tmux_canopy_icon_theme "$icon_theme"
+canopy_queue set-option -gq @tmux_canopy_appearance "$appearance"
+canopy_queue set-option -gq @tmux_canopy_animate "$animate"
+canopy_queue set-option -gq @tmux_canopy_resize_mode "$resize_mode"
+canopy_queue set-option -gq @tmux_canopy_width_presets "$width_presets"
 
 for alert_source in activity bell; do
   style=''
@@ -147,35 +148,35 @@ fi
 # Dedicated array indexes avoid replacing hooks owned by the user's
 # configuration or other plugins. Reloading removes stale hooks when modes
 # change.
-tmux set-hook -gu 'after-select-window[9001]' 2>/dev/null || true
-tmux set-hook -gu 'after-new-window[9001]' 2>/dev/null || true
-tmux set-hook -gu 'client-session-changed[9001]' 2>/dev/null || true
-tmux set-hook -gu 'after-resize-pane[9001]' 2>/dev/null || true
-tmux set-hook -gu 'alert-activity[9002]' 2>/dev/null || true
-tmux set-hook -gu 'alert-bell[9002]' 2>/dev/null || true
-tmux set-hook -gu 'alert-silence[9002]' 2>/dev/null || true
-tmux set-hook -gu 'after-select-window[9002]' 2>/dev/null || true
-tmux set-hook -gu 'after-select-pane[9002]' 2>/dev/null || true
-tmux set-hook -gu 'client-session-changed[9002]' 2>/dev/null || true
-tmux set-hook -gu 'after-kill-pane[9003]' 2>/dev/null || true
-tmux set-hook -gu 'after-split-window[9003]' 2>/dev/null || true
-tmux set-hook -gu 'client-detached[9003]' 2>/dev/null || true
-tmux set-hook -gu 'client-resized[9003]' 2>/dev/null || true
-tmux set-hook -gu 'after-resize-window[9003]' 2>/dev/null || true
-tmux set-hook -gu 'after-rename-session[9003]' 2>/dev/null || true
-tmux set-hook -gu 'after-rename-window[9003]' 2>/dev/null || true
-tmux set-hook -gu 'window-layout-changed[9005]' 2>/dev/null || true
-tmux set-hook -gu 'window-unlinked[9005]' 2>/dev/null || true
-tmux set-hook -gu 'after-resize-pane[9006]' 2>/dev/null || true
-tmux set-hook -gu 'window-layout-changed[9007]' 2>/dev/null || true
+canopy_queue set-hook -gu 'after-select-window[9001]'
+canopy_queue set-hook -gu 'after-new-window[9001]'
+canopy_queue set-hook -gu 'client-session-changed[9001]'
+canopy_queue set-hook -gu 'after-resize-pane[9001]'
+canopy_queue set-hook -gu 'alert-activity[9002]'
+canopy_queue set-hook -gu 'alert-bell[9002]'
+canopy_queue set-hook -gu 'alert-silence[9002]'
+canopy_queue set-hook -gu 'after-select-window[9002]'
+canopy_queue set-hook -gu 'after-select-pane[9002]'
+canopy_queue set-hook -gu 'client-session-changed[9002]'
+canopy_queue set-hook -gu 'after-kill-pane[9003]'
+canopy_queue set-hook -gu 'after-split-window[9003]'
+canopy_queue set-hook -gu 'client-detached[9003]'
+canopy_queue set-hook -gu 'client-resized[9003]'
+canopy_queue set-hook -gu 'after-resize-window[9003]'
+canopy_queue set-hook -gu 'after-rename-session[9003]'
+canopy_queue set-hook -gu 'after-rename-window[9003]'
+canopy_queue set-hook -gu 'window-layout-changed[9005]'
+canopy_queue set-hook -gu 'window-unlinked[9005]'
+canopy_queue set-hook -gu 'after-resize-pane[9006]'
+canopy_queue set-hook -gu 'window-layout-changed[9007]'
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
-  tmux set-hook -gu "${focus_hook}[9004]" 2>/dev/null || true
+  canopy_queue set-hook -gu "${focus_hook}[9004]"
 done
 
 if [[ "$sidebar_scope" == 'global' ]]; then
   # Detached new-window resolves to the unchanged live client, hence a no-op.
   for hook in after-select-window after-new-window client-session-changed; do
-    tmux set-hook -g "${hook}[9001]" "$(plugin_job '' follow '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_transition")"
+    canopy_queue set-hook -g "${hook}[9001]" "$(plugin_job '' follow '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_transition")"
   done
 fi
 
@@ -183,7 +184,7 @@ fi
 # tmux so ordinary content resizes start no shell at all.
 sidebar_pane_event="#{==:#{@tmux_canopy},1}"
 if [[ "$sidebar_transition" == 'slot' && "$resize_mode" == 'live' ]]; then
-  tmux set-hook -g 'after-resize-pane[9001]' \
+  canopy_queue set-hook -g 'after-resize-pane[9001]' \
     "if-shell -F $(tmux_quote "$sidebar_pane_event") $(tmux_quote "$(plugin_job -b sync-width '#{pane_id}' '#{pane_width}')")"
 fi
 
@@ -192,7 +193,7 @@ fi
 # events without replacing the user's normal pane-selection/copy bindings.
 resize_table=tmux-canopy-resize
 for event in MouseDrag1Pane MouseDrag1Border MouseDrag1Status; do
-  tmux bind-key -T "$resize_table" "$event" \
+  canopy_queue bind-key -T "$resize_table" "$event" \
     if-shell -F '#{==:#{@tmux_canopy_drag_native},1}' \
     "resize-pane -M ; switch-client -T $resize_table" "switch-client -T $resize_table"
 done
@@ -200,12 +201,12 @@ done
 # coordinates to window columns before passing them to the resize helper.
 release_x='#{?#{!=:#{mouse_x},},#{e|+:#{mouse_x},#{pane_left}},}'
 for event in MouseDragEnd1Pane MouseDragEnd1Border MouseDragEnd1Status MouseUp1Pane MouseUp1Border MouseUp1Status; do
-  tmux bind-key -T "$resize_table" "$event" run-shell \
+  canopy_queue bind-key -T "$resize_table" "$event" run-shell \
     "$(plugin_command mouse-resize end '#{@tmux_canopy_staged_sidebar}' '#{window_id}' "$release_x" "$resize_mode")"
 done
 # tmux can classify motion outside the original pane as an unnamed mouse
 # event. Keep waiting for release; ordinary keyboard input cancels the drag.
-tmux bind-key -T "$resize_table" Any if-shell -F '#{mouse_pane}' \
+canopy_queue bind-key -T "$resize_table" Any if-shell -F '#{mouse_pane}' \
   "switch-client -T $resize_table" "$(plugin_job '' mouse-resize clear)"
 canopy_bind root MouseDown1Border \
   if-shell -F '1' \
@@ -225,13 +226,13 @@ canopy_bind root MouseDragEnd1Border \
 # exit. Resolve hook_window through native loops; vanished windows simply do
 # not match. Only the matching window evaluates its pane inventory.
 empty_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?$(sidebar_empty_window_condition),1,},}}}"
-tmux set-hook -g 'window-layout-changed[9005]' \
+canopy_queue set-hook -g 'window-layout-changed[9005]' \
   "if-shell -F $(tmux_quote "$empty_event") $(tmux_quote "$(plugin_job -b reap-empty)")"
-tmux set-hook -g 'window-unlinked[9005]' "$(plugin_job -b reap-empty)"
+canopy_queue set-hook -g 'window-unlinked[9005]' "$(plugin_job -b reap-empty)"
 balance_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?#{==:#{P:#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},,1}},1},1,},}}}"
-tmux set-hook -g 'window-layout-changed[9007]' \
+canopy_queue set-hook -g 'window-layout-changed[9007]' \
   "if-shell -F $(tmux_quote "$balance_event") $(tmux_quote "$(plugin_job -b balance-window '#{hook_window}')")"
-tmux set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
+canopy_queue set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
 # Native and Canopy splits must repaint the tree immediately; waiting for a
 # later select-pane leaves the new pane missing until focus moves again.
 # Run synchronously so a slot split still sees the navigation transition guard
@@ -239,20 +240,20 @@ tmux set-hook -g 'after-kill-pane[9003]' "$(plugin_job -b cleanup refresh)"
 # With no sidebar anywhere on the server there is nothing to repaint, so the
 # synchronous job is skipped inside tmux.
 any_sidebar_event="#{S:#{W:#{P:#{?#{==:#{@tmux_canopy},1},1,}}}}"
-tmux set-hook -g 'after-split-window[9003]' \
+canopy_queue set-hook -g 'after-split-window[9003]' \
   "if-shell -F $(tmux_quote "$any_sidebar_event") $(tmux_quote "$(plugin_job '' cleanup split)")"
 # client_tty may already resolve to a surviving client after a detach.
-tmux set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook_client}')"
+canopy_queue set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook_client}')"
 for hook in client-resized after-resize-window; do
-  tmux set-hook -g "${hook}[9003]" "$(plugin_job -b responsive-width)"
+  canopy_queue set-hook -g "${hook}[9003]" "$(plugin_job -b responsive-width)"
 done
 # Right-edge marks are padded to the sidebar width at render time. One reload
 # after the width settles, not a tree rebuild on every column of a drag.
-tmux set-hook -gu 'after-resize-pane[9006]' 2>/dev/null || true
-tmux set-hook -g 'after-resize-pane[9006]' \
+canopy_queue set-hook -gu 'after-resize-pane[9006]'
+canopy_queue set-hook -g 'after-resize-pane[9006]' \
   "if-shell -F $(tmux_quote "$sidebar_pane_event") $(tmux_quote "$(plugin_job -b edge-refresh '#{pane_id}')")"
 for hook in after-rename-session after-rename-window; do
-  tmux set-hook -g "${hook}[9003]" "$(plugin_job -b cleanup refresh)"
+  canopy_queue set-hook -g "${hook}[9003]" "$(plugin_job -b cleanup refresh)"
 done
 # tmux 3.8+ monitors pane command changes. The refresh script no-ops unless
 # a sidebar client currently has agent mode on.
@@ -261,21 +262,22 @@ tmux set-hook -B -g '@tmux_canopy_command:%*:#{pane_current_command}' \
   "$(plugin_job -b agent-refresh)" 2>/dev/null || true
 # Mouse and keyboard changes use the same debounced, state-preserving refresh.
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
-  tmux set-hook -g "${focus_hook}[9004]" \
+  canopy_queue set-hook -g "${focus_hook}[9004]" \
     "$(plugin_job -b refresh-sidebar '#{pane_id}' '#{client_tty}' "$focus_hook")"
 done
 
 if [[ "$notification_sources" != 'none' && "$notification_target" != 'status' ]]; then
   for source in activity bell silence; do
-    tmux set-hook -g "alert-${source}[9002]" "$(plugin_job -b notify set '#{window_id}' '#{pane_id}' "$source")"
+    canopy_queue set-hook -g "alert-${source}[9002]" "$(plugin_job -b notify set '#{window_id}' '#{pane_id}' "$source")"
   done
   clear_request="$(notification_clear_command "$CURRENT_DIR/scripts/notify" '#{client_tty}' '#{window_id}')"
   for hook in after-select-window after-select-pane client-session-changed; do
-    tmux set-hook -g "${hook}[9002]" "$clear_request"
+    canopy_queue set-hook -g "${hook}[9002]" "$clear_request"
   done
 fi
 
-canopy_restore_unused_bindings
 # The legacy compatibility entrypoint is also a *.tmux file. TPM executes
 # both; this marker lets that entrypoint avoid a duplicate load.
-tmux set-option -gq @tmux_canopy_loaded_path "$CURRENT_DIR"
+canopy_queue set-option -gq @tmux_canopy_loaded_path "$CURRENT_DIR"
+# Write everything queued above, record new bindings, restore unused ones.
+canopy_load_finish

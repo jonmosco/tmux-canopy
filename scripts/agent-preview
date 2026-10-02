@@ -42,12 +42,17 @@ if [[ -z "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
   # Agents can be children of a pane shell. Resolve only descendants of that
   # pane, and prefer the closest matching process when there is more than one.
   kind="$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$pid" '
-    { parent[$1]=$2; name=$3; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
+    function carrier(n) { sub(/^-/,"",n)
+      return n ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|codex|claude|claude-code|opencode|gemini|pi|omp|agy|antigravity|agent|crush)$/ }
+    { parent[$1]=$2; name=$3; sub(/^.*\//,"",name); sub(/\.exe$/,"",name); comm[$1]=name
       if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush") kind[$1]=name
       else if (name=="claude" || name=="claude-code") kind[$1]="claude"
       else if (name=="antigravity") kind[$1]="agy"
       else if (name=="agent") kind[$1]="cursor-agent" }
     END { best=129; for (p in kind) { q=p; for (depth=0;depth<128 && q>0;depth++) {
+      # An editor or other foreground app between the pane and the agent
+      # owns it (see agent_carrier in lib/tree-render.awk).
+      if (q!=p && (q in comm) && !carrier(comm[q])) break
       if (q==root) { if (depth<best) { best=depth; result=kind[p] }; break }
       if (seen[p,q]++) break; q=parent[q] }
     } if (result!="") print result }')"

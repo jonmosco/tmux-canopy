@@ -73,6 +73,9 @@
 
 ### Fixed
 
+- Loading or reloading the plugin took 1.2–1.5 seconds and started about 250 tmux processes; it now reads tmux state once and writes in a few batched calls (about 0.2 seconds, under 10 processes).
+- An agent started by an editor or another foreground app, such as an OpenCode or Claude plugin inside Neovim, no longer makes that pane count as an agent pane; agents run from a shell or a runtime like `node` are still found. Hook reports are unaffected.
+- Rows with wide characters (CJK, fullwidth forms, emoji) no longer push their right-edge marks, such as fold counts, unread dots, and the current-pane marker, past the sidebar edge.
 - Opening the sidebar no longer deletes parked slots in other windows. The split hook was treating the not-yet-tagged dock as "no sidebars" and discarding those slots, so a later visit could not restore the original split ratio.
 - A finished background subagent no longer disappears the moment its result is delivered: the turn that delivers it no longer drops its **DONE** line, which now stays until the next prompt at least 30 seconds later.
 - A subagent's permission request can no longer be cleared by an unrelated tool completion with the same tool name from the main thread or another subagent.
