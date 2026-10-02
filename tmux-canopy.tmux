@@ -263,7 +263,7 @@ tmux set-hook -B -g '@tmux_canopy_command:%*:#{pane_current_command}' \
 # Mouse and keyboard changes use the same debounced, state-preserving refresh.
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
   canopy_queue set-hook -g "${focus_hook}[9004]" \
-    "$(plugin_job -b refresh-sidebar '#{pane_id}' '#{client_tty}' "$focus_hook")"
+    "$(plugin_job -b refresh-sidebar '#{pane_id}' '#{client_tty}' "$focus_hook" '#{mouse_pane}')"
 done
 
 if [[ "$notification_sources" != 'none' && "$notification_target" != 'status' ]]; then

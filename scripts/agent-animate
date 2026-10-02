@@ -38,11 +38,17 @@ if [[ -r "$cache" ]] && python3 "$SCRIPT_DIR/../lib/animate.py" --frames "$FRAME
   printf '%s\n' "$prefix" > "${cache}.prefix.$$" && mv -f -- "${cache}.prefix.$$" "${cache}.prefix"
 fi
 
-# One tmux query per tick covers ownership, token, options and copy-mode.
-status_format='#{@tmux_canopy}|#{@tmux_canopy_animate_token}|#{?@tmux_canopy_animate,#{@tmux_canopy_animate},#{@tmux-canopy-animate}}|#{@tmux-canopy-theme}|#{pane_in_mode}|#{&&:#{pane_active},#{window_active}}'
+# One tmux query per tick covers ownership, token, options, copy-mode, focus,
+# and when the sidebar's client last sent a key, click, or scroll. The query
+# runs as that client so client_activity is the owner's, not another client's.
+owner="$(tmux display-message -p -t "$sidebar" '#{@tmux_canopy_client}' 2>/dev/null || true)"
+client_args=()
+[[ -z "$owner" ]] || client_args=(-c "$owner")
+status_format='#{@tmux_canopy}|#{@tmux_canopy_animate_token}|#{?@tmux_canopy_animate,#{@tmux_canopy_animate},#{@tmux-canopy-animate}}|#{@tmux-canopy-theme}|#{pane_in_mode}|#{&&:#{pane_active},#{window_active}}|#{client_activity}'
+tick=0
 while sleep 0.15; do
-  IFS='|' read -r owned current animate theme in_mode focused \
-    < <(tmux display-message -p -t "$sidebar" "$status_format" 2>/dev/null || true)
+  IFS='|' read -r owned current animate theme in_mode focused activity \
+    < <(tmux display-message "${client_args[@]}" -p -t "$sidebar" "$status_format" 2>/dev/null || true)
   [[ "${owned:-}" == 1 && "${current:-}" == "$token" ]] || exit 0
   [[ "${animate:-on}" == on ]] || exit 0
   [[ "${theme:-}" != mono ]] || exit 0
@@ -59,10 +65,15 @@ while sleep 0.15; do
   [[ ! -e "${state_file}.search" ]] || continue
   # Suppress animation if the pane is in copy-mode
   [[ "${in_mode:-}" == 0 ]] || continue
-  # Pause while the sidebar has focus: every frame is an fzf reload, and fzf
-  # drops clicks, scrolls, and keys that arrive during a reload. The animation
-  # is for catching the eye from another pane; it resumes when focus leaves.
-  [[ "${focused:-}" != 1 ]] || continue
+  # Every frame is an fzf reload, and fzf drops clicks, scrolls, and keys that
+  # arrive during one. While the sidebar has focus, animate at a third of the
+  # rate (fewer reloads for a first click to land in), and hold still for
+  # about two seconds after any input so the rest of an interaction is safe.
+  if [[ "${focused:-}" == 1 ]]; then
+    printf -v now '%(%s)T' -1
+    [[ "${activity:-}" =~ ^[0-9]+$ ]] && ((now - activity < 2)) && continue
+    ((++tick % 3 == 0)) || continue
+  fi
   frame=$(( (frame + 1) % FRAMES ))
   printf '%s\n' "$frame" > "$frame_file"
   tmux send-keys -t "$sidebar" C-t 2>/dev/null || exit 0

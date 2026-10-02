@@ -8,10 +8,11 @@ import os
 import re
 import sys
 
-# Only the renderer's styled badges animate: an SGR start, the word (or the
-# working mark with an optional count), then a reset. Plain text such as a
-# ~/wrk directory or a WORKING window title never matches.
-BADGE_RE = re.compile(r'(\x1b\[[0-9;]*m)(WORKING|wrk|▷)([0-9]*)(\x1b\[0m)')
+# Only the renderer's live working badges animate: the bold-cyan accent, the
+# word (or the working mark with an optional count), then a reset. Plain text
+# such as a ~/wrk directory or a WORKING window title never matches, nor does
+# the dim mark of a stale report, which only says what an agent last reported.
+BADGE_RE = re.compile(r'(\x1b\[1;36m)(WORKING|wrk|▷)([0-9]*)(\x1b\[0m)')
 STYLES = ['\033[2;36m', '\033[2;36m', '\033[36m', '\033[36m',
           '\033[1;36m', '\033[36m', '\033[36m', '\033[2;36m']
 # LCM of the WORKING band (10), wrk band (4) and STYLES (8) periods.
