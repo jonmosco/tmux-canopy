@@ -57,11 +57,20 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     split(process_line,process_field,/[[:space:]]+/)
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
+    process_name[pid]=name
     if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush") agent_process[pid]=name
     else if (name=="antigravity") agent_process[pid]="agy"
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     else if (name=="agent") agent_process[pid]="cursor-agent"
     next
+}
+# Shells, launchers, and runtimes an agent may run under and still belong to
+# its pane. Any other process in between (an editor such as nvim, or lazygit)
+# owns the agent itself, so the pane is not reported as that agent.
+function agent_carrier(name) {
+    sub(/^-/,"",name)
+    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just)$/ ||
+        canonical_agent(name) != ""
 }
 function find_agents( pid,current,depth,p,root) {
     for (p in pane_pid) {
@@ -71,6 +80,9 @@ function find_agents( pid,current,depth,p,root) {
     for (pid in agent_process) {
         current=pid
         for (depth=0;depth<128 && current>0;depth++) {
+            # The agent itself, the pane's root, and everything between must
+            # be carriers; a foreground app on the way disqualifies it.
+            if (current != pid && (current in process_name) && !agent_carrier(process_name[current])) break
             if (current in owner) {
                 p=owner[current]
                 if (!(p in best_agent) || depth<best_agent[p]) {
@@ -187,9 +199,20 @@ function lazy_prefix(stem, branch, pm, color, icon,    prefix) {
 }
 # Keep an ordinary collapsed count at the edge, leaving a spare cell for fzf's
 # gutter/scrollbar and wide terminal glyphs. Skip it if the name needs the room.
-# Display columns, not bytes: macOS awk's length() counts UTF-8 bytes, but its
-# regex engine (like gawk's) matches whole characters.
-function text_width(value) { return gsub(/./,"",value) }
+# Terminal cells, not characters: CJK, Hangul, fullwidth forms, and emoji take
+# two. Each character is taken with match(), whose length is in bytes on macOS
+# awk and in characters on gawk, so substr() agrees with it on both. The ranges
+# compare as bytes because tree-source runs this with LC_COLLATE=C.
+function text_width(value,    c,cells) {
+    if (value !~ /[^ -~]/) return length(value)
+    while (match(value, /^./)) {
+        c=substr(value, 1, RLENGTH); value=substr(value, RLENGTH+1)
+        cells+=((c >= "\342\272\200" && c < "\355\236\260") || (c >= "\357\274\200" && c < "\357\275\241") ||
+                (c >= "\357\277\240" && c < "\357\277\247") || (c >= "\360\237\200\200" && c < "\360\237\274\200") ||
+                (c >= "\360\240\200\200" && c < "\361\200\200\200")) ? 2 : 1
+    }
+    return cells
+}
 function edge_count(value,count,budget, plain,padding) {
     if (count == "") return value
     plain=value

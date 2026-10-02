@@ -12,6 +12,24 @@ KINDS = {
     'crush': 'crush',
 }
 
+# Shells, launchers, and runtimes an agent may run under and still belong to
+# its pane. Any other process in between (an editor such as nvim, or lazygit)
+# owns the agent, so the pane is not reported as that agent.
+CARRIERS = frozenset((
+    'sh', 'bash', 'zsh', 'fish', 'dash', 'ksh', 'mksh', 'tcsh', 'csh', 'nu', 'xonsh', 'elvish', 'pwsh',
+    'login', 'su', 'sudo', 'doas', 'env', 'nice', 'nohup', 'time', 'timeout', 'script', 'stdbuf',
+    'caffeinate', 'direnv', 'mise', 'asdf', 'nix', 'nix-shell', 'devbox', 'node', 'nodejs', 'bun',
+    'deno', 'npx', 'npm', 'pnpm', 'yarn', 'tsx', 'ts-node', 'uv', 'uvx', 'pipx', 'poetry', 'ruby',
+    'bundle', 'cargo', 'make', 'just',
+))
+
+
+def is_carrier(name):
+    name = name.lstrip('-')
+    return (name in CARRIERS or name in KINDS or
+            (name.startswith('python') and name[6:].replace('.', '').isdigit()) or name == 'python')
+
+
 NAMES = {
     'codex': 'Codex', 'claude': 'Claude Code', 'opencode': 'OpenCode',
     'gemini': 'Gemini CLI', 'pi': 'Pi', 'omp': 'Oh My Pi',

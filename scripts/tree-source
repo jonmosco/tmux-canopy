@@ -130,6 +130,9 @@ else
     [[ -z "$processes" ]] || snapshot+=$'\n'"$processes"
   fi
 fi
-awk -v switcher="$switcher" -v agent_view="$agent_view" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
+# Byte-order string comparison for text_width's wide-character ranges, with
+# the user's character set kept (LC_ALL would override both, so clear it).
+ctype="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
+LC_ALL='' LC_CTYPE="$ctype" LC_COLLATE=C awk -v switcher="$switcher" -v agent_view="$agent_view" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
   -v nul="${TMUX_CANOPY_NUL:-0}" -v header="${TMUX_CANOPY_HEADER:-0}" -f "$SCRIPT_DIR/../lib/tree-render.awk" \
   "$state_file" - <<< "$snapshot"

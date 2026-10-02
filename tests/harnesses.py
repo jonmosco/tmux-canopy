@@ -37,6 +37,16 @@ try:
         for name in names[1:]:
             panes[name] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
                              str(temp / name) + ' 600')
+        # An editor that starts an agent as its own child (an editor plugin)
+        # owns that agent: the pane is the editor, not an agent pane.
+        install_agent_fixture(temp / 'nvim')
+        editor = temp / 'editor.sh'
+        editor.write_text(f'#!/bin/bash\n{temp / "opencode"} 600 &\nexec {temp / "nvim"} 600\n')
+        editor.chmod(0o755)
+        # Its own directory: OpenCode events are matched to panes by directory.
+        (temp / 'editor-project').mkdir()
+        editor_pane = tm('new-window', '-d', '-t', 'agents:', '-c', str(temp / 'editor-project'),
+                         '-P', '-F', '#{pane_id}', str(editor))
         # Native Claude Code installs run as claude.exe, including on macOS.
         install_agent_fixture(temp / 'claude.exe')
         panes['claude.exe'] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
@@ -70,6 +80,8 @@ try:
             row = next(line for line in agent_view.splitlines() if line.startswith('P:' + pane_id + '\t'))
             assert '[process]' in row and '·hook' not in row, (name, row)
             assert 'Source: visible terminal text' in run('agent-preview', pane, ['P:' + pane_id])
+        assert not any(line.startswith('P:' + editor_pane + '\t') for line in agent_view.splitlines()), agent_view
+        assert 'No supported agent process' in run('agent-preview', pane, ['P:' + editor_pane])
         # Crush is detected by process only (it has no lifecycle adapter yet).
         crush_row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes['crush'] + '\t'))
         assert 'Crush' in crush_row and '❖' in crush_row, crush_row

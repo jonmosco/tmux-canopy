@@ -2,7 +2,7 @@
 """Read a tmux snapshot and emit live agent and verified-report records."""
 import os
 import sys
-from agent_kinds import KINDS, process_name
+from agent_kinds import KINDS, is_carrier, process_name
 
 SEP = '\x1f'
 
@@ -36,6 +36,13 @@ def main():
     verified = set()
     stat_cache = {}
 
+    name_cache = {}
+
+    def cached_name(pid):
+        if pid not in name_cache:
+            name_cache[pid] = process_name(str(pid))
+        return name_cache[pid]
+
     def cached_stat(pid):
         if pid not in stat_cache:
             stat_cache[pid] = stat(pid)
@@ -57,10 +64,16 @@ def main():
             if birth is None:
                 continue
             current = pid
+            carried = True
             for depth in range(128):
+                # The pane's root and everything between it and the agent must
+                # be carriers (see agent_kinds.CARRIERS); hook reports are
+                # verified either way.
+                if current != pid and not is_carrier(cached_name(current)):
+                    carried = False
                 if current in owners:
                     pane = owners[current]
-                    if pane not in best or depth < best[pane][0]:
+                    if carried and (pane not in best or depth < best[pane][0]):
                         best[pane] = (depth, KINDS[name])
                     for report_pane, report_root, report_kind, report_pid, report_birth in reports:
                         if report_pane == pane and report_root == current and \
