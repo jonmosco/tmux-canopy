@@ -20,7 +20,7 @@ def animate(text, frame):
 
 
 # The same pattern sidebar-source uses to decide whether to start the animator.
-BADGE_GREP = r'''badge=$'\e\\[[0-9;]*m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'; LC_ALL=C grep -aEq "$badge" "$1"'''
+BADGE_GREP = r'''badge=$'\e\\[1;36m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'; LC_ALL=C grep -aEq "$badge" "$1"'''
 
 
 def badge_grep(path):
@@ -62,6 +62,15 @@ def main():
         for styled in ('\x1b[1;36mwrk\x1b[0m', '\x1b[1;36m▷3\x1b[0m'):
             plain.write_bytes(f'P:%1\tx {styled}\tP:%1\0'.encode())
             assert badge_grep(plain), styled
+
+    # A stale report's dim mark says what the agent last reported, not that it
+    # is working now, so it neither animates nor starts the animator.
+    stale = 'claude \x1b[2m▷\x1b[0m'
+    assert all(animate(stale, frame) == stale for frame in range(4)), stale
+    with tempfile.TemporaryDirectory(prefix='canopy-animate-stale-') as directory:
+        cache = Path(directory) / 'stale'
+        cache.write_bytes(f'P:%1\t{stale}\tP:%1\0'.encode())
+        assert not badge_grep(cache), 'a stale mark must not start the animator'
 
     # A summary mark keeps its count.
     counted = animate('W \x1b[1;36m▷3\x1b[0m', 2)
@@ -211,17 +220,21 @@ def main():
                 assert int(frame_file.read_text().strip()) != frame_frozen
                 print('ok - agent-animate respects ready guard and suppresses during search mode')
 
-                # 5. A focused sidebar pauses the animation, since each frame is a
-                # reload that would drop clicks and keys; leaving it resumes.
+                # 5. A focused sidebar keeps animating at a third of the rate,
+                # since each frame is a reload that could drop a click; full
+                # speed returns when focus leaves.
+                def advances(seconds):
+                    start = int(frame_file.read_text().strip())
+                    time.sleep(seconds)
+                    return (int(frame_file.read_text().strip()) - start) % 40
                 tm('select-pane', '-t', pane)
                 time.sleep(0.2)
-                frame_frozen = int(frame_file.read_text().strip())
-                time.sleep(0.45)
-                assert int(frame_file.read_text().strip()) == frame_frozen
+                focused = advances(1.8)
                 tm('select-pane', '-t', content)
-                time.sleep(0.45)
-                assert int(frame_file.read_text().strip()) != frame_frozen
-                print('ok - agent-animate pauses while the sidebar has focus')
+                time.sleep(0.2)
+                unfocused = advances(1.8)
+                assert 1 <= focused and focused * 2 < unfocused, (focused, unfocused)
+                print('ok - agent-animate slows down while the sidebar has focus')
             finally:
                 tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
                 animator.wait(timeout=5)

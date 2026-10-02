@@ -78,9 +78,10 @@ schedule_animate() {
     clear_animate "$cache" "$sidebar"
     return 0
   fi
-  # Match the styled badge the renderer emits (SGR, word or mark, reset), not
-  # plain text such as a ~/wrk directory; lib/animate.py uses the same pattern.
-  local badge=$'\e\\[[0-9;]*m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'
+  # Match the live working badge the renderer emits (bold-cyan accent, word or
+  # mark, reset), not plain text such as a ~/wrk directory or a stale report's
+  # dim mark; lib/animate.py uses the same pattern.
+  local badge=$'\e\\[1;36m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'
   if ((${#records[@]})) && printf '%s\0' "${records[@]}" | LC_ALL=C grep -aEq "$badge"; then
     cache_tmp="$(mktemp "${cache}.XXXXXX")" || return 0
     chmod 600 "$cache_tmp" 2>/dev/null || { rm -f -- "$cache_tmp"; return 0; }

@@ -119,6 +119,43 @@ def main():
             wait(lambda: top_row() == top, 'wheel scrolls back')
             assert selected() == clicked, (clicked, selected())
             print('ok - the mouse wheel scrolls the tree without moving the selection')
+
+            def post(action):
+                with unix_socket.socket(unix_socket.AF_UNIX, unix_socket.SOCK_STREAM) as connection:
+                    connection.settimeout(2)
+                    connection.connect(str(fzf_socket))
+                    connection.sendall(f'POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: {len(action)}\r\n'
+                                       f'Connection: close\r\n\r\n{action}'.encode())
+                    connection.recv(65536)
+
+            # Leaving the sidebar moves the pointer to the live content row.
+            tm('select-pane', '-t', first)
+            wait(lambda: selected() != clicked, 'pointer follows content focus')
+            time.sleep(.5)
+            live = selected()
+            # Clicking a row from outside is an explicit choice: it enters the
+            # sidebar and keeps the clicked row instead of jumping to the live one.
+            for row in (12, 6, 14, 9, 16):
+                tm('select-pane', '-t', first)
+                wait(lambda: selected() == live, 'pointer returns to the live row')
+                time.sleep(.3)
+                mouse(0, row, release=True)
+                wait(lambda: tm('display-message', '-p', '#{pane_id}') == sidebar, 'click focuses the sidebar')
+                wait(lambda: selected() != live, 'click selects the clicked row')
+                chosen = selected()
+                time.sleep(.8)
+                assert selected() == chosen, (row, chosen, selected())
+            print('ok - clicking a row from another pane keeps the clicked row')
+
+            # Keyboard entry still lands on the live content row.
+            tm('select-pane', '-t', first)
+            wait(lambda: selected() == live, 'pointer returns to the live row')
+            time.sleep(.3)
+            post('down+down+down')
+            wait(lambda: selected() != live, 'pointer moved away')
+            tm('select-pane', '-t', sidebar)
+            wait(lambda: selected() == live, 'keyboard entry jumps to the live row')
+            print('ok - entering the sidebar from the keyboard selects the live row')
         finally:
             if client is not None:
                 client.kill()

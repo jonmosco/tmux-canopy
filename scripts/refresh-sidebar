@@ -10,7 +10,8 @@ mode=request
 if [[ "${1:-}" == worker ]]; then
   mode=worker; expected_sidebar="${2:-}"; client="${3:-}"; token="${4:-}"; previous="${5:-}"
 else
-  client="${2:-}"; hook="${3:-}"
+  # mouse_pane is set only when a click caused the focus change.
+  client="${2:-}"; hook="${3:-}"; mouse_pane="${4:-}"
 fi
 [[ -n "$client" ]] || exit 0
 canopy_client_key "$client"
@@ -169,8 +170,12 @@ fi
 if [[ "$hook" == after-select-pane && "$returned" == 1 ]]; then
   # A deliberate return to the sidebar selects the live content row. The
   # location is settled at this point, so publish it before the fzf jump.
+  # Clicking a row to enter is an explicit choice: tmux hands that click to
+  # fzf, so the clicked row stays selected instead of jumping, as in file-tree
+  # sidebars. Keyboard entry still lands on the live content row.
   commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
-  commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o"
+  commands+="set-option -p -t $sidebar @tmux_canopy_focus_location '$location'"
+  [[ "${mouse_pane:-}" == "$sidebar" ]] || commands+=" ; send-keys -t $sidebar C-o"
   commit "#{!=:#{$guard},1}" "$commands"
   exit 0
 fi

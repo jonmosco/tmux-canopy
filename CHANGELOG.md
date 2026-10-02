@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Clicking a sidebar row while another pane has focus keeps the clicked row selected, as file-tree sidebars do. Previously the sidebar usually jumped back to the active pane's row. Entering the sidebar from the keyboard still selects the active pane's row.
 - The mouse wheel scrolls the sidebar's tree without moving the selection; previously every wheel event moved the selection one row, which made trackpad scrolling race through the list.
 - The preview drawer starts hidden. Press `p` to open it. `@tmux-canopy-preview auto` still shows it when the sidebar is tall enough.
 - Press `A` in the sidebar to turn agent mode on or off for this client. Tree stays available. `@tmux-canopy-agents` is only the default until a client chooses. Integrations stay installed when the mode is off.
@@ -73,6 +74,7 @@
 
 ### Fixed
 
+- A stale agent report (no update for 15 minutes) animated like a working agent; its dim mark now stays still, so only agents reporting work right now move.
 - Loading or reloading the plugin took 1.2–1.5 seconds and started about 250 tmux processes; it now reads tmux state once and writes in a few batched calls (about 0.2 seconds, under 10 processes).
 - An agent started by an editor or another foreground app, such as an OpenCode or Claude plugin inside Neovim, no longer makes that pane count as an agent pane; agents run from a shell or a runtime like `node` are still found. Hook reports are unaffected.
 - Rows with wide characters (CJK, fullwidth forms, emoji) no longer push their right-edge marks, such as fold counts, unread dots, and the current-pane marker, past the sidebar edge.
@@ -85,7 +87,7 @@
 - Subagents now appear in the default appearance; they were only drawn in `classic`. Compact density shows a count such as `+2` on the pane row instead.
 - Text that merely contains `wrk` or `WORKING`, such as a `~/wrk` directory or a window title, no longer starts or animates the working indicator.
 - The animation now requires `python3` rather than checking for `perl`, which it no longer uses.
-- Mouse clicks, scrolling, and keys in the sidebar were sometimes ignored while an agent was working: each frame of the `WORKING` animation reloads the list, and fzf drops input that arrives during a reload (about one click in five). The animation now pauses while the sidebar has focus.
+- Mouse clicks, scrolling, and keys in the sidebar were sometimes ignored while an agent was working: each frame of the `WORKING` animation reloads the list, and fzf drops input that arrives during a reload (about one click in five). While the sidebar has focus, the animation now runs slower and holds still for about two seconds after any input.
 - A global `detach-on-destroy on` is honored when the last session ends, so the dock is no longer briefly parked in an unrelated session (which resized its applications). The synchronize-panes toggle likewise reads an inherited global value.
 - Right-aligned counts and pane continuation lines align correctly on macOS, whose awk measures UTF-8 text in bytes.
 
