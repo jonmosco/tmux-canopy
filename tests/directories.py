@@ -30,7 +30,7 @@ def main():
                     ['P', '%90', '@0', '90', 'fzf', '', '/sidebar', '0', '1', '', '', '', '', '', '', ''],
                     ['P', '%91', '@0', '91', 'sleep', '', '/slot', '0', '', '1', '', '', '', '', '', ''],
                 ]
-            data[0].extend([''] * (36 - len(data[0])))
+            data[0].extend([''] * (38 - len(data[0])))
             data[0].append(appearance)
             output = subprocess.check_output(
                 ['awk', '-v', f'switcher={int(switcher)}', '-v', 'stable=1', '-v', f'nul={int(nul)}', '-f', str(ROOT / 'lib/tree-render.awk'), str(state_file), '-'],

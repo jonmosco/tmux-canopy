@@ -10,10 +10,12 @@ KINDS = {
     'agy': 'agy', 'antigravity': 'agy',
     'agent': 'cursor-agent',
     'crush': 'crush',
+    'copilot': 'copilot',
+    'grok': 'grok',
 }
 
-# Shells, launchers, and runtimes an agent may run under and still belong to
-# its pane. Any other process in between (an editor such as nvim, or lazygit)
+# Shells, launchers, runtimes, and sandbox wrappers an agent may run under and
+# still belong to its pane. A sandbox wrapper usually stays the agent's parent. Any other process in between (an editor such as nvim, or lazygit)
 # owns the agent, so the pane is not reported as that agent.
 CARRIERS = frozenset((
     'sh', 'bash', 'zsh', 'fish', 'dash', 'ksh', 'mksh', 'tcsh', 'csh', 'nu', 'xonsh', 'elvish', 'pwsh',
@@ -21,6 +23,7 @@ CARRIERS = frozenset((
     'caffeinate', 'direnv', 'mise', 'asdf', 'nix', 'nix-shell', 'devbox', 'node', 'nodejs', 'bun',
     'deno', 'npx', 'npm', 'pnpm', 'yarn', 'tsx', 'ts-node', 'uv', 'uvx', 'pipx', 'poetry', 'ruby',
     'bundle', 'cargo', 'make', 'just',
+    'bwrap', 'firejail', 'sandbox-exec', 'nono', 'fence', 'landrun', 'nsjail', 'minijail0', 'unshare',
 ))
 
 
@@ -34,7 +37,7 @@ NAMES = {
     'codex': 'Codex', 'claude': 'Claude Code', 'opencode': 'OpenCode',
     'gemini': 'Gemini CLI', 'pi': 'Pi', 'omp': 'Oh My Pi',
     'agy': 'Antigravity', 'cursor-agent': 'cursor-agent',
-    'crush': 'Crush',
+    'crush': 'Crush', 'copilot': 'Copilot CLI', 'grok': 'Grok Build',
 }
 
 

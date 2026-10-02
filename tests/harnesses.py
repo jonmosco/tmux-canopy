@@ -3,10 +3,12 @@
 import json
 import re
 import os
+import shutil
 from pathlib import Path
 from support import install_agent_fixture
 import subprocess as sp
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 socket = f'canopy-harnesses-{os.getpid()}'
@@ -27,7 +29,7 @@ try:
         temp = Path(directory)
         state = temp / 'state'
         state.touch()
-        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'agent', 'crush')
+        names = ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'agent', 'crush', 'copilot', 'grok')
         for name in names:
             install_agent_fixture(temp / name)
         pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'agents', '-x', '100', '-y', '30',
@@ -47,6 +49,16 @@ try:
         (temp / 'editor-project').mkdir()
         editor_pane = tm('new-window', '-d', '-t', 'agents:', '-c', str(temp / 'editor-project'),
                          '-P', '-F', '#{pane_id}', str(editor))
+        # A sandbox wrapper stays the agent's parent and still counts as its pane.
+        sandbox = temp / 'bwrap'
+        shutil.copy(shutil.which('bash'), sandbox)
+        panes['sandboxed'] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
+                                f'{sandbox} -c "{temp / "claude"} 600; :"')
+        sandbox_root = tm('display-message', '-p', '-t', panes['sandboxed'], '#{pane_pid}')
+        for _ in range(100):
+            if sp.run(['pgrep', '-P', sandbox_root], capture_output=True).returncode == 0:
+                break
+            time.sleep(.05)
         # Native Claude Code installs run as claude.exe, including on macOS.
         install_agent_fixture(temp / 'claude.exe')
         panes['claude.exe'] = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
@@ -92,6 +104,10 @@ try:
         crush_text = re.sub(r'\x1b\[[0-9;]*m', '', crush_row)
         assert ' C Crush' in crush_text and '❖' not in crush_text, crush_text
         tm('set-option', '-gu', '@tmux-canopy-icon-crush')
+        for name, label, glyph in (('copilot', 'Copilot CLI', '⊚'), ('grok', 'Grok Build', '⨯')):
+            row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes[name] + '\t'))
+            assert label in row and glyph in row, row
+            assert label in run('agent-preview', pane, ['P:' + panes[name]])
 
         event('claude', panes['claude'], {'hook_event_name': 'SessionStart', 'session_id': 'c1'})
         event('claude', panes['claude'], {'hook_event_name': 'UserPromptSubmit', 'session_id': 'c1'})
@@ -115,6 +131,17 @@ try:
                                          'notification_type': 'ToolPermission', 'message': 'Allow shell command?'})
         event('gemini', panes['gemini'], {'hook_event_name': 'BeforeAgent', 'session_id': 'other'})
         assert 'Status: Approval requested' in run('agent-preview', panes['gemini'], ['P:' + panes['gemini']])
+
+        event('copilot', panes['copilot'], {'sessionId': 'k1'}, 'sessionStart')
+        event('copilot', panes['copilot'], {'sessionId': 'k1', 'notification_type': 'permission_prompt',
+                                            'message': 'Allow shell command?'}, 'notification')
+        assert 'Status: Approval requested' in run('agent-preview', panes['copilot'], ['P:' + panes['copilot']])
+        event('grok', panes['grok'], {'hook_event_name': 'SessionStart', 'sessionId': 'x1'})
+        event('grok', panes['grok'], {'hook_event_name': 'UserPromptSubmit', 'sessionId': 'x1', 'promptId': 'p1'})
+        assert 'Status: Working' in run('agent-preview', panes['grok'], ['P:' + panes['grok']])
+        # Grok also runs Claude's hooks; a Claude report from a Grok pane is ignored.
+        event('claude', panes['grok'], {'hook_event_name': 'Stop', 'session_id': 'x1'})
+        assert 'Status: Working' in run('agent-preview', panes['grok'], ['P:' + panes['grok']])
 
         agy = {'conversationId': 'a1', 'workspacePaths': ['/work'],
                'transcriptPath': '/work/transcript.jsonl', 'modelName': 'gemini'}

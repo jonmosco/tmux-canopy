@@ -23,6 +23,8 @@
 
 ### Added
 
+- GitHub Copilot CLI (`copilot`) and Grok Build (`grok`) are detected as agents and have optional lifecycle adapters: `canopy integration install copilot grok` writes a hooks file Canopy owns into `~/.copilot/hooks/` and `~/.grok/hooks/`. Both report working, needs-input (permission prompts), turn ended, interrupted, and session end. `@tmux-canopy-icon-copilot` and `@tmux-canopy-icon-grok` override their icons.
+- Agents run inside a sandbox wrapper (`bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, `landrun`, `nsjail`, `minijail0`, `unshare`) are detected; the wrapper is treated like a shell between the pane and the agent.
 - Crush (Charm's `crush`) is detected as an agent: it appears in the Agents view, the footer, and the drawer with its own icon (`@tmux-canopy-icon-crush` overrides it). It has no lifecycle adapter yet, because Crush's released hooks cannot report a finished turn or a request for input.
 - With agent mode on, a footer at the bottom of the Tree view counts every agent on the server (`Agents ◆1 ▷2`) and reminds you that `n` jumps to the one waiting. Without agent mode, the footer counts your sessions, windows, and panes instead (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`), showing visible/total while a tree filter hides some. Press `f` to hide or show it, or set `@tmux-canopy-footer 'off'`. It lives only in the sidebar; your status line is untouched.
 - OpenCode's adapter loads in V2 as well as V1. It subscribes to the public event stream and observes prompt, tool, and permission hooks without approving a request or blocking a tool. Reinstall with `canopy integration install opencode` and restart OpenCode.
@@ -74,6 +76,7 @@
 
 ### Fixed
 
+- Claude Code showed **turn ended** while a `run_in_background` shell or background subagent was still running, because `Stop` fires when the turn ends. Canopy now reads the event's `background_tasks` and keeps the agent **working** until the work finishes.
 - A stale agent report (no update for 15 minutes) animated like a working agent; its dim mark now stays still, so only agents reporting work right now move.
 - Loading or reloading the plugin took 1.2–1.5 seconds and started about 250 tmux processes; it now reads tmux state once and writes in a few batched calls (about 0.2 seconds, under 10 processes).
 - An agent started by an editor or another foreground app, such as an OpenCode or Claude plugin inside Neovim, no longer makes that pane count as an agent pane; agents run from a shell or a runtime like `node` are still found. Hook reports are unaffected.

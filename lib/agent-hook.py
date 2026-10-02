@@ -18,11 +18,20 @@ core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
 
 
+def background_running(tasks):
+    """Stop ends the turn, not the work: a run_in_background shell or subagent
+    still listed as running keeps the agent working until a later Stop."""
+    return isinstance(tasks, list) and any(
+        isinstance(task, dict) and task.get('status', 'running') in ('running', 'pending')
+        for task in tasks)
+
+
 def normalized(kind, event, event_name=None):
     if kind in ('agy', 'antigravity'):
         kind = 'agy'
-    name = (event_name if kind == 'agy' else
-            event.get('hook_event_name') if kind in ('claude', 'gemini', 'cursor-agent') else event.get('type'))
+    # Copilot's payload has no event name, so its hook passes the name instead.
+    name = (event_name if kind in ('agy', 'copilot') else
+            event.get('hook_event_name') if kind in ('claude', 'gemini', 'cursor-agent', 'grok') else event.get('type'))
     if not isinstance(name, str):
         return None
     if kind == 'agy':
@@ -50,6 +59,8 @@ def normalized(kind, event, event_name=None):
             return 'needs-input', name
         if name == 'PostToolUse':
             return 'clear-request', name
+        if name == 'Stop' and background_running(event.get('background_tasks')):
+            return 'working', name
     elif kind == 'gemini':
         mapping = {'SessionStart': 'ready', 'BeforeAgent': 'working',
                    'AfterAgent': 'turn-ended', 'SessionEnd': 'session-ended'}
@@ -85,6 +96,32 @@ def normalized(kind, event, event_name=None):
                 return 'working', name
             if state == 'idle':
                 return 'turn-ended', name
+    elif kind == 'copilot':
+        mapping = {'sessionStart': 'ready', 'userPromptSubmitted': 'working',
+                   'agentStop': 'turn-ended', 'sessionEnd': 'session-ended'}
+        if name == 'notification' and event.get('notification_type') in ('permission_prompt', 'elicitation_dialog'):
+            return 'needs-input', name
+        if name in ('postToolUse', 'postToolUseFailure'):
+            return 'clear-request', name
+        if name == 'errorOccurred' and event.get('recoverable') is False:
+            return 'interrupted', name
+    elif kind == 'grok':
+        # A subagent's own session reports with subagentType; its stops and
+        # prompts are not the pane's.
+        if event.get('subagentType'):
+            return None
+        mapping = {'SessionStart': 'ready', 'UserPromptSubmit': 'working',
+                   'StopFailure': 'interrupted', 'StopCancelled': 'interrupted',
+                   'SessionEnd': 'session-ended'}
+        if name == 'Notification' and (event.get('notificationType') or event.get('notification_type')) == 'permission_prompt':
+            return 'needs-input', name
+        if name in ('PostToolUse', 'PostToolUseFailure'):
+            return 'clear-request', name
+        if name == 'Stop':
+            # Grok also sends an observe-only Stop as the session closes.
+            if event.get('reason', 'end_turn') != 'end_turn':
+                return None
+            return ('working' if background_running(event.get('backgroundTasks')) else 'turn-ended'), name
     elif kind == 'cursor-agent':
         mapping = {'sessionStart': 'ready', 'beforeSubmitPrompt': 'working',
                    'stop': 'turn-ended', 'sessionEnd': 'session-ended',
@@ -173,6 +210,8 @@ def session_id(kind, event):
         return core.field(event.get('conversationId'), 128)
     if kind == 'cursor-agent':
         return core.field(event.get('conversation_id') or event.get('session_id'), 128)
+    if kind in ('copilot', 'grok'):
+        return core.field(event.get('sessionId') or event.get('session_id'), 128)
     return core.field(event.get('session_id'), 128)
 
 
@@ -215,7 +254,8 @@ def report(kind, event, event_name=None):
         agent_kind = event.get('agent')
         state = event.get('state')
         allowed = {'ready', 'working', 'needs-input', 'turn-ended', 'session-ended', 'interrupted'}
-        if agent_kind not in ('claude', 'codex', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent') or state not in allowed:
+        if agent_kind not in ('claude', 'codex', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent',
+                              'copilot', 'grok') or state not in allowed:
             return
         request = event.get('request') if isinstance(event.get('request'), dict) else {}
         if state == 'needs-input' and not any(request.get(k) for k in ('id', 'summary', 'tool')):
@@ -263,6 +303,12 @@ def report(kind, event, event_name=None):
     agent = subagent_id(kind, event, current)
     child_event = kind == 'opencode' and bool(agent)
     if kind == 'opencode' and name == 'session.updated' and not child_event:
+        return
+    # Grok can deliver a cancelled turn's report after the next prompt starts;
+    # its promptId says which turn a report belongs to.
+    prompt = core.field(event.get('promptId'), 128) if kind == 'grok' else ''
+    if prompt and state in ('turn-ended', 'interrupted', 'working') and name != 'UserPromptSubmit' and \
+            current['turn'] and current['turn'] != prompt:
         return
     if not child_event:
         if current['session'] and current['session'] != session and not start:
@@ -314,6 +360,8 @@ def report(kind, event, event_name=None):
             core.refresh()
         return
     values.update(status=state, updated=now, request_agent=agent if state == 'needs-input' else '')
+    if kind == 'grok' and name == 'UserPromptSubmit':
+        values['turn'] = prompt
     if state == 'needs-input':
         tool = core.field(event.get('tool_name'), 80)
         detail = event.get('tool_input') or event.get('details') or {}
@@ -360,10 +408,10 @@ def main():
     kind = sys.argv[1] if len(sys.argv) > 1 else ''
     if kind == 'antigravity':
         kind = 'agy'
-    agy_event = sys.argv[2] if kind == 'agy' and len(sys.argv) > 2 else ''
+    event_arg = sys.argv[2] if kind in ('agy', 'copilot') and len(sys.argv) > 2 else ''
     # The adapter is observational. It never registers PreToolUse and never
     # returns a permission decision that could authorize a tool.
-    response = '{"decision": ""}' if agy_event == 'Stop' else '{}'
+    response = '{"decision": ""}' if event_arg == 'Stop' else '{}'
     # Cursor Agent requires an explicit allow response for subagentStart (and
     # only that event); every other reply is the inert default below.
     # Cursor can treat a missing allow as a block, so stdin is read/parsed
@@ -392,7 +440,7 @@ def main():
     if kind == 'cursor-agent' and event.get('hook_event_name') == 'subagentStart':
         cursor_response = '{"permission":"allow"}'
     if (oversized or
-            kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent') or
+            kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent', 'copilot', 'grok') or
             not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE)):
         emit()
         return
@@ -406,7 +454,7 @@ def main():
         emit()
         return
     try:
-        report(kind, event, agy_event)
+        report(kind, event, event_arg)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired):
         pass
     finally:

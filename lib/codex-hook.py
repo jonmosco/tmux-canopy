@@ -132,7 +132,7 @@ def process_identity(root, kind="codex"):
     names = {"codex": {"codex"}, "claude": {"claude", "claude-code"},
              "opencode": {"opencode"}, "gemini": {"gemini"},
              "pi": {"pi"}, "omp": {"omp"}, "agy": {"agy", "antigravity"},
-             "cursor-agent": {"agent"}}.get(kind, set())
+             "cursor-agent": {"agent"}, "copilot": {"copilot"}, "grok": {"grok"}}.get(kind, set())
     if not names:
         return None
     try:

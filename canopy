@@ -14,9 +14,9 @@ from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent
 PLACEHOLDER = "/absolute/path/to/tmux-canopy"
-KINDS = ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent")
+KINDS = ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", "copilot", "grok")
 EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "agy": "agy", "pi": "pi", "omp": "omp",
-               "opencode": "opencode", "cursor-agent": "agent"}
+               "opencode": "opencode", "cursor-agent": "agent", "copilot": "copilot", "grok": "grok"}
 TEMPLATES = {
     "codex": "codex-hooks.example.json",
     "claude": "claude-hooks.example.json",
@@ -26,7 +26,12 @@ TEMPLATES = {
     "omp": "pi-canopy.extension.ts",
     "opencode": "opencode-canopy.plugin.js",
     "cursor-agent": "cursor-agent-hooks.example.json",
+    "copilot": "copilot-hooks.example.json",
+    "grok": "grok-hooks.example.json",
 }
+# Agents that load every hook file in a directory get a file Canopy owns
+# outright, so installing never edits the user's own hook configuration.
+OWNED_HOOK_FILES = ("copilot", "grok")
 
 
 def config_path(kind):
@@ -45,6 +50,10 @@ def config_path(kind):
         return home / ".omp" / "agent" / "extensions" / "canopy-agent-state.ts"
     if kind == "cursor-agent":
         return home / ".cursor" / "hooks.json"
+    if kind == "copilot":
+        return home / ".copilot" / "hooks" / "canopy.json"
+    if kind == "grok":
+        return Path(os.environ.get("GROK_HOME", home / ".grok")).expanduser() / "hooks" / "canopy.json"
     return Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")).expanduser() / "opencode" / "plugins" / "canopy-agent-state.js"
 
 
@@ -52,7 +61,53 @@ def legacy_agy_path():
     return Path(os.environ.get("AGY_CONFIG_DIR", Path.home() / ".gemini" / "antigravity-cli")).expanduser() / "settings.json"
 
 
+def hook_commands(data):
+    """Every command string in a hook file, in either field Canopy writes."""
+    return [action.get(field) for groups in data.get("hooks", {}).values() if isinstance(groups, list)
+            for group in groups if isinstance(group, dict)
+            for action in (group.get("hooks") if isinstance(group.get("hooks"), list) else [group])
+            if isinstance(action, dict) for field in ("bash", "command") if field in action]
+
+
+def owned_template(kind):
+    data = json.loads((ROOT / "docs" / TEMPLATES[kind]).read_text())
+    command = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
+    for groups in data["hooks"].values():
+        for group in groups:
+            for action in group.get("hooks", [group]):
+                field = "bash" if "bash" in action else "command"
+                action[field] = action[field].replace(PLACEHOLDER + "/scripts/agent-hook", command)
+    return json.dumps(data, indent=2) + "\n"
+
+
+def owned_state(kind):
+    path = config_path(kind)
+    if not path.exists():
+        return "absent"
+    content = path.read_text()
+    if content == template(kind):
+        return "installed"
+    # Only a moved checkout is safe to rewrite: the file must match the
+    # template once each command's script path is swapped for this one.
+    try:
+        data = json.loads(content)
+    except ValueError:
+        return "modified (review manually)"
+    commands = hook_commands(data)
+    if not commands or not all(is_ours(command, kind) for command in commands):
+        return "modified (review manually)"
+    script = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
+    for groups in data["hooks"].values():
+        for group in groups:
+            for action in group.get("hooks", [group]):
+                field = "bash" if "bash" in action else "command"
+                action[field] = " ".join([script] + shlex.split(action[field])[1:])
+    return "outdated path" if json.dumps(data, indent=2) + "\n" == template(kind) else "modified (review manually)"
+
+
 def template(kind):
+    if kind in OWNED_HOOK_FILES:
+        return owned_template(kind)
     content = (ROOT / "docs" / TEMPLATES[kind]).read_text()
     if kind in ("codex", "claude", "gemini", "agy", "cursor-agent"):
         return json.loads(content.replace(PLACEHOLDER, shlex.quote(str(ROOT))))
@@ -85,7 +140,7 @@ def is_ours(command, kind):
         return False
     if kind == "codex":
         return len(parts) == 1
-    if kind == "agy":
+    if kind in ("agy", "copilot"):
         return len(parts) in (2, 3) and parts[1] == kind
     return len(parts) == 2 and parts[1] == kind
 
@@ -234,6 +289,8 @@ def integration_state(kind):
     path = config_path(kind)
     if kind == "agy":
         return agy_state()
+    if kind in OWNED_HOOK_FILES:
+        return owned_state(kind)
     if kind in ("codex", "claude", "gemini"):
         data = read_json(path)
         expected = template(kind)["hooks"]
@@ -293,6 +350,9 @@ SELF_TEST_EVENTS = {
     "pi": ({"type": "agent_start", "session_id": "self-test"}, "working"),
     "omp": ({"type": "agent_start", "session_id": "self-test"}, "working"),
     "cursor-agent": ({"hook_event_name": "beforeSubmitPrompt", "conversation_id": "self-test"}, "working"),
+    "copilot": ({"sessionId": "self-test", "notification_type": "permission_prompt",
+                 "message": "Allow?"}, "needs-input"),
+    "grok": ({"hook_event_name": "UserPromptSubmit", "sessionId": "self-test", "promptId": "p1"}, "working"),
 }
 
 
@@ -327,7 +387,7 @@ def reporter_self_test():
             if kind == "codex":
                 core.report(event)
             else:
-                hook.report(kind, event, "PreInvocation" if kind == "agy" else None)
+                hook.report(kind, event, {"agy": "PreInvocation", "copilot": "notification"}.get(kind))
         except Exception as error:  # Any exception here is a silent failure in a real hook.
             failures.append(f"{kind}: {type(error).__name__}: {error}")
             continue
@@ -397,7 +457,8 @@ def change(kind, action, dry_run=False):
     else:
         wanted = template(kind)
         current = path.read_text() if path.exists() else None
-        if current is not None and current != wanted:
+        if current is not None and current != wanted and not (
+                kind in OWNED_HOOK_FILES and owned_state(kind) == "outdated path"):
             raise ValueError(f"{path}: existing file was modified; review it manually")
         if action == "install" and current == wanted or action == "uninstall" and current is None:
             print(f"{kind}: already {'installed' if action == 'install' else 'absent'}")

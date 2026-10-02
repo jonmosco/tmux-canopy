@@ -111,6 +111,40 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
         "stop": [{"command": "/usr/bin/other-cursor-hook", "timeout": 5}]}}
     print("ok - integrations install idempotently, preserve unrelated settings, and uninstall only owned entries")
 
+    # Copilot and Grok load every file in their hooks directory, so Canopy
+    # installs a file of its own beside the user's and never edits theirs.
+    env["GROK_HOME"] = str(home / "custom grok")
+    copilot_user = home / ".copilot" / "hooks" / "mine.json"
+    copilot_user.parent.mkdir(parents=True)
+    copilot_user.write_text('{"version": 1, "hooks": {}}\n')
+    owned = {"copilot": home / ".copilot" / "hooks" / "canopy.json",
+             "grok": Path(env["GROK_HOME"]) / "hooks" / "canopy.json"}
+    run(cli, "integration", "install", "copilot", "grok", env=env)
+    copilot_hooks = json.loads(owned["copilot"].read_text())
+    assert copilot_hooks["version"] == 1
+    assert copilot_hooks["hooks"]["agentStop"] == [{"type": "command", "bash": str(ROOT / "scripts" / "agent-hook") +
+                                                    " copilot agentStop", "timeoutSec": 3}]
+    grok_hooks = json.loads(owned["grok"].read_text())
+    assert grok_hooks["hooks"]["Stop"] == [{"hooks": [{"type": "command", "command": str(ROOT / "scripts" / "agent-hook") +
+                                                       " grok", "timeout": 3}]}]
+    assert grok_hooks["hooks"]["Notification"][0]["matcher"] == "permission_prompt"
+    assert "already installed" in run(cli, "integration", "install", "copilot", env=env).stdout
+    status = run(cli, "integration", "status", "copilot", "grok", env=env).stdout
+    assert f"{'copilot':12} installed" in status and f"{'grok':12} installed" in status, status
+    owned["grok"].write_text(owned["grok"].read_text().replace(str(ROOT), "/previous/install"))
+    assert "outdated path" in run(cli, "integration", "status", "grok", env=env).stdout
+    run(cli, "integration", "install", "grok", env=env)
+    assert json.loads(owned["grok"].read_text()) == grok_hooks
+    owned["copilot"].write_text(owned["copilot"].read_text().replace('"timeoutSec": 3', '"timeoutSec": 9', 1))
+    assert "modified" in run(cli, "integration", "status", "copilot", env=env).stdout
+    result = run(cli, "integration", "uninstall", "copilot", env=env, ok=False)
+    assert result.returncode != 0 and "review it manually" in result.stderr and owned["copilot"].exists()
+    owned["copilot"].write_text(owned["copilot"].read_text().replace('"timeoutSec": 9', '"timeoutSec": 3', 1))
+    run(cli, "integration", "uninstall", "copilot", "grok", env=env)
+    assert not owned["copilot"].exists() and not owned["grok"].exists()
+    assert copilot_user.read_text() == '{"version": 1, "hooks": {}}\n'
+    print("ok - Copilot and Grok hooks live in a file Canopy owns beside the user's")
+
     for answer in ("", "all"):
         master, slave = pty.openpty()
         try:
@@ -127,7 +161,8 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     status = run(cli, "integration", "status", env=env).stdout
     assert all(f"{kind:12} installed" in status for kind in
                ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent"))
-    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", env=env)
+    run(cli, "integration", "uninstall", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent",
+        "copilot", "grok", env=env)
     assert json.loads(codex.read_text()) == restored
     assert json.loads(cursor.read_text()) == cursor_restored
     print("ok - dry-run, interactive setup cancellation, all-agent setup and removal")
