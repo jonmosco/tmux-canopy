@@ -4,6 +4,8 @@
 
 **A tmux workspace tree and AI-agent monitor in one sidebar, with no daemon.**
 
+Keep tmux. Keep your sessions. Keep your workflow. Canopy gives you the view from above: every session, window, pane, and agent at a glance.
+
 Canopy keeps your sessions, windows, and panes in a persistent tree that follows you as you switch windows and sessions, with the same selection and the same folded branches. Turn on agent mode and the same tree shows what every Claude Code, Codex, OpenCode, Gemini, Cursor, Antigravity, Pi, GitHub Copilot CLI, Grok Build, and Crush session is doing: which agents are working, which subagents they started, and which are waiting for you. Press `n` to jump straight to the next one that needs input.
 
 ## Preview
