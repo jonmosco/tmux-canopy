@@ -6,7 +6,11 @@ Remaining work for tmux-canopy. This list does not promise a release date. The
 ## Agent status reliability
 
 - [ ] Extend lifecycle regression coverage beyond Codex to verify that agent
-  exit, restart, and pane reuse cannot leave misleading status behind.
+  exit, restart, and pane reuse cannot leave misleading status behind. Codex has
+  real-process tests for these (`tests/codex_panel.py`) and Pi/Oh My Pi cover
+  session replacement (`tests/agent_reporting.py`); Claude Code, Gemini CLI,
+  OpenCode, Cursor Agent, and Antigravity still need the same real-process
+  checks.
 
 ## Jump to an agent needing input
 
@@ -19,8 +23,9 @@ Remaining work for tmux-canopy. This list does not promise a release date. The
 
 ## Agent request panel and responses (backlog)
 
-The agent summary already shows a read-only Codex request description and
-proposed command when a hook supplies them. The remaining work is to make
+The agent summary already shows a read-only request description when a
+lifecycle adapter reports one (for example Claude Code and Codex approvals,
+including Codex's proposed command). The remaining work is to make
 supported requests easier to inspect and, where safe, respond to them from the
 sidebar.
 
@@ -67,17 +72,6 @@ without switching focus away from the active application.
 - [ ] Test prompt delivery with special characters, multiline input, cancelled
   prompts, dead panes, and background panes across multiple windows and sessions.
 
-## Working-state animation
-
-- [x] Animate the **WORKING** status word with a moving highlight band while an
-  agent works, opt-in via `@tmux-canopy-animate`.
-- [x] Redraw frames from a cached snapshot (awk only) instead of a full source
-  reload, driven by a bounded worker that starts only when a working row is
-  drawn and exits when none remain, the sidebar is not visible, or its pane
-  closes. Target about 6–7 frames per second.
-- [x] Keep the no-daemon rule: no ticker without a visible working agent, and
-  static output (and all tests) when the option is off or the theme is `mono`.
-
 ## Switch sidebar side without reopening
 
 Left and right placement are supported today. Changing `@tmux-canopy-position`
@@ -101,7 +95,9 @@ selection background. The remaining work is to make theme sources explicit and
 consistent across views:
 
 - [ ] Keep the terminal palette usable on both light and dark themes without
-  assuming a particular palette.
+  assuming a particular palette. Today a light terminal needs
+  `@tmux-canopy-selection-background` set by hand (for example `254`); choose a
+  default that reads on both, and test both.
 - [ ] **tmux:** derive sidebar colors from the active tmux status, pane border,
   and message styles where available. Define clear fallbacks when those styles
   use `default` or omit a color.

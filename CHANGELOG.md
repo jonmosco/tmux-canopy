@@ -27,7 +27,7 @@
 - OpenCode's adapter loads in V2 as well as V1. It subscribes to the public event stream and observes prompt, tool, and permission hooks without approving a request or blocking a tool. Reinstall with `canopy integration install opencode` and restart OpenCode.
 - Pi and Oh My Pi adapters report tool execution, extension UI prompts as needs-input, and aborted or errored settles as interrupted. Reinstall with `canopy integration install pi` (and `omp`) so the extension file is replaced.
 - Cursor Agent (`cursor-agent`) process detection and optional lifecycle adapter for the `agent` CLI via `~/.cursor/hooks.json`.
-- Opt-in `@tmux-canopy-animate` moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
+- `@tmux-canopy-animate` (on by default) adds a moving highlight on visible `WORKING` status words from a cached snapshot (no permanent daemon; inert when off or `mono`).
 - `@tmux-canopy-appearance`: `default` groups panes by working directory with folder and application icons, `ascii` is the same layout without glyph-font requirements, and `classic` keeps the older tree for existing setups.
 - Tree reload on `after-split-window` so newly created panes appear without waiting for another focus change.
 - TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.

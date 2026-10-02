@@ -394,10 +394,11 @@ The option model is provider-neutral: each provider owns a namespaced pane/windo
 
 ### Appearance
 
-`@tmux-canopy-appearance` has two values. `default` groups panes by working
-directory and shows folder and application
+`@tmux-canopy-appearance` is `default` or `ascii`. `default` groups panes by
+working directory and shows folder and application
 icons using Unicode glyphs; `ascii` switches to an ASCII-only rendering for
-terminals without glyph support. `@tmux-canopy-icon-theme` remains available for
+terminals without glyph support. `classic`, the earlier window-first tree, is
+still accepted for existing setups. `@tmux-canopy-icon-theme` remains available for
 advanced customization. Close and reopen the
 sidebar after changing appearance; `Ctrl-r` alone does not restyle a running fzf
 process.
