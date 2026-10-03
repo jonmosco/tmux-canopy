@@ -6,7 +6,7 @@ export PYTHONDONTWRITEBYTECODE=1
 for file in tmux-canopy.tmux scripts/* tests/*.sh; do bash -n "$file"; done
 shellcheck tmux-canopy.tmux scripts/* tests/*.sh
 bash tests/integration.sh
-for suite in configuration setup buffers navigation rendering focus icons icon_alignment notifications attention jump_agent subagents codex_subagents agent_reporting agent_detection processes help preview codex_panel harnesses layout layout_scaling multiline directories filters quick_switch widths launch lifecycle create_refresh animate footer mouse wide_text; do
+for suite in configuration setup buffers navigation rendering focus icons icon_alignment notifications attention jump_agent subagents codex_subagents agent_reporting agent_detection processes help preview codex_panel harnesses layout layout_scaling multiline directories filters quick_switch widths launch lifecycle create_refresh animate footer mouse wide_text popup; do
   python3 "tests/$suite.py"
 done
 python3 tests/widths.py --right

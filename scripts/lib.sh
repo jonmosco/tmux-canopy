@@ -17,6 +17,23 @@ sidebar_transition_option() {
   printf '@tmux_canopy_transition_%s\n' "$CANOPY_KEY"
 }
 
+sidebar_popup_option() {
+  canopy_client_key "${1:-}"
+  printf '@tmux_canopy_popup_%s\n' "$CANOPY_KEY"
+}
+
+set_popup_active() {
+  tmux set-option -gq "$(sidebar_popup_option "${1:-}")" 1
+}
+
+clear_popup_active() {
+  tmux set-option -gu "$(sidebar_popup_option "${1:-}")" 2>/dev/null || true
+}
+
+popup_active() {
+  [[ "$(tmux show-option -gqv "$(sidebar_popup_option "${1:-}")" 2>/dev/null || true)" == '1' ]]
+}
+
 begin_sidebar_transition() {
   tmux set-option -gq "$(sidebar_transition_option "${1:-}")" 1
 }

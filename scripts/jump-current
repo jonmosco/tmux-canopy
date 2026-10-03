@@ -2,10 +2,26 @@
 # fzf transform action: position the pointer on the live content location.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sidebar="${TMUX_PANE:-}"
-[[ "$sidebar" =~ ^%[0-9]+$ ]] || { printf 'bell\n'; exit 0; }
-[[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || { printf 'bell\n'; exit 0; }
-location="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)"
+if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+  if [[ -r "${TMUX_CANOPY_STATE:-}.pos" ]]; then
+    target=''
+    read -r target < "${TMUX_CANOPY_STATE}.pos"
+    if [[ "$target" =~ ^[1-9][0-9]*$ ]]; then
+      printf 'change-query()+wait+pos(%s)\n' "$target"
+      exit 0
+    fi
+  fi
+  target_pane="${TMUX_CANOPY_TARGET:-${TMUX_PANE:-}}"
+  location="$(tmux display-message -p -t "$target_pane" '#{session_id}|#{window_id}|#{pane_id}' 2>/dev/null || true)"
+  if [[ -z "$location" && -n "${TMUX_CANOPY_CLIENT:-}" ]]; then
+    location="$(tmux display-message -c "$TMUX_CANOPY_CLIENT" -p '#{session_id}|#{window_id}|#{pane_id}' 2>/dev/null || true)"
+  fi
+else
+  sidebar="${TMUX_PANE:-}"
+  [[ "$sidebar" =~ ^%[0-9]+$ ]] || { printf 'bell\n'; exit 0; }
+  [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || { printf 'bell\n'; exit 0; }
+  location="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)"
+fi
 IFS='|' read -r session window pane <<< "$location"
 if [[ ! "$session" =~ ^\$[0-9]+$ || ! "$window" =~ ^@[0-9]+$ || ! "$pane" =~ ^%[0-9]+$ ]]; then
   printf 'bell\n'
