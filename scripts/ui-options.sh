@@ -135,6 +135,9 @@ sidebar_ui_options() {
     --bind='ctrl-q:abort'
   )
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
-    SIDEBAR_FZF_ARGS+=(--bind='q:abort')
+    SIDEBAR_FZF_ARGS+=(
+      --bind='q:abort'
+      --bind="result:transform($action_cmd popup-focus)+unbind(result)"
+    )
   fi
 }
