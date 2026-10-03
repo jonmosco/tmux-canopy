@@ -22,7 +22,7 @@ plugin_job() {
 # Read every setting, Canopy's ownership records, and the options it may own
 # in two tmux calls (see canopy_load_state); unset settings read as empty.
 settings=(key width scope smooth-navigation last-window-key transition notifications notification-target
-  silence-seconds icon-theme appearance animate resize-mode width-presets)
+  silence-seconds icon-theme appearance animate resize-mode width-presets mode popup-threshold popup-width popup-height)
 canopy_load_state "${settings[@]/#/@tmux-canopy-}" \
   window:window-status-activity-style window:window-status-bell-style \
   session:activity-action session:bell-action session:silence-action \
@@ -34,6 +34,8 @@ setting sidebar_transition transition; setting notification_sources notification
 setting notification_target notification-target; setting silence_seconds silence-seconds
 setting icon_theme icon-theme; setting appearance appearance; setting animate animate
 setting resize_mode resize-mode; setting width_presets width-presets
+setting sidebar_mode mode; setting popup_threshold popup-threshold
+setting popup_width popup-width; setting popup_height popup-height
 
 : "${sidebar_key:=T}"
 : "${sidebar_width:=42}"
@@ -49,6 +51,23 @@ setting resize_mode resize-mode; setting width_presets width-presets
 : "${animate:=on}"
 : "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
+: "${sidebar_mode:=sidebar}"
+: "${popup_threshold:=100}"
+: "${popup_width:=85%}"
+: "${popup_height:=80%}"
+
+if [[ "$sidebar_mode" != 'popup' && "$sidebar_mode" != 'auto' && "$sidebar_mode" != 'sidebar' ]]; then
+  sidebar_mode=sidebar
+fi
+if [[ ! "$popup_threshold" =~ ^[1-9][0-9]*$ ]]; then
+  popup_threshold=100
+fi
+if [[ ! "$popup_width" =~ ^[1-9][0-9]*%?$ ]]; then
+  popup_width='85%'
+fi
+if [[ ! "$popup_height" =~ ^[1-9][0-9]*%?$ ]]; then
+  popup_height='80%'
+fi
 
 if [[ ! "$sidebar_width" =~ ^[1-9][0-9]*%?$ ]]; then
   sidebar_width=42
@@ -100,6 +119,10 @@ canopy_queue set-option -gq @tmux_canopy_appearance "$appearance"
 canopy_queue set-option -gq @tmux_canopy_animate "$animate"
 canopy_queue set-option -gq @tmux_canopy_resize_mode "$resize_mode"
 canopy_queue set-option -gq @tmux_canopy_width_presets "$width_presets"
+canopy_queue set-option -gq @tmux_canopy_mode "$sidebar_mode"
+canopy_queue set-option -gq @tmux_canopy_popup_threshold "$popup_threshold"
+canopy_queue set-option -gq @tmux_canopy_popup_width "$popup_width"
+canopy_queue set-option -gq @tmux_canopy_popup_height "$popup_height"
 
 for alert_source in activity bell; do
   style=''

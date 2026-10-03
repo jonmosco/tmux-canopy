@@ -32,6 +32,7 @@ For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/cano
 
 - Sessions → windows → panes tree with application icons and an active-location marker.
 - Left or right placement; **left by default**.
+- Floating **popup modal** mode or adaptive **auto** switching on smaller displays (`@tmux-canopy-mode`).
 - Width-aware directory grouping, optional minimal and compact views, previews, and scrollable popup help.
 - Global quick switching, including panes inside collapsed branches.
 - Tree filters for the current session, unread notifications, window names, and pane titles.
@@ -115,6 +116,49 @@ Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in 
 
 Process detection needs no setup: a running agent shows as `[process]` in the Agents view. An adapter adds its exact state (working, needs input, turn ended, and so on). Adapters are optional and observational: they never approve a request or block a tool. Install only the ones you want with `canopy setup`, or `canopy integration install <agent>` using `claude`, `codex`, `opencode`, `gemini`, `cursor-agent`, `agy`, `pi`, `omp`, `copilot`, or `grok`, then restart that agent inside tmux. `canopy integration status` lists what is installed. Adapters need Python 3. Agent-specific notes, including OpenCode's plugin and Antigravity's hook file, are in [Agent lifecycle adapters](docs/reference.md#agent-lifecycle-adapters).
 
+### Using as a popup
+
+Canopy can run either as a docked sidebar split pane (the default) or inside a floating modal popup using `tmux display-popup`—ideal for smaller laptop screens, compact windows, or keeping your existing pane splits and layouts undisturbed.
+
+#### Always open as a popup
+
+To make **prefix + T** open Canopy in a floating popup:
+
+```tmux
+set -g @tmux-canopy-mode 'popup'
+```
+
+#### Adaptive auto mode for small screens
+
+If you prefer the docked sidebar on large monitors but want Canopy to automatically switch to a popup when your terminal window is narrow (e.g., on a laptop screen or half-screen window):
+
+```tmux
+set -g @tmux-canopy-mode 'auto'
+set -g @tmux-canopy-popup-threshold '100'  # column threshold (default: 100)
+```
+
+In `auto` mode:
+- When the window width meets or exceeds the threshold (100 columns by default), Canopy docks as a sidebar.
+- When the window width is below the threshold, or when the window is too narrow to fit both the sidebar and your content, Canopy automatically opens as a popup modal instead of refusing to open.
+
+#### Customizing popup dimensions
+
+You can adjust the size of the popup modal using percentages or column and line counts:
+
+```tmux
+set -g @tmux-canopy-popup-width '85%'   # default: 85%
+set -g @tmux-canopy-popup-height '80%'  # default: 80%
+```
+
+#### How the popup works
+
+- **Toggle:** Press **prefix + T** to open or close the popup.
+- **Active highlight:** When opened, the selection bar automatically highlights your currently active window and pane.
+- **Focus and switch:** Press `Enter` on any pane or window to switch to it and close the popup.
+- **Dismiss:** Press `q`, `Esc`, or re-press **prefix + T** to close the popup without switching focus.
+- **Preserved state:** Tree folds, active views (`1` Tree, `4` Agents, `2` Proc, `3` Buff), and search queries are remembered across popup sessions.
+- **No daemon:** The popup is ephemeral; when closed, no background process or daemon remains.
+
 ### Defaults
 
 Canopy opens on the **left**, follows its client across windows and sessions, and uses stable slots to keep application geometry steady when revisiting windows. It starts at 42 columns. Mouse resizing is live, with no fixed maximum; at least 40 columns are reserved for content.
@@ -122,6 +166,10 @@ Canopy opens on the **left**, follows its client across windows and sessions, an
 Place settings **before** the `run-shell` line:
 
 ```tmux
+set -g @tmux-canopy-mode 'sidebar'        # sidebar, popup, or auto (popup on narrow screens)
+set -g @tmux-canopy-popup-threshold '100' # column width threshold for auto popup
+set -g @tmux-canopy-popup-width '85%'     # popup width (% or columns)
+set -g @tmux-canopy-popup-height '80%'    # popup height (% or lines)
 set -g @tmux-canopy-position 'left'       # left or right
 set -g @tmux-canopy-width '42'
 set -g @tmux-canopy-scope 'global'        # global or window
@@ -134,6 +182,8 @@ set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 ```
+
+In `popup` mode (or `auto` mode when the window width is below `popup-threshold`), Canopy opens as a floating overlay via `tmux display-popup` without altering your window splits or pane geometry. Tree folds, active view, and filters are preserved across popup opens. Press `q` or `Esc` to close.
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
 
@@ -210,8 +260,9 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `g` | Scrollable symbol and color legend |
 | Mouse | Click selects, double-click focuses, the wheel scrolls (needs `set -g mouse on`) |
 | `Ctrl-q` | Close the sidebar |
+| `q` / `Esc` | Close the popup (in popup mode) |
 
-Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`.
+Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`. In popup mode, pressing `Enter` focuses the target and automatically closes the popup.
 When you leave the sidebar for a content pane, its selection pointer follows the active pane automatically.
 
 With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.

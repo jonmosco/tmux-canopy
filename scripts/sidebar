@@ -20,11 +20,28 @@ STATE_FILE="$(mktemp "${TMPDIR:-/tmp}/tmux-canopy.XXXXXX" 2>/dev/null)" || {
 }
 export TMUX_CANOPY_STATE="$STATE_FILE"
 
+POPUP_CACHE=''
+if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+  set_popup_active "$owner"
+  canopy_client_key "$owner"
+  # shellcheck disable=SC2153 # CANOPY_KEY is set by canopy_client_key
+  POPUP_CACHE="${TMPDIR:-/tmp}/tmux-canopy-popup-${CANOPY_KEY}"
+  if [[ -f "$POPUP_CACHE" ]]; then
+    cat "$POPUP_CACHE" >> "$STATE_FILE" 2>/dev/null || true
+  fi
+fi
+
 # shellcheck disable=SC2317,SC2329 # Invoked by EXIT, including signal-driven exits.
 cleanup() {
+  if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+    clear_popup_active "$owner"
+    if [[ -n "$POPUP_CACHE" && -f "$STATE_FILE" ]]; then
+      grep -E '^(VIEW|FOLD|FOOTER|FILTER)' "$STATE_FILE" > "$POPUP_CACHE" 2>/dev/null || true
+    fi
+  fi
   rm -f -- "${STATE_FILE}"*
   clear_sidebar_cache "$owner"
-  if [[ "${TMUX_CANOPY_TRANSITION:-move}" == slot ]]; then
+  if [[ "${TMUX_CANOPY_TRANSITION:-move}" == slot && "${TMUX_CANOPY_POPUP:-0}" != 1 ]]; then
     cleanup_slots_if_no_sidebars "${TMUX_PANE:-}"
   fi
 }
@@ -33,7 +50,9 @@ trap 'exit 0' INT TERM HUP
 
 rm -f -- "${STATE_FILE}.ready" "${STATE_FILE}.search"
 # @tmux-canopy-footer off starts this sidebar with its footer hidden; f toggles it.
-[[ "$(tmux show-option -gqv @tmux-canopy-footer 2>/dev/null)" != off ]] || printf 'FOOTER\toff\n' >> "$STATE_FILE"
+if ! grep -q '^FOOTER' "$STATE_FILE" 2>/dev/null; then
+  [[ "$(tmux show-option -gqv @tmux-canopy-footer 2>/dev/null)" != off ]] || printf 'FOOTER\toff\n' >> "$STATE_FILE"
+fi
 stty status undef discard undef 2>/dev/null || true
 sidebar_ui_options "${TMUX_PANE:-}"
 "$SCRIPT_DIR/sidebar-source" --stable | env -u FZF_DEFAULT_OPTS -u FZF_DEFAULT_OPTS_FILE -u FZF_DEFAULT_COMMAND "${TMUX_CANOPY_FZF_BINARY:-fzf}" "${SIDEBAR_FZF_ARGS[@]}"
