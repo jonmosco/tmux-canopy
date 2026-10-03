@@ -122,6 +122,10 @@ Canopy opens on the **left**, follows its client across windows and sessions, an
 Place settings **before** the `run-shell` line:
 
 ```tmux
+set -g @tmux-canopy-mode 'sidebar'        # sidebar, popup, or auto (popup on narrow screens)
+set -g @tmux-canopy-popup-threshold '100' # column width threshold for auto popup
+set -g @tmux-canopy-popup-width '85%'     # popup width (% or columns)
+set -g @tmux-canopy-popup-height '80%'    # popup height (% or lines)
 set -g @tmux-canopy-position 'left'       # left or right
 set -g @tmux-canopy-width '42'
 set -g @tmux-canopy-scope 'global'        # global or window
@@ -134,6 +138,8 @@ set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 ```
+
+In `popup` mode (or `auto` mode when the window width is below `popup-threshold`), Canopy opens as a floating overlay via `tmux display-popup` without altering your window splits or pane geometry. Tree folds, active view, and filters are preserved across popup opens. Press `q` or `Esc` to close.
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
 

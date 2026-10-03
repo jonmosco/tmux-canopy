@@ -96,7 +96,8 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
 | `g` | Open the scrollable legend of tree symbols, colors, badges, and labels |
 | `Ctrl-q` | Close |
-| `prefix + T` | Toggle the sidebar open or closed |
+| `q` / `Esc` | Close popup (in popup mode) |
+| `prefix + T` | Toggle the sidebar or popup open or closed |
 
 Tree navigation starts in a normal mode so navigation and creation keys remain available. Press `/` before typing a fuzzy query; normal-mode letter bindings are temporarily disabled while filtering. Expanded state lasts for the lifetime of each sidebar process.
 
@@ -253,6 +254,10 @@ No prompt integration or polling is installed. An isolated tmux 3.7c probe confi
 Set options before loading the plugin:
 
 ```tmux
+set -g @tmux-canopy-mode 'sidebar' # 'sidebar', 'popup', or 'auto'
+set -g @tmux-canopy-popup-threshold '100' # column width below which 'auto' uses popup
+set -g @tmux-canopy-popup-width '85%' # popup modal width (% or columns)
+set -g @tmux-canopy-popup-height '80%' # popup modal height (% or lines)
 set -g @tmux-canopy-key 'T'
 set -g @tmux-canopy-position 'left' # or 'right'
 set -g @tmux-canopy-width '42' # or '25%'
@@ -306,6 +311,23 @@ Resize modes control redraw behavior:
 On the left, staged and preset modes defer sidebar resizing until release. On the right, all modes use native live dragging; preset mode snaps to the nearest width on release. This preserves ordinary vertical and horizontal content-border resizing where tmux cannot identify the shared right-sidebar border from mouse-down coordinates. Release may land inside the sidebar or a content pane; the chosen width is saved and follows the sidebar across windows and sessions. A committed resize updates the active sidebar, runtime width, and inactive stable slots once. Staged and preset modes do not launch a shell for each column of mouse movement. Width presets are comma-separated terminal-column values.
 
 Opening on a zoomed pane is refused by default. Set `zoom-action` to `unzoom` to temporarily unzoom, create the sidebar, and restore the original pane's zoom when the sidebar closes.
+
+### Display modes
+
+Canopy supports three display modes configured via `@tmux-canopy-mode`:
+
+| Mode | Behavior |
+|---|---|
+| `sidebar` (default) | Renders as a dedicated split pane docked to the left or right of the window. |
+| `popup` | Renders inside an ephemeral floating modal via `tmux display-popup`. Existing panes and windows are not split or resized. |
+| `auto` | Automatically uses `popup` when the terminal window width is below `@tmux-canopy-popup-threshold` (default `100` columns) or when the window is too narrow for content and the minimum sidebar width; otherwise opens as `sidebar`. |
+
+In popup mode:
+- The popup is ephemeral: it exits when closed without leaving any background daemon or process running.
+- State is preserved: active view (Tree, Processes, Buffers, Agents), tree folds, footer visibility, and search queries are cached per client across popup invocations.
+- Closing: press `q` or `Esc` (when not actively editing search input), re-press the toggle key (`prefix + T`), or press `Enter` to focus the selected session, window, or pane.
+- Responsive preview: on terminals with 100 or more columns, the preview drawer appears on the right (`right,45%`); on narrower displays, it sits below the list.
+- Sizing is configured with `@tmux-canopy-popup-width` (default `85%`) and `@tmux-canopy-popup-height` (default `80%`). Both percentages and column/row counts are supported.
 
 The scope has two modes:
 

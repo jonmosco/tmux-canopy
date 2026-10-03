@@ -26,6 +26,12 @@ if [[ "$transition" == 'slot' && "$width" =~ ^[1-9][0-9]*$ && "$runtime_width" =
   width="$runtime_width"
 fi
 
+if [[ -n "$client" ]] && popup_active "$client"; then
+  clear_popup_active "$client"
+  tmux display-popup -c "$client" -C 2>/dev/null || true
+  exit 0
+fi
+
 sidebar_pane="$(sidebar_for_client "$client")"
 
 # Adopt sidebars created before client ownership was introduced rather than
@@ -54,28 +60,76 @@ fi
 source "$SCRIPT_DIR/ui-options.sh"
 sidebar_preflight "$client" "$target_pane" || exit 1
 
-restore_zoom_pane=''
-if [[ "$(tmux display-message -p -t "$target_pane" '#{window_zoomed_flag}' 2>/dev/null || true)" == '1' ]]; then
-  if [[ "$zoom_action" == 'unzoom' ]]; then
-    restore_zoom_pane="$target_pane"
-    tmux resize-pane -Z -t "$target_pane"
-  else
-    tmux display-message -c "$client" 'tmux-canopy: unzoom the pane before opening (or set @tmux-canopy-zoom-action unzoom)' 2>/dev/null || true
-    exit 0
+mode="$(tmux show-option -gqv @tmux-canopy-mode 2>/dev/null || true)"
+popup_threshold="$(tmux show-option -gqv @tmux-canopy-popup-threshold 2>/dev/null || true)"
+popup_width="$(tmux show-option -gqv @tmux-canopy-popup-width 2>/dev/null || true)"
+popup_height="$(tmux show-option -gqv @tmux-canopy-popup-height 2>/dev/null || true)"
+: "${mode:=sidebar}"
+: "${popup_threshold:=100}"
+: "${popup_width:=85%}"
+: "${popup_height:=80%}"
+
+window_width="$(tmux display-message -p -t "$target_pane" '#{window_width}' 2>/dev/null || true)"
+use_popup=0
+if [[ "$mode" == 'popup' ]]; then
+  use_popup=1
+elif [[ "$mode" == 'auto' ]]; then
+  if [[ "$window_width" =~ ^[1-9][0-9]*$ ]] && ((window_width < popup_threshold)); then
+    use_popup=1
   fi
 fi
 
-requested_width="$width"
-resolved_width="$(clamp_sidebar_width "$target_pane" "$width" "$minimum_width" "$maximum_width" "$minimum_content_width" 2>/dev/null || true)"
-if [[ -z "$resolved_width" ]]; then
-  tmux display-message -c "$client" "tmux-canopy: window is too narrow (requires ${minimum_width}+${minimum_content_width}+1 columns)" 2>/dev/null || true
-  if [[ -n "$restore_zoom_pane" ]]; then
-    tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+restore_zoom_pane=''
+if ((!use_popup)); then
+  if [[ "$(tmux display-message -p -t "$target_pane" '#{window_zoomed_flag}' 2>/dev/null || true)" == '1' ]]; then
+    if [[ "$zoom_action" == 'unzoom' ]]; then
+      restore_zoom_pane="$target_pane"
+      tmux resize-pane -Z -t "$target_pane"
+    else
+      tmux display-message -c "$client" 'tmux-canopy: unzoom the pane before opening (or set @tmux-canopy-zoom-action unzoom)' 2>/dev/null || true
+      exit 0
+    fi
   fi
-  exit 0
+
+  requested_width="$width"
+  resolved_width="$(clamp_sidebar_width "$target_pane" "$width" "$minimum_width" "$maximum_width" "$minimum_content_width" 2>/dev/null || true)"
+  if [[ -z "$resolved_width" ]]; then
+    if [[ "$mode" == 'auto' ]]; then
+      use_popup=1
+      if [[ -n "$restore_zoom_pane" ]]; then
+        tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+        restore_zoom_pane=''
+      fi
+    else
+      tmux display-message -c "$client" "tmux-canopy: window is too narrow (requires ${minimum_width}+${minimum_content_width}+1 columns)" 2>/dev/null || true
+      if [[ -n "$restore_zoom_pane" ]]; then
+        tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
+      fi
+      exit 0
+    fi
+  else
+    width="$resolved_width"
+    tmux set-option -gq @tmux_canopy_runtime_width "$requested_width"
+  fi
 fi
-width="$resolved_width"
-tmux set-option -gq @tmux_canopy_runtime_width "$requested_width"
+
+if ((use_popup)); then
+  exec tmux display-popup -c "$client" -t "$target_pane" \
+    -w "$popup_width" -h "$popup_height" \
+    -T ' Canopy · q/Esc close · Enter focus ' -E \
+    -e "TMUX_CANOPY_POPUP=1" \
+    -e "TMUX_CANOPY_CLIENT=$client" \
+    -e "TMUX_CANOPY_TARGET=$target_pane" \
+    -e "TMUX_CANOPY_WIDTH=$width" \
+    -e "TMUX_CANOPY_SCOPE=$scope" \
+    -e "TMUX_CANOPY_KEY=$toggle_key" \
+    -e "TMUX_CANOPY_LAST_KEY=$last_window_key" \
+    -e "TMUX_CANOPY_TRANSITION=$transition" \
+    -e "TMUX_CANOPY_FZF_BINARY=$SIDEBAR_FZF_BINARY" \
+    -e "TMUX_PANE=$target_pane" \
+    -e "TMPDIR=${TMPDIR:-/tmp}" \
+    "$BASH" "$SCRIPT_DIR/sidebar"
+fi
 
 position="$(tmux show-option -gqv @tmux-canopy-position 2>/dev/null || true)"
 [[ "$position" == right ]] || position=left

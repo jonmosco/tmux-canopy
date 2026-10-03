@@ -23,6 +23,13 @@ sidebar_ui_options() {
   : "${selection_style:=subtle}"
   pane_height="$(tmux display-message -p -t "$pane" '#{pane_height}' 2>/dev/null || printf '30')"
   preview_window="down,${preview_height},nowrap,border-top,+0"
+  if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+    popup_cols=80
+    read -r _rows popup_cols < <(stty size </dev/tty 2>/dev/null || echo "24 80")
+    if [[ "$popup_cols" =~ ^[1-9][0-9]*$ ]] && ((popup_cols >= 100)); then
+      preview_window="right,45%,nowrap,border-left,+0"
+    fi
+  fi
   if [[ "$preview_mode" == off || ( "$preview_mode" == auto && "$pane_height" =~ ^[0-9]+$ && "$pane_height" -lt 28 ) ]]; then
     preview_window+=',hidden'
   fi
@@ -46,6 +53,15 @@ sidebar_ui_options() {
   : "${appearance:=classic}"
   # Current-line arrow is drawn at the row edge. Leave the left pointer blank.
   pointer=' '; prompt='search › '; marker='●'; scrollbar='│'
+  local activate_suffix='' jump_agent_bind="n:execute-silent($jump_agent_cmd)"
+  local search_unbind='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?'
+  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
+  if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+    activate_suffix='+accept'
+    jump_agent_bind="n:execute-silent($jump_agent_cmd)+accept"
+    search_unbind+=',q'
+    esc_cmd="transform($action_cmd esc-action)"
+  fi
   # shellcheck disable=SC2034 # Output array consumed by sidebar/preflight.
   SIDEBAR_FZF_ARGS=(
     --ansi --read0 --multi-line --no-wrap --no-hscroll --gap=0 --highlight-line
@@ -72,8 +88,8 @@ sidebar_ui_options() {
     # The same shell shows the agent summary sidebar-source stored for this
     # load; an empty one hides the footer and its separator.
     --bind='load:+transform([ -n "$TMUX_CANOPY_STATE" ] || exit 0; touch "$TMUX_CANOPY_STATE.ready"; f=; [ -r "$TMUX_CANOPY_STATE.footer" ] && IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; printf "change-footer:%s" "$f")+change-header-lines(0)+change-header-lines(1)'
-    --bind='/:execute-silent([ -z "$TMUX_CANOPY_STATE" ] || touch "$TMUX_CANOPY_STATE.search")+show-input+enable-search+clear-query+unbind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
-    --bind='esc:execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
+    --bind="/:execute-silent([ -z \"\$TMUX_CANOPY_STATE\" ] || touch \"\$TMUX_CANOPY_STATE.search\")+show-input+enable-search+clear-query+unbind($search_unbind)"
+    --bind="esc:$esc_cmd"
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd)"
     --bind="g:execute-silent($help_cmd --legend)"
@@ -84,13 +100,13 @@ sidebar_ui_options() {
     --bind="4:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-agents)+reload-sync($source_cmd --stable)"
     --bind="A:execute-silent($action_cmd toggle-agents)+reload-sync($source_cmd --stable)"
     --bind="f:execute-silent($action_cmd toggle-footer)+reload-sync($source_cmd --stable)"
-    --bind="n:execute-silent($jump_agent_cmd)"
+    --bind="$jump_agent_bind"
     --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
     --bind="a:execute-silent($action_cmd actions {1})"
     --bind='p:toggle-preview'
     --bind="P:execute-silent($popup_cmd {1})"
-    --bind="enter:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})"
-    --bind="double-click:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})"
+    --bind="enter:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})$activate_suffix"
+    --bind="double-click:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})$activate_suffix"
     --bind="m:execute-silent($action_cmd move-toggle {1})+reload-sync($source_cmd --stable)"
     --bind="c:execute-silent($action_cmd move-cancel {1})+reload-sync($source_cmd --stable)"
     --bind="r:execute-silent($action_cmd rename {1})+reload-sync($source_cmd --stable)"
@@ -118,4 +134,7 @@ sidebar_ui_options() {
     --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'
   )
+  if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+    SIDEBAR_FZF_ARGS+=(--bind='q:abort')
+  fi
 }

@@ -99,10 +99,12 @@ help_records() {
   key '?' 'Open this help'
   key 'g' 'Open the symbol and color legend'
   key 'Ctrl-q' 'Close the sidebar'
-  key "prefix + $toggle_key" 'Toggle the sidebar from any pane'
+  key 'q / Esc' 'Close the popup (in popup mode)'
+  key "prefix + $toggle_key" 'Toggle the sidebar or popup from any pane'
   key 'prefix + h / l' 'Return focus to the left / right sidebar'
 
   section 'Appearance and behavior'
+  note 'Set @tmux-canopy-mode to sidebar (default), popup, or auto (popup on narrow screens, sidebar otherwise).'
   note 'Set @tmux-canopy-position to left (default) or right, then close and reopen the sidebar. Right-side mouse resizing is live; release saves the width.'
   note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
