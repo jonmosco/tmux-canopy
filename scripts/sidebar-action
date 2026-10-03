@@ -136,6 +136,17 @@ case "$action" in
     printf 'disable-search+clear-query+hide-input+search()+rebind(%s)\n' "$search_keys"
     ;;
 
+  popup-focus)
+    p=''
+    if [[ -n "$state_file" && -r "$state_file.pos" ]]; then
+      IFS= read -r p < "$state_file.pos"
+      rm -f "$state_file.pos"
+    fi
+    if [[ "$p" =~ ^[1-9][0-9]*$ ]]; then
+      printf 'pos(%s)\n' "$p"
+    fi
+    ;;
+
   activate)
     case "$token" in
       B:*|B2:*)

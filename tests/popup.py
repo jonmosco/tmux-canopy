@@ -25,7 +25,7 @@ def main():
     master = process = None
     with tempfile.TemporaryDirectory(prefix='canopy-popup-test-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
-        started, loads = temp / 'started', temp / 'loads'
+        started, loads, selected = temp / 'started', temp / 'loads', temp / 'selected'
 
         def tm(*args):
             result = sp.run([executable, '-L', socket, *args], env=env, capture_output=True, text=True, timeout=15)
@@ -54,7 +54,7 @@ def main():
         try:
             first = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'test', '-x', '120', '-y', '30',
                        '-P', '-F', '#{pane_id}', 'sleep 600')
-            tm('new-window', '-d', '-t', 'test:', '-n', 'second', 'sleep 600')
+            second_pane = tm('new-window', '-d', '-t', 'test:', '-n', 'second', '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('set-option', '-g', 'default-shell', '/bin/bash')
             tm('set-option', '-g', 'status', 'off')
             tm('set-option', '-g', '@tmux-canopy-mode', 'popup')
@@ -62,7 +62,8 @@ def main():
             script_env = env | {'TMUX': display(first, '#{socket_path},#{pid},0'), 'TMUX_PANE': first}
             install_fzf_probe(temp, [
                 f'start:execute-silent(touch {started})',
-                f'load:+execute-silent(printf x >> {loads})'], script_env)
+                f'load:+execute-silent(printf x >> {loads})',
+                f'ctrl-x:execute-silent(printf "%s" {{3}} > {selected})'], script_env)
 
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 120, 0, 0))
@@ -80,11 +81,24 @@ def main():
             threading.Thread(target=drain, daemon=True).start()
             wait(lambda: client in tm('list-clients', '-F', '#{client_tty}'), 'attached client')
             script_env['TMUX_CANOPY_CLIENT'] = client
+            tm('set-environment', '-g', 'PATH', script_env['PATH'])
 
             sp.run([str(ROOT / 'tmux-canopy.tmux')], env=script_env, check=True, timeout=15)
 
             def toggle():
-                tm('run-shell', '-b', f'{ROOT}/scripts/toggle "{client}" "{first}" 42 global T Tab slot')
+                cur = tm('display-message', '-c', client, '-p', '#{pane_id}')
+                tm('run-shell', '-b', f'{ROOT}/scripts/toggle "{client}" "{cur}" 42 global T Tab slot')
+
+            def probe_selection():
+                selected.unlink(missing_ok=True)
+                def poll():
+                    if selected.exists() and selected.stat().st_size:
+                        return True
+                    os.write(master, b'\x18')
+                    time.sleep(.08)
+                    return False
+                wait(poll, 'selection probe')
+                return selected.read_text().strip()
 
             def is_popup_active():
                 return any(line.startswith('@tmux_canopy_popup_') and line.endswith('1')
@@ -114,16 +128,29 @@ def main():
             wait(lambda: not is_popup_active(), 'popup closed via q')
             print('ok - pressing q inside popup exits and closes the popup')
 
-            # 4. Pressing Enter inside popup activates target and closes popup
-            started.unlink(missing_ok=True)
+            # 4. Switching to another window and reopening popup highlights the new window and pane
+            session_id = tm('display-message', '-t', 'test:', '-p', '#{session_id}')
+            tm('select-window', '-t', 'test:second')
             toggle()
-            wait(is_popup_active, 'popup opened for enter test')
-            time.sleep(.3)
+            wait(is_popup_active, 'popup opened on second window')
+            assert probe_selection() == f'P:{second_pane}:{session_id}', f'expected {second_pane}, got {probe_selection()}'
             os.write(master, b'\r')
             wait(lambda: not is_popup_active(), 'popup closed via Enter')
-            print('ok - pressing Enter inside popup activates target and closes the popup')
+            assert tm('display-message', '-c', client, '-p', '#{window_name}') == 'second'
+            print('ok - active window and pane are highlighted upon reopening popup')
 
-            # 5. Adaptive auto mode threshold
+            # 5. Switching to another pane in the same window and reopening popup highlights the new pane
+            third_pane = tm('split-window', '-d', '-t', 'test:second', '-P', '-F', '#{pane_id}', 'sleep 600')
+            tm('select-pane', '-t', third_pane)
+            toggle()
+            wait(is_popup_active, 'popup opened on split pane')
+            assert probe_selection() == f'P:{third_pane}:{session_id}', f'expected {third_pane}, got {probe_selection()}'
+            os.write(master, b'q')
+            wait(lambda: not is_popup_active(), 'popup closed via q')
+            print('ok - active split pane is highlighted upon reopening popup')
+
+            # 6. Adaptive auto mode threshold
+            tm('select-window', '-t', 'test:0')
             tm('set-option', '-g', '@tmux-canopy-mode', 'auto')
             tm('set-option', '-g', '@tmux-canopy-popup-threshold', '100')
 

@@ -179,6 +179,16 @@ function resolve_focus(token, kind,s,w,p,parts) {
     else printf "W:%s:%s\t\n",w,s
 }
 function row(token, value, identity) {
+    if (token != "H:" && token != "F:") {
+        row_count++
+        if (identity == ("P:" current_p ":" current_s) || (token ~ /^W:/ && w == current_w && s == current_s && p == current_p)) {
+            focus_target = row_count
+        } else if (!focus_target && (identity == ("W:" current_w ":" current_s))) {
+            focus_window_target = row_count
+        } else if (!focus_target && !focus_window_target && (identity == ("S:" current_s))) {
+            focus_session_target = row_count
+        }
+    }
     if (stable) printf "%s\t%s\t%s", token, value, identity
     else printf "%s\t%s", token, value
     # BSD awk cannot retain NUL in strings; emit it directly.
@@ -905,6 +915,22 @@ END {
             current_p=target[current_p]; current_w=pw[current_p]
         }
     }
+    if (ENVIRON["TMUX_CANOPY_POPUP"] == "1" && ENVIRON["TMUX_CANOPY_TARGET"] != "") {
+        pop_target = ENVIRON["TMUX_CANOPY_TARGET"]
+        if (pop_target in pw) {
+            current_p = pop_target
+            current_w = pw[pop_target]
+            for (si = 1; si <= ns; si++) {
+                s_candidate = sessions[si]
+                for (wpos = 1; wpos <= nw[s_candidate]; wpos++) {
+                    if (windows[s_candidate, wpos] == current_w) {
+                        current_s = s_candidate
+                        break
+                    }
+                }
+            }
+        }
+    }
     for (si=1; si<=ns; si++) {
         s=sessions[si]
         if (sname[s] ~ /^['"[:space:]]*$/) sname[s]=s
@@ -1125,5 +1151,12 @@ END {
                 }
             }
         }
+    }
+    best_focus = (focus_target ? focus_target : (focus_window_target ? focus_window_target : focus_session_target))
+    state_file = ENVIRON["TMUX_CANOPY_STATE"]
+    if (state_file != "" && state_file != "/dev/null" && best_focus > 0) {
+        pos_file = state_file ".pos"
+        print best_focus > pos_file
+        close(pos_file)
     }
 }
