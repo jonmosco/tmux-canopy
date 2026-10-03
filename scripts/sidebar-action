@@ -13,7 +13,7 @@ token="${2:-}"
 if [[ "$token" == DIR:* && "$action" != collapse && "$action" != expand ]]; then
   token="P:${token#DIR:}"
 fi
-state_file="${TMUX_CANOPY_STATE:?}"
+state_file="${TMUX_CANOPY_STATE:-}"
 sidebar="${TMUX_PANE:-}"
 row_identity="${3:-}"
 if [[ "$action" == diagnostics || ( "$token" == V:failure && "$action" == actions ) ]]; then
@@ -43,6 +43,10 @@ process_belongs_to_pane() {
 
 target_pane() {
   local target
+  if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 && -n "${TMUX_CANOPY_TARGET:-}" ]]; then
+    printf '%s\n' "$TMUX_CANOPY_TARGET"
+    return
+  fi
   target="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_target 2>/dev/null || true)"
   [[ -n "$target" ]] && printf '%s\n' "$target"
 }
@@ -117,6 +121,19 @@ case "$action" in
     else
       tmux set-option -gq "$option" on
     fi
+    ;;
+
+  esc-action)
+    search_keys='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?'
+    if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
+      search_keys+=',q'
+      if [[ -z "$state_file" || ! -f "$state_file.search" ]]; then
+        printf 'abort\n'
+        exit 0
+      fi
+    fi
+    [[ -z "$state_file" ]] || rm -f "$state_file.search"
+    printf 'disable-search+clear-query+hide-input+search()+rebind(%s)\n' "$search_keys"
     ;;
 
   activate)
