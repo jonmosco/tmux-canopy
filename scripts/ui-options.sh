@@ -137,7 +137,8 @@ sidebar_ui_options() {
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     SIDEBAR_FZF_ARGS+=(
       --bind='q:abort'
-      --bind="result:transform($action_cmd popup-focus)+unbind(result)"
+      --bind='load:transform([ -n "$TMUX_CANOPY_STATE" ] || exit 0; touch "$TMUX_CANOPY_STATE.ready"; f=; [ -r "$TMUX_CANOPY_STATE.footer" ] && IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; printf "change-footer:%s" "$f")'
+      --bind="result-final:transform($action_cmd popup-focus)+unbind(result-final)"
     )
   fi
 }

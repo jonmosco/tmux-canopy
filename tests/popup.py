@@ -25,7 +25,7 @@ def main():
     master = process = None
     with tempfile.TemporaryDirectory(prefix='canopy-popup-test-', ignore_cleanup_errors=True) as directory:
         temp = Path(directory)
-        started, loads, selected = temp / 'started', temp / 'loads', temp / 'selected'
+        started, selected = temp / 'started', temp / 'selected'
 
         def tm(*args):
             result = sp.run([executable, '-L', socket, *args], env=env, capture_output=True, text=True, timeout=15)
@@ -62,7 +62,6 @@ def main():
             script_env = env | {'TMUX': display(first, '#{socket_path},#{pid},0'), 'TMUX_PANE': first}
             install_fzf_probe(temp, [
                 f'start:execute-silent(touch {started})',
-                f'load:+execute-silent(printf x >> {loads})',
                 f'ctrl-x:execute-silent(printf "%s" {{3}} > {selected})'], script_env)
 
             master, slave = pty.openpty()
@@ -131,9 +130,10 @@ def main():
             # 4. Switching to another window and reopening popup highlights the new window and pane
             session_id = tm('display-message', '-t', 'test:', '-p', '#{session_id}')
             tm('select-window', '-t', 'test:second')
+            wait(lambda: tm('display-message', '-c', client, '-p', '#{window_name}') == 'second', 'client switched to second window')
             toggle()
             wait(is_popup_active, 'popup opened on second window')
-            assert probe_selection() == f'P:{second_pane}:{session_id}', f'expected {second_pane}, got {probe_selection()}'
+            wait(lambda: probe_selection() == f'P:{second_pane}:{session_id}', 'active second window pane highlighted')
             os.write(master, b'\r')
             wait(lambda: not is_popup_active(), 'popup closed via Enter')
             assert tm('display-message', '-c', client, '-p', '#{window_name}') == 'second'
@@ -142,9 +142,10 @@ def main():
             # 5. Switching to another pane in the same window and reopening popup highlights the new pane
             third_pane = tm('split-window', '-d', '-t', 'test:second', '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('select-pane', '-t', third_pane)
+            wait(lambda: tm('display-message', '-c', client, '-p', '#{pane_id}') == third_pane, 'client switched to split pane')
             toggle()
             wait(is_popup_active, 'popup opened on split pane')
-            assert probe_selection() == f'P:{third_pane}:{session_id}', f'expected {third_pane}, got {probe_selection()}'
+            wait(lambda: probe_selection() == f'P:{third_pane}:{session_id}', 'active third split pane highlighted')
             os.write(master, b'q')
             wait(lambda: not is_popup_active(), 'popup closed via q')
             print('ok - active split pane is highlighted upon reopening popup')
