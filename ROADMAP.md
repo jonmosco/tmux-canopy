@@ -106,6 +106,27 @@ currently takes effect when the sidebar is reopened.
 - [ ] Test both directions, content layouts, mouse resizing, and client
   ownership. Document the action in the README and built-in help.
 
+## Alerts
+
+Desktop and tmux alerts cover agents and tmux's bell, silence, and activity
+alerts today (see the README). Remaining work:
+
+- [ ] **Command finished (tmux 3.8+):** use the existing
+  `@tmux_canopy_command` format hook to record when a pane's foreground
+  command starts, and alert when the pane returns to its shell after a
+  configurable minimum duration, naming the command and how long it ran.
+  Older tmux has no equivalent hook; document that it needs 3.8.
+- [ ] **Linux delivery:** verify `notify-send` against real notification
+  services (GNOME, KDE, dunst, mako), and replace a pane's previous
+  notification instead of stacking them (the
+  `x-canonical-private-synchronous` hint, where supported).
+- [ ] **Desktop alerts over SSH:** an explicit opt-in that sends terminal
+  notification sequences (OSC 9, 777, or 99) so the alert appears on the
+  machine you type on. It needs tmux's `allow-passthrough`, so the opt-in must
+  say so rather than set it silently.
+- [ ] **Choose agent events:** allow alerting on needs-input only, without
+  finished or interrupted.
+
 ## Appearance and theme sources
 
 Canopy already uses the terminal's default foreground/background and ANSI
