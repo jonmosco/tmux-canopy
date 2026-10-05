@@ -46,6 +46,9 @@ if [[ "$(tmux show-option -gqv @tmux-canopy-agents 2>/dev/null || true)" == on ]
 else
   printf 'default off (Shift-a toggles it per client without a reload)\n'
 fi
+alerts="$(tmux show-option -gqv @tmux_canopy_agent_alerts 2>/dev/null || true)"
+printf 'Agent alerts: %s (desktop notifiers, in order: %s; canopy alerts test sends a sample)\n' \
+  "${alerts:-off}" "$("$SCRIPT_DIR/agent-notify" --notifier)"
 printf '\nRequired commands, formats, UI options and temporary state: '
 result=0
 if sidebar_preflight "$owner" "$target"; then printf 'OK\n'; else printf 'FAILED\n'; result=1; fi

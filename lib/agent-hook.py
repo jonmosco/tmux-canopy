@@ -281,10 +281,10 @@ def report(kind, event, event_name=None):
     if kind == 'claude' and name == 'SessionStart' and event.get('source') == 'compact':
         return
     meta = core.tmux('display-message', '-p', '-t', core.PANE,
-                     '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}')
+                     '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_agent_alerts}')
     if meta.returncode:
         return
-    pane, pid, dead, sidebar, slot = (meta.stdout.rstrip('\n').split('|') + [''] * 5)[:5]
+    pane, pid, dead, sidebar, slot, alerts = (meta.stdout.rstrip('\n').split('|') + [''] * 6)[:6]
     if pane != core.PANE or not pid.isdigit() or dead == '1' or sidebar == '1' or slot == '1':
         return
     identity = core.process_identity(pid, kind)
@@ -362,7 +362,13 @@ def report(kind, event, event_name=None):
     values.update(status=state, updated=now, request_agent=agent if state == 'needs-input' else '')
     if kind == 'grok' and name == 'UserPromptSubmit':
         values['turn'] = prompt
-    if state == 'needs-input':
+    if state == 'needs-input' and kind != 'opencode' and current['status'] == 'needs-input' and \
+            current['request_agent'] == agent and current['tool'] and not core.field(event.get('tool_name'), 80):
+        # Claude follows PermissionRequest with a tool-less permission_prompt
+        # Notification for the same request. Replacing the request would drop
+        # the tool its PostToolUse must match to clear it.
+        values['updated'] = current['updated'] or now
+    elif state == 'needs-input':
         tool = core.field(event.get('tool_name'), 80)
         detail = event.get('tool_input') or event.get('details') or {}
         if not isinstance(detail, dict):
@@ -401,6 +407,7 @@ def report(kind, event, event_name=None):
         values.update(tool='', summary='', command='', request='')
     if core.write(values):
         core.schedule_expiry(process_pid, process_birth, current_timer)
+        core.alert(alerts, current, values, kind, event.get('last_assistant_message'))
         core.refresh()
 
 
