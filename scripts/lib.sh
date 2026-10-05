@@ -64,9 +64,8 @@ sidebar_for_client() {
   cache_option="$(sidebar_cache_option "$client")"
   cached="$(tmux show-option -gqv "$cache_option" 2>/dev/null || true)"
 
-  if [[ -n "$cached" ]] \
-    && [[ "$(tmux show-option -pqv -t "$cached" @tmux_canopy 2>/dev/null || true)" == '1' ]] \
-    && [[ "$(tmux show-option -pqv -t "$cached" @tmux_canopy_client 2>/dev/null || true)" == "$client" ]]; then
+  if [[ "$cached" =~ ^%[0-9]+$ ]] \
+    && [[ "$(tmux display-message -p -t "$cached" '#{@tmux_canopy}|#{@tmux_canopy_client}' 2>/dev/null || true)" == "1|$client" ]]; then
     printf '%s\n' "$cached"
     return 0
   fi

@@ -5,11 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib.sh"
 
-configured="$(tmux show-option -gqv @tmux-canopy-width 2>/dev/null || true)"
-minimum="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
-maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
-min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
-runtime="$(tmux show-option -gqv @tmux_canopy_runtime_width 2>/dev/null || true)"
+IFS='|' read -r configured minimum maximum min_content runtime < <(
+  tmux display-message -p \
+    '#{@tmux-canopy-width}|#{@tmux-canopy-min-width}|#{@tmux-canopy-max-width}|#{@tmux-canopy-min-content-width}|#{@tmux_canopy_runtime_width}' 2>/dev/null || true
+)
 : "${configured:=42}"
 : "${minimum:=24}"
 : "${maximum:=0}"

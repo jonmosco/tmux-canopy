@@ -15,13 +15,16 @@ sidebar_ui_options() {
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
   local animate_cmd='"$TMUX_CANOPY_ROOT/scripts/animate-frame"'
   local mode_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-mode"'
-  preview_mode="$(tmux show-option -gqv @tmux-canopy-preview 2>/dev/null || true)"
-  preview_height="$(tmux show-option -gqv @tmux-canopy-preview-height 2>/dev/null || true)"
-  selection_style="$(tmux show-option -gqv @tmux-canopy-selection-style 2>/dev/null || true)"
+  local pane_flag=()
+  [[ -n "$pane" ]] && pane_flag=(-t "$pane")
+  IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance < <(
+    tmux display-message -p "${pane_flag[@]}" \
+      '#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}' 2>/dev/null || true
+  )
   : "${preview_mode:=off}"
   : "${preview_height:=35%}"
   : "${selection_style:=subtle}"
-  pane_height="$(tmux display-message -p -t "$pane" '#{pane_height}' 2>/dev/null || printf '30')"
+  [[ "$pane_height" =~ ^[1-9][0-9]*$ ]] || pane_height=30
   preview_window="down,${preview_height},nowrap,border-top,+0"
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     popup_cols=80
@@ -33,7 +36,6 @@ sidebar_ui_options() {
   if [[ "$preview_mode" == off || ( "$preview_mode" == auto && "$pane_height" =~ ^[0-9]+$ && "$pane_height" -lt 28 ) ]]; then
     preview_window+=',hidden'
   fi
-  selection_background="$(tmux show-option -gqv @tmux-canopy-selection-background 2>/dev/null || true)"
   if [[ "$selection_background" =~ ^([0-9]|[1-9][0-9]{1,2})$ ]] && ((selection_background <= 255)); then
     :
   elif [[ ! "$selection_background" =~ ^#[[:xdigit:]]{6}$ ]]; then
@@ -47,9 +49,7 @@ sidebar_ui_options() {
     pointer) fzf_colors+=',fg+:-1:regular' ;;
     *) fzf_colors+=",bg+:$selection_background,fg+:-1:regular" ;;
   esac
-  theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
   [[ "$theme" != mono ]] || fzf_colors='bw'
-  appearance="$(tmux show-option -gqv @tmux_canopy_appearance 2>/dev/null || true)"
   : "${appearance:=classic}"
   # Current-line arrow is drawn at the row edge. Leave the left pointer blank.
   pointer=' '; prompt='search › '; marker='●'; scrollbar='│'
