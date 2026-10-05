@@ -14,6 +14,10 @@ spec = importlib.util.spec_from_file_location("canopy_agent_hook", ROOT / "lib" 
 hook = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hook)
 core = hook.core
+codex_spec = importlib.util.spec_from_file_location("canopy_codex_hook", ROOT / "lib" / "codex-hook.py")
+codex = importlib.util.module_from_spec(codex_spec)
+codex_spec.loader.exec_module(codex)
+assert codex.core is core, "all reporters use the shared reporting module"
 
 
 def harness(kind, path="/repo"):
@@ -478,13 +482,13 @@ for mode in ("", "off", "bogus"):
     check(state["status"] == "turn-ended" and started == [], f"alerts stay off for {mode!r}: {started}")
 
 state, started = alert_harness("codex", "desktop")
-core.report({"hook_event_name": "SessionStart", "session_id": "c1"})
-core.report({"hook_event_name": "UserPromptSubmit", "session_id": "c1", "turn_id": "t1"})
-core.report({"hook_event_name": "PermissionRequest", "session_id": "c1", "turn_id": "t1",
+codex.report({"hook_event_name": "SessionStart", "session_id": "c1"})
+codex.report({"hook_event_name": "UserPromptSubmit", "session_id": "c1", "turn_id": "t1"})
+codex.report({"hook_event_name": "PermissionRequest", "session_id": "c1", "turn_id": "t1",
              "tool_name": "Bash", "tool_input": {"command": "make", "description": "Build"}})
-core.report({"hook_event_name": "PreToolUse", "session_id": "c1", "turn_id": "t1",
+codex.report({"hook_event_name": "PreToolUse", "session_id": "c1", "turn_id": "t1",
              "tool_name": "Bash", "tool_input": {"command": "make", "description": "Build"}})
-core.report({"hook_event_name": "Stop", "session_id": "c1", "turn_id": "t1"})
+codex.report({"hook_event_name": "Stop", "session_id": "c1", "turn_id": "t1"})
 check(started == [("%4", "needs-input", "codex", "Build", "desktop"), ("%4", "done", "codex", "", "desktop")],
       f"Codex alerts on a request and on the end of a working turn: {started}")
 
@@ -498,9 +502,9 @@ send("claude", {"hook_event_name": "StopFailure", "session_id": "a4"})
 check(len(started) == 1, f"an interruption with no turn in progress stays quiet: {started}")
 
 state, started = alert_harness("codex", "both")
-core.report({"hook_event_name": "SessionStart", "session_id": "c2"})
-core.report({"hook_event_name": "UserPromptSubmit", "session_id": "c2", "turn_id": "t1"})
-core.report({"hook_event_name": "Interrupt", "session_id": "c2", "turn_id": "t1"})
+codex.report({"hook_event_name": "SessionStart", "session_id": "c2"})
+codex.report({"hook_event_name": "UserPromptSubmit", "session_id": "c2", "turn_id": "t1"})
+codex.report({"hook_event_name": "Interrupt", "session_id": "c2", "turn_id": "t1"})
 check(started == [("%4", "interrupted", "codex", "", "both")], f"Codex interruption alerts: {started}")
 
 # The text rides in the environment: the request's command, the agent's last
@@ -522,9 +526,9 @@ send("claude", {"hook_event_name": "StopFailure", "session_id": "a5", "last_assi
 check(texts[-1]["CANOPY_ALERT_REPLY"] == "", f"only a finished turn carries a reply: {texts[-1]}")
 
 state, started = alert_harness("codex", "tmux")
-core.report({"hook_event_name": "SessionStart", "session_id": "c3"})
-core.report({"hook_event_name": "UserPromptSubmit", "session_id": "c3", "turn_id": "t1"})
-core.report({"hook_event_name": "Stop", "session_id": "c3", "turn_id": "t1", "last_assistant_message": "Fixed it."})
+codex.report({"hook_event_name": "SessionStart", "session_id": "c3"})
+codex.report({"hook_event_name": "UserPromptSubmit", "session_id": "c3", "turn_id": "t1"})
+codex.report({"hook_event_name": "Stop", "session_id": "c3", "turn_id": "t1", "last_assistant_message": "Fixed it."})
 check(texts[-1]["CANOPY_ALERT_REPLY"] == "Fixed it.", f"Codex passes its last reply: {texts[-1]}")
 
 print("ok - agent alerts fire once per transition, only when enabled")
