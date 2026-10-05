@@ -5,20 +5,48 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/launch-lib.sh"
 
 state_file="${TMUX_CANOPY_STATE:?}"
-view="$(awk -F '\t' '$1 == "VIEW" { print $2; exit }' "$state_file" 2>/dev/null)"
-: "${view:=tree}"
+view='tree'
 mode=''
-mode_color='\033[2m'
-if grep -q $'^MOVE\t' "$state_file" 2>/dev/null; then mode='MOVE'; mode_color='\033[36;1m'
-elif grep -q $'^LINK\t' "$state_file" 2>/dev/null; then mode='LINK'; mode_color='\033[36;1m'
-elif awk -F '\t' -v now="$(date +%s)" '$1 == "DELETE" && now - $3 <= 5 { found=1 } END { exit !found }' "$state_file" 2>/dev/null; then mode='DELETE'; mode_color='\033[33;1m'
+mode_color=$'\033[2m'
+printf -v now '%(%s)T' -1
+
+if [[ -r "$state_file" ]]; then
+  has_move=0 has_link=0 has_delete=0
+  while IFS=$'\t' read -r kind val stamp _; do
+    case "$kind" in
+      VIEW)   [[ -n "$val" ]] && view="$val" ;;
+      MOVE)   has_move=1 ;;
+      LINK)   has_link=1 ;;
+      DELETE)
+        if [[ "$stamp" =~ ^[0-9]+$ ]] && (( now - stamp <= 5 )); then
+          has_delete=1
+        fi
+        ;;
+    esac
+  done < "$state_file"
+
+  if ((has_move)); then
+    mode='MOVE'; mode_color=$'\033[36;1m'
+  elif ((has_link)); then
+    mode='LINK'; mode_color=$'\033[36;1m'
+  elif ((has_delete)); then
+    mode='DELETE'; mode_color=$'\033[33;1m'
+  fi
 fi
 
-width="$(tmux display-message -p -t "${TMUX_PANE:-}" '#{pane_width}' 2>/dev/null || printf '42')"
+pane_flag=()
+[[ -n "${TMUX_PANE:-}" ]] && pane_flag=(-t "${TMUX_PANE:-}")
+client="$(canopy_agents_client)"
+agents_fmt="$(canopy_agents_format "$client")"
+
+IFS='|' read -r width appearance theme agents_enabled < <(
+  tmux display-message -p "${pane_flag[@]}" \
+    "#{pane_width}|#{@tmux_canopy_appearance}|#{@tmux-canopy-theme}|${agents_fmt}" 2>/dev/null || true
+)
+
 [[ "$width" =~ ^[1-9][0-9]*$ ]] || width=42
-if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
-appearance="$(tmux show-option -gqv @tmux_canopy_appearance 2>/dev/null || true)"
 : "${appearance:=classic}"
+[[ "$agents_enabled" == on ]] || agents_enabled=off
 # Match the tree renderer, including fzf's pointer gutter and right edge.
 case "$view" in
   processes) selected=1 ;;
@@ -55,7 +83,6 @@ for tier in full compact tiny; do
   tabs="${labels[*]}"
   (( ${#tabs} + reserved + box_pad <= width - 4 )) && break
 done
-theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 accent=$'\033[1;36m'; reset=$'\033[0m'; dim=$'\033[2m'
 if [[ "$theme" == mono ]]; then accent=''; reset=''; dim=''; mode_color=''; fi
 printf 'H:\t'
