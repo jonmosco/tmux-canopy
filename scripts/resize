@@ -8,25 +8,36 @@ source "$SCRIPT_DIR/lib.sh"
 action="${1:-}"
 sidebar="${2:-}"
 value="${3:-}"
-[[ -n "$sidebar" && "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == '1' ]] || exit 0
+[[ -n "$sidebar" ]] || exit 0
 
-minimum="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
-maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
-min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
-presets="$(tmux show-option -gqv @tmux-canopy-width-presets 2>/dev/null || true)"
+IFS='|' read -r is_canopy current minimum maximum min_content presets < <(
+  tmux display-message -p -t "$sidebar" \
+    '#{@tmux_canopy}|#{pane_width}|#{@tmux-canopy-min-width}|#{@tmux-canopy-max-width}|#{@tmux-canopy-min-content-width}|#{@tmux-canopy-width-presets}' 2>/dev/null || true
+)
+
+[[ "$is_canopy" == '1' && "$current" =~ ^[1-9][0-9]*$ ]] || exit 0
 : "${minimum:=24}"
 : "${maximum:=0}"
 : "${min_content:=40}"
 : "${presets:=30,42,48}"
 
-current="$(tmux display-message -p -t "$sidebar" '#{pane_width}' 2>/dev/null || true)"
-[[ "$current" =~ ^[1-9][0-9]*$ ]] || exit 0
-
-mapfile -t widths < <(
-  tr ',' '\n' <<< "$presets" |
-    awk '/^[1-9][0-9]*$/ && !seen[$0]++ { print $0 }' |
-    sort -n
-)
+IFS=',' read -ra raw_widths <<< "$presets"
+widths=()
+for w in "${raw_widths[@]}"; do
+  w="${w//[[:space:]]/}"
+  if [[ "$w" =~ ^[1-9][0-9]*$ ]]; then
+    inserted=0
+    for ((idx=0; idx<${#widths[@]}; idx++)); do
+      if ((w == widths[idx])); then
+        inserted=1; break
+      elif ((w < widths[idx])); then
+        widths=("${widths[@]:0:idx}" "$w" "${widths[@]:idx}")
+        inserted=1; break
+      fi
+    done
+    ((inserted)) || widths+=("$w")
+  fi
+done
 ((${#widths[@]} > 0)) || widths=(30 42 48)
 
 desired="$value"
@@ -67,5 +78,5 @@ tmux resize-pane -t "$sidebar" -x "$width" 2>/dev/null || exit 0
 # Remember the user's choice, not a temporary narrow-window clamp.
 tmux set-option -gq @tmux_canopy_runtime_width "$desired"
 # Invalidate any old live-mode debounce before synchronizing slots once.
-tmux set-option -gq @tmux_canopy_resize_nonce "commit-$(date +%s%N)-$$"
+tmux set-option -gq @tmux_canopy_resize_nonce "commit-${EPOCHREALTIME:-$(date +%s)}-$RANDOM-$$"
 sync_sidebar_slots "$desired" "$minimum" "$maximum" "$min_content"
