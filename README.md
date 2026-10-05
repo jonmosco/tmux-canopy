@@ -40,7 +40,7 @@ For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/cano
 - Zoom badges (`[Z]`), native pane/window zoom toggle, and automatic sidebar width balance when closing panes.
 - Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
 - AI agent monitoring: Track active agents across sessions with animated status badges, a dedicated Agents view (`4`), summary drawer (`i`), subagent trees, and a one-key jump (`n`) to panes waiting for user input or approval.
-- Optional agent alerts: a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, skipped while you're watching that pane. On macOS, clicking one jumps to the agent's pane. No daemon; off by default.
+- Optional alerts: a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, or when a pane rings the bell or goes quiet, skipped while you're watching that pane. On macOS, clicking one jumps to the agent's pane. No daemon; off by default.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets.
 - One sidebar owned by the client that opened it; no daemon or agent service.
@@ -99,7 +99,7 @@ With agent mode on, Canopy finds agents running in any pane of any session and s
 - **Summary footer:** the bottom of the Tree view counts every agent on the server, such as `Agents ◆1 ▷2`, so you can see who needs you without leaving your place in the tree.
 - **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
 - **Summary drawer (`i`):** the selected agent's state, its age, and the pending request when the agent reports one.
-- **Alerts (optional):** a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, skipped while you're looking at that pane. Off by default; see [Agent alerts](#agent-alerts).
+- **Alerts (optional):** a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, skipped while you're looking at that pane. Off by default; see [Alerts](#alerts).
 
 Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in your tmux configuration, then reload and reopen the sidebar. Press `A` in the sidebar to switch it on or off for just your client.
 
@@ -118,14 +118,15 @@ Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in 
 
 Process detection needs no setup: a running agent shows as `[process]` in the Agents view. An adapter adds its exact state (working, needs input, turn ended, and so on). Adapters are optional and observational: they never approve a request or block a tool. Install only the ones you want with `canopy setup`, or `canopy integration install <agent>` using `claude`, `codex`, `opencode`, `gemini`, `cursor-agent`, `agy`, `pi`, `omp`, `copilot`, or `grok`, then restart that agent inside tmux. `canopy integration status` lists what is installed. Adapters need Python 3. Agent-specific notes, including OpenCode's plugin and Antigravity's hook file, are in [Agent lifecycle adapters](docs/reference.md#agent-lifecycle-adapters).
 
-### Agent alerts
+### Alerts
 
-Canopy can tell you when an agent needs input, finishes, or is interrupted, even with the sidebar closed. Alerts are off until you turn them on, and Canopy changes no tmux option to provide them:
+Canopy can tell you when an agent needs input, finishes, or is interrupted, and when a pane rings the bell or goes quiet, even with the sidebar closed. Alerts are off until you turn them on, and Canopy changes no tmux option to provide them:
 
 ```tmux
-set -g @tmux-canopy-agent-alerts 'both'         # off, desktop, tmux, or both
-set -g @tmux-canopy-agent-alert-sound 'default' # optional: off, default, or a sound name
-set -g @tmux-canopy-agent-alert-detail 'brief'  # optional: full adds the agent's last reply
+set -g @tmux-canopy-alerts 'both'         # off, desktop, tmux, or both
+set -g @tmux-canopy-alert-events 'agents' # optional: agents, bell, silence, activity, or all
+set -g @tmux-canopy-alert-sound 'default' # optional: off, default, or a sound name
+set -g @tmux-canopy-alert-detail 'brief'  # optional: full adds the agent's last reply
 ```
 
 Each alert names the agent, the project, the session and window, and what the agent was doing:
@@ -136,16 +137,24 @@ work:2 · Fix the flaky login test
 Run the test suite: make test
 ```
 
-A finished turn says how long it took (`Turn ended after 4m`). Set `agent-alert-detail` to `full` to see the start of Claude Code's or Codex's last reply instead; it is off by default because notifications can show on a locked screen.
+A finished turn says how long it took (`Turn ended after 4m`). Set `alert-detail` to `full` to see the start of Claude Code's or Codex's last reply instead; it is off by default because notifications can show on a locked screen.
+
+`alert-events` chooses what alerts. `agents` is the default. `bell` covers the many tools that ring the terminal bell when they finish, including Crush, which has no adapter yet. `silence` tells you when a pane stops printing, such as a build that has stalled or finished, and needs `silence` in `@tmux-canopy-notifications` (or tmux's own `monitor-silence`). `activity` alerts on any new output, which is noisy for most panes. A bell alert names the command and, with `alert-detail` set to `full`, shows the pane's last line of output:
+
+```text
+Bell from make · shop-api
+work:3 build
+make: *** [test] Error 2
+```
 
 - **`desktop`** sends a notification through [terminal-notifier](https://github.com/julienXX/terminal-notifier) or `osascript` on macOS, and `notify-send` on Linux.
 - **`tmux`** shows a five-second message on every attached tmux client, which also works over SSH.
 - No alert is sent while you're looking at that pane. With `set -g focus-events on`, an agent in a visible pane still alerts while you're in another application.
-- Alerts come from lifecycle adapters, so agents shown only as `[process]` don't send them.
+- Agent alerts come from lifecycle adapters, so agents shown only as `[process]` don't send them. A bell from the agent can stand in.
 
-On macOS, install `terminal-notifier` (`brew install terminal-notifier`): clicking its notification brings your terminal forward on the agent's pane. Without it, Canopy uses `osascript`, whose notifications appear as Script Editor and can't be clicked through. macOS asks each one for permission the first time. If `terminal-notifier` doesn't appear under System Settings → Notifications, open it once with `open "$(brew --prefix terminal-notifier)"/terminal-notifier.app` and allow it.
+On macOS, install `terminal-notifier` (`brew install terminal-notifier`): clicking its notification brings your terminal forward on that pane. Without it, Canopy uses `osascript`, whose notifications appear as Script Editor and can't be clicked through. macOS asks each one for permission the first time. If `terminal-notifier` doesn't appear under System Settings → Notifications, open it once with `open "$(brew --prefix terminal-notifier)"/terminal-notifier.app` and allow it.
 
-Run `canopy alerts test` to send a sample. It reports which notifier delivered it, or which one macOS refused. See [Agent alerts](docs/reference.md#agent-alerts) for the details.
+Run `canopy alerts test` to send a sample. It reports which notifier delivered it, or which one macOS refused. See [Alerts](docs/reference.md#alerts) for the details.
 
 ### Using as a popup
 
@@ -212,9 +221,10 @@ set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
-set -g @tmux-canopy-agent-alerts 'off'     # desktop, tmux, or both: alert when an agent needs you
-set -g @tmux-canopy-agent-alert-sound 'off' # or a sound name such as default or Glass
-set -g @tmux-canopy-agent-alert-detail 'brief' # full: include the agent's last reply
+set -g @tmux-canopy-alerts 'off'     # desktop, tmux, or both: alert when an agent needs you
+set -g @tmux-canopy-alert-events 'agents' # add bell, silence, or activity for tmux's own alerts
+set -g @tmux-canopy-alert-sound 'off' # or a sound name such as default or Glass
+set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
 ```
 
 In `popup` mode (or `auto` mode when the window width is below `popup-threshold`), Canopy opens as a floating overlay via `tmux display-popup` without altering your window splits or pane geometry. Tree folds, active view, and filters are preserved across popup opens. Press `q` or `Esc` to close.

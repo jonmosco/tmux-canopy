@@ -43,17 +43,28 @@ if [[ "$action" == set ]]; then
   [[ "$subject" =~ ^@[0-9]+$ && "$pane" =~ ^%[0-9]+$ && "$provider" =~ ^(activity|bell|silence)$ ]] || exit 0
   option="@tmux_canopy_notice_$provider"
   pane_option="@tmux_canopy_notice_pane_$provider"
-  info="$(tmux display-message -p -t "$pane" "#{window_id}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_notifications}|#{$pane_option}" 2>/dev/null)" || exit 0
-  IFS='|' read -r window dead sidebar slot configured recorded <<< "$info"
+  info="$(tmux display-message -p -t "$pane" "#{window_id}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_notifications}|#{$pane_option}|#{@tmux_canopy_alerts}|#{@tmux_canopy_alert_events}" 2>/dev/null)" || exit 0
+  IFS='|' read -r window dead sidebar slot configured recorded alerts events <<< "$info"
   [[ "$window" == "$subject" && "$dead" != 1 && "$sidebar" != 1 && "$slot" != 1 ]] || exit 0
-  [[ ",$configured," == *",$provider,"* || ",$configured," == *,all,* ]] || exit 0
+  alert=()
+  if [[ "$alerts" =~ ^(desktop|tmux|both)$ && ",$events," == *",$provider,"* ]]; then
+    alert=("$SCRIPT_DIR/alert" "$pane" "$provider" tmux "$alerts")
+  fi
+  if [[ ",$configured," != *",$provider,"* && ",$configured," != *,all,* ]]; then
+    # Without a sidebar badge there is no unread state to deduplicate against.
+    ((${#alert[@]} == 0)) || exec "${alert[@]}" </dev/null >/dev/null 2>&1
+    exit 0
+  fi
   # A pane-only name avoids inheriting the window aggregate through formats.
   # Recheck in tmux's queue so concurrent identical events cause one write and
   # one refresh, even when their initial snapshots all saw an unread flag of 0.
+  # An alert rides along, so it too fires once until the pane is read.
   [[ "$recorded" == 1 ]] && exit 0
+  job=''
+  ((${#alert[@]} == 0)) || job=" ; run-shell -b $(tmux_quote "$(tmux_shell "${alert[@]}")")"
   condition="#{&&:#{!=:#{$pane_option},1},#{&&:#{==:#{window_id},$subject},#{&&:#{!=:#{pane_dead},1},#{&&:#{!=:#{@tmux_canopy},1},#{!=:#{@tmux_canopy_slot},1}}}}}"
   tmux if-shell -F -t "$pane" "$condition" \
-    "set-option -pq -t $pane $pane_option 1 ; set-option -pq -t $pane $option 1 ; set-option -wq -t $subject $option 1 ; $(refresh_command)"
+    "set-option -pq -t $pane $pane_option 1 ; set-option -pq -t $pane $option 1 ; set-option -wq -t $subject $option 1 ; $(refresh_command)$job"
   exit 0
 fi
 

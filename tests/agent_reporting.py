@@ -422,7 +422,7 @@ check(output == '{"permission":"allow"}\n',
 print("ok - Gemini, Pi/OMP, OpenCode lifecycle edges and common report contract")
 
 # Agent alerts: only transitions a user waits for start the delivery script,
-# and only when @tmux-canopy-agent-alerts is on. Its value rides along on the
+# and only when @tmux-canopy-alerts covers agents. Its value rides along on the
 # reporter's existing pane check, so it needs no tmux call of its own.
 def alert_harness(kind, mode):
     state = harness(kind)

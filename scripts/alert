@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Deliver one agent alert. A lifecycle reporter starts this detached, and only
-# on a transition worth announcing, so it never delays an agent's hook.
-#   agent-notify PANE EVENT KIND MODE
-#     with CANOPY_ALERT_SUMMARY, _COMMAND, _REPLY, and _ELAPSED (seconds) in the
-#     environment
-#   agent-notify --notifier    list the desktop notifiers, in the order tried
-#   agent-notify --test MODE   send a sample alert, whatever has focus
+# Deliver one alert. A lifecycle reporter starts this detached, and only on a
+# transition worth announcing, so it never delays an agent's hook; tmux's own
+# bell, silence, and activity alerts arrive through scripts/notify.
+#   alert PANE EVENT KIND MODE
+#     An agent event (needs-input, done, interrupted) has its KIND, with
+#     CANOPY_ALERT_SUMMARY, _COMMAND, _REPLY, and _ELAPSED (seconds) in the
+#     environment. A tmux alert (bell, silence, activity) has KIND tmux.
+#   alert --notifier    list the desktop notifiers, in the order tried
+#   alert --test MODE   send a sample alert, whatever has focus
 set -u
 shopt -s extglob
 sep=$'\037'
@@ -98,13 +100,13 @@ case "${1:-}" in
     clients=()
     if [[ "$mode" == tmux || "$mode" == both ]]; then
       mapfile -t clients < <(tmux list-clients -F '#{client_name}' 2>/dev/null)
-      notify_clients 'Canopy · agent alerts are working' "${clients[@]}"
+      notify_clients 'Canopy · alerts are working' "${clients[@]}"
       printf 'tmux: %s client(s)\n' "${#clients[@]}"
     fi
     if [[ "$mode" == desktop || "$mode" == both ]]; then
-      sound="$(tmux show-option -gqv @tmux_canopy_agent_alert_sound 2>/dev/null)"
+      sound="$(tmux show-option -gqv @tmux_canopy_alert_sound 2>/dev/null)"
       [[ "$sound" != off ]] || sound=''
-      if notify_desktop 'Canopy' 'Agent alerts' 'Agent alerts are working' tmux-canopy-test "$sound"; then
+      if notify_desktop 'Canopy' 'Alerts' 'Alerts are working' tmux-canopy-test "$sound"; then
         printf 'desktop: sent with %s\n' "$NOTIFIER"
       else
         printf 'desktop: not sent\n'
@@ -119,34 +121,44 @@ esac
 pane="${1:-}" event="${2:-}" kind="${3:-}" mode="${4:-}"
 [[ "$pane" =~ ^%[0-9]+$ ]] || exit 0
 case "$mode" in desktop|tmux|both) ;; *) exit 0 ;; esac
-case "$kind" in
-  claude) label='Claude Code' ;; codex) label=Codex ;; opencode) label=OpenCode ;;
-  gemini) label='Gemini CLI' ;; cursor-agent) label='Cursor Agent' ;; agy) label=Antigravity ;;
-  pi) label=Pi ;; omp) label='Oh My Pi' ;; copilot) label='Copilot CLI' ;; grok) label='Grok Build' ;;
-  *) exit 0 ;;
-esac
-case "$event" in
-  needs-input) title="$label needs input" ;;
-  done) title="$label finished" ;;
-  interrupted) title="$label was interrupted" ;;
-  *) exit 0 ;;
-esac
+title=''
+if [[ "$kind" == tmux ]]; then
+  # Titled once the pane's command is known.
+  case "$event" in bell|silence|activity) ;; *) exit 0 ;; esac
+else
+  case "$kind" in
+    claude) label='Claude Code' ;; codex) label=Codex ;; opencode) label=OpenCode ;;
+    gemini) label='Gemini CLI' ;; cursor-agent) label='Cursor Agent' ;; agy) label=Antigravity ;;
+    pi) label=Pi ;; omp) label='Oh My Pi' ;; copilot) label='Copilot CLI' ;; grok) label='Grok Build' ;;
+    *) exit 0 ;;
+  esac
+  case "$event" in
+    needs-input) title="$label needs input" ;;
+    done) title="$label finished" ;;
+    interrupted) title="$label was interrupted" ;;
+    *) exit 0 ;;
+  esac
+fi
 summary="${CANOPY_ALERT_SUMMARY:-}" request_command="${CANOPY_ALERT_COMMAND:-}"
 reply="${CANOPY_ALERT_REPLY:-}" elapsed="${CANOPY_ALERT_ELAPSED:-}"
 
-# One tmux call reads where the pane is and every client that could see it.
-mapfile -t lines < <(tmux display-message -p -t "$pane" \
-  "#{session_id}$sep#{session_name}$sep#{window_index}$sep#{window_name}$sep#{window_active}$sep#{pane_active}$sep#{focus-events}$sep#{pane_dead}$sep#{socket_path}$sep#{@tmux_canopy_agent_alert_sound}$sep#{@tmux_canopy_agent_alert_detail}$sep#{pane_current_path}$sep#{host}$sep#{host_short}$sep#{pane_title}" \; \
-  list-clients -F "#{client_name}$sep#{session_id}$sep#{client_flags}" 2>/dev/null)
+# One tmux call reads where the pane is, every client that could see it, and,
+# for a tmux alert, the pane's last lines after a marker.
+query=(display-message -p -t "$pane" "#{session_id}$sep#{session_name}$sep#{window_index}$sep#{window_name}$sep#{window_active}$sep#{pane_active}$sep#{focus-events}$sep#{pane_dead}$sep#{socket_path}$sep#{@tmux_canopy_alert_sound}$sep#{@tmux_canopy_alert_detail}$sep#{pane_current_path}$sep#{host}$sep#{host_short}$sep#{pane_current_command}$sep#{monitor-silence}$sep#{pane_title}"
+  ';' list-clients -F "#{client_name}$sep#{session_id}$sep#{client_flags}")
+[[ "$kind" != tmux ]] || query+=(';' display-message -p "$sep$sep" ';' capture-pane -p -J -t "$pane" -S -40)
+mapfile -t lines < <(tmux "${query[@]}" 2>/dev/null)
 ((${#lines[@]})) || exit 0
-IFS="$sep" read -r session_id session_name window_index window_name window_active pane_active focus_events dead socket sound detail path host host_short pane_title <<< "${lines[0]}"
+IFS="$sep" read -r session_id session_name window_index window_name window_active pane_active focus_events dead socket sound detail path host host_short pane_command silence pane_title <<< "${lines[0]}"
 [[ "$dead" != 1 ]] || exit 0
 
 # Skip the alert when someone is already looking at the pane. Without
 # focus-events tmux cannot tell a focused terminal from a background one, so a
 # visible pane counts as seen.
-clients=()
-for line in "${lines[@]:1}"; do
+clients=() output=() index=1
+for ((index = 1; index < ${#lines[@]}; index++)); do
+  line=${lines[index]}
+  if [[ "$line" == "$sep$sep" ]]; then output=("${lines[@]:index+1}"); break; fi
   IFS="$sep" read -r client client_session flags <<< "$line"
   [[ -n "$client" ]] || continue
   clients+=("$client")
@@ -156,8 +168,15 @@ for line in "${lines[@]:1}"; do
   fi
 done
 
-# Title: agent, event, project. Subtitle: where, and the topic an agent such as
-# Claude Code puts in the pane title. Body: the request, or how the turn ended.
+# Title: agent or command, event, project. Subtitle: where, and the topic an
+# agent such as Claude Code puts in the pane title. Body: the request, how the
+# turn ended, or what the tmux alert means.
+command_name=${pane_command:-shell}
+case "$event" in
+  bell) clean title "Bell from $command_name" 80 ;;
+  silence) clean title "$command_name went quiet" 80 ;;
+  activity) clean title "Output from $command_name" 80 ;;
+esac
 project=''
 path=${path%/}
 if [[ "$path" == "${HOME%/}" ]]; then project='~'; elif [[ -n "$path" ]]; then project=${path##*/}; fi
@@ -172,17 +191,30 @@ if [[ -n "$topic" ]]; then
 else
   clean subtitle "$session_name:$window_index $window_name" 120
 fi
-after=''
-if [[ "$elapsed" =~ ^[0-9]{1,9}$ ]]; then
-  if ((elapsed < 60)); then after="${elapsed}s"
-  elif ((elapsed < 3600)); then after="$((elapsed / 60))m"
-  else after="$((elapsed / 3600))h$((elapsed % 3600 / 60))m"; fi
-fi
+duration() {
+  local seconds="$2"
+  printf -v "$1" '%s' ''
+  [[ "$seconds" =~ ^[0-9]{1,9}$ ]] || return 0
+  if ((seconds < 60)); then printf -v "$1" '%ss' "$seconds"
+  elif ((seconds < 3600)); then printf -v "$1" '%sm' "$((seconds / 60))"
+  else printf -v "$1" '%sh%sm' "$((seconds / 3600))" "$((seconds % 3600 / 60))"; fi
+}
+after='' quiet='' last=''
+duration after "$elapsed"
+duration quiet "$silence"
 clean summary "$summary"
 clean request_command "$request_command" 120
 # The agent's own words stay out of alerts unless asked for: notifications
 # can show on a locked screen and stay in the notification history.
-if [[ "$detail" == full ]]; then clean reply "$reply" 150; else reply=''; fi
+# The same goes for the pane's output, which a tmux alert can show.
+if [[ "$detail" == full ]]; then
+  clean reply "$reply" 150
+  for ((index = ${#output[@]} - 1; index >= 0; index--)); do
+    [[ "${output[index]}" != *[![:space:]]* ]] || { clean last "${output[index]}" 150; break; }
+  done
+else
+  reply=''
+fi
 case "$event" in
   needs-input)
     body=${summary:-Waiting for you}
@@ -191,6 +223,9 @@ case "$event" in
     if [[ -n "$reply" ]]; then body="$reply${after:+ (after $after)}"
     else body="Turn ended${after:+ after $after}"; fi ;;
   interrupted) body="Stopped${after:+ after $after}" ;;
+  bell) body=${last:-Rang the bell} ;;
+  silence) body="No output${quiet:+ for $quiet}${last:+ · $last}" ;;
+  activity) body=${last:-New output} ;;
 esac
 clean body "$body"
 if [[ "$mode" == tmux || "$mode" == both ]]; then

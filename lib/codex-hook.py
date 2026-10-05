@@ -137,7 +137,7 @@ def alert(mode, current, values, kind, reply=""):
     # Time since the agent last started working: its prompt or last approval.
     if event != "needs-input" and current["updated"].isdigit() and values["updated"].isdigit():
         text["CANOPY_ALERT_ELAPSED"] = str(max(0, int(values["updated"]) - int(current["updated"])))
-    start_alert((str(Path(__file__).resolve().parents[1] / "scripts" / "agent-notify"),
+    start_alert((str(Path(__file__).resolve().parents[1] / "scripts" / "alert"),
                  PANE, event, kind, mode), text)
 
 
