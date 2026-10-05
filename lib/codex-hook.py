@@ -16,6 +16,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from agent_kinds import name_from_args, process_name
 from subagent_state import agent_id, list_field, next_entries
+import agent_reporting as core
 
 SEP = "\x1f"
 PANE = os.environ.get("TMUX_PANE", "")
@@ -182,7 +183,7 @@ def process_identity(root, kind="codex"):
         for _ in range(128):
             if current <= 1:
                 break
-            stat = linux_stat(current)
+            stat = core.linux_stat(current)
             if not stat:
                 break
             chain.append((current, process_name(current), stat[1]))
@@ -300,7 +301,7 @@ def hook_ancestors():
             current = stat[0]
         return
     table = {}
-    for line in process_table() or ():
+    for line in core.process_table() or ():
         fields = line.split(None, 2)
         if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
             table[int(fields[0])] = (int(fields[1]), fields[2].split())
@@ -327,31 +328,20 @@ def app_server_pane(event):
     """The pane a daemon-run hook belongs to: the pane already bound to this
     session, or, for a session starting, the only Codex pane in its cwd. Two
     candidates mean no report rather than a guess."""
-    session = field(event.get("session_id"), 128)
+    session = core.field(event.get("session_id"), 128)
     directory = event.get("cwd") if isinstance(event.get("cwd"), str) else ""
-    rows = tmux("list-panes", "-a", "-F",
-                "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|"
-                "#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_process_pid}|"
-                "#{@tmux_canopy_agent_process_birth}")
-    if rows.returncode or not session:
+    if not session:
         return ""
     bound, unbound, rebound = [], [], []
-    for line in rows.stdout.splitlines():
-        pane, root, dead, sidebar, slot, path, source, owner, pid, birth = (line.split("|") + [""] * 10)[:10]
-        if not root.isdigit() or dead == "1" or sidebar == "1" or slot == "1":
-            continue
-        identity = process_identity(root)
-        if not identity:
-            continue
+    for candidate in core.agent_panes("codex", ("source", "session", "process_pid", "process_birth")):
+        pane, path = candidate["pane"], candidate["path"]
+        source, owner = candidate["source"], candidate["session"]
+        pid, birth, identity = candidate["process_pid"], candidate["process_birth"], candidate["identity"]
         live = source == "codex-hook" and owner and identity == (pid, birth)
         if live and owner == session:
             bound.append(pane)
             continue
-        try:
-            here = bool(directory) and os.path.realpath(path) == os.path.realpath(directory)
-        except (OSError, ValueError):
-            here = False
-        if here:
+        if core.same_directory(path, directory):
             (rebound if live else unbound).append(pane)
     if bound:
         return bound[0] if len(bound) == 1 else ""
@@ -363,6 +353,9 @@ def app_server_pane(event):
 
 
 def report(event):
+    field, tmux = core.field, core.tmux
+    process_identity, read_options, write = core.process_identity, core.read_options, core.write
+    schedule_expiry, refresh, alert, fields = core.schedule_expiry, core.refresh, core.alert, core.FIELDS
     kind = event.get("hook_event_name")
     session = field(event.get("session_id"), 128)
     turn = field(event.get("turn_id"), 128)
@@ -373,24 +366,24 @@ def report(event):
     agent = agent_id(event)
     if kind in ("SubagentStart", "SubagentStop") and not agent:
         return
-    meta = tmux("display-message", "-p", "-t", PANE,
+    meta = tmux("display-message", "-p", "-t", core.PANE,
                 "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_agent_alerts}")
     if meta.returncode:
         return
     pane, pid, dead, sidebar, slot, alerts = (meta.stdout.rstrip("\n").split("|") + [""] * 6)[:6]
-    if pane != PANE or not pid.isdigit() or dead == "1" or sidebar == "1" or slot == "1":
+    if pane != core.PANE or not pid.isdigit() or dead == "1" or sidebar == "1" or slot == "1":
         return
     identity = process_identity(pid)
     if identity is None:
         return
     process_pid, process_birth = identity
-    combined = read_options(FIELDS + ("timer",))
+    combined = read_options(fields + ("timer",))
     current_timer = combined.pop("timer")
     current = combined
     if current["pane_pid"] != pid or current["process_pid"] != process_pid or current["process_birth"] != process_birth:
-        current = {key: "" for key in FIELDS}
+        current = {key: "" for key in fields}
     if kind == "SessionStart" and current["session"] != session:
-        current = {key: "" for key in FIELDS}
+        current = {key: "" for key in fields}
     if kind not in ("SessionStart", "UserPromptSubmit") and current["session"] not in ("", session):
         return
     if kind in ("PermissionRequest", "PreToolUse", "PostToolUse", "Stop", "Interrupt") and \
@@ -468,8 +461,7 @@ def report(event):
 
 
 def main():
-    global PANE
-    if not os.environ.get("TMUX") or not re.fullmatch(r"%[0-9]+", PANE):
+    if not os.environ.get("TMUX") or not re.fullmatch(r"%[0-9]+", core.PANE):
         return
     try:
         raw = sys.stdin.buffer.read(131073)
@@ -479,18 +471,18 @@ def main():
         if not isinstance(event, dict):
             return
         if from_app_server():
-            PANE = app_server_pane(event)
-            if not PANE:
+            core.PANE = app_server_pane(event)
+            if not core.PANE:
                 if event.get("hook_event_name") in ("Stop", "SubagentStop"):
                     print("{}")
                 return
-        lock_fd = pane_lock(PANE[1:])
+        lock_fd = core.pane_lock(core.PANE[1:])
         if not lock_fd:
             return
         try:
             report(event)
         finally:
-            pane_unlock(lock_fd)
+            core.pane_unlock(lock_fd)
         if event.get("hook_event_name") in ("Stop", "SubagentStop"):
             # Codex requires JSON from successful stop hooks.
             print("{}")

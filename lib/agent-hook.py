@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Opt-in, observational lifecycle bridge for supported agent harnesses."""
 import hashlib
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -11,11 +10,8 @@ import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from subagent_state import (agent_id, list_field, next_entries, parse_subagents,
-                             resolve_cursor_stop_id, with_cursor_subagent_fields)
-
-spec = importlib.util.spec_from_file_location('canopy_codex_hook', Path(__file__).with_name('codex-hook.py'))
-core = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(core)
+                              resolve_cursor_stop_id, with_cursor_subagent_fields)
+import agent_reporting as core
 
 
 def background_running(tasks):
@@ -163,36 +159,26 @@ def opencode_parent_session(event):
 def opencode_pane(session, event):
     """Resolve global OpenCode plugin events only to a uniquely verified pane."""
     directory = opencode_directory(event)
-    rows = core.tmux('list-panes', '-a', '-F',
-                      '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_pane_pid}|#{@tmux_canopy_agent_process_pid}|#{@tmux_canopy_agent_process_birth}|#{@tmux_canopy_agent_subagents}')
-    if rows.returncode:
-        return ''
     bound, child, new_session = set(), set(), set()
-    for line in rows.stdout.splitlines():
-        fields = (line.split('|') + [''] * 12)[:12]
-        pane, root, dead, sidebar, slot, path, source, bound_session, bound_pane_pid, bound_process, bound_birth, subagents = fields
-        if not root.isdigit() or dead == '1' or sidebar == '1' or slot == '1':
-            continue
+    for candidate in core.agent_panes('opencode', ('source', 'session', 'pane_pid', 'process_pid',
+                                                     'process_birth', 'subagents')):
+        pane, root, path = candidate['pane'], candidate['root'], candidate['path']
+        source, bound_session = candidate['source'], candidate['session']
+        bound_pane_pid = candidate['pane_pid']
+        bound_process, bound_birth, subagents = candidate['process_pid'], candidate['process_birth'], candidate['subagents']
+        identity = candidate['identity']
         if source == 'opencode-hook' and bound_session == session and bound_pane_pid == root:
-            identity = core.process_identity(root, 'opencode')
-            if identity and identity == (bound_process, bound_birth):
+            if identity == (bound_process, bound_birth):
                 bound.add(pane)
         elif source == 'opencode-hook' and any(entry[0] == session for entry in parse_subagents(subagents)):
-            identity = core.process_identity(root, 'opencode')
-            if identity and identity == (bound_process, bound_birth):
+            if identity == (bound_process, bound_birth):
                 child.add(pane)
         elif (not bound_session or
               (source == 'opencode-hook' and bound_process and
-               core.process_identity(root, 'opencode') != (bound_process, bound_birth))) and directory:
-            identity = core.process_identity(root, 'opencode')
-            if not identity:
-                continue
+                identity != (bound_process, bound_birth))) and directory:
             # Without a project directory there is no safe way to distinguish
             # this server event from another OpenCode session.
-            try:
-                if os.path.realpath(path) != os.path.realpath(directory):
-                    continue
-            except (OSError, TypeError):
+            if not core.same_directory(path, directory):
                 continue
             new_session.add(pane)
     candidates = bound or child or new_session

@@ -359,7 +359,7 @@ SELF_TEST_EVENTS = {
 def reporter_self_test():
     """Run each reporter's real report path with only tmux and ps stubbed out.
 
-    This catches reporters drifting from the shared codex-hook helpers, which
+    This catches reporters drifting from the shared reporting module, which
     otherwise fail silently because hooks must never print or exit nonzero.
     """
     failures = []
@@ -385,7 +385,10 @@ def reporter_self_test():
             core.process_identity = lambda root, kind="codex": ("4001", "123")
             core.refresh = lambda: None
             if kind == "codex":
-                core.report(event)
+                codex = load_module("canopy_codex_hook", ROOT / "lib" / "codex-hook.py")
+                if codex.core is not core:
+                    raise RuntimeError("Codex does not use the shared reporting module")
+                codex.report(event)
             else:
                 hook.report(kind, event, {"agy": "PreInvocation", "copilot": "notification"}.get(kind))
         except Exception as error:  # Any exception here is a silent failure in a real hook.

@@ -75,7 +75,7 @@ def test_live_cursor_agent_identity():
     if not targets:
         print("skip - no live agent panes for identity check")
         return
-    core = load("canopy_codex_hook", ROOT / "lib" / "codex-hook.py")
+    core = load("canopy_agent_reporting", ROOT / "lib" / "agent_reporting.py")
     for pane, pid in targets:
         identity = core.process_identity(pid, "cursor-agent")
         check(identity is not None,
