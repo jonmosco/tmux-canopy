@@ -212,11 +212,8 @@ def process_identity(root, kind="codex"):
                     candidates.append((pid, stat[1]))
         stat_for = linux_stat
     else:
-        # args= exposes argv0 for Node CLIs whose comm is a thread name.
-        try:
-            records = subprocess.run(("ps", "-eo", "pid=,ppid=,args="), text=True,
-                                     capture_output=True, timeout=3, check=False).stdout.splitlines()
-        except (OSError, subprocess.TimeoutExpired):
+        records = process_table()
+        if records is None:
             return None
         parents = {}
         candidates = []
@@ -267,6 +264,103 @@ def process_identity(root, kind="codex"):
         except (OSError, subprocess.TimeoutExpired):
             return None
     return str(pid), birth
+
+_TABLE = None
+
+
+def process_table():
+    """Every process as a "pid ppid args" line, read once per hook run."""
+    global _TABLE
+    if _TABLE is None:
+        # args= exposes argv0 for Node CLIs whose comm is a thread name.
+        try:
+            _TABLE = subprocess.run(("ps", "-eo", "pid=,ppid=,args="), text=True,
+                                    capture_output=True, timeout=3, check=False).stdout.splitlines()
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+    return _TABLE
+
+
+def hook_ancestors():
+    """Argument lists of this hook's ancestors, nearest first."""
+    if os.path.isdir("/proc/self"):
+        current = os.getppid()
+        for _ in range(64):
+            if current <= 1:
+                return
+            try:
+                with open(f"/proc/{current}/cmdline", "rb") as handle:
+                    args = [part.decode("utf-8", "replace") for part in handle.read().split(b"\0") if part]
+            except OSError:
+                return
+            yield args
+            stat = linux_stat(current)
+            if not stat:
+                return
+            current = stat[0]
+        return
+    table = {}
+    for line in process_table() or ():
+        fields = line.split(None, 2)
+        if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
+            table[int(fields[0])] = (int(fields[1]), fields[2].split())
+    current = os.getppid()
+    for _ in range(64):
+        if current <= 1 or current not in table:
+            return
+        parent, args = table[current]
+        yield args
+        current = parent
+
+
+def from_app_server():
+    """Codex 0.159+ runs hooks in a shared app-server daemon. The daemon keeps
+    the environment of the pane that started it, so TMUX_PANE names that pane
+    for every Codex window on the machine."""
+    for args in hook_ancestors():
+        if "app-server" in args[1:3] and any(os.path.basename(arg) == "codex" for arg in args[:2]):
+            return True
+    return False
+
+
+def app_server_pane(event):
+    """The pane a daemon-run hook belongs to: the pane already bound to this
+    session, or, for a session starting, the only Codex pane in its cwd. Two
+    candidates mean no report rather than a guess."""
+    session = field(event.get("session_id"), 128)
+    directory = event.get("cwd") if isinstance(event.get("cwd"), str) else ""
+    rows = tmux("list-panes", "-a", "-F",
+                "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{pane_current_path}|"
+                "#{@tmux_canopy_agent_source}|#{@tmux_canopy_agent_session}|#{@tmux_canopy_agent_process_pid}|"
+                "#{@tmux_canopy_agent_process_birth}")
+    if rows.returncode or not session:
+        return ""
+    bound, unbound, rebound = [], [], []
+    for line in rows.stdout.splitlines():
+        pane, root, dead, sidebar, slot, path, source, owner, pid, birth = (line.split("|") + [""] * 10)[:10]
+        if not root.isdigit() or dead == "1" or sidebar == "1" or slot == "1":
+            continue
+        identity = process_identity(root)
+        if not identity:
+            continue
+        live = source == "codex-hook" and owner and identity == (pid, birth)
+        if live and owner == session:
+            bound.append(pane)
+            continue
+        try:
+            here = bool(directory) and os.path.realpath(path) == os.path.realpath(directory)
+        except (OSError, ValueError):
+            here = False
+        if here:
+            (rebound if live else unbound).append(pane)
+    if bound:
+        return bound[0] if len(bound) == 1 else ""
+    if event.get("hook_event_name") not in ("SessionStart", "UserPromptSubmit"):
+        return ""
+    # A pane already following another session can start a new one (/new).
+    candidates = unbound or rebound
+    return candidates[0] if len(candidates) == 1 else ""
+
 
 def report(event):
     kind = event.get("hook_event_name")
@@ -374,6 +468,7 @@ def report(event):
 
 
 def main():
+    global PANE
     if not os.environ.get("TMUX") or not re.fullmatch(r"%[0-9]+", PANE):
         return
     try:
@@ -383,6 +478,12 @@ def main():
         event = json.loads(raw)
         if not isinstance(event, dict):
             return
+        if from_app_server():
+            PANE = app_server_pane(event)
+            if not PANE:
+                if event.get("hook_event_name") in ("Stop", "SubagentStop"):
+                    print("{}")
+                return
         lock_fd = pane_lock(PANE[1:])
         if not lock_fd:
             return

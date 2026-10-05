@@ -78,6 +78,7 @@
 
 ### Fixed
 
+- With Codex 0.159 and later, whose shared `app-server` daemon runs every hook with the `TMUX_PANE` of the pane that started it, a Codex session started in another pane took over that first pane's status. Canopy now routes a daemon-run hook by its session: to the pane already following it, or to the only Codex pane in the session's directory. When two Codex panes share a directory, it reports nothing rather than guess.
 - After you approved a Claude Code permission prompt, the pane could stay marked needs input (`!`) until the turn ended. Claude reports each prompt twice, and its second report has no tool name, so it replaced the request with one that the approved tool's completion could not clear.
 - Claude Code showed **turn ended** while a `run_in_background` shell or background subagent was still running, because `Stop` fires when the turn ends. Canopy now reads the event's `background_tasks` and keeps the agent **working** until the work finishes.
 - A stale agent report (no update for 15 minutes) animated like a working agent; its dim mark now stays still, so only agents reporting work right now move.
