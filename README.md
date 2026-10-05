@@ -10,9 +10,9 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Animated tmux-canopy demo: opening the sidebar, moving through and folding the tree, searching, turning on agent mode, subagents appearing, and jumping to an agent that needs approval](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)
+[![Canopy workflow: open the workspace tree, find and preview login tests, switch projects, follow subagents, jump to an agent waiting for approval, then open the floating popup](docs/assets/canopy-demo.gif)](docs/assets/canopy-demo.gif)
 
-[View a still image](docs/assets/canopy-demo.png).
+**Find work. Follow agents. Unblock the next task.** Dock it on a large display or open it as a floating popup when space is tight. Recorded in a real tmux client with fictional projects and scripted agent events. [View a still image](docs/assets/canopy-demo.png).
 
 ## Quick start
 
