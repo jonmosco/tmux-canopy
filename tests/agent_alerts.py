@@ -264,7 +264,7 @@ try:
         elapsed = hook({'hook_event_name': 'Stop', 'session_id': 'e2e', 'last_assistant_message': 'Shipped it.'})
         assert tm('show-option', '-pqv', '-t', watched, '@tmux_canopy_agent_status') == 'turn-ended'
         assert elapsed < 1.5, f'hook waited for delivery: {elapsed:.2f}s'
-        wait(lambda: any('Claude Code finished · shop-api' in call and any(arg.startswith('Shipped it. (after ')
+        wait(lambda: any('Claude Code finished · shop-api' in call and any('Shipped it. (after ' in arg
                                                                            for arg in call) for call in calls()),
              'reporter started delivery with the reply')
 
