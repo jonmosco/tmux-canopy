@@ -5,7 +5,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 ## Current features
 
 - Sessions → windows → panes hierarchy
-- Real, fixed-width, full-height pane on the left (default) or right edge
+- Real, fixed-width, full-height pane on the left (default) or right edge, or a floating popup (always, or automatically on narrow terminals)
 - One active pane marker and emphasized parent names, independent of the sidebar selection
 - Vim-style collapse and expand controls
 - Normal and fuzzy-filter modes
@@ -27,6 +27,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - Cross-session hooks resolve the owning client's live pane and reject stale sidebar/slot targets
 - Provider-neutral notification badges sourced only from live content panes
 - Native activity, bell, and optional silence providers
+- Optional desktop and tmux alerts for agents and for tmux's bell, silence, and activity alerts, skipped while the pane is in view
 - Event-driven, debounced refresh with session/window/pane aggregation
 - Read state clears when the affected window is focused, with selected/all manual clearing
 - Native session/window rename and confirmed pane/window/session deletion
@@ -36,7 +37,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - Switchable Tree, pane-attributed Processes, and tmux Buffers views; optional detected Agents view
 - ANSI semantic colors, compact tree guides, width-aware paths, dynamic mode tabs, and adaptive preview
 - Responsive fixed or percentage widths with minimum sidebar/content constraints
-- Staged one-shot mouse resizing and compact/default/wide width presets
+- Live mouse resizing by default, with staged one-shot and preset modes and compact/default/wide width presets
 - Geometry-stable window switches with debounced, owner-only active-location refreshes
 - Zoom guards with optional unzoom-and-restore behavior
 - Hook-driven orphan cache, target, and stable-slot cleanup
@@ -788,6 +789,7 @@ None of these suites alters the developer's active tmux server.
 - The hierarchy refreshes after navigation rather than subscribing to tmux control-mode events.
 - Tree expansion is session/window based; panes are leaves.
 - Multi-selection, bulk movement, and undo are not implemented.
+- Desktop alerts appear on the machine running tmux; over SSH, only the `tmux` alert mode reaches you. Only `terminal-notifier` alerts on macOS can be clicked through to the pane.
 - Deletion is intentionally irreversible after the second `x`; there is no trash or undo layer.
 - New sessions created with `S` use the first available automatic name (`session-1`, `session-2`, and so on) and are styled dimmed; press `N` to create a session with an immediate name prompt, or rename any session afterward with `r`.
 
