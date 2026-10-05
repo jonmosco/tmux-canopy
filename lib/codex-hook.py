@@ -106,6 +106,41 @@ def refresh():
                    capture_output=True, timeout=3, check=False)
 
 
+def start_alert(argv, text):
+    # Detached with no shared pipes: agents wait for their hook's output to
+    # close, and delivery must never hold that up. Text travels in the
+    # environment, which other users cannot read the way they can read argv.
+    try:
+        subprocess.Popen(argv, env=os.environ | text, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except OSError:
+        pass
+
+
+def alert(mode, current, values, kind, reply=""):
+    """Announce only the transitions a user waits for. Repeated reports of the
+    same state stay quiet, so Claude's paired permission events alert once."""
+    if mode not in ("desktop", "tmux", "both"):
+        return
+    previous, status = current["status"], values["status"]
+    if status == "needs-input" and previous != "needs-input":
+        event = "needs-input"
+    elif status == "turn-ended" and previous in ("working", "needs-input"):
+        event = "done"
+    elif status == "interrupted" and previous in ("working", "needs-input"):
+        event = "interrupted"
+    else:
+        return
+    text = {"CANOPY_ALERT_SUMMARY": values["summary"], "CANOPY_ALERT_COMMAND": values["command"],
+            "CANOPY_ALERT_REPLY": field(reply, 600) if event == "done" else "", "CANOPY_ALERT_ELAPSED": ""}
+    # Time since the agent last started working: its prompt or last approval.
+    if event != "needs-input" and current["updated"].isdigit() and values["updated"].isdigit():
+        text["CANOPY_ALERT_ELAPSED"] = str(max(0, int(values["updated"]) - int(current["updated"])))
+    start_alert((str(Path(__file__).resolve().parents[1] / "scripts" / "agent-notify"),
+                 PANE, event, kind, mode), text)
+
+
 def schedule_expiry(process_pid, process_birth, current_timer):
     if not process_birth.isdigit():
         return  # Portable platforms retain manual refresh on report expiry.
@@ -245,10 +280,10 @@ def report(event):
     if kind in ("SubagentStart", "SubagentStop") and not agent:
         return
     meta = tmux("display-message", "-p", "-t", PANE,
-                "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}")
+                "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_agent_alerts}")
     if meta.returncode:
         return
-    pane, pid, dead, sidebar, slot = (meta.stdout.rstrip("\n").split("|") + [""] * 5)[:5]
+    pane, pid, dead, sidebar, slot, alerts = (meta.stdout.rstrip("\n").split("|") + [""] * 6)[:6]
     if pane != PANE or not pid.isdigit() or dead == "1" or sidebar == "1" or slot == "1":
         return
     identity = process_identity(pid)
@@ -334,6 +369,7 @@ def report(event):
         values.update(tool="", summary="", command="", request="")
     if write(values):
         schedule_expiry(process_pid, process_birth, current_timer)
+        alert(alerts, current, values, "codex", event.get("last_assistant_message"))
         refresh()
 
 

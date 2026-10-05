@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# Deliver one agent alert. A lifecycle reporter starts this detached, and only
+# on a transition worth announcing, so it never delays an agent's hook.
+#   agent-notify PANE EVENT KIND MODE
+#     with CANOPY_ALERT_SUMMARY, _COMMAND, _REPLY, and _ELAPSED (seconds) in the
+#     environment
+#   agent-notify --notifier    list the desktop notifiers, in the order tried
+#   agent-notify --test MODE   send a sample alert, whatever has focus
+set -u
+shopt -s extglob
+sep=$'\037'
+
+# Installed desktop notifiers, in the order they are tried.
+desktop_notifiers() {
+  local name
+  NOTIFIERS=()
+  if [[ "$OSTYPE" == darwin* ]]; then
+    for name in terminal-notifier osascript; do
+      command -v "$name" >/dev/null 2>&1 && NOTIFIERS+=("$name")
+    done
+  elif command -v notify-send >/dev/null 2>&1; then
+    NOTIFIERS=(notify-send)
+  fi
+}
+
+# Text reaches each notifier as a plain argument, never as script source.
+# terminal-notifier exits non-zero while macOS has not allowed it to notify,
+# so the next notifier gets a turn. NOTIFIER names the one that delivered.
+#   notify_desktop TITLE SUBTITLE BODY GROUP SOUND CLICK-COMMAND APP-TO-ACTIVATE
+# Only terminal-notifier runs a command when clicked, and it does so itself,
+# so no process waits around for the click.
+notify_desktop() {
+  local title="$1" subtitle="$2" body="$3" group="$4" sound="${5:-}" click="${6:-}" app="${7:-}" name escaped extra script
+  NOTIFIER='' REFUSED=()
+  desktop_notifiers
+  for name in "${NOTIFIERS[@]}"; do
+    extra=()
+    case "$name" in
+      terminal-notifier)
+        [[ -z "$sound" ]] || extra+=(-sound "$sound")
+        [[ -z "$click" ]] || extra+=(-execute "$click")
+        [[ -z "$app" ]] || extra+=(-activate "$app")
+        terminal-notifier -title "$title" -subtitle "$subtitle" -message "$body" -group "$group" "${extra[@]}" ;;
+      # The title always starts with a letter, so osascript stops reading
+      # options there even when the body starts with a dash.
+      osascript)
+        script='display notification (item 2 of argv) with title (item 1 of argv) subtitle (item 3 of argv)'
+        extra=("$title" "$body" "$subtitle")
+        # AppleScript has no name for the system default; Glass is the usual one.
+        [[ "$sound" != default ]] || sound=Glass
+        [[ -z "$sound" ]] || { script+=' sound name (item 4 of argv)'; extra+=("$sound"); }
+        osascript -e 'on run argv' -e "$script" -e 'end run' "${extra[@]}" ;;
+      notify-send)
+        # notify-send has no subtitle, so it leads the body.
+        escaped="$subtitle"$'\n'"$body"
+        escaped=${escaped//&/&amp;}; escaped=${escaped//</&lt;}; escaped=${escaped//>/&gt;}
+        # Freedesktop sound names differ from macOS ones; default is the
+        # theme's instant-message sound.
+        [[ "$sound" != default ]] || sound='message-new-instant'
+        [[ -z "$sound" ]] || extra+=(-h "string:sound-name:$sound")
+        notify-send -a tmux-canopy "${extra[@]}" -- "$title" "$escaped" ;;
+    esac >/dev/null 2>&1 && { NOTIFIER=$name; return 0; }
+    REFUSED+=("$name")
+  done
+  return 1
+}
+
+notify_clients() {
+  local message="$1" client command=()
+  # display-message expands formats, and tmux splits an argument ending in ;.
+  message=${message//#/##}
+  [[ "$message" != *';' ]] || message+=' '
+  shift
+  for client in "$@"; do
+    ((${#command[@]} == 0)) || command+=(';')
+    command+=(display-message -c "$client" -d 5000 "$message")
+  done
+  ((${#command[@]} == 0)) || tmux "${command[@]}" >/dev/null 2>&1
+}
+
+# One line of at most LIMIT characters, runs of spaces collapsed.
+clean() {
+  local value="${2//[[:cntrl:]]/ }" limit="${3:-200}"
+  value=${value//+([[:space:]])/ }; value=${value# }; value=${value% }
+  ((${#value} <= limit)) || value="${value:0:limit-1}…"
+  printf -v "$1" '%s' "$value"
+}
+# Quote for /bin/sh, which runs terminal-notifier's click command.
+sh_quote() { local q="'\\''"; printf -v "$1" "'%s'" "${2//\'/$q}"; }
+
+case "${1:-}" in
+  --notifier)
+    desktop_notifiers
+    if ((${#NOTIFIERS[@]})); then (IFS=,; printf '%s\n' "${NOTIFIERS[*]}"); else printf 'none\n'; fi
+    exit 0 ;;
+  --test)
+    mode="${2:-both}" result=0
+    clients=()
+    if [[ "$mode" == tmux || "$mode" == both ]]; then
+      mapfile -t clients < <(tmux list-clients -F '#{client_name}' 2>/dev/null)
+      notify_clients 'Canopy · agent alerts are working' "${clients[@]}"
+      printf 'tmux: %s client(s)\n' "${#clients[@]}"
+    fi
+    if [[ "$mode" == desktop || "$mode" == both ]]; then
+      sound="$(tmux show-option -gqv @tmux_canopy_agent_alert_sound 2>/dev/null)"
+      [[ "$sound" != off ]] || sound=''
+      if notify_desktop 'Canopy' 'Agent alerts' 'Agent alerts are working' tmux-canopy-test "$sound"; then
+        printf 'desktop: sent with %s\n' "$NOTIFIER"
+      else
+        printf 'desktop: not sent\n'
+        result=1
+      fi
+      ((${#REFUSED[@]} == 0)) || (IFS=,; printf 'desktop: refused by %s; check its macOS notification permission\n' "${REFUSED[*]}")
+      ((${#NOTIFIERS[@]})) || printf 'desktop: no notifier found (macOS: terminal-notifier or osascript; Linux: notify-send)\n'
+    fi
+    exit "$result" ;;
+esac
+
+pane="${1:-}" event="${2:-}" kind="${3:-}" mode="${4:-}"
+[[ "$pane" =~ ^%[0-9]+$ ]] || exit 0
+case "$mode" in desktop|tmux|both) ;; *) exit 0 ;; esac
+case "$kind" in
+  claude) label='Claude Code' ;; codex) label=Codex ;; opencode) label=OpenCode ;;
+  gemini) label='Gemini CLI' ;; cursor-agent) label='Cursor Agent' ;; agy) label=Antigravity ;;
+  pi) label=Pi ;; omp) label='Oh My Pi' ;; copilot) label='Copilot CLI' ;; grok) label='Grok Build' ;;
+  *) exit 0 ;;
+esac
+case "$event" in
+  needs-input) title="$label needs input" ;;
+  done) title="$label finished" ;;
+  interrupted) title="$label was interrupted" ;;
+  *) exit 0 ;;
+esac
+summary="${CANOPY_ALERT_SUMMARY:-}" request_command="${CANOPY_ALERT_COMMAND:-}"
+reply="${CANOPY_ALERT_REPLY:-}" elapsed="${CANOPY_ALERT_ELAPSED:-}"
+
+# One tmux call reads where the pane is and every client that could see it.
+mapfile -t lines < <(tmux display-message -p -t "$pane" \
+  "#{session_id}$sep#{session_name}$sep#{window_index}$sep#{window_name}$sep#{window_active}$sep#{pane_active}$sep#{focus-events}$sep#{pane_dead}$sep#{socket_path}$sep#{@tmux_canopy_agent_alert_sound}$sep#{@tmux_canopy_agent_alert_detail}$sep#{pane_current_path}$sep#{host}$sep#{host_short}$sep#{pane_title}" \; \
+  list-clients -F "#{client_name}$sep#{session_id}$sep#{client_flags}" 2>/dev/null)
+((${#lines[@]})) || exit 0
+IFS="$sep" read -r session_id session_name window_index window_name window_active pane_active focus_events dead socket sound detail path host host_short pane_title <<< "${lines[0]}"
+[[ "$dead" != 1 ]] || exit 0
+
+# Skip the alert when someone is already looking at the pane. Without
+# focus-events tmux cannot tell a focused terminal from a background one, so a
+# visible pane counts as seen.
+clients=()
+for line in "${lines[@]:1}"; do
+  IFS="$sep" read -r client client_session flags <<< "$line"
+  [[ -n "$client" ]] || continue
+  clients+=("$client")
+  if [[ "$client_session" == "$session_id" && "$window_active" == 1 && "$pane_active" == 1 ]] &&
+     [[ "$focus_events" != 1 || ",$flags," == *,focused,* ]]; then
+    exit 0
+  fi
+done
+
+# Title: agent, event, project. Subtitle: where, and the topic an agent such as
+# Claude Code puts in the pane title. Body: the request, or how the turn ended.
+project=''
+path=${path%/}
+if [[ "$path" == "${HOME%/}" ]]; then project='~'; elif [[ -n "$path" ]]; then project=${path##*/}; fi
+[[ -z "$project" ]] || clean title "$title · $project" 120
+topic=$pane_title
+# Agents lead the title with a spinner or status glyph.
+[[ ! "$topic" =~ ^[^[:alnum:]]+[[:space:]]+(.+)$ ]] || topic=${BASH_REMATCH[1]}
+case "$topic" in "$host"|"$host_short"|"$window_name") topic='' ;; esac
+subtitle=''
+if [[ -n "$topic" ]]; then
+  clean subtitle "$session_name:$window_index · $topic" 120
+else
+  clean subtitle "$session_name:$window_index $window_name" 120
+fi
+after=''
+if [[ "$elapsed" =~ ^[0-9]{1,9}$ ]]; then
+  if ((elapsed < 60)); then after="${elapsed}s"
+  elif ((elapsed < 3600)); then after="$((elapsed / 60))m"
+  else after="$((elapsed / 3600))h$((elapsed % 3600 / 60))m"; fi
+fi
+clean summary "$summary"
+clean request_command "$request_command" 120
+# The agent's own words stay out of alerts unless asked for: notifications
+# can show on a locked screen and stay in the notification history.
+if [[ "$detail" == full ]]; then clean reply "$reply" 150; else reply=''; fi
+case "$event" in
+  needs-input)
+    body=${summary:-Waiting for you}
+    [[ -z "$request_command" || "$body" == *"$request_command"* ]] || body+=": $request_command" ;;
+  done)
+    if [[ -n "$reply" ]]; then body="$reply${after:+ (after $after)}"
+    else body="Turn ended${after:+ after $after}"; fi ;;
+  interrupted) body="Stopped${after:+ after $after}" ;;
+esac
+clean body "$body"
+if [[ "$mode" == tmux || "$mode" == both ]]; then
+  notify_clients "$title · $subtitle · $body" "${clients[@]}"
+fi
+if [[ "$mode" == desktop || "$mode" == both ]]; then
+  [[ "$sound" =~ ^[A-Za-z0-9._-]+$ && "$sound" != off ]] || sound=''
+  # A click runs outside tmux with a minimal PATH, so the command names this
+  # tmux binary and server. tmux switches its most recently active client.
+  click='' app='' tmux_bin=''
+  hash tmux 2>/dev/null
+  if [[ -n "${BASH_CMDS[tmux]:-}" && -n "$socket" ]]; then
+    sh_quote tmux_bin "${BASH_CMDS[tmux]}"
+    sh_quote socket "$socket"
+    click="$tmux_bin -S $socket switch-client -t $pane \\; select-window -t $pane \\; select-pane -t $pane"
+  fi
+  # The terminal app that started the tmux server is brought forward on click.
+  [[ "${__CFBundleIdentifier:-}" =~ ^[A-Za-z0-9.-]+$ ]] && app=$__CFBundleIdentifier
+  notify_desktop "$title" "$subtitle" "$body" "tmux-canopy-$pane" "$sound" "$click" "$app"
+fi
+exit 0

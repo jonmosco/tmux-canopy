@@ -22,7 +22,8 @@ plugin_job() {
 # Read every setting, Canopy's ownership records, and the options it may own
 # in two tmux calls (see canopy_load_state); unset settings read as empty.
 settings=(key width scope smooth-navigation last-window-key transition notifications notification-target
-  silence-seconds icon-theme appearance animate resize-mode width-presets mode popup-threshold popup-width popup-height)
+  silence-seconds icon-theme appearance animate resize-mode width-presets mode popup-threshold popup-width popup-height
+  agent-alerts agent-alert-sound agent-alert-detail)
 canopy_load_state "${settings[@]/#/@tmux-canopy-}" \
   window:window-status-activity-style window:window-status-bell-style \
   session:activity-action session:bell-action session:silence-action \
@@ -36,6 +37,8 @@ setting icon_theme icon-theme; setting appearance appearance; setting animate an
 setting resize_mode resize-mode; setting width_presets width-presets
 setting sidebar_mode mode; setting popup_threshold popup-threshold
 setting popup_width popup-width; setting popup_height popup-height
+setting agent_alerts agent-alerts; setting agent_alert_sound agent-alert-sound
+setting agent_alert_detail agent-alert-detail
 
 : "${sidebar_key:=T}"
 : "${sidebar_width:=42}"
@@ -55,6 +58,9 @@ setting popup_width popup-width; setting popup_height popup-height
 : "${popup_threshold:=100}"
 : "${popup_width:=85%}"
 : "${popup_height:=80%}"
+: "${agent_alerts:=off}"
+: "${agent_alert_sound:=off}"
+: "${agent_alert_detail:=brief}"
 
 if [[ "$sidebar_mode" != 'popup' && "$sidebar_mode" != 'auto' && "$sidebar_mode" != 'sidebar' ]]; then
   sidebar_mode=sidebar
@@ -106,6 +112,10 @@ esac
 if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
   animate=on
 fi
+case "$agent_alerts" in desktop|tmux|both) ;; *) agent_alerts=off ;; esac
+# A macOS or freedesktop sound name, passed to the notifier as one argument.
+[[ "$agent_alert_sound" =~ ^[A-Za-z0-9._-]+$ ]] || agent_alert_sound=off
+[[ "$agent_alert_detail" == full ]] || agent_alert_detail=brief
 
 sidebar_notification_sources="$notification_sources"
 if [[ "$notification_target" == 'status' ]]; then
@@ -123,6 +133,10 @@ canopy_queue set-option -gq @tmux_canopy_mode "$sidebar_mode"
 canopy_queue set-option -gq @tmux_canopy_popup_threshold "$popup_threshold"
 canopy_queue set-option -gq @tmux_canopy_popup_width "$popup_width"
 canopy_queue set-option -gq @tmux_canopy_popup_height "$popup_height"
+# Lifecycle reporters read this in a tmux call they already make.
+canopy_queue set-option -gq @tmux_canopy_agent_alerts "$agent_alerts"
+canopy_queue set-option -gq @tmux_canopy_agent_alert_sound "$agent_alert_sound"
+canopy_queue set-option -gq @tmux_canopy_agent_alert_detail "$agent_alert_detail"
 
 for alert_source in activity bell; do
   style=''

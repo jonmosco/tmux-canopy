@@ -74,6 +74,23 @@ send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "bg1"})
 send("claude", {"hook_event_name": "Stop", "session_id": "bg1"})
 check(state["status"] == "turn-ended", "Claude Stop from versions without the field ends the turn")
 
+# Claude reports one approval twice: PermissionRequest, then a permission_prompt
+# Notification without a tool. Either order must leave a request that the
+# approved tool's PostToolUse clears.
+for order in ("request-first", "notification-first"):
+    state = harness("claude")
+    request = {"hook_event_name": "PermissionRequest", "session_id": "pp1", "tool_name": "Bash",
+               "tool_input": {"command": "rm x", "description": "Remove x"}}
+    notification = {"hook_event_name": "Notification", "session_id": "pp1", "notification_type": "permission_prompt",
+                    "message": "Claude needs your permission to use Bash"}
+    send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "pp1"})
+    for event in ((request, notification) if order == "request-first" else (notification, request)):
+        send("claude", event)
+    check(state["status"] == "needs-input" and state["tool"] == "Bash" and state["summary"] == "Remove x" and
+          state["command"] == "rm x", f"{order}: the request keeps its tool and details: {state}")
+    send("claude", {"hook_event_name": "PostToolUse", "session_id": "pp1", "tool_name": "Bash"})
+    check(state["status"] == "working" and not state["request"], f"{order}: approval clears the request: {state}")
+
 # Copilot CLI passes the event name as an argument; its payload is camelCase.
 state = harness("copilot")
 for name, event, expected in [
@@ -403,3 +420,111 @@ check(output == '{"permission":"allow"}\n',
       f"main() emits exactly one line when report() raises: {output!r}")
 
 print("ok - Gemini, Pi/OMP, OpenCode lifecycle edges and common report contract")
+
+# Agent alerts: only transitions a user waits for start the delivery script,
+# and only when @tmux-canopy-agent-alerts is on. Its value rides along on the
+# reporter's existing pane check, so it needs no tmux call of its own.
+def alert_harness(kind, mode):
+    state = harness(kind)
+    plain, started = core.tmux, []
+
+    def tmux(*args):
+        result = plain(*args)
+        if args[:1] == ("display-message",) and args[-1].startswith("#{pane_id}|"):
+            return subprocess.CompletedProcess(args, 0, result.stdout.rstrip("\n") + "|" + mode + "\n", "")
+        return result
+    core.tmux = tmux
+    # Recorded as (pane, event, kind, summary, mode); the full text is kept too.
+    texts.clear()
+
+    def start(argv, text):
+        started.append((argv[1], argv[2], argv[3], text["CANOPY_ALERT_SUMMARY"], argv[4]))
+        texts.append(text)
+    core.start_alert = start
+    return state, started
+
+
+texts = []
+
+
+state, started = alert_harness("claude", "both")
+send("claude", {"hook_event_name": "SessionStart", "session_id": "a1"})
+send("claude", {"hook_event_name": "Stop", "session_id": "a1"})
+check(started == [], f"a turn that never started working does not alert: {started}")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "a1"})
+send("claude", {"hook_event_name": "PermissionRequest", "session_id": "a1", "tool_name": "Bash",
+                "tool_input": {"command": "rm x", "description": "Remove x"}})
+send("claude", {"hook_event_name": "Notification", "session_id": "a1", "notification_type": "permission_prompt",
+                "message": "Claude needs your permission to use Bash"})
+check(started == [("%4", "needs-input", "claude", "Remove x", "both")],
+      f"Claude's paired permission events alert once, with the request: {started}")
+send("claude", {"hook_event_name": "PostToolUse", "session_id": "a1", "tool_name": "Bash"})
+send("claude", {"hook_event_name": "Stop", "session_id": "a1"})
+check(started[1:] == [("%4", "done", "claude", "", "both")], f"working to turn-ended alerts done: {started}")
+send("claude", {"hook_event_name": "Stop", "session_id": "a1"})
+check(len(started) == 2, f"a repeated Stop does not alert again: {started}")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "a1"})
+send("claude", {"hook_event_name": "SubagentStart", "session_id": "a1", "agent_id": "s1", "agent_type": "Explore"})
+send("claude", {"hook_event_name": "PermissionRequest", "session_id": "a1", "agent_id": "s1",
+                "agent_type": "Explore", "tool_name": "Read", "tool_input": {"description": "Read y"}})
+check(started[2:] == [("%4", "needs-input", "claude", "Explore: Read y", "both")],
+      f"a subagent's request alerts with its name: {started}")
+
+for mode in ("", "off", "bogus"):
+    state, started = alert_harness("claude", mode)
+    send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "a2"})
+    send("claude", {"hook_event_name": "PermissionRequest", "session_id": "a2", "tool_name": "Bash"})
+    send("claude", {"hook_event_name": "Stop", "session_id": "a2"})
+    check(state["status"] == "turn-ended" and started == [], f"alerts stay off for {mode!r}: {started}")
+
+state, started = alert_harness("codex", "desktop")
+core.report({"hook_event_name": "SessionStart", "session_id": "c1"})
+core.report({"hook_event_name": "UserPromptSubmit", "session_id": "c1", "turn_id": "t1"})
+core.report({"hook_event_name": "PermissionRequest", "session_id": "c1", "turn_id": "t1",
+             "tool_name": "Bash", "tool_input": {"command": "make", "description": "Build"}})
+core.report({"hook_event_name": "PreToolUse", "session_id": "c1", "turn_id": "t1",
+             "tool_name": "Bash", "tool_input": {"command": "make", "description": "Build"}})
+core.report({"hook_event_name": "Stop", "session_id": "c1", "turn_id": "t1"})
+check(started == [("%4", "needs-input", "codex", "Build", "desktop"), ("%4", "done", "codex", "", "desktop")],
+      f"Codex alerts on a request and on the end of a working turn: {started}")
+
+state, started = alert_harness("claude", "tmux")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "a3"})
+send("claude", {"hook_event_name": "StopFailure", "session_id": "a3"})
+send("claude", {"hook_event_name": "StopFailure", "session_id": "a3"})
+check(started == [("%4", "interrupted", "claude", "", "tmux")], f"an interrupted turn alerts once: {started}")
+send("claude", {"hook_event_name": "SessionStart", "session_id": "a4"})
+send("claude", {"hook_event_name": "StopFailure", "session_id": "a4"})
+check(len(started) == 1, f"an interruption with no turn in progress stays quiet: {started}")
+
+state, started = alert_harness("codex", "both")
+core.report({"hook_event_name": "SessionStart", "session_id": "c2"})
+core.report({"hook_event_name": "UserPromptSubmit", "session_id": "c2", "turn_id": "t1"})
+core.report({"hook_event_name": "Interrupt", "session_id": "c2", "turn_id": "t1"})
+check(started == [("%4", "interrupted", "codex", "", "both")], f"Codex interruption alerts: {started}")
+
+# The text rides in the environment: the request's command, the agent's last
+# reply on a finished turn, and the seconds since it last started working.
+state, started = alert_harness("claude", "desktop")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "a5"})
+state["updated"] = str(int(state["updated"]) - 125)
+send("claude", {"hook_event_name": "PermissionRequest", "session_id": "a5", "tool_name": "Bash",
+                "tool_input": {"command": "make test", "description": "Run the tests"}})
+check(texts[-1]["CANOPY_ALERT_COMMAND"] == "make test" and texts[-1]["CANOPY_ALERT_ELAPSED"] == "",
+      f"a request carries its command: {texts[-1]}")
+send("claude", {"hook_event_name": "PostToolUse", "session_id": "a5", "tool_name": "Bash"})
+state["updated"] = str(int(state["updated"]) - 125)
+send("claude", {"hook_event_name": "Stop", "session_id": "a5", "last_assistant_message": "All tests pass.\n\nDone."})
+check(texts[-1]["CANOPY_ALERT_REPLY"] == "All tests pass. Done." and texts[-1]["CANOPY_ALERT_ELAPSED"] in ("125", "126"),
+      f"a finished turn carries the reply and its duration: {texts[-1]}")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "a5"})
+send("claude", {"hook_event_name": "StopFailure", "session_id": "a5", "last_assistant_message": "partial"})
+check(texts[-1]["CANOPY_ALERT_REPLY"] == "", f"only a finished turn carries a reply: {texts[-1]}")
+
+state, started = alert_harness("codex", "tmux")
+core.report({"hook_event_name": "SessionStart", "session_id": "c3"})
+core.report({"hook_event_name": "UserPromptSubmit", "session_id": "c3", "turn_id": "t1"})
+core.report({"hook_event_name": "Stop", "session_id": "c3", "turn_id": "t1", "last_assistant_message": "Fixed it."})
+check(texts[-1]["CANOPY_ALERT_REPLY"] == "Fixed it.", f"Codex passes its last reply: {texts[-1]}")
+
+print("ok - agent alerts fire once per transition, only when enabled")
