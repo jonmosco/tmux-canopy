@@ -569,18 +569,18 @@ def main():
     integrations.add_argument("action", choices=("status", "install", "uninstall"))
     integrations.add_argument("kinds", nargs="*", choices=KINDS)
     integrations.add_argument("--dry-run", action="store_true")
-    alerts = commands.add_parser("alerts", help="send a sample agent alert")
+    alerts = commands.add_parser("alerts", help="send a sample alert")
     alerts.add_argument("action", choices=("test",))
     alerts.add_argument("mode", nargs="?", choices=("desktop", "tmux", "both"),
-                        help="defaults to @tmux-canopy-agent-alerts, or both when it is off")
+                        help="defaults to @tmux-canopy-alerts, or both when it is off")
     args = parser.parse_args()
     if args.command == "alerts":
-        mode = args.mode or subprocess.run(("tmux", "show-option", "-gqv", "@tmux_canopy_agent_alerts"),
+        mode = args.mode or subprocess.run(("tmux", "show-option", "-gqv", "@tmux_canopy_alerts"),
                                            text=True, capture_output=True, timeout=5,
                                            check=False).stdout.strip()
         if mode not in ("desktop", "tmux", "both"):
             mode = "both"
-        return subprocess.call([str(ROOT / "scripts" / "agent-notify"), "--test", mode])
+        return subprocess.call([str(ROOT / "scripts" / "alert"), "--test", mode])
     if args.command == "doctor":
         result = subprocess.call([str(ROOT / "scripts" / "doctor"), "--report"])
         print("\nAgent integrations:")

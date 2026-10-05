@@ -274,9 +274,10 @@ set -g @tmux-canopy-last-window-key 'Tab'
 set -g @tmux-canopy-notifications 'activity,bell'
 set -g @tmux-canopy-notification-target 'sidebar'
 set -g @tmux-canopy-silence-seconds '30'
-set -g @tmux-canopy-agent-alerts 'off' # desktop, tmux, or both: tell you when an agent needs you
-set -g @tmux-canopy-agent-alert-sound 'off' # default or a sound name for desktop alerts
-set -g @tmux-canopy-agent-alert-detail 'brief' # full: include the agent's last reply
+set -g @tmux-canopy-alerts 'off' # desktop, tmux, or both: tell you when an agent needs you
+set -g @tmux-canopy-alert-events 'agents' # add bell, silence, or activity for tmux's own alerts
+set -g @tmux-canopy-alert-sound 'off' # default or a sound name for desktop alerts
+set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
 set -g @tmux-canopy-appearance 'default' # or 'ascii'
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-footer 'on' # off: open sidebars without the Tree view footer; f toggles it
@@ -405,7 +406,7 @@ Choose exactly where native alerts are presented:
 
 The default is `sidebar`. Original `window-status-activity-style`, `window-status-bell-style`, and alert-action values are saved and restored when switching modes. The `status` and `both` modes set configured alert actions to `other` so tmux actually marks background windows. Custom status formats that explicitly contain `#F`, `#{window_flags}`, or alert conditionals must omit those expressions if strict sidebar-only display is desired; tmux does not expose a separate hook-only alert flag.
 
-Native tmux alert hooks record provider state only when tmux supplies a live, non-sidebar, non-placeholder pane and its owning window. Events without a valid open terminal pane are ignored. No process scanner, Git poller, agent API, or external desktop event can create a notification in the default model. Agent alerts are separate and add no sidebar badge; see [Agent alerts](#agent-alerts).
+Native tmux alert hooks record provider state only when tmux supplies a live, non-sidebar, non-placeholder pane and its owning window. Events without a valid open terminal pane are ignored. No process scanner, Git poller, agent API, or external desktop event can create a notification in the default model. Desktop and tmux alerts are separate and add no badge of their own; see [Alerts](#alerts).
 
 A single bold amber badge sits immediately after the name. Expanded branches show badges on affected panes, without repeating the alert on their ancestors. Collapsed windows count unread panes; collapsed sessions count unread windows. Counts appear only above one, and multiple providers on one target count once. A bell takes priority over activity, then silence; previews list all recorded types. A window-level alert with no remaining flagged pane stays visible on the window until cleared. The green active-location marker is unchanged.
 
@@ -545,14 +546,15 @@ An agent run inside a sandbox wrapper such as `bwrap`, `firejail`, `sandbox-exec
 
 Crush (Charm's `crush`) is detected by its process only: it appears in the Agents view, the footer, and the drawer as `[process]`, without a verified state. Its released hook support covers only `PreToolUse`, which cannot report a finished turn or a request for input, so Canopy has no Crush adapter yet. Crush can ring the terminal bell when it needs permission or finishes (its `notifications` setting); with `bell` in `@tmux-canopy-notifications`, Canopy then marks that pane with its bell badge.
 
-### Agent alerts
+### Alerts
 
-Agent alerts tell you when an agent needs you, even when the sidebar is closed. They are off by default:
+Alerts tell you when an agent needs you, or when a pane rings the bell or goes quiet, even when the sidebar is closed. They are off by default:
 
 ```tmux
-set -g @tmux-canopy-agent-alerts 'both'         # off, desktop, tmux, or both
-set -g @tmux-canopy-agent-alert-sound 'default' # optional, desktop only
-set -g @tmux-canopy-agent-alert-detail 'brief'  # or full: include the agent's last reply
+set -g @tmux-canopy-alerts 'both'         # off, desktop, tmux, or both
+set -g @tmux-canopy-alert-events 'agents' # agents, bell, silence, activity, or all
+set -g @tmux-canopy-alert-sound 'default' # optional, desktop only
+set -g @tmux-canopy-alert-detail 'brief'  # or full: include the agent's last reply
 ```
 
 | Value | Delivery |
@@ -562,7 +564,26 @@ set -g @tmux-canopy-agent-alert-detail 'brief'  # or full: include the agent's l
 | `tmux` | A five-second `display-message` on every attached client. |
 | `both` | Both of the above. |
 
-An alert fires once when a pane's lifecycle report changes to **needs input** (an approval or question), when a turn ends after the agent was working or waiting (**finished**), or when such a turn is cut short by an error or an interrupt (**was interrupted**). Repeated reports of the same state stay quiet. Each alert has three lines:
+`@tmux-canopy-alert-events` is a comma-separated list of what alerts; unknown names are ignored, and `all` means every one:
+
+| Event | Alerts when |
+|---|---|
+| `agents` | Default. An agent with a lifecycle adapter needs input, finishes, or is interrupted (below). |
+| `bell` | A pane rings the terminal bell. Many tools do when they finish (`make; tput bel`, shell prompts that ring after long commands, Crush). tmux monitors the bell by default. |
+| `silence` | A pane prints nothing for the window's `monitor-silence` seconds. Turn that on with `silence` in `@tmux-canopy-notifications` and `@tmux-canopy-silence-seconds`, or with tmux's own `monitor-silence`. |
+| `activity` | A background window prints anything. Needs `monitor-activity`, which `activity` in `@tmux-canopy-notifications` turns on. Noisy for logs and spinners. |
+
+Bell, silence, and activity alerts use tmux's own alert hooks, the same ones that put badges in the sidebar, and follow tmux's `bell-action`, `silence-action`, and `activity-action`. Choosing them in `alert-events` installs those hooks even when the sidebar shows no badges, but never turns on monitoring by itself. While the sidebar keeps a badge for the pane, its alert fires once until you read the pane, however many events arrive; without a badge, each event alerts. A tmux alert names the pane's command, the project, and the session and window:
+
+```text
+Bell from make · shop-api          sleep went quiet · shop-api
+work:3 build                       work:3 build
+Rang the bell                      No output for 30s
+```
+
+With `@tmux-canopy-alert-detail 'full'`, the body is the pane's last line of output instead (for silence, after `No output for 30s ·`). tmux attributes an alert to the window, so the pane named is that window's active pane.
+
+An agent alert fires once when a pane's lifecycle report changes to **needs input** (an approval or question), when a turn ends after the agent was working or waiting (**finished**), or when such a turn is cut short by an error or an interrupt (**was interrupted**). Repeated reports of the same state stay quiet. Each alert has three lines:
 
 ```text
 Claude Code needs input · shop-api       ← agent, event, and project (the pane's directory)
@@ -572,15 +593,15 @@ Run the test suite: make test            ← the request and its command
 
 The topic is the pane title that agents such as Claude Code set, without its leading spinner or status glyph; when the title is only the host name, the window name is shown instead. The body depends on the event: the request and its command for **needs input** (a subagent's request names the subagent), `Turn ended after 4m` for **finished**, and `Stopped after 1m` for **was interrupted**. The duration counts from when the agent last started working: its prompt, or the last approval. `notify-send` has no subtitle line, so the second line starts the body; the `tmux` message joins all three with `·`.
 
-With `@tmux-canopy-agent-alert-detail 'full'`, a finished Claude Code or Codex turn shows the start of the agent's last reply instead, on one line and cut to 150 characters: `All tests pass. The flaky test was a race in… (after 4m)`. The default, `brief`, leaves it out, because a reply can contain code or anything else from the conversation, and desktop notifications can appear on a locked screen and stay in the notification history. Text reaches the delivery script through its environment, not its command line, so other users on the machine cannot read it in `ps`.
+With `@tmux-canopy-alert-detail 'full'`, a finished Claude Code or Codex turn shows the start of the agent's last reply instead, on one line and cut to 150 characters: `All tests pass. The flaky test was a race in… (after 4m)`. The default, `brief`, leaves it out, because a reply can contain code or anything else from the conversation, and desktop notifications can appear on a locked screen and stay in the notification history. Text reaches the delivery script through its environment, not its command line, so other users on the machine cannot read it in `ps`.
 
 No alert is sent while you are looking at the pane: when it is the active pane of the active window on an attached client. With `focus-events on`, that client's terminal must also have focus, so an agent in a visible pane still alerts while you work in another application. Without `focus-events`, tmux cannot tell, and a visible pane counts as seen. Canopy does not change `focus-events` or any other tmux option.
 
 Clicking a `terminal-notifier` alert brings your terminal forward and moves tmux's most recently active client to the agent's pane, switching session and window as needed. The click runs as a short `/bin/sh` command that names the tmux binary and server socket directly, so it works without tmux in `PATH`; `terminal-notifier` runs it itself, and nothing waits for the click. The terminal brought forward is the application that started the tmux server (macOS's `__CFBundleIdentifier`). Clicking an alert for a pane that has since closed does nothing. `osascript` and `notify-send` alerts are display-only.
 
-`@tmux-canopy-agent-alert-sound` adds a sound to desktop alerts; it does not affect `tmux` messages. `off` (the default) is silent. `default` plays the usual notification sound: the system default with `terminal-notifier`, Glass with `osascript`, and the theme's `message-new-instant` with `notify-send`. Any other value is passed as a sound name: a macOS sound such as `Glass`, `Ping`, or `Submarine`, or a [freedesktop sound name](https://specifications.freedesktop.org/sound-naming-spec/latest/) on Linux, where support depends on the notification service. Values other than letters, digits, `.`, `_`, and `-` are ignored.
+`@tmux-canopy-alert-sound` adds a sound to desktop alerts; it does not affect `tmux` messages. `off` (the default) is silent. `default` plays the usual notification sound: the system default with `terminal-notifier`, Glass with `osascript`, and the theme's `message-new-instant` with `notify-send`. Any other value is passed as a sound name: a macOS sound such as `Glass`, `Ping`, or `Submarine`, or a [freedesktop sound name](https://specifications.freedesktop.org/sound-naming-spec/latest/) on Linux, where support depends on the notification service. Values other than letters, digits, `.`, `_`, and `-` are ignored.
 
-Alerts need a lifecycle adapter, since a `[process]`-only agent reports no state. The reporter reads the setting in a tmux call it already makes, so reports that do not alert cost nothing extra; an alert starts one short-lived script that the agent's hook does not wait for. Run `canopy alerts test` (optionally with `desktop`, `tmux`, or `both`) to send a sample. It says which notifier delivered it and which refused, and exits non-zero when none did. macOS asks each notifier for permission once: if `terminal-notifier` is refused, allow it under System Settings → Notifications (open its app once with `open` if it is not listed). `osascript` exits successfully even when macOS hides its notification, so check that one on screen. `canopy doctor` shows the setting and the notifiers found, in the order they are tried.
+Agent alerts need a lifecycle adapter, since a `[process]`-only agent reports no state; a bell alert can stand in for one that rings the bell. The reporter reads the setting in a tmux call it already makes, so reports that do not alert cost nothing extra; an alert starts one short-lived script that the agent's hook does not wait for. Run `canopy alerts test` (optionally with `desktop`, `tmux`, or `both`) to send a sample. It says which notifier delivered it and which refused, and exits non-zero when none did. macOS asks each notifier for permission once: if `terminal-notifier` is refused, allow it under System Settings → Notifications (open its app once with `open` if it is not listed). `osascript` exits successfully even when macOS hides its notification, so check that one on screen. `canopy doctor` shows the setting and the notifiers found, in the order they are tried.
 
 ### Common reporter contract
 
