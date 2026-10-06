@@ -12,11 +12,20 @@ sep=$'\037'
 # Scrub metadata control characters before splitting. The captured screen's
 # colors are retained separately by capture-pane -e.
 clean=$'s/[\001-\037\177]/ /'
-format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}$sep#{@tmux_canopy_notice_pane_activity}$sep#{@tmux_canopy_notice_pane_bell}$sep#{@tmux_canopy_notice_pane_silence}$sep#{@tmux_canopy_notifications}"
+format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}$sep#{@tmux_canopy_notice_pane_activity}$sep#{@tmux_canopy_notice_pane_bell}$sep#{@tmux_canopy_notice_pane_silence}$sep#{@tmux_canopy_notifications}$sep#{@tmux-canopy-git-context}"
 metadata="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
 [[ -n "$metadata" ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
-IFS="$sep" read -r width height cursor history alternate command directory activity bell silence configured <<< "$metadata"
+IFS="$sep" read -r width height cursor history alternate command directory activity bell silence configured git_mode <<< "$metadata"
 [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[1-9][0-9]*$ && "$cursor" =~ ^[0-9]+$ && "$history" =~ ^[0-9]+$ ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
+git_context=''
+if [[ "$git_mode" == branch ]] && command -v git >/dev/null 2>&1; then
+  SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/git-lib.sh"
+  if canopy_git_root "$directory" && canopy_git_branch "$CANOPY_GIT_ROOT"; then
+    git_context=$CANOPY_GIT_BRANCH
+  fi
+fi
 unread=''
 if [[ "$configured" != none ]]; then
   [[ "$activity" != 1 ]] || unread+='activity, '
@@ -29,7 +38,9 @@ if [[ -n "$unread" ]]; then
   ((rows > 1)) || exit 0
   ((rows-=1))
 fi
-budget=$((rows - 2))
+git_extra=0
+[[ -z "$git_context" || "$rows" -lt 3 ]] || git_extra=1
+budget=$((rows - 2 - git_extra))
 ((budget > 0)) || budget=0
 mode=recent
 case "${command##*/}" in
@@ -68,6 +79,7 @@ if [[ -n "${HOME:-}" ]]; then
 fi
 if ((${#directory} > columns)) && [[ "$directory" == */* ]]; then directory="…/${directory##*/}"; fi
 printf '%s\n' "$directory"
+((git_extra)) && printf 'Git: %s\n' "$git_context"
 ((budget > 0)) || exit 0
 # No -J: physical terminal rows must stay separate. No -a: capture the active
 # screen, not the saved alternate-screen contents. Negative rows are shell-only.

@@ -15,7 +15,7 @@ for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp
   config+="${sep}$(text "@tmux-canopy-icon-$app")"
 done
 # Appearance before agents so agents remains the final D field for tree-source.
-config+="${sep}#{@tmux_canopy_appearance}"
+config+="${sep}#{@tmux_canopy_appearance}${sep}#{@tmux-canopy-git-context}"
 # The client's effective agents setting (saved on/off, else the global
 # default) resolves inside this same tmux call when the client is known.
 agents_client="${TMUX_CANOPY_CLIENT:-${TMUX_CANOPY_RENDER_CLIENT:-}}"
@@ -48,6 +48,8 @@ else
   if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
 fi
 config_row="${config_row%"$sep"*}${sep}${agents_enabled}"
+git_mode=${config_row%"$sep"*}
+git_mode=${git_mode##*"$sep"}
 if [[ "$snapshot" == *$'\n'* ]]; then
   snapshot="${config_row}"$'
 '"${snapshot#*$'\n'}"
@@ -99,6 +101,34 @@ fi
 if [[ "$agents_enabled" != on ]]; then
   [[ -z "$TMUX_CANOPY_NEEDS_INPUT" ]] || exit 0
   agent_view=0
+fi
+# Git is strictly opt-in. Find roots with shell builtins and ask git once per
+# distinct repository; no process is started for unrelated directories.
+if [[ "$git_mode" == branch ]] && command -v git >/dev/null 2>&1; then
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/git-lib.sh"
+  declare -A git_paths=() git_branches=()
+  git_rows=''
+  while IFS= read -r line; do
+    [[ "$line" == P$sep* ]] || continue
+    IFS="$sep" read -ra fields <<< "$line"
+    [[ "${fields[7]:-}" != 1 && "${fields[8]:-}" != 1 && "${fields[9]:-}" != 1 ]] || continue
+    directory=${fields[6]:-}
+    [[ -n "$directory" ]] || continue
+    if [[ -z ${git_paths[x$directory]+set} ]]; then
+      canopy_git_root "$directory" || true
+      git_paths[x$directory]=$CANOPY_GIT_ROOT
+    fi
+    root=${git_paths[x$directory]}
+    [[ -n "$root" ]] || continue
+    if [[ -z ${git_branches[x$root]+set} ]]; then
+      canopy_git_branch "$root" || true
+      git_branches[x$root]=$CANOPY_GIT_BRANCH
+    fi
+    branch=${git_branches[x$root]}
+    [[ -z "$branch" ]] || git_rows+=$'\n'"G${sep}${fields[1]}${sep}${branch}"
+  done <<< "$snapshot"
+  snapshot+=$git_rows
 fi
 if [[ "$agent_view" == 1 && -d /proc/self ]] && command -v python3 >/dev/null 2>&1; then
   # Python is optional; its /proc walk avoids a full-system ps invocation.

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canopy · visual directions</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --page: #0d1219; --paper: #141c25; --screen: #0b1119;
+    --ink: #e8edf0; --muted: #a0afbd; --quiet: #718291; --guide: #50606e;
+    --border: #2a3948; --accent: #83d5dd; --selection: #213743;
+    --green: #98d4ad; --amber: #f0bf81; --blue: #98bce8;
+    --chrome: #19232e; --chip: #273647;
+  }
+  html[data-theme="light"] {
+    color-scheme: light;
+    --page: #e9eff1; --paper: #f9fbfa; --screen: #fffefa;
+    --ink: #23313b; --muted: #526573; --quiet: #687b87; --guide: #8697a1;
+    --border: #bbcad0; --accent: #126779; --selection: #d9ebed;
+    --green: #247856; --amber: #955419; --blue: #3e6697;
+    --chrome: #e7eff0; --chip: #e6eeee;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
+  .page { max-width: 1240px; margin: auto; padding: 44px 30px 72px; }
+  .eyebrow, .number, .meta { font: 600 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .intro { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+  h1 { font-size: clamp(32px, 4vw, 52px); letter-spacing: -.045em; font-weight: 650; line-height: 1.1; margin: 12px 0; }
+  .lede { max-width: 71ch; color: var(--muted); margin: 0; }
+  button { background: var(--paper); color: var(--ink); border: 1px solid var(--border); border-radius: 7px; padding: 10px 14px; font: inherit; white-space: nowrap; cursor: pointer; }
+  button:hover, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .callout { margin: 30px 0 36px; padding: 12px 17px; border-left: 3px solid var(--accent); background: var(--paper); color: var(--muted); border-radius: 0 7px 7px 0; }
+  .callout strong, .footnote strong { color: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .case { background: var(--paper); border: 1px solid var(--border); border-radius: 12px; padding: 23px; min-width: 0; }
+  .case-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  h2 { font-size: 21px; letter-spacing: -.02em; font-weight: 600; margin: 6px 0 4px; }
+  .case p { font-size: 14px; color: var(--muted); margin: 0 0 18px; max-width: 58ch; min-height: 43px; }
+  .term { width: min(100%, 48ch); background: var(--screen); border: 1px solid var(--border); border-radius: 7px; overflow: hidden; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .term--30 { width: min(100%, 36ch); }
+  .term--56 { width: min(100%, 62ch); }
+  .chrome { display: flex; gap: 6px; align-items: center; border-bottom: 1px solid var(--border); background: var(--chrome); color: var(--quiet); font-size: 11px; padding: 5px 11px; }
+  .chrome .dots { letter-spacing: 2px; color: var(--guide); }
+  .chrome .label { margin-left: auto; }
+  .terminal-head { padding: 8px 11px 5px; color: var(--accent); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .terminal-head .muted { color: var(--quiet); overflow: hidden; text-overflow: ellipsis; }
+  .terminal-head .trailing { margin-left: auto; flex: none; font-size: 11px; color: var(--muted); }
+  .body { min-height: 222px; padding: 0 0 10px; }
+  .r { display: flex; align-items: baseline; gap: .42ch; padding: 2px 11px; min-width: 0; white-space: nowrap; }
+  .r.indent1 { padding-left: 3ch; }
+  .r.indent2 { padding-left: 5ch; }
+  .r.indent3 { padding-left: 8ch; }
+  .r.selected { background: var(--selection); }
+  .r .name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .r .push { margin-left: auto; flex: none; }
+  .guide { color: var(--guide); flex: none; }
+  .muted { color: var(--muted); }
+  .quiet { color: var(--quiet); }
+  .cyan { color: var(--accent); }
+  .green { color: var(--green); }
+  .amber { color: var(--amber); }
+  .blue { color: var(--blue); }
+  .strong { font-weight: 700; }
+  .footer { border-top: 1px solid var(--border); padding: 9px 11px; color: var(--muted); display: flex; gap: 10px; white-space: nowrap; overflow: hidden; }
+  .footer .push { margin-left: auto; }
+  .meta { margin-top: 16px; font-size: 11px; letter-spacing: .04em; color: var(--quiet); }
+  .agent { padding: 7px 11px 8px; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); }
+  .agent.need { border-left-color: var(--amber); }
+  .agent.working { border-left-color: var(--accent); }
+  .agent.unknown { border-left-color: var(--guide); }
+  .agent.selected { background: var(--selection); }
+  .agent-main { display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+  .agent-main .agent-name { overflow: hidden; text-overflow: ellipsis; }
+  .agent-main .state { margin-left: auto; flex: none; font-size: 12px; }
+  .agent-sub { color: var(--muted); font-size: 12px; margin: 2px 0 0 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .footnote { margin-top: 24px; color: var(--muted); font-size: 14px; }
+  code { font: .95em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .case p { min-height: 0; } }
+  @media (max-width: 520px) { .page { padding: 26px 14px 50px; } .intro { flex-wrap: wrap; } .case { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="intro">
+    <div>
+      <div class="eyebrow">Canopy / visual study</div>
+      <h1>Make the tree easier to read.</h1>
+      <p class="lede">Four sketches built around the same workspaces. The first approximates the default UI. Option 02 is available as <code>@tmux-canopy-appearance 'quiet'</code>; the others are proposals. These are illustrations, not pixel-exact screenshots.</p>
+    </div>
+    <button id="theme" type="button" aria-label="Switch to light colors">Preview light colors</button>
+  </header>
+  <div class="callout"><strong>Try the light switch.</strong> Color here is illustrative, not a proposed hard-coded terminal palette. Attention, unread output, active location, and selection deliberately remain different signals.</div>
+  <main class="grid">
+    <section class="case">
+      <div class="case-heading"><span class="number">01 / baseline</span><span class="meta">~42 columns</span></div>
+      <h2>What competes today</h2>
+      <p>A useful full tree, but deep prefixes, four tabs, and long labels crowd the pane names. Existing behavior is more customizable than this one example.</p>
+      <div class="term" aria-label="Approximation of current Tree view">
+        <div class="chrome"><span class="dots">● ● ●</span><span class="label">sidebar / approximation</span></div>
+        <div class="terminal-head"><span>╭─ Tree</span><span class="muted">Agents Proc Buff ─ All</span></div>
+        <div class="body">
+          <div class="r"><span class="guide">▾</span><span class="name">acme-api</span></div>
+          <div class="r indent1"><span class="guide">└─ ▾</span><span class="blue">▣</span><span class="name">api</span><span class="quiet push">⎇ feature/auth</span></div>
+          <div class="r indent2"><span class="guide">└─ ▾</span><span class="name">1:server</span></div>
+          <div class="r indent3 selected"><span class="guide">├─</span><span class="green">●</span><span class="name">claude</span><span class="amber">NEEDS INPUT</span><span class="quiet push">··</span></div>
+          <div class="r indent3"><span class="guide">└─</span><span class="name">zsh</span></div>
+          <div class="r indent1"><span class="guide">└─ ▾</span><span class="blue">▣</span><span class="name">client</span></div>
+          <div class="r indent2"><span class="guide">└─ ▾</span><span class="name">2:web</span></div>
+          <div class="r indent3"><span class="guide">└─</span><span class="name">nvim</span><span class="amber push">●</span></div>
+          <div class="r"><span class="guide">▸</span><span class="name">scratch</span><span class="quiet push">[2w]</span></div>
+        </div>
+        <div class="footer"><span>Agents</span><span class="amber">◆1</span><span class="cyan">▷1</span><span class="quiet push">n jumps to input</span></div>
+      </div>
+      <div class="meta">Problem / the name gives up space first</div>
+    </section>
+
+    <section class="case">
+      <div class="case-heading"><span class="number">02 / opt-in quiet</span><span class="meta">~42 columns</span></div>
+      <h2>Quiet tree, same objects</h2>
+      <p>Keep sessions, folders, windows, panes, and folds. Subdue the scaffolding; let the directory name and one compact right-edge status do the work.</p>
+      <div class="term" aria-label="Illustration of opt-in quiet Tree view">
+        <div class="chrome"><span class="dots">● ● ●</span><span class="label">tree / quiet appearance</span></div>
+        <div class="terminal-head"><span class="strong">Tree</span><span class="muted">· All</span><span class="trailing">◆1 / 2 agents</span></div>
+        <div class="body">
+          <div class="r"><span class="guide">▾</span><span class="name strong">acme-api</span></div>
+          <div class="r indent1"><span class="guide">▾</span><span class="blue">▣</span><span class="name">api</span><span class="quiet push">⎇ feature/auth</span></div>
+          <div class="r indent2"><span class="guide">▾</span><span class="name">server</span></div>
+          <div class="r indent3 selected"><span class="green">●</span><span class="name strong">claude</span><span class="amber push">!</span></div>
+          <div class="r indent3"><span class="guide">·</span><span class="name muted">zsh</span></div>
+          <div class="r indent1"><span class="guide">▾</span><span class="blue">▣</span><span class="name">client</span></div>
+          <div class="r indent2"><span class="guide">▾</span><span class="name">web</span></div>
+          <div class="r indent3"><span class="guide">·</span><span class="name">nvim</span><span class="amber push">●</span></div>
+          <div class="r"><span class="guide">▸</span><span class="name muted">scratch</span><span class="quiet push">2 windows</span></div>
+        </div>
+        <div class="footer"><span><span class="cyan">1</span> Tree</span><span><span class="cyan">4</span> Agents</span><span><span class="cyan">n</span> Next</span><span class="quiet push">? Help</span></div>
+      </div>
+      <div class="meta">Change / name first · compact attention at edge</div>
+    </section>
+
+    <section class="case">
+      <div class="case-heading"><span class="number">03 / narrow option</span><span class="meta">~30 columns</span></div>
+      <h2>Compact navigator</h2>
+      <p>One summary row for a window until expanded. The active pane remains visible; other windows are folded. No new tmux object or hidden deletion.</p>
+      <div class="term term--30" aria-label="Proposed compact Tree view">
+        <div class="chrome"><span class="dots">● ● ●</span><span class="label">tree / proposal</span></div>
+        <div class="terminal-head"><span class="strong">Tree</span><span class="muted">· api</span><span class="trailing amber">! 1</span></div>
+        <div class="body">
+          <div class="r"><span class="guide">▾</span><span class="name strong">acme-api</span></div>
+          <div class="r indent1"><span class="guide">▾</span><span class="name">server</span></div>
+          <div class="r indent2 selected"><span class="green">●</span><span class="name strong">claude</span><span class="amber push">!</span></div>
+          <div class="r indent2"><span class="guide">·</span><span class="name muted">zsh</span></div>
+          <div class="r indent1"><span class="guide">▸</span><span class="name">web</span><span class="quiet push">2p</span></div>
+          <div class="r indent1"><span class="guide">▸</span><span class="name">tests</span><span class="amber push">●</span></div>
+          <div class="r"><span class="guide">▸</span><span class="name muted">scratch</span><span class="quiet push">2w</span></div>
+        </div>
+        <div class="footer"><span class="quiet">h fold</span><span class="quiet">l open</span><span class="quiet push">? help</span></div>
+      </div>
+      <div class="meta">Trade-off / more to expand, less to scan</div>
+    </section>
+
+    <section class="case">
+      <div class="case-heading"><span class="number">04 / separate view</span><span class="meta">~56 columns</span></div>
+      <h2>Agents as a dashboard</h2>
+      <p>Only in the existing Agents view: two-line rows for the agent and its context. Keep Tree compact; put lifecycle detail here without suggesting Canopy can answer prompts.</p>
+      <div class="term term--56" aria-label="Proposed Agents dashboard">
+        <div class="chrome"><span class="dots">● ● ●</span><span class="label">agents / proposal</span></div>
+        <div class="terminal-head"><span class="strong">Agents</span><span class="muted">· all sessions</span><span class="trailing">◆1 ▷1 ○1</span></div>
+        <div class="body">
+          <div class="agent need selected"><div class="agent-main"><span class="amber">✳</span><span class="agent-name strong">Claude Code</span><span class="state amber">! needs input</span></div><div class="agent-sub">acme-api › server · feature/auth · &lt;1m</div></div>
+          <div class="agent working"><div class="agent-main"><span class="cyan">◇</span><span class="agent-name strong">Codex</span><span class="state cyan">▷ working</span></div><div class="agent-sub">acme-web › review · fix/search · 2m</div></div>
+          <div class="agent unknown"><div class="agent-main"><span class="muted">◦</span><span class="agent-name">Crush</span><span class="state quiet">○ process</span></div><div class="agent-sub">scratch › build · state not verified</div></div>
+        </div>
+        <div class="footer"><span class="cyan">Enter</span><span>focus pane</span><span class="cyan">i</span><span>summary</span><span class="quiet push">n next input</span></div>
+      </div>
+      <div class="meta">Trade-off / richer agents view, more vertical space</div>
+    </section>
+  </main>
+  <p class="footnote"><strong>Illustrations, not screenshots.</strong> Quiet tree (02) and branch labels are opt-in today; the exact spacing and colors shown are illustrative. The compact navigator (03) and Agents dashboard (04) remain proposals. Prior explorations: <a href="sidebar-nav.html" style="color:var(--accent)">navigation</a> · <a href="directory-colors.html" style="color:var(--accent)">directory color</a>.</p>
+</div>
+<script>
+  const themeButton = document.getElementById('theme');
+  themeButton.addEventListener('click', () => {
+    const light = document.documentElement.dataset.theme !== 'light';
+    document.documentElement.dataset.theme = light ? 'light' : 'dark';
+    themeButton.textContent = light ? 'Preview dark colors' : 'Preview light colors';
+    themeButton.setAttribute('aria-label', light ? 'Switch to dark colors' : 'Switch to light colors');
+  });
+  if (new URLSearchParams(location.search).get('theme') === 'light') themeButton.click();
+</script>
+</body>
+</html>

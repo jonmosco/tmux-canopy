@@ -34,6 +34,7 @@ For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/cano
 - Left or right placement; **left by default**.
 - Floating **popup modal** mode or adaptive **auto** switching on smaller displays (`@tmux-canopy-mode`).
 - Width-aware directory grouping, optional minimal and compact views, previews, and scrollable popup help.
+- Optional Git branch labels for panes and directory groups, without polling or changing repository state.
 - Global quick switching, including panes inside collapsed branches.
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus and direct keys.
@@ -218,7 +219,7 @@ set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
 set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
-set -g @tmux-canopy-appearance 'default'  # default (folders + icons) or ascii
+set -g @tmux-canopy-appearance 'default'  # default, quiet, or ascii
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 set -g @tmux-canopy-alerts 'off'     # desktop, tmux, or both: alert when an agent needs you
@@ -311,9 +312,19 @@ When you leave the sidebar for a content pane, its selection pointer follows the
 
 With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
 
+## Git branch context
+
+Git branch labels are off by default. To show the branch of each pane's working directory in the Tree and quick switcher, set this in your tmux configuration:
+
+```tmux
+set -g @tmux-canopy-git-context 'branch'
+```
+
+Press `Ctrl-r` in the sidebar after changing the option or switching branches. Directory groups display `⎇ feature/name` (ASCII: `[git:feature/name]`); compact layouts show the branch beside the pane when space permits. The pane preview shows the full name even if a narrow tree omits it. A detached HEAD appears as `detached@<commit>`. This requires Git; if it is unavailable, no label is shown. Canopy reads Git metadata only on reload, once per distinct repository, and never runs `git status`, watches files, checks out branches, or creates worktrees. A `cd` without another tmux event may also require `Ctrl-r`.
+
 ## Customizing the look
 
-By default, panes are grouped by working directory with folder and application icons, and labels adapt to the sidebar's width. Set `@tmux-canopy-appearance 'ascii'` for the same layout without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows, then press `Ctrl-r` in the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).
+By default, panes are grouped by working directory with folder and application icons, and labels adapt to the sidebar's width. For a quieter tree without losing folders, folds, agents, or actions, opt in with `set -g @tmux-canopy-appearance 'quiet'`. It replaces the view tabs with a compact `Tree · All` header, softens guides, keeps the active pane dot by its name, and moves agent and unread marks to the right edge. The Tree footer becomes shortcut hints (`1 Tree`, `4 Agents`, `n Next` when agent mode is on); `f` still hides it. See the [visual example](docs/sidebar-visual-examples.html) (illustrative, not a screenshot). Set `@tmux-canopy-appearance 'ascii'` for the default layout without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows. Reload the plugin after changing appearance, then reopen the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).
 
 See the [configuration and command reference](docs/reference.md) for every control, appearance setting, notification option, and the architecture.
 
