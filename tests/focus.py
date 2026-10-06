@@ -140,6 +140,9 @@ def main():
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             script_env['TMUX_PANE'] = sidebar
             wait(lambda: location(sidebar) == f'{session}|{wa}|{pane_a}', 'initial remembered content')
+            jump_action = run('jump-current')
+            assert 'reload-sync' in jump_action and 'clear-screen' not in jump_action, jump_action
+            print('ok - focus pointer refresh does not clear the sidebar before reloading')
             time.sleep(.3)
             tm('send-keys', '-t', sidebar, 'M-a')
             before, row_before = probe(sidebar), pointer_line(sidebar)

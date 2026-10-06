@@ -54,7 +54,7 @@ done < <("$SCRIPT_DIR/sidebar-source" --stable --read0)
 reload=''
 if [[ -n "$rows" ]]; then
   exec {rows_fd}>&-
-  reload="clear-screen+reload-sync(cat \"\$TMUX_CANOPY_STATE.$suffix\"; rm -f \"\$TMUX_CANOPY_STATE.$suffix\")"
+  reload="reload-sync(cat \"\$TMUX_CANOPY_STATE.$suffix\"; rm -f \"\$TMUX_CANOPY_STATE.$suffix\")"
 fi
 target="${pane_position:-${window_position:-$session_position}}"
 if [[ "$target" =~ ^[1-9][0-9]*$ ]]; then
