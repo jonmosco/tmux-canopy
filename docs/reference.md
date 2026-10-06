@@ -256,6 +256,7 @@ Set options before loading the plugin:
 
 ```tmux
 set -g @tmux-canopy-mode 'sidebar' # 'sidebar', 'popup', or 'auto'
+set -g @tmux-canopy-git-context 'off' # 'branch' to show read-only Git context
 set -g @tmux-canopy-popup-threshold '100' # column width below which 'auto' uses popup
 set -g @tmux-canopy-popup-width '85%' # popup modal width (% or columns)
 set -g @tmux-canopy-popup-height '80%' # popup modal height (% or lines)
@@ -279,7 +280,7 @@ set -g @tmux-canopy-alerts 'off' # desktop, tmux, or both: tell you when an agen
 set -g @tmux-canopy-alert-events 'agents' # add bell, silence, or activity for tmux's own alerts
 set -g @tmux-canopy-alert-sound 'off' # default or a sound name for desktop alerts
 set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
-set -g @tmux-canopy-appearance 'default' # or 'ascii'
+set -g @tmux-canopy-appearance 'default' # or 'quiet', 'ascii' (classic still works)
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-footer 'on' # off: open sidebars without the Tree view footer; f toggles it
 set -g @tmux-canopy-theme 'ansi'
@@ -417,18 +418,32 @@ Notification clearing uses one metadata snapshot and one batch of necessary muta
 
 Changed notifications share one short-lived 120 ms refresh worker. The claim is acquired inside tmux's command queue; duplicate events are rechecked there before changing state. Claims expire after two seconds so a killed worker cannot permanently block future refreshes. Distinct pane-only options (`@tmux_canopy_notice_pane_*`) prevent panes from inheriting a window's aggregate unread badge; the previous pane option names are maintained and cleared for compatibility. Unread state is still server-wide, not per-client.
 
-The option model is provider-neutral: each provider owns a namespaced pane/window state key while rendering and aggregation are centralized. Optional Git and agent adapters can be added later without changing sidebar movement, slots, or tree navigation. Git state will remain persistent metadata rather than clear-on-focus unread state.
+The option model is provider-neutral: each notification provider owns a namespaced pane/window state key while rendering and aggregation are centralized. Git branch context is a separate, opt-in snapshot read, not an unread notification or a persistent tmux option on each pane.
 
 ### Appearance
 
-`@tmux-canopy-appearance` is `default` or `ascii`. `default` groups panes by
-working directory and shows folder and application
-icons using Unicode glyphs; `ascii` switches to an ASCII-only rendering for
-terminals without glyph support. `classic`, the earlier window-first tree, is
-still accepted for existing setups. `@tmux-canopy-icon-theme` remains available for
-advanced customization. Close and reopen the
-sidebar after changing appearance; `Ctrl-r` alone does not restyle a running fzf
-process.
+`@tmux-canopy-appearance` defaults to `default`, grouping panes by working
+directory and showing folder and application icons. `quiet` is an opt-in variant
+of that tree, with the same sessions, folders, windows, panes, folds, filters,
+actions, agent rows, and selection identities. It replaces the tab bar with a
+short `Tree · All`/`Agents · All` header (`Tree - All` with ASCII icons) and a compact agent summary when agent
+mode is on. In Tree view it subdues guides, uses small chevrons for folds, places
+the green active-pane dot beside its name (`>` with ASCII icons), and right-aligns agent attention and
+unread notices as separate marks. A waiting subagent can raise its parent's
+mark; unverified process detection never claims a confirmed state. Git branches,
+when enabled, appear at the right edge of directory rows if they fit. The Tree
+footer shows shortcut hints instead of workspace/agent counts; `f` and
+`@tmux-canopy-footer` still control its visibility. Other views keep their
+existing tabs. The examples in [Quiet tree](sidebar-visual-examples.html) are
+illustrations, not pixel-exact screenshots.
+
+`ascii` uses the default folder layout without Unicode glyphs; it can also be
+selected as `@tmux-canopy-icon-theme 'ascii'` alongside `quiet`. `classic`, the
+earlier window-first tree, is still accepted for existing setups.
+`@tmux-canopy-icon-theme` and `@tmux-canopy-theme 'mono'` also work with `quiet`.
+Reload the plugin after changing `@tmux-canopy-appearance`, then reopen the
+sidebar. A running sidebar can be refreshed with `Ctrl-r` after its normalized
+appearance option has been updated.
 
 `@tmux-canopy-animate on` (default) adds a moving reverse-video highlight
 band across visible `WORKING` / `wrk` status words while an agent is working. The
@@ -480,6 +495,14 @@ stable action identity. The full directory is available in pane preview and
 Ctrl-g global quick switch. Tree search matches the directory text shown in
 its current width; Ctrl-g searches full paths even when they are hidden.
 
+#### Git branch context
+
+Set `@tmux-canopy-git-context 'branch'` to show read-only branch labels; the default `off` starts no Git process. For each non-internal, live pane, Canopy walks upward from its snapshot `pane_current_path` to find a `.git` directory or file (including linked Git worktrees). It queries `git symbolic-ref --short HEAD` once per distinct discovered repository root path on each reload; a detached HEAD also uses `git rev-parse --short HEAD` and displays `detached@<commit>`. Non-repository paths, inaccessible paths, Git errors, and missing Git simply have no label. No `git status`, working-tree scan, hook, daemon, or repository mutation is involved.
+
+In the directory-grouped appearances, the label appears on the directory row (`⎇ feature/name`, or `[git:feature/name]` in ASCII); `quiet` aligns it at the right edge when it fits. In other appearances it appears beside the relevant pane/combined window row when width allows; the pane preview shows its full branch, and `Ctrl-g` quick switching includes it. A pane in a different repository in the same window keeps its own branch; sessions and mixed windows do not claim one branch. Git labels do not displace existing narrow-row content or alter tree identities, folds, filters, notifications, or agent badges. Git branch names and detached commits are not interpreted as shell commands or tmux formats.
+
+Changing this option or switching branches takes effect on the next Tree reload; press `Ctrl-r` if nothing else triggers one. A directory-only change can likewise require `Ctrl-r` (see [Directory-change refresh investigation](#directory-change-refresh-investigation)). A directory whose control bytes have been replaced in the tmux snapshot may not resolve reliably and is unsupported for Git context. This setting does not install Git or add worktree actions.
+
 Paths use the terminal's default foreground with dim styling rather than a
 fixed light text color. Lines do not wrap or horizontally scroll on selection.
 fzf handles final ANSI/Unicode cell clipping. To change density at runtime, set
@@ -521,7 +544,7 @@ A collapsed window or session rolls up its descendants' hook-reported agent stat
 
 Claude Code, Codex, OpenCode, and Cursor Agent subagents appear as read-only lines beneath their parent pane in Tree and Agents views, in every appearance (including the default folders-and-icons layout), each with their type and status. OpenCode child sessions use their configured agent and title; they begin unmarked until OpenCode reports `busy` or `retry`, then show `WORKING`, `NEEDS INPUT`, or `DONE`. A completed OpenCode child remains through the current turn and is removed when the parent advances or the child session is deleted. Claude Code can tag tool and permission events with the subagent's `agent_id`; Codex attributes child events only when they include that ID. A tagged subagent approval request is attributed in the drawer. The matching reply or tool event clears it, and stopping that subagent also clears it. A subagent waiting on input counts toward the `◆` roll-up and is a target for `n`; selecting its line focuses the parent pane. At most eight are kept per pane. Subagent lines require multi-line rows and are omitted in compact density, where the pane row shows a count such as `+2` instead. Reinstall the relevant integration and restart its agent to receive its current hooks or plugin events.
 
-In Tree view, a footer pinned below the list counts every agent pane on the server with the same marks as the Agents header (`◆` needs input, `▷` working, `✓` ready or ended, `○` unverified), whatever the tree's filters and folds. When an agent needs input and the sidebar is wide enough, it adds a reminder that `n` jumps there. The footer disappears when no agent is running. With agent mode off, the footer instead counts sessions, windows, and content panes, using the session, window, and pane icons (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`). Linked windows count once, and Canopy's own sidebar and reserve panes are not counted. While a tree filter hides some, each count shows visible/total, such as `◈ 1/3 sessions`; folded branches still count. A narrow sidebar drops the words and keeps the icons and numbers. Press `f` to hide or show the footer in that sidebar, or set `@tmux-canopy-footer 'off'` to open sidebars without it. The footer lives only in the sidebar; Canopy does not change your status line.
+Except in `quiet`, where the compact header carries an agent summary and the Tree footer shows key hints, a footer pinned below the Tree list counts every agent pane on the server with the same marks as the Agents header (`◆` needs input, `▷` working, `✓` ready or ended, `○` unverified), whatever the tree's filters and folds. When an agent needs input and the sidebar is wide enough, it adds a reminder that `n` jumps there. The footer disappears when no agent is running. With agent mode off, the footer instead counts sessions, windows, and content panes, using the session, window, and pane icons (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`). Linked windows count once, and Canopy's own sidebar and reserve panes are not counted. While a tree filter hides some, each count shows visible/total, such as `◈ 1/3 sessions`; folded branches still count. A narrow sidebar drops the words and keeps the icons and numbers. Press `f` to hide or show the footer in that sidebar, or set `@tmux-canopy-footer 'off'` to open sidebars without it. The footer lives only in the sidebar; Canopy does not change your status line.
 
 Press `n` from any view to jump straight to the next pane reporting needs-input (approval requested or interrupted), across every session and window, ignoring active Tree filters — the same "search everything" scope `Ctrl-g` already uses. Detection always runs at Agents-view strength, so an agent running under a wrapper shell is found even from the Tree view. Order follows the tree's own natural session/window/pane order; a linked window contributes one entry per session it's linked into. Repeated presses wrap back to the first match after the last, and `n` does nothing when no agent currently needs input.
 

@@ -103,6 +103,10 @@ def main():
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        tm('set-option', '-g', '@tmux-canopy-appearance', 'quiet')
+        load()
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
+        assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         tm('set-option', '-g', '@tmux-canopy-appearance', 'unexpected')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'

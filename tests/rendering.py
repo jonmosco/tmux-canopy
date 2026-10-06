@@ -212,6 +212,25 @@ def main():
             run('toggle', client, pane_a, '42', 'global', 'T', 'Tab', 'slot')
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             wait_for(lambda: any('two' in line for line in tm('capture-pane', '-p', '-t', sidebar).splitlines()), 'initial sidebar render')
+            sidebar_pid_before = tm('display-message', '-p', '-t', sidebar, '#{pane_pid}')
+            tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')
+            tm('send-keys', '-t', sidebar, 'C-r')
+            wait_for(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar), 'quiet appearance in attached client')
+            quiet_frame = tm('capture-pane', '-p', '-t', sidebar)
+            assert '1 Tree' in quiet_frame and 'Proc Buff' not in quiet_frame, quiet_frame
+            assert tm('display-message', '-p', '-t', sidebar, '#{pane_pid}') == sidebar_pid_before
+            tm('resize-pane', '-t', sidebar, '-x', '30')
+            tm('send-keys', '-t', sidebar, 'C-r')
+            wait_for(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar)
+                     and tm('display-message', '-p', '-t', sidebar, '#{pane_width}') == '30',
+                     'quiet appearance at 30 columns')
+            assert '1 Tree' in tm('capture-pane', '-p', '-t', sidebar)
+            tm('resize-pane', '-t', sidebar, '-x', '42')
+            tm('send-keys', '-t', sidebar, 'C-r')
+            tm('set-option', '-g', '@tmux_canopy_appearance', 'classic')
+            tm('send-keys', '-t', sidebar, 'C-r')
+            wait_for(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'classic appearance restored')
+            print('ok - quiet appearance renders in an attached sidebar and reloads in place')
             time.sleep(.3)
             script_env['TMUX_PANE'] = sidebar
             wait_for(lambda: tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_focus_location').endswith('|' + pane_a), 'current content location')

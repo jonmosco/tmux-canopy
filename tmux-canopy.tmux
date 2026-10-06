@@ -108,6 +108,7 @@ case "$appearance" in
   default|'') appearance=places ;;
   ascii) appearance=places; icon_theme=ascii ;;
   classic) appearance=classic ;; # Preserve explicitly configured older setups.
+  quiet) appearance=quiet ;;
   *) appearance=places ;;
 esac
 if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
