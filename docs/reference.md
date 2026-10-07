@@ -94,7 +94,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
-| `?` | Open scrollable Help; `j`/`k` or arrows scroll, Space pages, `q`/Esc closes |
+| `?` | Open scrollable Help; the wheel, `j`/`k`, or arrows scroll, Space pages, `q`/Esc closes |
 | `g` | Open the scrollable legend of tree symbols, colors, badges, and labels |
 | `Ctrl-q` | Close |
 | `q` / `Esc` | Close popup (in popup mode) |
@@ -108,13 +108,13 @@ Press `A` to turn agent mode on or off for this client. Tree stays on `1`. While
 
 Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use `prefix + h` to return to it.
 
-Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use `b` to page back and `g`/`G` for the beginning/end. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
+Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use the mouse wheel to scroll three lines at a time, `b` to page back, and `g`/`G` for the beginning/end. The same wheel controls work in the Legend. Clicks do not activate help entries; press `q` or Esc to close. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
 
 Press `g` in the sidebar to open the same responsive overlay as a legend. It explains the selection pointer, active-location dot, unread badges, tree guides, pane command/title/directory, and filter markers. An amber dot means unread terminal output, not that an agent needs input. Run `scripts/help --legend --print 80` to read the legend outside tmux.
 
 ### Mouse
 
-With tmux's `mouse` option on, a click selects a row (on either line of a two-line pane row) and a double-click focuses its target. Clicking a row from another pane focuses the sidebar and keeps the clicked row selected; entering the sidebar from the keyboard selects the active pane's row instead. The wheel scrolls the tree without moving the selection, which follows only when it reaches the edge of the view; when the whole tree fits, the wheel moves the selection instead. Dragging the sidebar's border resizes it. Set `set -g mouse on` in your tmux configuration so every session has the mouse; `set mouse on` typed in one session applies to that session only.
+With tmux's `mouse` option on, a click selects a row (on either line of a two-line pane row) and a double-click focuses its target. Clicking a row from another pane focuses the sidebar and keeps the clicked row selected; entering the sidebar from the keyboard selects the active pane's row instead. The wheel scrolls the tree without moving the selection, which follows only when it reaches the edge of the view; when the whole tree fits, the wheel moves the selection instead. Dragging the sidebar's border resizes it. In Help and Legend overlays, the wheel scrolls their text rather than the tree; clicks do not activate commands. Set `set -g mouse on` in your tmux configuration so every session has the mouse; `set mouse on` typed in one session applies to that session only.
 
 ### Tree filters
 

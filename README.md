@@ -301,9 +301,9 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `f` | Show / hide the footer |
 | `[` / `]` | Previous / next width preset |
 | `Ctrl-r` | Refresh |
-| `?` | Scrollable help popup |
-| `g` | Scrollable symbol and color legend |
-| Mouse | Click selects, double-click focuses, the wheel scrolls (needs `set -g mouse on`) |
+| `?` | Scrollable help popup (wheel or `j`/`k` to scroll) |
+| `g` | Scrollable symbol and color legend (wheel also works) |
+| Mouse | In the tree, click selects, double-click focuses, and the wheel scrolls; in Help/Legend, the wheel scrolls (needs `set -g mouse on`) |
 | `Ctrl-q` | Close the sidebar |
 | `q` / `Esc` | Close the popup (in popup mode) |
 

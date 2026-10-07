@@ -4,6 +4,7 @@
 
 ### Changed
 
+- The mouse wheel now scrolls the Help and Legend popups three lines at a time. Clicks do not run commands, and mouse reporting is restored when the popup closes.
 - The README demo is now a shorter real-tmux agent workflow with a smaller sidebar, balanced content panes, and smaller text, plus a walkthrough of browsing, search, previews, Agents view, quiet appearance, and popup mode. Both recordings are reproducible from `docs/demo/record.py` using fictional fixtures.
 
 - Clicking a sidebar row while another pane has focus keeps the clicked row selected, as file-tree sidebars do. Previously the sidebar usually jumped back to the active pane's row. Entering the sidebar from the keyboard still selects the active pane's row.
