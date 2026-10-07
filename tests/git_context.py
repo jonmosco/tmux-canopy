@@ -52,6 +52,9 @@ def main():
         wrapper.chmod(0o755)
         env['CANOPY_GIT_LOG'] = str(log)
         env['PATH'] = str(fake) + ':' + env['PATH']
+        # The sidebar's fzf load hook writes its ready marker under TMPDIR.
+        # A painted row can precede that hook (especially on slower runners).
+        env['TMPDIR'] = str(temp)
         state = temp / 'state'
         state.touch()
 
@@ -178,11 +181,32 @@ def main():
             while 'now/updated' not in tm('capture-pane', '-p', '-t', sidebar):
                 assert time.monotonic() < deadline, tm('capture-pane', '-p', '-t', sidebar)
                 time.sleep(.05)
+            # A painted frame can precede fzf's load binding or the focus
+            # worker's first Ctrl-o reload. Wait for both before exercising the
+            # *next* Ctrl-r; otherwise that startup reload may paint over it.
+            focus = tm('display-message', '-p', '-t', a,
+                       '#{session_id}|#{window_id}|#{pane_id}')
+            while True:
+                pending, _, location = tm('display-message', '-p', '-t', sidebar,
+                                          '#{@tmux_canopy_focus_pending}|#{@tmux_canopy_focus_location}').partition('|')
+                if not pending and location == focus and list(temp.glob('tmux-canopy.*.ready')):
+                    break
+                assert time.monotonic() < deadline, 'sidebar did not finish opening'
+                time.sleep(.05)
             tm('set-option', '-g', '@tmux-canopy-git-context', 'off')
+            assert 'now/updated' not in run('tree-source'), 'the source ignored git-context off'
+            ready = next(temp.glob('tmux-canopy.*.ready'))
+            ready_before = ready.stat().st_mtime_ns
             tm('send-keys', '-t', sidebar, 'C-r')
             deadline = time.monotonic() + 10
             while 'now/updated' in tm('capture-pane', '-p', '-t', sidebar):
-                assert time.monotonic() < deadline, 'Git label did not disappear after reload'
+                assert time.monotonic() < deadline, (
+                    'Git label did not disappear after reload; option='
+                    + tm('show-option', '-gqv', '@tmux-canopy-git-context')
+                    + ', source_has_label=' + str('now/updated' in run('tree-source'))
+                    + ', fzf_loaded_again=' + str(ready.stat().st_mtime_ns != ready_before)
+                    + ', focus=' + tm('display-message', '-p', '-t', sidebar,
+                                     '#{@tmux_canopy_focus_pending}|#{@tmux_canopy_focus_location}'))
                 time.sleep(.05)
             tm('set-option', '-g', '@tmux-canopy-git-context', 'branch')
             tm('send-keys', '-t', sidebar, 'C-r')
