@@ -5,6 +5,6 @@ __pycache__/
 .env
 .DS_Store
 node_modules/
-/docs/assets/canopy-demo.cast
+/docs/assets/*.cast
 /docs/assets/canopy-demo-captures.json
 .superpowers/
