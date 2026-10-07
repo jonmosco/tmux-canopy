@@ -98,6 +98,7 @@ help_records() {
   section 'Sidebar'
   key '?' 'Open this help'
   key 'g' 'Open the symbol and color legend'
+  note 'In Help and Legend, the mouse wheel scrolls three lines. Clicks do not run commands.'
   key 'Ctrl-q' 'Close the sidebar'
   key 'q / Esc' 'Close the popup (in popup mode)'
   key "prefix + $toggle_key" 'Toggle the sidebar or popup from any pane'
@@ -294,14 +295,14 @@ if ((color == 0)); then bold=''; reset=''; footer_style=''; fi
 saved_tty="$(stty -g </dev/tty)" || exit 1
 restore_terminal() {
   stty "$saved_tty" </dev/tty 2>/dev/null || true
-  printf '\033[0m\033[?25h\033[?1049l'
+  printf '\033[?1006l\033[?1000l\033[0m\033[?25h\033[?1049l'
 }
 trap restore_terminal EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM HUP
 trap 'dirty=1' WINCH
 stty -echo -icanon min 1 time 0 status undef discard undef </dev/tty 2>/dev/null || stty -echo -icanon min 1 time 0 </dev/tty
-printf '\033[?1049h\033[?25l'
+printf '\033[?1049h\033[?25l\033[?1000h\033[?1006h'
 offset=0; dirty=1; lines=()
 while :; do
   if ((dirty)); then
@@ -318,8 +319,9 @@ while :; do
   ((offset >= 0)) || offset=0
   title='SIDEBAR HELP'
   if ((legend_mode)); then title='SIDEBAR LEGEND'; fi
-  controls='j/k scroll  Space page  q/Esc close'
-  ((width >= ${#controls})) || controls='j/k scroll  q close'
+  controls='j/k or wheel scroll  Space page  q/Esc close'
+  ((width >= ${#controls})) || controls='j/k or wheel scroll  q close'
+  ((width >= ${#controls})) || controls='j/k  q close'
   printf '\033[H%s%s%s\033[K\r\n%s\033[K\r\n\033[K\r\n' "$bold" "${title:0:width}" "$reset" "${controls:0:width}"
   for ((i=0; i<page; i++)); do
     printf '%s\033[K\r\n' "${lines[offset+i]:-}"
@@ -335,9 +337,34 @@ while :; do
       [[ "$part" =~ [a-zA-Z~] ]] && break
     done
     [[ -n "$sequence" ]] || break
+    # The older X10 mouse encoding has three bytes after CSI M; consume them
+    # together so a coordinate cannot masquerade as a pager shortcut.
+    if [[ "$sequence" == '[M' ]]; then
+      for ((byte=0; byte<3; byte++)); do
+        IFS= read -r -s -n 1 -t 0.03 part </dev/tty || break
+        sequence+="$part"
+      done
+    fi
     pressed="$pressed$sequence"
   fi
   case "$pressed" in
+    $'\033[<'*M)
+      button=${pressed#$'\033[<'}; button=${button%%;*}
+      if [[ "$button" =~ ^[0-9]{1,3}$ ]] && ((button >= 64 && button < 128)); then
+        case $((button & 3)) in
+          0) ((offset-=3)) ;;
+          1) ((offset+=3)) ;;
+        esac
+      fi
+      ;;
+    $'\033[M'*)
+      if ((${#pressed} == 6)); then
+        case "${pressed:3:1}" in
+          '`') ((offset-=3)) ;;
+          a) ((offset+=3)) ;;
+        esac
+      fi
+      ;;
     q|Q) break ;;
     j|$'\033[B') ((offset+=1)) ;;
     k|$'\033[A') ((offset-=1)) ;;

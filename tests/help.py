@@ -6,6 +6,7 @@ from pathlib import Path
 import pty
 import re
 import select
+import shutil
 import signal
 import struct
 import subprocess
@@ -82,7 +83,16 @@ def main():
             try:
                 wait_for(b'q close   1-14')
                 assert b'SIDEBAR HELP' in output and b'[j / Down]' in output
+                assert b'\x1b[?1000h\x1b[?1006h' in output, 'mouse reporting not enabled'
                 assert (b'\x1b[1;36m' in output) == (theme == 'ansi')
+                send(b'\x1b[<65;12;8M')  # SGR wheel down
+                wait_for(b'q close   4-17')
+                send(b'\x1b[<64;12;8M')  # SGR wheel up
+                wait_for(b'q close   1-14')
+                send(b'\x1b[Ma99')  # X10 wheel down, including its three data bytes
+                wait_for(b'q close   4-17')
+                send(b'\x1b[M`bG')  # X10 wheel up; coordinates must not become keys
+                wait_for(b'q close   1-14')
                 send(b'\x1b[B')
                 wait_for(b'q close   2-15')
                 send(b' ')
@@ -105,6 +115,7 @@ def main():
                 wait_for(b'[Enter]')
                 send(b'\x1b' if theme == 'mono' else b'q')
                 wait_for(b'\x1b[?1049l')
+                assert b'\x1b[?1006l\x1b[?1000l' in output, 'mouse reporting not restored'
                 _, status = os.waitpid(pid, 0)
                 assert os.waitstatus_to_exitcode(status) == 0
                 pid = None
@@ -139,7 +150,70 @@ def main():
                 os.kill(pid, signal.SIGTERM)
                 os.waitpid(pid, 0)
             os.close(master)
-    print('ok - ANSI/mono pager, arrows, paging, first/last, resize reflow, q/Esc and terminal restoration')
+    print('ok - ANSI/mono pager, keyboard and mouse wheel, resize reflow, q/Esc and terminal restoration')
+
+    # tmux must forward wheel events to the real attached popup, not only to
+    # a pager invoked directly on a pty. This server never touches user panes.
+    tmux = shutil.which('tmux')
+    socket = f'canopy-help-mouse-{os.getpid()}'
+    attached_env = os.environ.copy()
+    attached_env.pop('TMUX', None)
+    attached_env.pop('TMUX_PANE', None)
+
+    def tm(*args):
+        p = subprocess.run([tmux, '-L', socket, *args], env=attached_env,
+                           text=True, capture_output=True, timeout=15)
+        assert p.returncode == 0, (args, p.stderr)
+        return p.stdout.strip()
+
+    client_process = popup_process = master = None
+    try:
+        pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'help', '-x', '100', '-y', '35',
+                  '-P', '-F', '#{pane_id}', 'sleep 600')
+        tm('set-option', '-g', 'mouse', 'on')
+        tm('set-option', '-g', 'status', 'off')
+        master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 35, 100, 0, 0))
+        client = os.ttyname(slave)
+        client_process = subprocess.Popen([tmux, '-L', socket, 'attach-session', '-t', 'help'],
+                                          env=attached_env | {'TERM': 'xterm-256color'},
+                                          stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
+        os.close(slave)
+        deadline = time.monotonic() + 8
+        while client not in tm('list-clients', '-F', '#{client_tty}').splitlines():
+            assert time.monotonic() < deadline, 'private tmux client did not attach'
+            time.sleep(.05)
+        popup_process = subprocess.Popen([tmux, '-L', socket, 'display-popup', '-c', client,
+                                          '-t', pane, '-w', '60', '-h', '20', '-E',
+                                          str(HELP), '--render'], env=attached_env,
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        def wait_for_screen(text):
+            seen = bytearray()
+            deadline = time.monotonic() + 6
+            while text not in seen and time.monotonic() < deadline:
+                if select.select([master], [], [], .05)[0]:
+                    seen.extend(os.read(master, 65536))
+            assert text in seen, (text, bytes(seen[-150:]))
+
+        wait_for_screen(b'q close   1-14')
+        os.write(master, b'\x1b[<65;30;15M')
+        wait_for_screen(b'q close   4-17')
+        os.write(master, b'q')
+        _, stderr = popup_process.communicate(timeout=6)
+        assert popup_process.returncode == 0, stderr
+        print('ok - attached tmux Help popup accepts the mouse wheel without changing panes')
+    finally:
+        subprocess.run([tmux, '-L', socket, 'kill-server'], env=attached_env,
+                       capture_output=True, timeout=10)
+        if popup_process and popup_process.poll() is None:
+            popup_process.terminate()
+            popup_process.wait(timeout=3)
+        if client_process:
+            client_process.terminate()
+            client_process.wait(timeout=3)
+        if master is not None:
+            os.close(master)
 
 
 if __name__ == '__main__':
