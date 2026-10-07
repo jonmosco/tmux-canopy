@@ -10,9 +10,9 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Canopy workflow: open the workspace tree, find and preview login tests, switch projects, follow subagents, jump to an agent waiting for approval, then open the floating popup](docs/assets/canopy-demo.gif?v=b00910a)](docs/assets/canopy-demo.gif?v=b00910a)
+[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=3)](docs/assets/canopy-demo.gif?v=3)
 
-**Find work. Follow agents. Unblock the next task.** Dock it on a large display or open it as a floating popup when space is tight. Recorded in a real tmux client with fictional projects and scripted agent events. [View a still image](docs/assets/canopy-demo.png).
+**See every project. Spot the blocker. Jump to it with `n`.** This 19-second preview was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=3) for browsing, search, previews, Agents view, quiet appearance, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=3).
 
 ## Quick start
 

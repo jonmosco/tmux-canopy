@@ -1,30 +1,17 @@
 #!/usr/bin/env python3
-"""Record the README demo: a scripted Canopy session captured with asciinema.
+"""Record the README preview and longer walkthrough from a real tmux client.
 
-Builds a fictional workspace (acme-api, acme-web, notes) in a temporary home
-on a private tmux server, records one client headlessly with asciinema while a
-timeline drives keys (tmux send-keys -K) and real agent hook events, then
-converts the recording to a GIF with agg. Captions use the demo server's own
-status line. The agent panes are renamed sleep binaries printing a fictional
-transcript. Nothing from the user's own tmux server, files, or projects is shown.
+Builds fictional workspaces on a private tmux server, attaches a headless
+asciinema client, drives keys and real (scripted) agent hook events, then
+renders GIFs with agg. No user's sessions, config, or projects are captured.
 
-    python3 docs/demo/record.py                  # docs/assets/canopy-demo.{cast,gif,png}
-    python3 docs/demo/record.py --output /tmp/x  # review elsewhere first
-
-Options: --theme (an agg theme, default dracula), --font-family, and --poster
-(the GIF time in seconds exported as canopy-demo.png).
+    python3 docs/demo/record.py --output /tmp/canopy-demo-review
+    python3 docs/demo/record.py --demo preview  # only the short README GIF
 
 Requires tmux, fzf, Python 3, asciinema 3, agg, and on macOS coreutils
-(gsleep). ffmpeg is optional and only exports the still image. The GIF uses
-Hack Nerd Font Mono when installed. Adjust the timeline's pauses to change pacing.
-
-Before committing, watch the GIF and check the recording holds nothing private:
-
-    grep -c -e "$USER" -e "$(hostname -s)" -e /Users/ -e /home/ docs/assets/canopy-demo.cast  # expect 0
-
-The .cast is not committed (.gitignore); it is about three times the GIF's size
-and this script recreates it. Use it locally with `asciinema play`, or to
-re-render with other agg settings without recording again.
+(gsleep). ffmpeg exports the preview still. Review the GIFs at README size and
+check the .cast files for private data before copying assets into docs/assets.
+The .cast files are ignored by git and can be played with `asciinema play`.
 """
 import argparse
 import json
@@ -46,8 +33,15 @@ def main():
     parser.add_argument('--output', default=str(ROOT / 'docs' / 'assets'), help='directory for the .cast and .gif')
     parser.add_argument('--font-family', default='Hack Nerd Font Mono,JetBrains Mono,Menlo')
     parser.add_argument('--theme', default='dracula')
-    parser.add_argument('--poster', type=float, default=26, help='GIF time in seconds for canopy-demo.png')
+    parser.add_argument('--poster', type=float, default=8, help='preview GIF time in seconds for the still')
+    parser.add_argument('--demo', choices=('both', 'preview', 'walkthrough'), default='both')
     args = parser.parse_args()
+    if args.demo == 'both':
+        for demo in ('preview', 'walkthrough'):
+            sp.run([sys.executable, __file__, '--demo', demo, '--output', args.output,
+                    '--font-family', args.font_family, '--theme', args.theme,
+                    '--poster', str(args.poster)], check=True)
+        return
     for tool in ('tmux', 'fzf', 'asciinema', 'agg'):
         if not shutil.which(tool):
             sys.exit(f'{tool} is required')
@@ -56,7 +50,8 @@ def main():
         sys.exit('gsleep is required on macOS (brew install coreutils)')
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    cast, gif = output / 'canopy-demo.cast', output / 'canopy-demo.gif'
+    name = 'canopy-demo' if args.demo == 'preview' else 'canopy-walkthrough'
+    cast, gif = output / f'{name}.cast', output / f'{name}.gif'
 
     with tempfile.TemporaryDirectory(prefix='canopy-demo-') as directory:
         home = Path(directory) / 'home'
@@ -135,18 +130,19 @@ set -g status-format[0] '#[align=centre]#{{@demo_caption}}'
 set -g pane-border-style 'fg=#44475a'
 set -g pane-active-border-style 'fg=#6272a4'
 set -g @tmux-canopy-icon-theme nerdfont
-set -g @tmux-canopy-agents off
+set -g @tmux-canopy-agents on
+set -g @tmux-canopy-width 38
 set -g @tmux-canopy-animate on
 set -g @demo_caption ''
 ''')
         try:
             api = tm('-f', str(config), 'new-session', '-d', '-s', 'acme-api', '-x', str(COLS), '-y', str(ROWS),
                      '-n', 'server', '-c', str(home / 'acme-api'), '-P', '-F', '#{pane_id}', api_agent)
-            tm('split-window', '-d', '-v', '-l', '40%', '-t', api, '-c', str(home / 'acme-api'), tests)
+            tm('split-window', '-d', '-v', '-l', '50%', '-t', api, '-c', str(home / 'acme-api'), tests)
             tm('new-window', '-d', '-t', 'acme-api:', '-n', 'release', '-c', str(home / 'acme-api'), codex)
             web = tm('new-session', '-d', '-s', 'acme-web', '-n', 'ui', '-c', str(home / 'acme-web'),
                      '-P', '-F', '#{pane_id}', web_agent)
-            tm('split-window', '-d', '-h', '-l', '30%', '-t', web, '-c', str(home / 'acme-web'), git)
+            tm('split-window', '-d', '-h', '-l', '50%', '-t', web, '-c', str(home / 'acme-web'), git)
             tm('new-session', '-d', '-s', 'notes', '-n', 'today', '-c', str(home / 'notes'), notes)
             tm('select-pane', '-t', api)
             base = env | {'TMUX': tm('display-message', '-p', '-t', api, '#{socket_path},#{pid},0')}
@@ -176,6 +172,13 @@ set -g @demo_caption ''
             if not client:
                 raise RuntimeError('the recorded client did not attach')
 
+            def permission():
+                tty = tm('display-message', '-p', '-t', web, '#{pane_tty}')
+                with open(tty, 'wb', buffering=0) as pane:
+                    pane.write(b'\r\n\r\n Run npm run e2e? [y/N]\r\n')
+                hook(web, 'web', {'hook_event_name': 'PermissionRequest', 'tool_name': 'Bash',
+                                  'tool_input': {'command': 'npm run e2e'}})
+
             def caption(text):
                 tm('set-option', '-g', '@demo_caption', text)
                 tm('refresh-client', '-S', '-t', client)
@@ -192,54 +195,96 @@ set -g @demo_caption ''
 
             key = '#[fg=#bd93f9,bold]'
             plain = '#[fg=#f8f8f2,nobold]'
-            # The timeline. Pauses are long enough to read each step.
-            time.sleep(1.5)
-            caption(f'{plain}A workspace tree and AI-agent monitor for tmux · no daemon')
-            time.sleep(2.5)
-            caption(f'{key}prefix T{plain}  opens the sidebar')
-            keys('C-b', 'T', pause=.1)
-            time.sleep(2.5)
-            caption(f'{key}j k{plain}  move through every session, window, and pane')
-            keys('j', 'j', 'j', 'j', 'j', 'k', pause=.45)
-            time.sleep(1)
-            caption(f'{key}h l{plain}  fold and unfold')
-            keys('h', pause=1.2)
-            keys('l', pause=1.2)
-            caption(f'{key}/{plain}  searches everything')
-            keys('/', pause=.5)
-            typed('notes')
-            time.sleep(1.5)
-            keys('Escape', pause=1)
-            caption(f'{key}A{plain}  turns on agent mode · the footer counts every agent')
-            keys('A', pause=.2)
-            time.sleep(3)
-            caption(f'{plain}Subagents appear under the agent that started them')
-            hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's1', 'agent_type': 'Explore'})
-            time.sleep(.8)
-            hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's2', 'agent_type': 'Plan'})
-            time.sleep(3)
-            hook(web, 'web', {'hook_event_name': 'PermissionRequest', 'tool_name': 'Bash',
-                              'tool_input': {'command': 'npm run e2e'}})
-            time.sleep(.8)
-            caption(f'#[fg=#f1fa8c,bold]◆{plain} an agent in another session needs your approval')
-            time.sleep(3)
-            caption(f'{key}n{plain}  jumps straight to it')
-            keys('n', pause=.2)
-            time.sleep(3)
-            caption(f'{plain}One sidebar that follows you · {key}prefix T{plain} to close · no daemon')
-            time.sleep(3.5)
+            if args.demo == 'preview':
+                caption(f'{plain}Your whole tmux workspace, in one tree')
+                keys('C-b', 'T', pause=.15)
+                time.sleep(2.8)
+                caption(f'{plain}Agents and subagents stay visible across projects')
+                hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's1', 'agent_type': 'Explore'})
+                time.sleep(.6)
+                hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's2', 'agent_type': 'Plan'})
+                time.sleep(2.8)
+                permission()
+                caption(f'{plain}An agent in another session needs approval')
+                time.sleep(3)
+                caption(f'{key}n{plain}  jump straight to the waiting agent')
+                keys('n', pause=.2)
+                time.sleep(3.5)
+                caption(f'{plain}One sidebar follows you · no daemon')
+                time.sleep(2.5)
+            else:
+                caption(f'{plain}Navigate sessions, windows, and panes')
+                keys('C-b', 'T', pause=.15)
+                time.sleep(2)
+                caption(f'{key}j k{plain}  browse · {key}h l{plain}  fold branches')
+                keys('j', 'j', 'j', 'j', pause=.35)
+                keys('h', pause=.6)
+                keys('l', pause=.6)
+                time.sleep(1.5)
+                caption(f'{key}/{plain}  find a pane by name')
+                keys('/', pause=.3)
+                typed('notes')
+                time.sleep(2)
+                keys('Escape', pause=.3)
+                keys('C-o', pause=.2)
+                caption(f'{key}p{plain}  preview without leaving the tree')
+                keys('p', pause=.3)
+                time.sleep(2.5)
+                keys('p', pause=.3)
+                caption(f'{plain}Subagents appear beneath their parent')
+                hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's1', 'agent_type': 'Explore'})
+                time.sleep(.6)
+                hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's2', 'agent_type': 'Plan'})
+                time.sleep(2.5)
+                caption(f'{key}4{plain}  only show work with agents')
+                keys('4', pause=.3)
+                time.sleep(2)
+                permission()
+                caption(f'{plain}An agent in another project needs approval')
+                time.sleep(2.5)
+                caption(f'{key}n{plain}  jump to the blocker')
+                keys('n', pause=.2)
+                time.sleep(2)
+                keys('C-b', 'T', pause=.15)
+                tm('set-option', '-g', '@tmux-canopy-appearance', 'quiet')
+                tm('run-shell', str(ROOT / 'tmux-canopy.tmux'))
+                caption(f'{plain}Quiet mode keeps the tree, softens the chrome')
+                keys('C-b', 'T', pause=.15)
+                time.sleep(3)
+                caption(f'{plain}Need more space? Open Canopy as a popup')
+                keys('C-b', 'T', pause=.15)
+                tm('set-option', '-g', '@tmux-canopy-mode', 'popup')
+                time.sleep(.7)
+                keys('C-b', 'T', pause=.15)
+                time.sleep(3)
+                caption(f'{key}q / Esc{plain}  close the popup without switching panes')
+                time.sleep(2)
             tm('detach-client', '-t', client)
             recorder.wait(timeout=20)
+            # tmux clears the screen on detach. Keep the last real frame so the
+            # GIF loops from the product, not a black "detached" terminal.
+            with cast.open() as recording:
+                header = recording.readline()
+                events = recording.readlines()
+            if len(events) < 4 or 'detached (from session' not in events[-2]:
+                raise RuntimeError('unexpected asciinema ending; inspect the cast before rendering')
+            teardown = next((i for i in range(max(0, len(events) - 10), len(events))
+                             if f'\\u001b[1;{ROWS}r' in events[i] and '\\u001b[?1l' in events[i]), None)
+            if teardown is None:
+                raise RuntimeError('tmux screen reset not found; inspect the cast before rendering')
+            with cast.open('w') as recording:
+                recording.write(header)
+                recording.writelines(events[:teardown])
         finally:
             sp.run(['tmux', '-L', SOCKET, 'kill-server'], env=env, capture_output=True)
 
-    sp.run(['agg', '--quiet', '--font-family', args.font_family, '--font-size', '15', '--line-height', '1.3',
+    sp.run(['agg', '--quiet', '--font-family', args.font_family, '--font-size', '14', '--line-height', '1.3',
             '--theme', args.theme, '--idle-time-limit', '2', '--fps-cap', '30', '--last-frame-duration', '3',
             str(cast), str(gif)], check=True)
     print(f'wrote {cast}\nwrote {gif}')
     # A still for the README link and for viewers that do not animate GIFs:
     # the moment the waiting agent appears, sidebar open with subagents.
-    if shutil.which('ffmpeg'):
+    if args.demo == 'preview' and shutil.which('ffmpeg'):
         png = output / 'canopy-demo.png'
         sp.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-ss', str(args.poster), '-i', str(gif),
                 '-frames:v', '1', str(png)], check=True)
