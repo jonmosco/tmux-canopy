@@ -231,5 +231,85 @@ try:
         assert len(option('subagents').split(';')) == 1
         print('ok - subagent fields are sanitized and malformed ids are ignored')
 
+        # Antigravity (agy) subagents spawned via invoke_subagent PostToolUse
+        install_agent_fixture(temp / 'agy')
+        agy_pane = tm('new-window', '-d', '-t', 'agents:', '-P', '-F', '#{pane_id}',
+                      str(temp / 'agy') + ' 600')
+        agy_base = base | {'TMUX_PANE': agy_pane}
+
+        def agy_event(payload, event_name):
+            result = sp.run([str(ROOT / 'scripts/agent-hook'), 'agy', event_name],
+                            input=json.dumps(payload), env=agy_base, text=True,
+                            capture_output=True, timeout=10)
+            expected = '{"decision": ""}\n' if event_name == 'Stop' else '{}\n'
+            assert result.returncode == 0 and result.stdout == expected, (result.stdout, result.stderr)
+
+        agy_session = {'conversationId': 'agy-main'}
+        agy_event(agy_session | {'invocationNum': 0, 'initialNumSteps': 0}, 'PreInvocation')
+        agy_event(agy_session | {
+            'stepIdx': 1,
+            'toolCall': {
+                'name': 'invoke_subagent',
+                'args': {
+                    'Subagents': [
+                        {'Role': 'Codebase Researcher', 'TypeName': 'research'},
+                        {'Role': 'Database Debugger', 'TypeName': 'debugger'}
+                    ]
+                }
+            }
+        }, 'PostToolUse')
+        for view in ((), ('--agents',)):
+            lines = rows(*view)['P:' + agy_pane].split('\n')
+            assert any('Codebase Researcher' in line and 'WORKING' in line for line in lines[1:]), (view, lines)
+            assert any('Database Debugger' in line and 'WORKING' in line for line in lines[1:]), (view, lines)
+        print('ok - agy invoke_subagent renders subagent child rows in Tree and Agents views')
+
+        # manage_subagents kill removes the targeted subagent row
+        agy_event(agy_session | {
+            'stepIdx': 2,
+            'toolCall': {
+                'name': 'manage_subagents',
+                'args': {'Action': 'kill', 'ConversationIds': ['sub-1-1']}
+            }
+        }, 'PostToolUse')
+        for view in ((), ('--agents',)):
+            lines = rows(*view)['P:' + agy_pane].split('\n')
+            assert not any('Codebase Researcher' in line for line in lines[1:]), (view, lines)
+            assert any('Database Debugger' in line and 'WORKING' in line for line in lines[1:]), (view, lines)
+
+        # manage_subagents kill_all removes all child rows
+        agy_event(agy_session | {
+            'stepIdx': 3,
+            'toolCall': {
+                'name': 'manage_subagents',
+                'args': {'Action': 'kill_all'}
+            }
+        }, 'PostToolUse')
+        for view in ((), ('--agents',)):
+            lines = rows(*view)['P:' + agy_pane].split('\n')
+            assert not any('Codebase Researcher' in line or 'Database Debugger' in line for line in lines[1:]), (view, lines)
+        print('ok - agy manage_subagents removes killed child rows')
+
+        # Re-invoke, then Stop with fullyIdle: True marks subagents done and hides child rows
+        agy_event(agy_session | {
+            'stepIdx': 4,
+            'toolCall': {
+                'name': 'invoke_subagent',
+                'args': {'Subagents': [{'Role': 'Codebase Researcher', 'TypeName': 'research'}]}
+            }
+        }, 'PostToolUse')
+        agy_event(agy_session | {'executionNum': 1, 'terminationReason': 'model_stop',
+                                'error': '', 'fullyIdle': True}, 'Stop')
+        for view in ((), ('--agents',)):
+            lines = rows(*view)['P:' + agy_pane].split('\n')
+            assert not any('Codebase Researcher' in line for line in lines[1:]), (view, lines)
+        agy_subagents = tm('display-message', '-p', '-t', agy_pane, '#{@tmux_canopy_agent_subagents}')
+        assert 'Codebase Researcher,done' in agy_subagents
+
+        # Next prompt clears done subagents from options
+        agy_event(agy_session | {'invocationNum': 1, 'initialNumSteps': 0}, 'PreInvocation')
+        assert tm('display-message', '-p', '-t', agy_pane, '#{@tmux_canopy_agent_subagents}') == ''
+        print('ok - agy fullyIdle Stop marks subagents done and next prompt prunes them')
+
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

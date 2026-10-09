@@ -143,8 +143,16 @@ try:
         event('claude', panes['grok'], {'hook_event_name': 'Stop', 'session_id': 'x1'})
         assert 'Status: Working' in run('agent-preview', panes['grok'], ['P:' + panes['grok']])
 
-        agy = {'conversationId': 'a1', 'workspacePaths': ['/work'],
-               'transcriptPath': '/work/transcript.jsonl', 'modelName': 'gemini'}
+        agy_work = temp / 'agy-work'
+        agy_subagents_dir = agy_work / '.system_generated' / 'subagents'
+        agy_subagents_dir.mkdir(parents=True)
+        (agy_subagents_dir / 'sub-uuid-1.json').write_text(json.dumps({
+            'conversationId': 'sub-uuid-1',
+            'spawnStepIndex': 2,
+            'state': 'SUBAGENT_STATE_ALIVE'
+        }))
+        agy = {'conversationId': 'a1', 'workspacePaths': [str(agy_work)],
+               'transcriptPath': str(agy_work / '.system_generated' / 'logs' / 'transcript.jsonl'), 'modelName': 'gemini'}
         event('agy', panes['agy'], agy | {'hook_event_name': 'PermissionRequest'}, 'PermissionRequest')
         assert 'Source: visible terminal text' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
         event('agy', panes['agy'], agy | {'invocationNum': 0, 'initialNumSteps': 0}, 'PreInvocation')
@@ -152,16 +160,62 @@ try:
         event('agy', panes['agy'], agy | {'toolCall': {'name': 'run_command', 'args': {'CommandLine': 'date'}},
                                           'stepIdx': 1, 'error': ''}, 'PostToolUse')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        event('agy', panes['agy'], agy | {
+            'stepIdx': 2,
+            'toolCall': {
+                'name': 'invoke_subagent',
+                'args': {
+                    'Subagents': [
+                        {'Role': 'Codebase Researcher', 'TypeName': 'research'},
+                        {'Role': 'Database Debugger', 'TypeName': 'debugger'}
+                    ]
+                }
+            }
+        }, 'PostToolUse')
+        subagents = tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
+        assert 'sub-uuid-1,Codebase Researcher,working' in subagents, subagents
+        assert 'Database Debugger,working' in subagents, subagents
         event('agy', panes['agy'], agy | {'invocationNum': 0, 'initialNumSteps': 1}, 'PostInvocation')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
         event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
                                           'error': '', 'fullyIdle': False}, 'Stop')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        subagents = tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
+        assert 'sub-uuid-1,Codebase Researcher,working' in subagents
+        event('agy', panes['agy'], agy | {
+            'stepIdx': 3,
+            'toolCall': {
+                'name': 'manage_subagents',
+                'args': {'Action': 'kill', 'ConversationIds': ['sub-uuid-1']}
+            }
+        }, 'PostToolUse')
+        subagents = tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
+        assert 'sub-uuid-1' not in subagents
+        assert 'Database Debugger,working' in subagents
         event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
                                           'error': '', 'fullyIdle': True}, 'Stop')
         assert 'Status: Turn ended' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        subagents = tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
+        assert 'Database Debugger,done' in subagents
         event('agy', panes['agy'], agy | {'invocationNum': 1, 'initialNumSteps': 4}, 'PreInvocation')
         assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}') == ''
+        event('agy', panes['agy'], agy | {
+            'stepIdx': 5,
+            'toolCall': {
+                'name': 'invoke_subagent',
+                'args': {'Subagents': [{'Role': 'Helper', 'TypeName': 'helper'}]}
+            }
+        }, 'PostToolUse')
+        assert 'Helper,working' in tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
+        event('agy', panes['agy'], agy | {
+            'stepIdx': 6,
+            'toolCall': {
+                'name': 'manage_subagents',
+                'args': {'Action': 'kill_all'}
+            }
+        }, 'PostToolUse')
+        assert tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}') == ''
         event('agy', panes['agy'], agy | {'executionNum': 2, 'terminationReason': 'error',
                                           'error': 'request failed', 'fullyIdle': True}, 'Stop')
         assert 'Status: Interrupted' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])

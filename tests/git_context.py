@@ -30,7 +30,7 @@ def main():
                GIT_AUTHOR_NAME='Test', GIT_AUTHOR_EMAIL='test@example.com',
                GIT_COMMITTER_NAME='Test', GIT_COMMITTER_EMAIL='test@example.com')
     with tempfile.TemporaryDirectory(prefix='canopy-git-') as folder:
-        temp = Path(folder)
+        temp = Path(folder).resolve()
         first = temp / 'app space'
         other = temp / 'second'
         plain = temp / 'ordinary'

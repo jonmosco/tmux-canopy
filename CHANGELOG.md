@@ -43,6 +43,7 @@
 - TPM installation path and a `canopy` command for tmux diagnostics and optional agent integration setup, status, and removal.
 - Doctor output lists Canopy-owned tmux bindings, options, hooks, and optional agent integration states.
 - Claude Code subagents appear as read-only child lines of their pane with type, status (working, needs input, done), and age; a waiting subagent counts toward attention roll-ups and `n`, and its approval request is attributed to it. Requires reinstalling the Claude integration for the new `SubagentStart`/`SubagentStop` hooks.
+- Antigravity (`agy`) subagents spawned via `invoke_subagent` appear as read-only child lines of their pane with their role and status, resolving conversation IDs from on-disk session metadata. Terminating subagents via `manage_subagents` removes them immediately, and fully idle stops transition active subagents to completed before they are pruned on the next prompt.
 - Doctor runs a reporter self-test and lists agent processes in tmux panes with the age of their last report, explaining missing reports.
 - Detect OpenCode, Gemini CLI, Pi, and Oh My Pi in the Agents view and read-only drawer; distinguish process detection, unverified screen hints, and optional lifecycle reports.
 - Optional Claude Code, Gemini CLI, OpenCode, Pi, and Oh My Pi lifecycle adapters with example configurations, pane/process identity checks, and source-aware row labels.
