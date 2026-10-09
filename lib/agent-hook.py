@@ -9,8 +9,8 @@ import subprocess
 import sys
 import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from subagent_state import (agent_id, list_field, next_entries, parse_subagents,
-                              resolve_cursor_stop_id, with_cursor_subagent_fields)
+from subagent_state import (agent_id, format_subagents, list_field, next_entries, parse_subagents,
+                            resolve_cursor_stop_id, update_subagent, with_cursor_subagent_fields)
 import agent_reporting as core
 
 
@@ -213,7 +213,44 @@ def subagent_id(kind, event, current=None):
             return session
         if session and any(entry[0] == session for entry in parse_subagents(current['subagents'])):
             return session
+    if kind == 'agy' and current:
+        session = session_id(kind, event)
+        if session and any(entry[0] == session for entry in parse_subagents(current['subagents'])):
+            return session
     return ''
+
+
+def find_agy_spawned_ids(event):
+    """Find subagent conversationIds spawned at this step from Antigravity session metadata."""
+    step_idx = event.get('stepIdx')
+    transcript = event.get('transcriptPath')
+    artifact_dir = event.get('artifactDirectoryPath')
+    subagents_dir = None
+    if isinstance(transcript, str) and transcript:
+        p = Path(transcript).parent.parent / 'subagents'
+        if p.is_dir():
+            subagents_dir = p
+    if not subagents_dir and isinstance(artifact_dir, str) and artifact_dir:
+        p = Path(artifact_dir) / '.system_generated' / 'subagents'
+        if p.is_dir():
+            subagents_dir = p
+    found = []
+    if subagents_dir and step_idx is not None:
+        try:
+            for entry in os.scandir(subagents_dir):
+                if entry.name.endswith('.json') and entry.is_file():
+                    try:
+                        with open(entry.path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        if data.get('spawnStepIndex') == step_idx:
+                            cid = data.get('conversationId')
+                            if isinstance(cid, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', cid):
+                                found.append(cid)
+                    except (OSError, ValueError):
+                        continue
+        except OSError:
+            pass
+    return found
 
 
 def with_opencode_subagent_fields(event):
@@ -287,7 +324,7 @@ def report(kind, event, event_name=None):
     start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation', 'sessionStart') or \
         (is_contract and state == 'ready')
     agent = subagent_id(kind, event, current)
-    child_event = kind == 'opencode' and bool(agent)
+    child_event = kind in ('opencode', 'agy') and bool(agent)
     if kind == 'opencode' and name == 'session.updated' and not child_event:
         return
     # Grok can deliver a cancelled turn's report after the next prompt starts;
@@ -310,6 +347,9 @@ def report(kind, event, event_name=None):
             state = 'subagent-stop'
         elif name in ('session.idle', 'session.error') or (name == 'session.status' and state == 'turn-ended'):
             state = 'subagent-done'
+    elif kind == 'agy' and agent:
+        if name == 'Stop' or state in ('turn-ended', 'interrupted'):
+            state = 'subagent-done'
     if kind == 'cursor-agent':
         subagent_event = with_cursor_subagent_fields(event)
     elif kind == 'opencode':
@@ -324,6 +364,51 @@ def report(kind, event, event_name=None):
     values.update(source=kind + '-hook', session=stored_session, pane_pid=pid,
                   process_pid=process_pid, process_birth=process_birth,
                   subagents=next_entries(current['subagents'], agent, subagent_event, state, now))
+    if kind == 'agy' and name == 'PostToolUse':
+        call = event.get('toolCall')
+        if isinstance(call, dict) and call.get('name') == 'invoke_subagent':
+            args = call.get('args') if isinstance(call.get('args'), dict) else {}
+            specs = args.get('Subagents') if isinstance(args.get('Subagents'), list) else []
+            if specs:
+                entries = parse_subagents(values['subagents'])
+                spawned = find_agy_spawned_ids(event)
+                step = event.get('stepIdx', '0')
+                for idx, spec in enumerate(specs):
+                    if not isinstance(spec, dict):
+                        continue
+                    spec_id = spec.get('conversationId') or spec.get('subagent_id') or spec.get('agent_id')
+                    sub_id = spec_id if (isinstance(spec_id, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', spec_id)) else (spawned[idx] if idx < len(spawned) else f"sub-{step}-{idx + 1}")
+                    role = spec.get('Role') or spec.get('TypeName') or 'subagent'
+                    update_subagent(entries, sub_id, {'agent_type': role}, 'working', now)
+                values['subagents'] = format_subagents(entries)
+        elif isinstance(call, dict) and call.get('name') in ('manage_subagents', 'manage_task'):
+            args = call.get('args') if isinstance(call.get('args'), dict) else {}
+            action = args.get('Action')
+            if action == 'kill_all':
+                values['subagents'] = ''
+            elif action == 'kill':
+                targets = set()
+                cids = args.get('ConversationIds')
+                if isinstance(cids, list):
+                    targets.update(str(cid) for cid in cids if isinstance(cid, str))
+                elif isinstance(cids, str):
+                    targets.add(cids)
+                cid = args.get('ConversationId')
+                if isinstance(cid, str):
+                    targets.add(cid)
+                tid = args.get('TaskId')
+                if isinstance(tid, str):
+                    targets.add(tid)
+                if targets:
+                    entries = [entry for entry in parse_subagents(values['subagents']) if entry[0] not in targets]
+                    values['subagents'] = format_subagents(entries)
+    elif kind == 'agy' and not agent and name == 'Stop' and state in ('turn-ended', 'interrupted'):
+        if event.get('fullyIdle') is not False:
+            entries = parse_subagents(values['subagents'])
+            for item in entries:
+                if item[2] == 'working':
+                    item[2], item[4] = 'done', ''
+            values['subagents'] = format_subagents(entries)
     # Only a request's own agent (or the main thread) can clear it.
     if state == 'subagent-stop' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent:

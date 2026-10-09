@@ -111,7 +111,7 @@ Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in 
 | OpenCode | ✅ | ✅ plugin | ✅ permissions and questions | ✅ |
 | Gemini CLI | ✅ | ✅ hooks | ✅ tool permissions | – |
 | Cursor Agent (`agent`) | ✅ | ✅ hooks, partial | – no permission event | ✅ |
-| Antigravity (`agy`) | ✅ | ✅ hooks | – no permission event | – |
+| Antigravity (`agy`) | ✅ | ✅ hooks | – no permission event | ✅ |
 | Pi and Oh My Pi | ✅ | ✅ extension | ✅ extension prompts | – |
 | GitHub Copilot CLI (`copilot`) | ✅ | ✅ hooks | ✅ permission and question prompts | – |
 | Grok Build (`grok`) | ✅ | ✅ hooks | ✅ permission prompts | – |

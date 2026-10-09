@@ -208,10 +208,17 @@ def main():
                        capture_output=True, timeout=10)
         if popup_process and popup_process.poll() is None:
             popup_process.terminate()
-            popup_process.wait(timeout=3)
-        if client_process:
+            try:
+                popup_process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                popup_process.kill()
+        if client_process and client_process.poll() is None:
             client_process.terminate()
-            client_process.wait(timeout=3)
+            try:
+                client_process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                client_process.kill()
+                client_process.wait(timeout=3)
         if master is not None:
             os.close(master)
 

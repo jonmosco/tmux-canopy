@@ -90,7 +90,7 @@ def main():
                 return current['text'].split('\t')[0] if current else None
 
             def top_row():
-                return next(line for line in tm('capture-pane', '-p', '-t', sidebar).splitlines()[1:] if line.strip())
+                return next((line for line in tm('capture-pane', '-p', '-t', sidebar).splitlines()[1:] if line.strip()), '')
 
             left = int(tm('display-message', '-p', '-t', sidebar, '#{pane_left}'))
 
