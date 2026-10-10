@@ -147,8 +147,10 @@ try:
         lines = [plain(line) for line in pane_row().split('\n')]
         assert any('general-purpose !' in line for line in lines[1:]), lines
         assert any('Explore ▷' in line for line in lines[1:]), lines
-        # Each child line keeps its age at the edge.
-        assert all(re.search(r'(<1m|[0-9]+[mh])$', line) for line in lines[1:]), lines
+        # The pane's request comes first, then each subagent line with its age
+        # at the edge.
+        assert lines[1].strip(' │') == 'make', lines
+        assert all(re.search(r'(<1m|[0-9]+[mh])$', line) for line in lines[2:]), lines
         tm('set-option', '-gu', '@tmux_canopy_appearance')
         assert 'Request: general-purpose: Approval requested' in preview()
         assert f'P:{pane}\t' in needs_input()

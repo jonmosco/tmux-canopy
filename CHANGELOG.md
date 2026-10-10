@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- An agent waiting on you shows what it asks for on a dim line beneath its pane: the command it wants to run, then its description or question when that says more (`make test · Run the tests`). The drawer still has the full request.
+- `>` types a line into the selected pane through a tmux prompt and presses Enter, so you can answer an agent or run a command in another pane without leaving the sidebar. It is also in the pane and window action menus. The text is sent literally, never parsed by tmux or a shell.
+
 ## 0.3.0 - 2026-10-10
 
 ### Changed

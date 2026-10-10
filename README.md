@@ -98,7 +98,9 @@ With agent mode on, Canopy finds agents running in any pane of any session and s
 - **Status on every agent pane:** working (an animated `▷`) and needs input (`!`). Folded windows and sessions roll these up as `◆` and `▷` counts.
 - **Subagents:** listed under their parent pane while they run, each with its own status.
 - **Summary footer:** the bottom of the Tree view counts every agent on the server, such as `Agents ◆1 ▷2`, so you can see who needs you without leaving your place in the tree.
+- **What it's waiting for:** an agent that needs input shows the command it wants to run, or its question, on a dim line beneath its pane.
 - **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
+- **Reply without switching (`>`):** type a line into the selected pane from a tmux prompt; your focus stays where it is.
 - **Summary drawer (`i`):** the selected agent's state, its age, and the pending request when the agent reports one.
 - **Alerts (optional):** a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, skipped while you're looking at that pane. Off by default; see [Alerts](#alerts).
 
@@ -262,7 +264,7 @@ Tree · All                         ◆1 ▷1   ① ②
 | ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them: the session, a window, or a pane. | `canopy-branch`, `canopy-directory` at `prefix :` |
 | ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; it can differ. | `Ctrl-o` jump back to your pane |
 | ⑦ | **Pane:** application icon, pane index, and the command running in it. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
-| ⑧ | **Agent state** at the right edge: `!` needs input, `▷` working, `✓` turn ended. | `n` next agent that needs input, `i` agent summary |
+| ⑧ | **Agent state** at the right edge: `!` needs input, `▷` working, `✓` turn ended. An agent that needs input shows what it asks for on a dim line beneath. | `n` next agent that needs input, `i` agent summary, `>` send it a reply |
 | ⑨ | **Subagents** of the pane above, with their own state. They disappear when they finish. | |
 | ⑩ | **An idle shell**, dimmed so running programs stand out. | |
 | ⑪ | **A window with one pane**, on one row. The command follows `·` when the window has another name. | |
@@ -291,6 +293,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `t` | Create new window in selected session |
 | `S` / `N` | Create session / create named session with prompt |
 | `r` | Rename selected session or window |
+| `>` | Type a line into the selected pane, such as a reply to an agent |
 | `x`, then `x` | Confirm deletion of a pane, window, session, or paste buffer |
 | `m` / `c` | Mark move source / cancel move mode |
 | `u` / `U` | Clear selected / all notifications |

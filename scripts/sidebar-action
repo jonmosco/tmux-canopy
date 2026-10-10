@@ -124,7 +124,7 @@ case "$action" in
     ;;
 
   esc-action)
-    search_keys='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?'
+    search_keys='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?'
     if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
       search_keys+=',q'
       if [[ -z "$state_file" || ! -f "$state_file.search" ]]; then
@@ -194,6 +194,14 @@ case "$action" in
         ;;
       Q:*) "$SCRIPT_DIR/tree-action" zoom "P:${token#Q:}" ;;
       *) "$SCRIPT_DIR/tree-action" zoom "$token" ;;
+    esac
+    ;;
+
+  send)
+    case "$token" in
+      X:*) rest="${token#X:}"; "$SCRIPT_DIR/tree-action" send "P:${rest#*:}" ;;
+      Q:*) "$SCRIPT_DIR/tree-action" send "P:${token#Q:}" ;;
+      P:*|W:*|S:*) "$SCRIPT_DIR/tree-action" send "$token" ;;
     esac
     ;;
 

@@ -26,8 +26,8 @@ Remaining work for tmux-canopy. This list does not promise a release date. The
 
 ## Agent request panel and responses (backlog)
 
-The agent summary already shows a read-only request description when a
-lifecycle adapter reports one (for example Claude Code and Codex approvals,
+The agent summary and the line beneath a waiting pane already show the request
+description when a lifecycle adapter reports one (for example Claude Code and Codex approvals,
 including Codex's proposed command). The remaining work is to make
 supported requests easier to inspect and, where safe, respond to them from the
 sidebar.
@@ -56,24 +56,15 @@ sidebar.
 - [ ] Test stale requests, focus and cancellation, literal response text, duplicate
   submissions, concurrent clients, acknowledgement failures, and narrow terminals.
 
-## Send prompt to pane (backlog)
+## Send text to a pane
 
-Allow sending text or prompts directly into a selected pane from the sidebar
-without switching focus away from the active application.
+`>` sends a line to the selected pane, and an agent waiting on you shows its
+request beneath its pane. Follow-ups:
 
-- [ ] Add a **Send prompt to pane** item to the pane action menu and define an
-  optional shortcut.
-- [ ] Use a native tmux prompt (`command-prompt -p 'Prompt:'`) to accept the input,
-  with an option to select or prefill from recent tmux paste buffers.
-- [ ] Revalidate target pane existence and alive state (`pane_dead != 1`) before
-  sending; safely ignore vanished or dead targets.
-- [ ] Deliver input using native `send-keys -l` followed by `Enter` to preserve
-  exact literal text, whitespace, and Unicode characters without command
-  injection or shell expansion.
-- [ ] Keep the invoking client's focus, sidebar geometry, selection, query, and
-  preview state completely unchanged throughout the operation.
-- [ ] Test prompt delivery with special characters, multiline input, cancelled
-  prompts, dead panes, and background panes across multiple windows and sessions.
+- [ ] Prefill the prompt from a recent paste buffer, and send multiline text
+  with bracketed paste (`paste-buffer -p`) for agents that accept it.
+- [ ] For an agent waiting on an approval, offer its choices in a menu instead
+  of free text, once an integration reports them (see the request panel above).
 
 ## Switch sidebar side without reopening
 

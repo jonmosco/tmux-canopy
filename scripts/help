@@ -54,6 +54,7 @@ help_records() {
   key 'z' 'Toggle zoom on the selected pane or window'
   key 'b' 'Break selected pane into its own window'
   key 'r' 'Rename a session or window'
+  key '>' 'Type a line into the selected pane, such as a reply to an agent'
   key 'x, then x' 'Confirm deletion of a pane, window, session or buffer'
   key 'a, then D' 'Open diagnostics'
   if [[ "$agents_enabled" == on ]]; then
@@ -156,6 +157,7 @@ legend_records() {
     note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
     legend_item 'Agents ◆1 ▷2' 'Default Tree footer: every agent on the server, whatever the filters and folds. Quiet shows a compact count in the header and shortcuts in the footer. n jumps to one needing input.' amber
     legend_item '! / ▷ / ✓' 'Agent state on a pane: needs input, working (pulses while animation is on), ready or turn ended.' amber
+    legend_item '  make test · Run…' 'What an agent waiting on you asks for: the command, then its description. i shows it in full; > replies.' dim
     legend_item '├─ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
     note 'Quiet moves these marks to the right edge, separate from amber unread notices; a waiting subagent takes priority. Classic spells states out instead, as the labels below show.'
     legend_item '[process]' 'An agent process was found in this pane; no lifecycle state is available.' dim
