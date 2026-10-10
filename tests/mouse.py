@@ -51,6 +51,10 @@ def main():
             for _ in range(48):
                 tm('new-window', '-d', '-t', 'one:')
             tm('set-option', '-g', 'mouse', 'on')
+            # Every new shell's prompt is activity, and each alert reloads the
+            # sidebar, which drops wheel input mid-reload. This test is about
+            # the mouse, so keep notifications out of it.
+            tm('set-option', '-g', '@tmux-canopy-notifications', 'none')
             tm('set-option', '-g', 'status', 'off')
             base = script_env | {'TMUX': tm('display-message', '-p', '-t', first, '#{socket_path},#{pid},0')}
             tm('set-environment', '-g', 'PATH', script_env['PATH'])
