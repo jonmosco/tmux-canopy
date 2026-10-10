@@ -93,6 +93,9 @@ else
   printf '  hooks: '
   hook_names="$( { tmux show-hooks -g 2>/dev/null; tmux show-hooks -wg 2>/dev/null; } | awk '$1 ~ /\[900[0-9]\]/ && !seen[$1]++ {printf "%s%s", separator, $1; separator=", "}')"
   printf '%s\n' "${hook_names:-none}"
+  printf '  commands: '
+  alias_names="$(tmux show-options -s command-alias 2>/dev/null | awk '$1 ~ /\[910[0-9]\]/ { sub(/^[^ ]+ "?/, ""); sub(/=.*/, ""); printf "%s%s", separator, $0; separator=", " }')"
+  printf '%s\n' "${alias_names:-none}"
   printf '  monitor: '
   if tmux show-hooks -B -g 2>/dev/null | grep -Fq '@tmux_canopy_command'; then
     printf '@tmux_canopy_command (tmux 3.8+)\n'

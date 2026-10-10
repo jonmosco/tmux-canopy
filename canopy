@@ -572,11 +572,16 @@ def main():
     integrations.add_argument("action", choices=("status", "install", "uninstall"))
     integrations.add_argument("kinds", nargs="*", choices=KINDS)
     integrations.add_argument("--dry-run", action="store_true")
+    details = commands.add_parser("details", help="show or hide directory and branch details")
+    details.add_argument("what", choices=("branch", "directory"))
+    details.add_argument("action", nargs="?", default="toggle", choices=("on", "off", "toggle"))
     alerts = commands.add_parser("alerts", help="send a sample alert")
     alerts.add_argument("action", choices=("test",))
     alerts.add_argument("mode", nargs="?", choices=("desktop", "tmux", "both"),
                         help="defaults to @tmux-canopy-alerts, or both when it is off")
     args = parser.parse_args()
+    if args.command == "details":
+        return subprocess.call([str(ROOT / "scripts" / "details"), args.what, args.action])
     if args.command == "alerts":
         mode = args.mode or subprocess.run(("tmux", "show-option", "-gqv", "@tmux_canopy_alerts"),
                                            text=True, capture_output=True, timeout=5,

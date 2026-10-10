@@ -111,9 +111,20 @@ def main():
 
             tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')
             quiet_labels = rows()
-            assert any('feature/alpha' in value for key, value in quiet_labels.items() if key.startswith('DIR:'))
-            assert not any('feature/alpha' in value or 'fix/beta' in value for key, value in quiet_labels.items()
-                           if key.startswith(('S:', 'W:'))), 'quiet must keep branches on their directory'
+
+            def window(pane):
+                return 'W:' + tm('display-message', '-p', '-t', pane, '#{window_id}:#{session_id}')
+            # quiet follows tmux's order, so branches are details on the highest
+            # row whose panes all share them. This session and its first window
+            # are mixed and claim none; the mixed window's panes carry their own,
+            # and single-pane windows carry theirs.
+            assert not any(key.startswith('DIR:') for key in quiet_labels), 'quiet has no folder rows'
+            assert not any('feature/' in value or 'fix/beta' in value for key, value in quiet_labels.items()
+                           if key.startswith('S:')), 'a mixed session must not claim one branch'
+            assert 'feature/alpha' not in quiet_labels[window(a)] and 'fix/beta' not in quiet_labels[window(a)], \
+                'a mixed window must not claim one branch'
+            assert 'feature/alpha' in quiet_labels[f'P:{a}'] and 'fix/beta' in quiet_labels[f'P:{mixed}'], quiet_labels
+            assert 'fix/beta' in quiet_labels[window(b)] and 'feature/wt' in quiet_labels[window(e)], quiet_labels
             for appearance in ('classic', 'pills', 'lazygit'):
                 tm('set-option', '-g', '@tmux_canopy_appearance', appearance)
                 tm('set-option', '-g', '@tmux-canopy-density', 'compact')

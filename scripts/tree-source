@@ -37,7 +37,13 @@ fi
 # per-session/window/pane subprocesses; the renderer performs all aggregation.
 snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
   list-sessions -F "$sessions" \; list-windows -a -F "$windows" \; \
-  list-panes -a -F "$panes" \; list-clients -F "$clients" 2>/dev/null)" || exit 1
+  list-panes -a -F "$panes" \; list-clients -F "$clients" \; \
+  display-message -p -t "${TMUX_PANE:-}" "X${sep}#{@tmux-canopy-directory}" 2>/dev/null)" || exit 1
+# The directory-details setting rides along as a last line rather than a D
+# field, so the renderer's fixed D layout stays put.
+details_directory=on
+[[ "$snapshot" != *$'\n'"X${sep}off" ]] || details_directory=off
+snapshot="${snapshot%$'\n'"X${sep}"*}"
 config_row="${snapshot%%$'\n'*}"
 if [[ -n "$agents_client" ]]; then
   agents_enabled=${config_row##*"$sep"}
@@ -164,5 +170,6 @@ fi
 # the user's character set kept (LC_ALL would override both, so clear it).
 ctype="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
 LC_ALL='' LC_CTYPE="$ctype" LC_COLLATE=C awk -v switcher="$switcher" -v agent_view="$agent_view" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
+  -v details_directory="$details_directory" \
   -v nul="${TMUX_CANOPY_NUL:-0}" -v header="${TMUX_CANOPY_HEADER:-0}" -f "$SCRIPT_DIR/../lib/tree-render.awk" \
   "$state_file" - <<< "$snapshot"

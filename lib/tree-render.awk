@@ -22,7 +22,7 @@ $1 == "D" {
     # Standalone/legacy snapshots still end with agents at field 41.
     agents_enabled=($42 == "on" || (NF == 41 && $41 == "on"))
     if (!agents_enabled) agent_view=0
-    current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
+    current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal"); quiet_compact=($14 != "off")
     if (!filter_set) filter=$15
     if (!window_set) window_filter=$16
     if (!title_set) title_filter=$17
@@ -270,7 +270,9 @@ function quiet_pane_edge(p,    label,glyph,style,notice_mark,signal) {
         if (glyph != "") signal=style glyph reset
     } else if (agent_view && agent_kind[p] != "") signal=dim (icons == "ascii" ? "o" : "○") reset
     notice_mark=unread_glyph(pa[p],pb[p],pz[p])
-    if (notice_mark != "") signal=signal (signal == "" ? "" : " ") attention notice_mark reset
+    # Plain output is the commonest notice and the least urgent: it stays dim so
+    # bells, silence, and agents waiting on you keep the amber.
+    if (notice_mark != "") signal=signal (signal == "" ? "" : " ") (pb[p] || pz[p] ? attention : dim) notice_mark reset
     return signal
 }
 # Keep right-edge attention visible even if a long command would otherwise
@@ -687,16 +689,80 @@ function place_name(value,    n,parts) {
 }
 # Every scalar and scratch array is local: the caller's loop variables
 # (w, p, key, ...) must survive this call.
-function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,bases,label,dir_last,dir_branch,dir_stem,dir_key,dir_open,folder,folder_color,folder_line,wc,win_ids,win_names,win_first,win_last,windex,wlast,win_stem,wt,wm,name_disp,pt,cmd,icon,pm,cmd_disp,line,pane_last,continuation,prefix,edge,current_place) {
+# quiet has no folder rows, so a directory and its branch become a detail on
+# the highest row whose panes all share them: the session heading, else each
+# window, else each pane. Nothing mixed claims one directory or branch.
+function quiet_home_place(s,    wpos,w,ppos,p) {
+    quiet_place[s]=""; quiet_place_pane[s]=""
+    for (wpos=1; wpos<=nw[s]; wpos++) {
+        w=windows[s,wpos]
+        if (!visible_w[s SUBSEP w]) continue
+        for (ppos=1; ppos<=np[w]; ppos++) {
+            p=panes[w,ppos]
+            if (!visible_p[p]) continue
+            if (quiet_place_pane[s] == "") { quiet_place[s]=path[p]; quiet_place_pane[s]=p }
+            else if (path[p] != quiet_place[s]) { quiet_place[s]=""; quiet_place_pane[s]=""; return }
+        }
+    }
+}
+# The directory every visible pane of a window shares, or "" when they differ.
+function shared_place(w,    ppos,p,place) {
+    place=""
+    for (ppos=1; ppos<=np[w]; ppos++) {
+        p=panes[w,ppos]
+        if (!visible_p[p]) continue
+        if (place == "") place=path[p]
+        else if (path[p] != place) return ""
+    }
+    return place
+}
+# The right-hand edge: pane p's directory and branch, then the row's marks.
+# On a narrow row the detail gives way in steps (a shortened branch, then the
+# directory alone, then nothing), never the name or a mark.
+function quiet_edge(value, p, edge, budget,    plain,room,name,branch,opening,closing,detail) {
+    if (p == "" || path[p] == "") return edge
+    plain=value edge; gsub(/\033\[[0-9;]*m/,"",plain)
+    room=budget-text_width(plain)-2-(edge == "" ? 0 : 2)
+    # @tmux-canopy-directory off leaves only the branch, which needs git context.
+    name=(details_directory == "off" ? "" : place_name(path[p])); branch=git_branch[p]
+    if (name == "" && branch == "") return edge
+    opening=(icons == "ascii" ? " [git:" : " ⎇ "); closing=(icons == "ascii" ? "]" : "")
+    # Without a directory the branch leads: "⎇ main", not " ⎇ main".
+    if (name == "") sub(/^ /, "", opening)
+    if (branch != "" && text_width(name opening branch closing) <= room) detail=name opening branch closing
+    else if (branch != "" && room-text_width(name opening closing)-1 >= 4)
+        detail=name opening substr(branch, 1, room-text_width(name opening closing)-1) "…" closing
+    else if (name != "" && text_width(name) <= room) detail=name
+    else return edge
+    return dim detail reset (edge == "" ? "" : "  " edge)
+}
+# A shell at its prompt is scaffolding next to what is running. It recedes
+# unless it is where you are or has something to report.
+function idle_shell(p, s) {
+    return command[p] ~ /^-?(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh)$/ &&
+        !(p == current_p && s == current_s) && !pa[p] && !pb[p] && !pz[p]
+}
+function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,bases,label,dir_last,dir_branch,dir_stem,dir_key,dir_open,folder,folder_color,folder_line,wc,win_ids,win_names,win_first,win_last,windex,wlast,win_stem,wt,wm,name_disp,pt,cmd,icon,pm,cmd_disp,line,pane_last,continuation,prefix,edge,current_place,stem_blank,pane_indent) {
     n=0
+    # A finished branch leaves a blank stem as wide as an open one, so the last
+    # folder's and window's children line up with their siblings'.
+    stem_blank=sprintf("%*s", text_width(stem_mid), "")
+    # quiet draws no guides, so a pane hangs from its window instead: its
+    # location mark sits under the window's icon, and its icon under the
+    # window's label. Every pane keeps an icon slot, blank or not, so pane
+    # names line up with each other and start right of their window's name.
+    pane_indent=sprintf("%*s", text_width(branch_mid " " fold_open) - text_width(stem_mid), "")
     current_place=path[current_p]; if (current_place == "") current_place="(no directory)"
+    # quiet follows tmux's own order: one group, so each window appears once,
+    # in index order, whatever directories its panes are in.
+    if (appearance == "quiet") current_place="(tmux order)"
     for (wpos=1; wpos<=nw[s]; wpos++) {
         w=windows[s,wpos]; key=s SUBSEP w
         if (!visible_w[key]) continue
         for (ppos=1; ppos<=np[w]; ppos++) {
             p=panes[w,ppos]
             if (!visible_p[p]) continue
-            place=path[p]; if (place == "") place="(no directory)"
+            place=(appearance == "quiet" ? "(tmux order)" : path[p]); if (place == "") place="(no directory)"
             id=s SUBSEP place
             if (!(id in place_seen)) { place_seen[id]=1; place_order[s, ++n]=place; place_count[id]=0 }
             idx=++place_count[id]
@@ -715,7 +781,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
         }
         dir_last=(i == n)
         dir_branch=(dir_last ? branch_end : branch_mid)
-        dir_stem=(dir_last ? "   " : stem_mid)
+        dir_stem=(appearance == "quiet" ? "" : dir_last ? stem_blank : stem_mid)
         dir_key="DIR:" place_pane[id, 1]
         dir_open=!(dir_key in collapsed)
         if (icons == "nerdfont") folder=(dir_open ? "󰝰" : "󰉋")
@@ -729,8 +795,11 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
                 folder_line=edge_colored(folder_line,green (icons == "ascii" ? ">" : "▶") reset,width-3)
             else folder_line=quiet_git_row(folder_line,place_pane[id,1],width-3)
         } else folder_line=git_line(folder_line,place_pane[id,1],width-5)
-        row(dir_key, folder_line, dir_key ":" s)
-        if (!dir_open) continue
+        if (appearance == "quiet") dir_open=1
+        else {
+            row(dir_key, folder_line, dir_key ":" s)
+            if (!dir_open) continue
+        }
         wc=0
         for (idx=1; idx<=cnt; idx++) {
             w=place_wid[id, idx]
@@ -739,31 +808,64 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
         }
         for (windex=1; windex<=wc; windex++) {
             w=win_ids[windex]; wlast=(windex == wc)
-            win_stem=dir_stem (wlast ? "   " : stem_mid)
+            win_stem=dir_stem (wlast ? stem_blank : stem_mid)
             wt="W:" w ":" s
             wm=(wt == del ? "✕" : wt == link ? "⇉" : wt == move || w == move_w ? "⇢" : " ")
             name_disp=(unnamed_w[s SUBSEP w] ? dim win_names[windex] reset : win_names[windex])
-            row(wt, dim dir_stem (wlast ? branch_end : branch_mid) reset " " fold_open (wm != " " ? mark(wm) " " : "") name_disp (w_zoomed[w] ? " [Z]" : "") reset, wt)
+            if (appearance == "quiet" && quiet_compact && !agent_view && np[w] == 1 && win_first[windex] == win_last[windex]) {
+                # A window holding one pane is one row with the window's identity:
+                # the pane's icon stands in for the window's, its location mark
+                # takes the fold's place, and its command shows only when the
+                # window is named something else.
+                p=place_pane[id, win_first[windex]]; pt="P:" p
+                cmd=command[p]; icon=appicon(cmd)
+                if (idle_shell(p, s)) name_disp=dim win_names[windex] reset
+                pm=(wm != " " ? wm : pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
+                prefix=dim dir_stem (wlast ? branch_end : branch_mid) reset " " (pm == "●" ? green (icons == "ascii" ? ">" : "●") reset : pm == " " ? " " : mark(pm)) " "
+                prefix=prefix (icon != "" && icon != " " ? appcolor(cmd) icon reset : dim window_icon reset) " " dim wi[s SUBSEP w] ":" reset
+                cmd_disp=(cmd == "" || cmd == win_names[windex] ? "" : dim " · " cmd reset)
+                line=(w == current_w && s == current_s ? bold : "") name_disp reset
+                line=quiet_pane_line(prefix, line, cmd_disp (w_zoomed[w] ? " " dim "[Z]" reset : "") subagent_count(p),
+                    quiet_edge(prefix line cmd_disp, path[p] != quiet_place[s] ? p : "", quiet_pane_edge(p), width-3), width-3)
+                continuation=prefix; gsub(/\033\[[0-9;]*m/,"",continuation)
+                row(wt, line subagent_lines(p, sprintf("%*s", text_width(continuation), "")), wt)
+                continue
+            }
+            line=dim dir_stem (wlast ? branch_end : branch_mid) reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " ? mark(wm) " " : "") dim window_icon " " wi[s SUBSEP w] ":" reset (w == current_w && s == current_s ? bold : "") name_disp reset (w_zoomed[w] ? " [Z]" : "")
+            if (collapsed[wt]) {
+                line=line notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) agent_summary(w_need[w],w_work[w],w_done[w]) dim " [" shown_p[w] "p]" reset
+                if (w == current_w && s == current_s && visible_p[current_p] && place == current_place)
+                    line=edge_colored(line,green (icons == "ascii" ? ">" : "▶") reset,width-3)
+            } else if (appearance == "quiet" && shared_place(w) != "" && shared_place(w) != quiet_place[s])
+                line=edge_colored(line, quiet_edge(line, place_pane[id, win_first[windex]], "", width-3), width-3)
+            row(wt, line, wt)
+            if (collapsed[wt]) continue
             for (idx=win_first[windex]; idx<=win_last[windex]; idx++) {
                 p=place_pane[id, idx]; pt="P:" p
                 cmd=command[p]; icon=appicon(cmd)
                 pm=(pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
-                cmd_disp=(unnamed_cmd[p] ? dim cmd reset : cmd)
+                cmd_disp=(unnamed_cmd[p] || (appearance == "quiet" && idle_shell(p, s)) ? dim cmd reset : cmd)
                 pane_last=(idx == win_last[windex])
                 if (appearance == "quiet") {
                     # A left-hand location dot leaves the right edge for agent
                     # attention and terminal notices; fzf still owns selection.
-                    prefix=dim win_stem reset (pm == "●" ? green (icons == "ascii" ? ">" : "●") reset : pm == " " ? " " : mark(pm))
-                    if (icon != "" && icon != " ") prefix=prefix " " appcolor(cmd) icon reset
-                    line=quiet_pane_line(prefix " ",cmd_disp,(pane_zoomed[p] ? " " dim "[Z]" reset : "") subagent_count(p),quiet_pane_edge(p),width-3)
+                    prefix=dim win_stem reset pane_indent (pm == "●" ? green (icons == "ascii" ? ">" : "●") reset : pm == " " ? " " : mark(pm)) " "
+                    if (icon != "" && icon != " ") prefix=prefix appcolor(cmd) icon reset
+                    prefix=prefix sprintf("%*s", 2 - text_width(icon == " " ? "" : icon), "") " "
+                    line=quiet_pane_line(prefix dim pi[p] ":" reset,cmd_disp,(pane_zoomed[p] ? " " dim "[Z]" reset : "") subagent_count(p),
+                        quiet_edge(prefix pi[p] ":" cmd_disp, shared_place(w) == "" && path[p] != quiet_place[s] ? p : "", quiet_pane_edge(p), width-3), width-3)
                     edge=""
                 } else {
-                    line=lazy_prefix(win_stem, pane_last ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " cmd_disp (pane_zoomed[p] ? " " dim "[Z]" reset : "") hook_glyph(p) subagent_count(p)
+                    line=lazy_prefix(win_stem, pane_last ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " dim pi[p] ":" reset cmd_disp (pane_zoomed[p] ? " " dim "[Z]" reset : "") hook_glyph(p) subagent_count(p)
                     edge=pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●")
                 }
                 # Subagents hang beneath the pane, their branches aligned with
                 # its command (lazy_prefix draws no icon cell for a blank icon).
-                continuation=dim win_stem (pane_last ? "   " : stem_mid) reset sprintf("%*s", (icon == "" || icon == " " ? 0 : 1+text_width(icon)), "")
+                if (appearance == "quiet") {
+                    continuation=prefix; gsub(/\033\[[0-9;]*m/,"",continuation)
+                    continuation=sprintf("%*s", text_width(continuation)+length(pi[p])+1, "")
+                }
+                else continuation=dim win_stem (pane_last ? stem_blank : stem_mid) reset sprintf("%*s", (icon == "" || icon == " " ? 0 : 1+text_width(icon))+length(pi[p])+1, "")
                 row(pt, (appearance == "quiet" ? line : edge_colored(line, edge, width-3)) subagent_lines(p, continuation), pt ":" s)
             }
         }
@@ -1042,7 +1144,7 @@ END {
     if (appearance == "lazygit" && theme != "mono") {
         fold_open=accent fold_open reset; fold_closed=accent fold_closed reset
     }
-    show_session_glyph=(appearance == "lazygit" || custom_s != "")
+    show_session_glyph=(appearance == "lazygit" || appearance == "places" || appearance == "quiet" || custom_s != "")
     show_window_glyph=(appearance == "lazygit" ? custom_w != "" : custom_w != "")
     filter_session=current_s
     if (sidebar[current_p] == 1) {
@@ -1217,7 +1319,20 @@ END {
         }
         session_glyph=(show_session_glyph ? dim session_icon reset " " : "")
         session_style=(sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim (s == current_s ? bold : "") : (s == current_s ? bold : ""))
-        row(st,edge_colored((collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset, sm == "●" ? green (appearance == "quiet" && icons == "ascii" ? ">" : "▶") reset : "", width-3),st)
+        session_rule=""
+        if (appearance == "quiet") {
+            # Without guides, sessions are the headings: every one bold behind an
+            # accent glyph, and a blank line above each after the first. Where you
+            # are shows through the window, pane, and folded-session marks instead.
+            session_glyph=(show_session_glyph ? accent session_icon reset " " : "")
+            session_style=bold (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
+            if (quiet_sessions++ && density != "compact" && density != "minimal") session_rule="\n"
+        }
+        if (appearance == "quiet") quiet_home_place(s)
+        session_body=(collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset
+        session_mark=(sm == "●" ? green (appearance == "quiet" && icons == "ascii" ? ">" : "▶") reset : "")
+        if (appearance == "quiet") session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
+        row(st,session_rule edge_colored(session_body, session_mark, width-3),st)
         if (collapsed[st]) continue
         if (appearance == "places" || appearance == "quiet") { places_panes(s); continue }
         visible_wpos=0

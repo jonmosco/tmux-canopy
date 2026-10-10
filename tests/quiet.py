@@ -55,13 +55,19 @@ def main():
         header = ANSI.sub('', quiet['H:tree'])
         assert 'Tree · All' in header and '◆1/1' in header and 'Proc Buff' not in header, header
         assert '1 Tree' in quiet['F:'] and '4 Agents' in quiet['F:'] and 'n Next' in quiet['F:']
-        assert '⎇ feature/auth' in ANSI.sub('', quiet['DIR:%0:$0'])
+        # tmux order: no folder rows; the session's directory and branch are a
+        # detail on its heading, and rows in that directory carry none.
+        assert ANSI.sub('', quiet['S:$0']).rstrip().endswith('api ⎇ feature/auth'), quiet['S:$0']
+        assert not any('⎇' in ANSI.sub('', quiet[key]) for key in ('W:@0:$0', 'P:%0:$0', 'P:%1:$0'))
         assert '\x1b[1;32m●\x1b[0m' in quiet['P:%0:$0'] and '▶' not in quiet['P:%0:$0']
         assert '\x1b[1;33m!\x1b[0m' in quiet['P:%0:$0']
         assert 'NEEDS INPUT' not in quiet['P:%0:$0'] and '·hook' not in quiet['P:%0:$0']
-        assert '\x1b[1;33m●\x1b[0m' in quiet['P:%1:$0']  # unread != agent needs input
+        assert '\x1b[2m●\x1b[0m' in quiet['P:%1:$0']  # plain activity is a dim notice, not agent attention
         assert 'P:%0:$0' in quiet and 'W:@0:$0' in quiet and 'S:$0' in quiet
-        assert 'DIR:%0:$0' in quiet and not any('─' in ANSI.sub('', quiet[key]) for key in ('S:$0', 'W:@0:$0'))
+        assert '◈' in quiet['S:$0'] and '▣' in quiet['W:@0:$0']
+        assert '\x1b[1mserver\x1b[0m' in quiet['W:@0:$0'], quiet['W:@0:$0']
+        assert '0:' in quiet['W:@0:$0'] and '0:' in quiet['P:%0:$0']
+        assert 'DIR:%0:$0' not in quiet and not any('─' in ANSI.sub('', quiet[key]) for key in ('S:$0', 'W:@0:$0'))
         assert 'Tree Agents Proc Buff' in ANSI.sub('', render(appearance='places')['H:tree']), 'default appearance changed'
         print('ok - quiet appearance keeps tree identities and separates active, agent, and unread marks')
 
@@ -70,15 +76,17 @@ def main():
                 rows = render(width=width, icons=icons)
                 header = ANSI.sub('', rows['H:tree'])
                 assert header.startswith('Tree') and len(header) < width, (icons, width, header)
-                assert 'P:%0:$0' in rows and 'DIR:%0:$0' in rows
+                assert 'P:%0:$0' in rows and 'DIR:%0:$0' not in rows
                 if width == 24:
-                    assert 'feature/auth' not in ANSI.sub('', rows['DIR:%0:$0'])
+                    # Too narrow for the branch: the detail keeps just the directory.
+                    session = ANSI.sub('', rows['S:$0'])
+                    assert 'feature' not in session and session.rstrip().endswith('api'), (icons, session)
                 if icons == 'ascii':
                     assert 'Tree - All' in header
                     assert '\x1b' in rows['P:%0:$0'] and '!' in ANSI.sub('', rows['P:%0:$0'])
                     assert '>' in ANSI.sub('', rows['P:%0:$0'])
                 if width >= 42:
-                    assert 'feature/auth' in rows['DIR:%0:$0'], (icons, width, rows['DIR:%0:$0'])
+                    assert 'feature/auth' in rows['S:$0'], (icons, width, rows['S:$0'])
         narrow = render(width=24, long_command=True)
         pane = ANSI.sub('', narrow['P:%1:$0'])
         assert pane.endswith('●') and len(pane) <= 21, pane
@@ -97,12 +105,15 @@ def main():
         assert '○' in ANSI.sub('', unknown['P:%0:$0']) and '!' not in unknown['P:%0:$0']
         work = render(subagent=True)
         assert '!' in ANSI.sub('', work['P:%0:$0']) and 'Explore' in work['P:%0:$0']
+        # A folder folded in another appearance does not hide panes in quiet.
         folded_folder = render(state_text='DIR:%0\n')
-        assert '▶' in folded_folder['DIR:%0:$0'] and not any(k.startswith('P:') for k in folded_folder)
-        ascii_folded = render(icons='ascii', state_text='DIR:%0\n')
-        assert '>' in ANSI.sub('', ascii_folded['DIR:%0:$0'])
+        assert 'DIR:%0:$0' not in folded_folder and 'P:%0:$0' in folded_folder, sorted(folded_folder)
         folded = render(state_text='S:$0\n')
         assert '▶' in folded['S:$0'] and not any(k.startswith('P:') for k in folded)
+        folded_window = render(state_text='W:@0:$0\n')
+        window = ANSI.sub('', folded_window['W:@0:$0'])
+        assert '[2p]' in window and '◆' in window and '▶' in window, window
+        assert not any(k.startswith('P:') for k in folded_window)
         print('ok - quiet appearance handles widths, themes, footer visibility, agent view and subagents')
 
 
