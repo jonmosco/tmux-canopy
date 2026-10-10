@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess as sp
 import tempfile
+import time
 import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +64,40 @@ def render(icons, density='normal', compact=''):
         return {row[2]: row[1] for row in rows}
 
 
+def header(statuses, width=42, icons='unicode', agent_view=False):
+    """The quiet header for agents in the given hook-reported states ('' = none)."""
+    now = str(int(time.time()))
+    with tempfile.TemporaryDirectory(prefix='canopy-quiet-header-') as directory:
+        state = Path(directory) / 'state'
+        state.write_text('')
+        d = ['D', icons, 'activity,bell', 'ansi', 'normal', '', '', '', '%0', '@0', '$0', str(width), 'host']
+        d.extend([''] * (39 - len(d)))
+        d.extend(['quiet', '', 'on'])
+        records = [d, ['S', '$0', 'work', '1'], ['W', '$0', '@0', '0', 'agents', str(len(statuses)), 'off', '', '', '', '0']]
+        for index, status in enumerate(statuses):
+            pid = str(200 + index)
+            row = ['P', f'%{index}', '@0', str(index), 'claude', '', '/work', '0', '', '', '', '', '', '', '', '0', pid]
+            if status:
+                row += ['claude-hook', 's' + pid, pid, status, now, '', '']
+            records += [row, ['A', f'%{index}', 'claude']] + ([['V', f'%{index}']] if status else [])
+        run = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1', '-v', 'nul=1', '-v', f'agent_view={int(agent_view)}',
+                      '-v', f'now={now}', '-f', str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
+                     input='\n'.join(SEP.join(r) for r in records) + '\n', text=True, capture_output=True, check=True,
+                     env=os.environ | {'TMUX_CANOPY_RENDER_HOME': '/home/test'})
+        rows = {row.split('\t')[2]: row.split('\t')[1] for row in run.stdout.strip('\0').split('\0')}
+        return ANSI.sub('', rows['H:tree']).rstrip()
+
+
 def main():
+    # The header counts every agent state ("◆1 ▷1 ○1"), not only the most
+    # urgent one, and falls back to that state with the total when narrow.
+    mixed = ('needs-input', 'working', '', 'turn-ended', 'working')
+    assert header(mixed).endswith('◆1 ▷2 ✓1 ○1'), header(mixed)
+    assert header(mixed, agent_view=True).endswith('◆1 ▷2 ✓1 ○1'), header(mixed, agent_view=True)
+    assert header(mixed, icons='ascii').endswith('!1 +2 d1 o1'), header(mixed, icons='ascii')
+    assert header(('working', '')).endswith('▷1 ○1'), header(('working', ''))
+    assert header(mixed, width=22).endswith('◆1/5'), header(mixed, width=22)
+
     for icons in ('unicode', 'nerdfont', 'ascii'):
         tree = render(icons)
         window = label_column(tree['W:@0:$0'])

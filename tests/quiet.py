@@ -53,7 +53,7 @@ def main():
         assert 'Tree Agents Proc Buff' in ANSI.sub('', classic['H:tree'])
         quiet = render()
         header = ANSI.sub('', quiet['H:tree'])
-        assert 'Tree · All' in header and '◆1/1' in header and 'Proc Buff' not in header, header
+        assert 'Tree · All' in header and header.rstrip().endswith('◆1') and 'Proc Buff' not in header, header
         assert '1 Tree' in quiet['F:'] and '4 Agents' in quiet['F:'] and 'n Next' in quiet['F:']
         # tmux order: no folder rows; the session's directory and branch are a
         # detail on its heading, and rows in that directory carry none.
@@ -93,13 +93,13 @@ def main():
         mono = render(theme='mono')
         assert not any('\x1b' in value for value in mono.values()), mono
         hidden = render(state_text='FOOTER\toff\n')
-        assert 'F:' not in hidden and '◆1/1' in ANSI.sub('', hidden['H:tree'])
+        assert 'F:' not in hidden and ANSI.sub('', hidden['H:tree']).rstrip().endswith('◆1')
         filtered = render(state_text='FILTER\tsession\n')
         assert 'Tree · Session' in ANSI.sub('', filtered['H:tree'])
         pending = render(state_text='MOVE\tP:%0\n')
         assert 'MOVE' in ANSI.sub('', pending['H:tree'])
         summary = render(agent_view=True)
-        assert 'Agents' in summary['H:tree'] and '◆1/1' in ANSI.sub('', summary['H:tree'])
+        assert 'Agents' in summary['H:tree'] and ANSI.sub('', summary['H:tree']).rstrip().endswith('◆1')
         assert 'P:%1:$0' not in summary and 'P:%0:$0' in summary
         unknown = render(agent_view=True, verified=False)
         assert '○' in ANSI.sub('', unknown['P:%0:$0']) and '!' not in unknown['P:%0:$0']

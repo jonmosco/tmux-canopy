@@ -238,14 +238,14 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 A sidebar with agent mode on, one agent waiting for approval, and a folded session:
 
 ```text
-Tree · All                          ◆1/3   ① ②
+Tree · All                         ◆1 ▷1   ① ②
 ▾ ◈ acme                                   ③
    ▾ ▣ 0:server             api ⎇ main     ④ ⑤
    ●  ✳  1:claude                    !     ⑥ ⑦ ⑧
             Explore                  ▷     ⑨
             Plan                     !
              2:zsh                         ⑩
-      ✳ 1:ui · claude      web ⎇ feat/ui   ⑪
+      ✳ 1:ui · claude      web ⎇ ui  ▷     ⑪
 
 ▾ ◈ notes
       ▣ 0:today · zsh                ●     ⑫
@@ -258,7 +258,7 @@ Tree · All                          ◆1/3   ① ②
 | | What it shows | Keys |
 |---|---|---|
 | ① | **View and filter.** The open view (`Tree`, `Agents`, `Proc`, `Buff`) and the tree filter: `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
-| ② | **Agent summary:** the most urgent state and the total, such as `◆1/3` (one of three agents needs input). `▷` working, `✓` ended, `○` found by process only. | `n` jump to the agent waiting |
+| ② | **Agent summary:** how many agents are in each state: `◆` needs input, `▷` working, `✓` ended, `○` found by process only. A narrow sidebar shows the most urgent state and the total instead, such as `◆1/3`. | `n` jump to the agent waiting |
 | ③ | **Session**, a bold heading. Sessions are separated by a blank line. | `h` / `l` fold and unfold, `H` / `L` all |
 | ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
 | ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them: the session, a window, or a pane. | `canopy-branch`, `canopy-directory` at `prefix :` |

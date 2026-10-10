@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The `quiet` header counts agents in every state (`◆1 ▷2 ✓1 ○1`) instead of only the most urgent one with the total (`◆1/5`), which it still shows when the header is too narrow.
+
 ## 0.2.0 - 2026-10-10
 
 ### Changed

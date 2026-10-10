@@ -453,8 +453,9 @@ they have an icon. A shell idling at its prompt, other than your current pane an
 with no activity, bell, or silence to report, is dimmed, and plain activity is a
 dim mark so bells, silence, and agents waiting on you keep the amber. A folder
 folded in another appearance does not hide panes in `quiet`. It replaces the tab bar with a
-short `Tree · All`/`Agents · All` header (`Tree - All` with ASCII icons) and a compact agent summary when agent
-mode is on. In Tree view it subdues guides, uses small chevrons for folds, places
+short `Tree · All`/`Agents · All` header (`Tree - All` with ASCII icons) and, when agent mode is on, a count
+of agents in each state (`◆1 ▷2 ✓1 ○1`), shortened to the most urgent state and the total (`◆1/5`) when
+the header is too narrow. In Tree view it subdues guides, uses small chevrons for folds, places
 the green active-pane dot beside its name (`>` with ASCII icons), and right-aligns agent attention and
 unread notices as separate marks. A waiting subagent can raise its parent's
 mark; unverified process detection never claims a confirmed state. Git branches,
