@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reload restores owned configuration without clobbering later user edits."""
 import os
+import re
 from pathlib import Path
 import subprocess as sp
 import tempfile
@@ -71,7 +72,7 @@ def main():
             assert '--bind=ctrl-t:' in binds
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             load()
-            assert 'Agents' in source() and '[Agents]' in source('--agents')
+            assert 'Agents' in source() and 'Agents · All' in re.sub(r'\x1b\[[0-9;]*m', '', source('--agents'))
             client = '/dev/ttys-agent-test'
             key = sp.check_output(['cksum'], input=client.encode()).split()[0].decode()
             tm('set-option', '-g', '@tmux_canopy_agents_' + key, 'off')
@@ -93,26 +94,32 @@ def main():
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'auto')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        # quiet is the default appearance; ascii is quiet without glyphs.
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
         tm('set-option', '-g', '@tmux-canopy-appearance', 'ascii')
         load()
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'ascii'
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'auto')
         tm('set-option', '-g', '@tmux-canopy-appearance', 'default')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
+        # folders keeps the directory-grouped tree; places is still accepted.
+        for name in ('folders', 'places'):
+            tm('set-option', '-g', '@tmux-canopy-appearance', name)
+            load()
+            assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places', name
         tm('set-option', '-g', '@tmux-canopy-appearance', 'quiet')
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         tm('set-option', '-g', '@tmux-canopy-appearance', 'unexpected')
         load()
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
         tm('set-option', '-g', '@tmux-canopy-appearance', 'nope')
         load()
-        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'places'
+        assert tm('show-option', '-gqv', '@tmux_canopy_appearance') == 'quiet'
         assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
         tm('set-option', '-g', '@tmux-canopy-animate', 'off')
         load()

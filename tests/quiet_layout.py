@@ -49,10 +49,12 @@ def render(icons, density='normal', compact=''):
                    ['W', '$0', '@5', '3', 'mixed', '2', 'off', '', '', '', '0'],
                    pane('%6', '@5', '1', 'zsh', '/projects/api', '106'),
                    pane('%7', '@5', '2', 'claude', '/projects/docs', '107'),
-                   ['S', '$1', 'docs', '0'], ['W', '$1', '@2', '1', 'zsh', '1', 'off', '', '', '', '0'],
+                   ['S', '$1', 'reference', '0'], ['W', '$1', '@2', '1', 'zsh', '1', 'off', '', '', '', '0'],
                    pane('%4', '@2', '1', 'zsh', '/projects/docs', '104'),
                    ['S', '$2', 'session-3', '0'], ['W', '$2', '@3', '1', 'zsh', '1', 'off', '', '', '', '0'],
-                   pane('%5', '@3', '1', 'zsh', '/projects/docs', '105')]
+                   pane('%5', '@3', '1', 'zsh', '/projects/docs', '105'),
+                   ['S', '$3', 'notes', '0'], ['W', '$3', '@4', '1', 'zsh', '1', 'off', '', '', '', '0'],
+                   pane('%8', '@4', '1', 'zsh', '/projects/notes', '108')]
         run = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1', '-v', 'nul=1',
                       '-f', str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
                      input='\n'.join(SEP.join(r) for r in records) + '\n', text=True,
@@ -82,7 +84,7 @@ def main():
         assert '\n' not in first and '\x1b[1mwork' in first, first
         gap, heading = second.split('\n')
         assert gap == '', second
-        assert '\x1b[1mdocs' in heading and '\x1b[1;36m' in heading, heading
+        assert '\x1b[1mreference' in heading and '\x1b[1;36m' in heading, heading
         assert '\x1b[1m\x1b[2msession-3' in automatic.split('\n')[1], automatic
         # Plain output is a dim notice; a bell keeps the amber.
         assert '\x1b[2m' + ('*' if icons == 'ascii' else '●') + '\x1b[0m' in tree['P:%1:$0'], tree['P:%1:$0']
@@ -97,6 +99,9 @@ def main():
         # window shows one per pane. Nothing mixed claims one.
         tail = {key: ANSI.sub('', tree[key]).rstrip() for key in tree}
         assert tail['S:$1'].endswith('docs') and not tail['W:@2:$1'].endswith('docs'), (tail['S:$1'], tail['W:@2:$1'])
+        # ...unless the session is named after that directory: the detail would
+        # only repeat its name.
+        assert tail['S:$3'].split('\n')[-1].count('notes') == 1, tail['S:$3']
         assert not tail['S:$0'].endswith(('api', 'web', 'docs')), tail['S:$0']
         assert tail['W:@0:$0'].endswith('api') and tail['W:@1:$0'].endswith('web'), (tail['W:@0:$0'], tail['W:@1:$0'])
         assert not tail['W:@5:$0'].endswith(('api', 'docs')), tail['W:@5:$0']

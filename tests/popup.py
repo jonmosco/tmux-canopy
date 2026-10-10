@@ -133,7 +133,10 @@ def main():
             wait(lambda: tm('display-message', '-c', client, '-p', '#{window_name}') == 'second', 'client switched to second window')
             toggle()
             wait(is_popup_active, 'popup opened on second window')
-            wait(lambda: probe_selection() == f'P:{second_pane}:{session_id}', 'active second window pane highlighted')
+            # quiet shows a single-pane window as one row with the window's identity.
+            second_window = display(second_pane, '#{window_id}')
+            wait(lambda: probe_selection() in (f'P:{second_pane}:{session_id}', f'W:{second_window}:{session_id}'),
+                 'active second window highlighted')
             os.write(master, b'\r')
             wait(lambda: not is_popup_active(), 'popup closed via Enter')
             assert tm('display-message', '-c', client, '-p', '#{window_name}') == 'second'

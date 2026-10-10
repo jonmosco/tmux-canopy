@@ -1331,7 +1331,10 @@ END {
         if (appearance == "quiet") quiet_home_place(s)
         session_body=(collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset
         session_mark=(sm == "●" ? green (appearance == "quiet" && icons == "ascii" ? ">" : "▶") reset : "")
-        if (appearance == "quiet") session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
+        # A session named after its directory gains nothing from the directory
+        # alone; a branch still adds something.
+        if (appearance == "quiet" && !(place_name(quiet_place[s]) == sname[s] && git_branch[quiet_place_pane[s]] == ""))
+            session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
         row(st,session_rule edge_colored(session_body, session_mark, width-3),st)
         if (collapsed[st]) continue
         if (appearance == "places" || appearance == "quiet") { places_panes(s); continue }

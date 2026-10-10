@@ -281,7 +281,7 @@ set -g @tmux-canopy-alerts 'off' # desktop, tmux, or both: tell you when an agen
 set -g @tmux-canopy-alert-events 'agents' # add bell, silence, or activity for tmux's own alerts
 set -g @tmux-canopy-alert-sound 'off' # default or a sound name for desktop alerts
 set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
-set -g @tmux-canopy-appearance 'default' # or 'quiet', 'ascii' (classic still works)
+set -g @tmux-canopy-appearance 'quiet' # default; or 'folders', 'ascii' (classic still works)
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-footer 'on' # off: open sidebars without the Tree view footer; f toggles it
 set -g @tmux-canopy-theme 'ansi'
@@ -423,15 +423,17 @@ The option model is provider-neutral: each notification provider owns a namespac
 
 ### Appearance
 
-`@tmux-canopy-appearance` defaults to `default`, grouping panes by working
-directory and showing folder and application icons. Session symbols (`◈`) and
+`@tmux-canopy-appearance` defaults to `quiet`, described below: sessions,
+windows, and panes in tmux's order with directories as details. `folders` (the
+default before 0.2, also accepted as `places`) groups panes by working
+directory and shows folder and application icons. Session symbols (`◈`) and
 window symbols (`▣`) distinguish tmux objects from folders; windows show their
 index (`▣ 1:server`) and panes show their index before the command (`0:claude`).
 These numbers are tmux indexes, not agent counts. Window names are bold at the
 current location. Window folds hide their panes inside each directory group
 and show pane counts and rolled-up attention. ASCII uses `S` and `W`; Nerd Font
-and custom session/window icons are respected. `quiet` is an opt-in variant
-that follows tmux's own structure instead of grouping by folder, with the same
+and custom session/window icons are respected. `quiet`, the default, follows
+tmux's own structure instead of grouping by folder, with the same
 sessions, windows, panes, folds, filters, actions, agent rows, and selection
 identities.
 
@@ -462,8 +464,9 @@ footer shows shortcut hints instead of workspace/agent counts; `f` and
 existing tabs. The examples in [Quiet tree](sidebar-visual-examples.html) are
 illustrations, not pixel-exact screenshots.
 
-`ascii` uses the default folder layout without Unicode glyphs; it can also be
-selected as `@tmux-canopy-icon-theme 'ascii'` alongside `quiet`. `classic`, the
+`ascii` is `quiet` without Unicode glyphs, the same as
+`@tmux-canopy-icon-theme 'ascii'`; use the icon theme with `folders` for the
+grouped layout in ASCII. `classic`, the
 earlier window-first tree, is still accepted for existing setups.
 `@tmux-canopy-icon-theme` and `@tmux-canopy-theme 'mono'` also work with `quiet`.
 Reload the plugin after changing `@tmux-canopy-appearance`, then reopen the
@@ -506,8 +509,9 @@ may be `minimal`, `normal`, `compact`, or `detailed`:
 
 The active pane has one green dot. Its session and window names are bold; fzf's
 highlight and cyan pointer identify the selected row. A minimal combined window
-row carries the dot when it contains the active pane. The default appearance
-shows folder and application icons; ASCII mode uses text markers.
+row carries the dot when it contains the active pane. The default and folders
+appearances show application icons, and folders adds folder icons; ASCII mode
+uses text markers.
 Explicitly configured icons remain in both. Expanded branches omit pane/client
 totals unless a Tree filter is active.
 An ordinary collapsed window shows a muted pane count at the right edge when
@@ -547,7 +551,7 @@ view shortcuts remain in help.
 Pending `MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
 hidden. Tree rows use branch guides and the ASCII fallback uses plain-text
-equivalents. Colored application icons apply in the default appearance.
+equivalents. Colored application icons apply in the quiet and folders appearances.
 
 ### Preview
 

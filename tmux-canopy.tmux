@@ -104,12 +104,13 @@ fi
 if [[ "$icon_theme" != 'nerdfont' && "$icon_theme" != 'unicode' && "$icon_theme" != 'ascii' ]]; then
   icon_theme=unicode
 fi
+# quiet, the tmux-ordered tree, is the default; folders keeps the directory-
+# grouped tree (places, its internal name, and classic are still accepted).
 case "$appearance" in
-  default|'') appearance=places ;;
-  ascii) appearance=places; icon_theme=ascii ;;
+  folders|places) appearance=places ;;
+  ascii) appearance=quiet; icon_theme=ascii ;;
   classic) appearance=classic ;; # Preserve explicitly configured older setups.
-  quiet) appearance=quiet ;;
-  *) appearance=places ;;
+  *) appearance=quiet ;;
 esac
 if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
   animate=on
