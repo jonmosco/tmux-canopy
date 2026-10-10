@@ -46,8 +46,9 @@ def main():
         try:
             first = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'one', '-x', '120', '-y', '30',
                        '-P', '-F', '#{pane_id}')
-            # Long enough that the tree scrolls.
-            for _ in range(24):
+            # Long enough that the tree scrolls, even with one row per
+            # single-pane window.
+            for _ in range(48):
                 tm('new-window', '-d', '-t', 'one:')
             tm('set-option', '-g', 'mouse', 'on')
             tm('set-option', '-g', 'status', 'off')

@@ -133,6 +133,8 @@ set -g @tmux-canopy-icon-theme nerdfont
 set -g @tmux-canopy-agents on
 set -g @tmux-canopy-width 38
 set -g @tmux-canopy-animate on
+set -g @tmux-canopy-alerts tmux
+set -g @tmux-canopy-appearance quiet
 set -g @demo_caption ''
 ''')
         try:
@@ -204,9 +206,9 @@ set -g @demo_caption ''
                 time.sleep(.6)
                 hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's2', 'agent_type': 'Plan'})
                 time.sleep(2.8)
+                # The real tmux alert takes over the status line for five seconds.
                 permission()
-                caption(f'{plain}An agent in another session needs approval')
-                time.sleep(3)
+                time.sleep(5.2)
                 caption(f'{key}n{plain}  jump straight to the waiting agent')
                 keys('n', pause=.2)
                 time.sleep(3.5)
@@ -240,17 +242,10 @@ set -g @demo_caption ''
                 keys('4', pause=.3)
                 time.sleep(2)
                 permission()
-                caption(f'{plain}An agent in another project needs approval')
-                time.sleep(2.5)
+                time.sleep(5.2)
                 caption(f'{key}n{plain}  jump to the blocker')
                 keys('n', pause=.2)
-                time.sleep(2)
-                keys('C-b', 'T', pause=.15)
-                tm('set-option', '-g', '@tmux-canopy-appearance', 'quiet')
-                tm('run-shell', str(ROOT / 'tmux-canopy.tmux'))
-                caption(f'{plain}Quiet mode keeps the tree, softens the chrome')
-                keys('C-b', 'T', pause=.15)
-                time.sleep(3)
+                time.sleep(2.5)
                 caption(f'{plain}Need more space? Open Canopy as a popup')
                 keys('C-b', 'T', pause=.15)
                 tm('set-option', '-g', '@tmux-canopy-mode', 'popup')

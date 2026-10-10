@@ -1,6 +1,6 @@
 # tmux-canopy
 
-[![Test](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml/badge.svg)](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/jonmosco/tmux-canopy?sort=semver)](https://github.com/jonmosco/tmux-canopy/releases/latest) [![Test](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml/badge.svg)](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml)
 
 **A tmux workspace tree and AI-agent monitor in one sidebar, with no daemon.**
 
@@ -10,9 +10,9 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=3)](docs/assets/canopy-demo.gif?v=3)
+[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=4)](docs/assets/canopy-demo.gif?v=4)
 
-**See every project. Spot the blocker. Jump to it with `n`.** This 19-second preview was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=3) for browsing, search, previews, Agents view, quiet appearance, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=3).
+**See every project. Spot the blocker. Jump to it with `n`.** This 19-second preview was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=4) for browsing, search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=4).
 
 ## Quick start
 
@@ -30,10 +30,10 @@ For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/cano
 
 ## Features
 
-- Sessions → windows → panes tree with distinct session/window symbols, numbered windows and panes, application icons, and an active-location marker. Directory groups keep related panes together.
+- Sessions → windows → panes in tmux's own order, each window once, with numbered windows and panes, application icons, and an active-location marker. Directories and Git branches show as details; idle shells are dimmed so what is running stands out.
 - Left or right placement; **left by default**.
 - Floating **popup modal** mode or adaptive **auto** switching on smaller displays (`@tmux-canopy-mode`).
-- Width-aware directory grouping, optional minimal and compact views, previews, and scrollable popup help.
+- Optional directory-grouped layout (`folders`), minimal and compact views, previews, and scrollable popup help.
 - Optional Git branch labels for panes and directory groups, without polling or changing repository state.
 - Global quick switching, including panes inside collapsed branches.
 - Tree filters for the current session, unread notifications, window names, and pane titles.
@@ -220,7 +220,7 @@ set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
 set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
-set -g @tmux-canopy-appearance 'default'  # default, quiet, or ascii
+set -g @tmux-canopy-appearance 'quiet'    # quiet (default), folders, or ascii
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 set -g @tmux-canopy-alerts 'off'     # desktop, tmux, or both: alert when an agent needs you
@@ -235,43 +235,44 @@ Reload your tmux configuration after changing settings. Close and reopen Canopy 
 
 ## The sidebar at a glance
 
-A sidebar with agent mode on, two Claude Code sessions, and a folded session:
+A sidebar with agent mode on, one agent waiting for approval, and a folded session:
 
 ```text
-╭─ Tree Agents Proc Buff ─ All       ① ②
-  ▼ app                              ③
-  ├─ ▼ 📂 api                        ④
-  │  ╰─ ▼ server                     ⑤
-  │     ├─ ✳ claude !            ▶   ⑥ ⑦ ⑧
-  │     │    ├─ Explore ●      <1m   ⑨
-  │     │    ╰─ Plan !         <1m
-  │     ╰─ zsh
-  ├─ ▼ 📂 web
-  │  ╰─ ▼ ui
-  │     ╰─ ✳ claude ●
-  ╰─ ▼ 📂 projects
-     ╰─ ▼ notes
-        ├─ zsh                   ●   ⑩
-        ╰─ zsh
-  ▶ scratch [2w]                     ⑪
+Tree · All                          ◆1/3   ① ②
+▾ ◈ acme                                   ③
+   ▾ ▣ 0:server             api ⎇ main     ④ ⑤
+   ●  ✳  1:claude                    !     ⑥ ⑦ ⑧
+            Explore                  ▷     ⑨
+            Plan                     !
+             2:zsh                         ⑩
+      ✳ 1:ui · claude      web ⎇ feat/ui   ⑪
+
+▾ ◈ notes
+      ▣ 0:today · zsh                ●     ⑫
+
+▸ ◈ scratch [2w]                           ⑬
 ───────────────────────────────────
-  Agents ◆1 ▷1  n jumps to input     ⑫
+ 1 Tree   4 Agents   n Next                ⑭
 ```
 
 | | What it shows | Keys |
 |---|---|---|
-| ① | **Views.** Tree, Agents, Processes, and Buffers; the highlighted one is open. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers |
-| ② | **Tree filter:** `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `F` or `Ctrl-f` |
-| ③ | **Session.** Bold when it is the one you are in. `▼` open, `▶` folded. | `h` / `l` fold and unfold, `H` / `L` all |
-| ④ | **Folder.** Panes grouped by their working directory. | |
-| ⑤ | **Window.** | `Enter` focus, `r` rename, `t` new window, `a` actions |
-| ⑥ | **Pane:** application icon and the command running in it. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
-| ⑦ | **Agent state:** `!` needs input, a pulsing `●` working, `✓` turn ended. | `n` next agent that needs input, `i` agent summary |
-| ⑧ | **Your current pane** (green `▶`). The highlighted row is what you are browsing; it can differ. | `Ctrl-o` jump back to your pane |
-| ⑨ | **Subagents** of the pane above, with their state and age. They disappear when they finish. | |
-| ⑩ | **Unread output** (amber `●`); a bell or a silence alert has its own mark. | `u` clear, `U` clear all |
-| ⑪ | **Folded session**, with the number of windows inside. | `l` unfold |
-| ⑫ | **Footer.** With agent mode on, every agent on the server, whatever the tree's filters and folds. With it off, your sessions, windows, and panes (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`), shown as visible/total while a filter hides some. | `n` jump to the agent waiting, `f` hide or show |
+| ① | **View and filter.** The open view (`Tree`, `Agents`, `Proc`, `Buff`) and the tree filter: `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
+| ② | **Agent summary:** the most urgent state and the total, such as `◆1/3` (one of three agents needs input). `▷` working, `✓` ended, `○` found by process only. | `n` jump to the agent waiting |
+| ③ | **Session**, a bold heading. Sessions are separated by a blank line. | `h` / `l` fold and unfold, `H` / `L` all |
+| ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
+| ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them: the session, a window, or a pane. | `canopy-branch`, `canopy-directory` at `prefix :` |
+| ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; it can differ. | `Ctrl-o` jump back to your pane |
+| ⑦ | **Pane:** application icon, pane index, and the command running in it. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
+| ⑧ | **Agent state** at the right edge: `!` needs input, `▷` working, `✓` turn ended. | `n` next agent that needs input, `i` agent summary |
+| ⑨ | **Subagents** of the pane above, with their own state. They disappear when they finish. | |
+| ⑩ | **An idle shell**, dimmed so running programs stand out. | |
+| ⑪ | **A window with one pane**, on one row. The command follows `·` when the window has another name. | |
+| ⑫ | **Unread output** (dim `●`); a bell or silence alert is amber. | `u` clear, `U` clear all |
+| ⑬ | **Folded session**, with the number of windows inside. | `l` unfold |
+| ⑭ | **Key hints.** | `f` hide or show |
+
+Prefer panes grouped by directory, with tab headers and tree guides? Set `@tmux-canopy-appearance 'folders'`.
 
 Press `g` in the sidebar for every symbol and color, and `?` for every key.
 
@@ -327,7 +328,7 @@ Press `Ctrl-r` in the sidebar after changing a setting by hand or switching bran
 
 ## Customizing the look
 
-By default, panes are grouped by working directory with folder and application icons, and labels adapt to the sidebar's width. For a quieter tree that follows tmux's own structure, opt in with `set -g @tmux-canopy-appearance 'quiet'`. It lists sessions, windows, and panes in tmux's order, each window once, with directories and Git branches as dim details on the right instead of folder rows. Sessions read as bold headings, a window holding one pane takes one row, and shells idling at their prompt are dimmed so what is running stands out. It replaces the view tabs with a compact `Tree · All` header, keeps the active pane dot by its name, and moves agent and unread marks to the right edge. The Tree footer becomes shortcut hints (`1 Tree`, `4 Agents`, `n Next` when agent mode is on); `f` still hides it. See the [visual example](docs/sidebar-visual-examples.html) (illustrative, not a screenshot). Set `@tmux-canopy-appearance 'ascii'` for the default layout without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows. Reload the plugin after changing appearance, then reopen the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).
+The default appearance, `quiet`, follows tmux's own structure: sessions, windows, and panes in tmux's order, each window once, with directories and Git branches as dim details on the right. Sessions read as bold headings, a window holding one pane takes one row, and shells idling at their prompt are dimmed so what is running stands out. A compact `Tree · All` header replaces the view tabs, the active pane dot sits by its name, agent and unread marks sit at the right edge, and the footer shows key hints (`f` hides it). Set `@tmux-canopy-appearance 'folders'` to group panes by working directory with folder rows, view tabs, and tree guides instead, `ascii` for `quiet` without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows. Reload the plugin after changing appearance, then reopen the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).
 
 See the [configuration and command reference](docs/reference.md) for every control, appearance setting, notification option, and the architecture.
 

@@ -74,7 +74,9 @@ sleep 0.3
 assert_eq '1' "$("${TMUX_TEST[@]}" show-option -wqv -t "$source_window" @tmux_canopy_notice_activity)" 'activity provider records a window notification'
 notice_file="$(mktemp)"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE=/dev/null TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/tree-source' > '$notice_file'"
-grep -F "P:$target" "$notice_file" | grep -Fq $'\033[1;33m●' || fail 'tree renders one amber pane activity badge'
+# quiet (the default) draws plain activity dim, on the pane row or, for a
+# single-pane window, on the window row.
+grep -E "^(P:$target|W:$source_window)" "$notice_file" | grep -Fq $'\033[2m●' || fail 'tree renders one dim pane activity badge'
 if grep -E '^([SW]):' "$notice_file" | grep -Fq $'\033[1;33m'; then fail 'expanded ancestors must not repeat pane notifications'; fi
 rm -f "$notice_file"
 run_in_server "$target" "'$PROJECT_DIR/scripts/notify' clear-window '$source_window'"
@@ -323,7 +325,9 @@ run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='cl
 # Query through the private server so tree-source sees its TMUX environment.
 marker_file="$(mktemp)"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/tree-source' > '$marker_file'"
-grep -F "P:$move_source_pane" "$marker_file" | grep -Fq '⇢' || fail 'move source is visibly marked in the tree'
+# A single-pane window is one row in quiet (the default), so the mark may sit there.
+move_source_window="$("${TMUX_TEST[@]}" display-message -p -t "$move_source_pane" '#{window_id}')"
+grep -E "^(P:$move_source_pane|W:$move_source_window)" "$marker_file" | grep -Fq '⇢' || fail 'move source is visibly marked in the tree'
 rm -f "$marker_file"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_CANOPY_WIDTH=42 TMUX_CANOPY_SCOPE=global TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' complete-move 'P:$move_source_pane' 'P:$move_destination_pane' right"
 sleep 0.3
