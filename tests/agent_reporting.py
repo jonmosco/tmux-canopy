@@ -95,6 +95,30 @@ for order in ("request-first", "notification-first"):
     send("claude", {"hook_event_name": "PostToolUse", "session_id": "pp1", "tool_name": "Bash"})
     check(state["status"] == "working" and not state["request"], f"{order}: approval clears the request: {state}")
 
+# A long Claude conversation can move to a new session id (compaction, /clear,
+# resume) inside the same process. The pane follows it instead of discarding
+# every later report; another process, or a late event from the old session,
+# still cannot take over.
+state = harness("claude")
+send("claude", {"hook_event_name": "SessionStart", "session_id": "long-1"})
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "long-1"})
+send("claude", {"hook_event_name": "SessionStart", "session_id": "long-2", "source": "compact"})
+check(state["session"] == "long-2" and state["status"] == "working",
+      f"a compact start adopts the new session id without resetting the turn: {state}")
+send("claude", {"hook_event_name": "Stop", "session_id": "long-2"})
+check(state["status"] == "turn-ended", f"reports under the new id are kept: {state}")
+send("claude", {"hook_event_name": "UserPromptSubmit", "session_id": "long-3"})
+check(state["session"] == "long-3" and state["status"] == "working",
+      f"a new prompt from the same process adopts its session even with no start: {state}")
+send("claude", {"hook_event_name": "Stop", "session_id": "long-2"})
+check(state["session"] == "long-3" and state["status"] == "working", f"a late Stop from the old session is ignored: {state}")
+same = core.process_identity
+core.process_identity = lambda root, agent_kind="codex": ("9999", "456")
+send("claude", {"hook_event_name": "SessionStart", "session_id": "other", "source": "compact"})
+check(state["session"] == "long-3" and state["status"] == "working",
+      f"a compact start from another process changes nothing: {state}")
+core.process_identity = same
+
 # Copilot CLI passes the event name as an argument; its payload is camelCase.
 state = harness("copilot")
 for name, event, expected in [
