@@ -2,28 +2,7 @@
 
 ## Unreleased
 
-### Changed
-
-- Default and quiet trees distinguish sessions and windows with object symbols, show window and pane indexes, bold the current window, and honor window folds within directory groups with pane counts and rolled-up attention.
-- The mouse wheel now scrolls the Help and Legend popups three lines at a time. Clicks do not run commands, and mouse reporting is restored when the popup closes.
-- The README demo is now a shorter real-tmux agent workflow with a smaller sidebar, balanced content panes, and smaller text, plus a walkthrough of browsing, search, previews, Agents view, quiet appearance, and popup mode. Both recordings are reproducible from `docs/demo/record.py` using fictional fixtures.
-
-- Clicking a sidebar row while another pane has focus keeps the clicked row selected, as file-tree sidebars do. Previously the sidebar usually jumped back to the active pane's row. Entering the sidebar from the keyboard still selects the active pane's row.
-- The mouse wheel scrolls the sidebar's tree without moving the selection; previously every wheel event moved the selection one row, which made trackpad scrolling race through the list.
-- The preview drawer starts hidden. Press `p` to open it. `@tmux-canopy-preview auto` still shows it when the sidebar is tall enough.
-- Press `A` in the sidebar to turn agent mode on or off for this client. Tree stays available. `@tmux-canopy-agents` is only the default until a client chooses. Integrations stay installed when the mode is off.
-- The Agents tab sits beside Tree (`Tree Agents Proc Buff`) instead of after Buffers.
-- Lazygit rows drop the window index, window icon, and `·hook` label. Working and needs-input are a `▷` or `!` at the row edge. The full status remains in the drawer.
-- Pi and Oh My Pi are no longer labeled `node` when Node is only the runtime. Other Node processes stay `node`.
-- Pi's sidebar icon is π, the mark used on [pi.dev](https://pi.dev/). Oh My Pi uses the same π in yellow, matching the orange accent on its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg).
-- Nerd Font agent icons use Codicons where those marks exist: Claude, OpenAI/Codex, Cursor, and Gemini's four-point star. OpenCode stays a code glyph because its logo is a pixel wordmark. Antigravity keeps an orbit glyph.
-- Refreshes are faster. With Pi or other Node panes open, a refresh no longer re-reads the process table once per Node pane (about 870 ms down to about 60 ms with three such panes), and every refresh makes fewer tmux calls.
-- Moving focus renders the tree once instead of twice, and `Ctrl-o` also refreshes the list as it moves the pointer.
-- Resizing or splitting ordinary panes no longer starts a shell; Canopy's hooks check for a sidebar inside tmux first. Bursts of pane-command changes in agent mode share one refresh.
-- The `WORKING` animation precomputes its frames, starts far fewer processes per frame, loops without a visible jump, and keeps its position across refreshes.
-- Subagent lines in the default appearance use the same marks as their pane: `▷` working (animated) and `!` needs input, with the age at the edge. `classic` keeps the status words.
-- In the Buffers view, `x` arms deletion and a second `x` within five seconds deletes the buffer, as for panes, windows, and sessions. The actions menu item is now **Delete (arm)**.
-- Unnamed windows and panes show a dimmed placeholder name.
+## 0.1.0 - 2026-10-10
 
 ### Added
 
@@ -57,8 +36,6 @@
 - The active-location dot stays visible on the nearest collapsed window or session and returns to the pane row when expanded.
 - Leaving or returning focus to the sidebar, or pressing `Ctrl-o`, moves the pointer to the current pane or its visible parent without activating a different pane.
 - Agents view (`4`) groups panes with detected Codex or Claude processes beneath their sessions and windows, with agent counts on parent rows.
-
-
 - Tree filters for All, Current session, and Unread, with optional window-name and pane-title filters, native controls, and matching-pane navigation.
 - Ctrl-g global quick switcher searches sessions, windows, and panes inside collapsed branches without changing tree state.
 - Optional compact rows for single-pane windows via `@tmux-canopy-compact-single-panes`.
@@ -69,20 +46,34 @@
 
 ### Changed
 
+- Default and quiet trees distinguish sessions and windows with object symbols, show window and pane indexes, bold the current window, and honor window folds within directory groups with pane counts and rolled-up attention.
+- The mouse wheel now scrolls the Help and Legend popups three lines at a time. Clicks do not run commands, and mouse reporting is restored when the popup closes.
+- The README demo is now a shorter real-tmux agent workflow with a smaller sidebar, balanced content panes, and smaller text, plus a walkthrough of browsing, search, previews, Agents view, quiet appearance, and popup mode. Both recordings are reproducible from `docs/demo/record.py` using fictional fixtures.
+- Clicking a sidebar row while another pane has focus keeps the clicked row selected, as file-tree sidebars do. Previously the sidebar usually jumped back to the active pane's row. Entering the sidebar from the keyboard still selects the active pane's row.
+- The mouse wheel scrolls the sidebar's tree without moving the selection; previously every wheel event moved the selection one row, which made trackpad scrolling race through the list.
+- The preview drawer starts hidden. Press `p` to open it. `@tmux-canopy-preview auto` still shows it when the sidebar is tall enough.
+- Press `A` in the sidebar to turn agent mode on or off for this client. Tree stays available. `@tmux-canopy-agents` is only the default until a client chooses. Integrations stay installed when the mode is off.
+- The Agents tab sits beside Tree (`Tree Agents Proc Buff`) instead of after Buffers.
+- Lazygit rows drop the window index, window icon, and `·hook` label. Working and needs-input are a `▷` or `!` at the row edge. The full status remains in the drawer.
+- Pi and Oh My Pi are no longer labeled `node` when Node is only the runtime. Other Node processes stay `node`.
+- Pi's sidebar icon is π, the mark used on [pi.dev](https://pi.dev/). Oh My Pi uses the same π in yellow, matching the orange accent on its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg).
+- Nerd Font agent icons use Codicons where those marks exist: Claude, OpenAI/Codex, Cursor, and Gemini's four-point star. OpenCode stays a code glyph because its logo is a pixel wordmark. Antigravity keeps an orbit glyph.
+- Refreshes are faster. With Pi or other Node panes open, a refresh no longer re-reads the process table once per Node pane (about 870 ms down to about 60 ms with three such panes), and every refresh makes fewer tmux calls.
+- Moving focus renders the tree once instead of twice, and `Ctrl-o` also refreshes the list as it moves the pointer.
+- Resizing or splitting ordinary panes no longer starts a shell; Canopy's hooks check for a sidebar inside tmux first. Bursts of pane-command changes in agent mode share one refresh.
+- The `WORKING` animation precomputes its frames, starts far fewer processes per frame, loops without a visible jump, and keeps its position across refreshes.
+- Subagent lines in the default appearance use the same marks as their pane: `▷` working (animated) and `!` needs input, with the age at the edge. `classic` keeps the status words.
+- In the Buffers view, `x` arms deletion and a second `x` within five seconds deletes the buffer, as for panes, windows, and sessions. The actions menu item is now **Delete (arm)**.
+- Unnamed windows and panes show a dimmed placeholder name.
 - Sidebar reloads from `cleanup refresh` skip clients mid window-transition so slot creation does not flash a stale tree.
 - Antigravity now uses its documented `PreInvocation`, `PostToolUse`, and `Stop` hooks in a named `~/.gemini/config/hooks.json` entry. Reinstalling the integration removes the older unsupported hook entries from Antigravity CLI settings. Its reporter never grants tool permission; verified permission and subagent states are unavailable until Antigravity exposes those events.
 - Agent awareness is opt-in through `@tmux-canopy-agents on`; the default sidebar focuses on tmux navigation, processes, and buffers. Agent tabs, controls, labels, scans, and pane-command monitoring are hidden until enabled.
-
 - Show a tmux session glyph instead of the inline dash; retain Unicode, ASCII, and custom-icon fallbacks.
-
 - Bind Codex reports to the live process and refresh expiring reports; accelerate the Agents view process scan on Linux.
 - Stabilize multiline sidebar selection coverage with fzf’s local state API.
-
 - Simplified Tree rows with one active marker, emphasized parent names, shorter prefixes, compact counts, adaptive directory labels, and grouping for adjacent panes sharing a directory.
 - Added a `minimal` density preset that combines single-pane windows and keeps multi-pane windows to one line per pane.
 - Show ordinary pane counts only on collapsed windows, aligned to the right edge; expanded shared-directory groups have no count.
-
-
 - Notifications use one amber badge beside each affected pane, with counts on collapsed branches and full types in previews.
 
 ### Fixed
@@ -107,12 +98,9 @@
 - Mouse clicks, scrolling, and keys in the sidebar were sometimes ignored while an agent was working: each frame of the `WORKING` animation reloads the list, and fzf drops input that arrives during a reload (about one click in five). While the sidebar has focus, the animation now runs slower and holds still for about two seconds after any input.
 - A global `detach-on-destroy on` is honored when the last session ends, so the dock is no longer briefly parked in an unrelated session (which resized its applications). The synchronize-panes toggle likewise reads an inherited global value.
 - Right-aligned counts and pane continuation lines align correctly on macOS, whose awk measures UTF-8 text in bytes.
-
 - TPM loads the legacy compatibility entrypoint without applying Canopy twice.
 - Sidebar navigation preserves split proportions when a hidden window resizes to the active terminal, preventing content panes from collapsing to one column.
-
 - Slot navigation uses native empty panes, fixing new-window follow failures on macOS caused by `sleep infinity`.
-
 - Buffer names containing separators now retain their exact identity through preview, paste, and deletion.
 - Configuration reloads restore obsolete bindings and disabled notification monitors, preserving later user overrides.
 - Leaving search restores the full object list.
