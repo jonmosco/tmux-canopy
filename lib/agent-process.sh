@@ -26,7 +26,7 @@ canopy_load_ps_snapshot() {
     argv0=${argv0##*/}
     CANOPY_COMM[$pid]=${argv0%.exe}
     case "${CANOPY_COMM[$pid]}" in
-      node|nodejs|pi|omp) ;;
+      node|nodejs|pi|omp|hermes|hermes-agent|python|Python|python[0-9]|python[0-9].*) ;;
       *) continue ;;
     esac
     read -ra rest_args <<< "$rest"
@@ -35,6 +35,29 @@ canopy_load_ps_snapshot() {
     CANOPY_KIND_PIDS+=("$pid")
   done <<< "$raw"
   return "$canopy_ps_status"
+}
+# Hermes runs as Python: its installer shim's -c launcher imports hermes_cli
+# (ps splits that source into words, so any word counts), and its TUI is
+# `python -m tui_gateway`. Any other Python process stays python.
+canopy_hermes_args() {
+  local token base module=0
+  for token in "$@"; do
+    [[ $token == *hermes_cli* ]] && return 0
+  done
+  for token in "$@"; do
+    if ((module)); then
+      [[ ${token%%.*} == tui_gateway ]]
+      return
+    fi
+    [[ $token == -m ]] && { module=1; continue; }
+    [[ $token == -* ]] && continue
+    # The first operand is the script; anything after it is its arguments.
+    base=${token##*/}
+    base=${base%.exe}
+    [[ $base == hermes || $base == hermes-agent ]]
+    return
+  done
+  return 1
 }
 # Pi and Oh My Pi exec through Node. A node/nodejs argv0 is those agents only
 # when a later argument is their launcher; every other Node process stays node.
@@ -46,7 +69,11 @@ canopy_hosted_agent() {
   host=${host%.exe}
   case "$host" in
     pi|omp) CANOPY_REPLY=$host; printf '%s' "$host"; return 0 ;;
+    hermes|hermes-agent) CANOPY_REPLY=hermes; printf 'hermes'; return 0 ;;
     node|nodejs) ;;
+    python|Python|python[0-9]|python[0-9].*)
+      canopy_hermes_args "$@" || return 1
+      CANOPY_REPLY=hermes; printf 'hermes'; return 0 ;;
     *) return 1 ;;
   esac
   for token in "$@"; do
@@ -96,7 +123,8 @@ canopy_ps_snapshot_lines() {
   local pid
   CANOPY_REPLY=''
   for pid in "${!CANOPY_PPID[@]}"; do
-    CANOPY_REPLY+="$pid ${CANOPY_PPID[$pid]} ${CANOPY_COMM[$pid]}"$'\n'
+    # A hosted agent (Pi under node, Hermes under python) is listed as itself.
+    CANOPY_REPLY+="$pid ${CANOPY_PPID[$pid]} ${CANOPY_KIND[$pid]:-${CANOPY_COMM[$pid]}}"$'\n'
   done
   printf '%s' "$CANOPY_REPLY"
 }
@@ -153,7 +181,8 @@ canopy_process_identity() {
   # using a single cached process-table snapshot instead of a ps call per
   # ancestor (see canopy_load_ps_snapshot above).
   canopy_load_ps_snapshot
-  canopy_agent_name_matches "${CANOPY_COMM[$pid]:-}" "$kind" || return 1
+  # A hosted agent's own name is its host's (node, python); its kind is not.
+  canopy_agent_name_matches "${CANOPY_KIND[$pid]:-${CANOPY_COMM[$pid]:-}}" "$kind" || return 1
   # ps pads single-digit days ("Oct  1"); the snapshot keeps single spaces.
   local -a birth_fields
   read -ra birth_fields <<< "$birth"
@@ -169,7 +198,7 @@ canopy_process_identity() {
 canopy_agent_name_matches() {
   local target=${1%.exe}
   case "$2:$target" in
-    codex:codex|claude:claude|claude:claude-code|opencode:opencode|gemini:gemini|pi:pi|omp:omp|agy:agy|agy:antigravity|cursor-agent:agent|copilot:copilot|grok:grok) return 0 ;;
+    codex:codex|claude:claude|claude:claude-code|opencode:opencode|gemini:gemini|pi:pi|omp:omp|agy:agy|agy:antigravity|cursor-agent:agent|copilot:copilot|grok:grok|hermes:hermes|hermes:hermes-agent) return 0 ;;
     *) return 1 ;;
   esac
 }

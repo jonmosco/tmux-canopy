@@ -11,7 +11,7 @@ text() { printf '#{s/[\001-\037\177]/ /:%s}' "$1"; }
 config="D${sep}#{@tmux_canopy_icon_theme}${sep}#{@tmux_canopy_notifications}${sep}#{@tmux-canopy-theme}${sep}#{@tmux-canopy-density}${sep}$(text @tmux-canopy-icon-session)${sep}$(text @tmux-canopy-icon-window)${sep}$(text @tmux-canopy-icon-pane)${sep}#{pane_id}${sep}#{window_id}${sep}#{session_id}${sep}#{pane_width}${sep}$(text host)${sep}#{@tmux-canopy-compact-single-panes}${sep}$(text @tmux-canopy-filter)${sep}$(text @tmux-canopy-filter-window)${sep}$(text @tmux-canopy-filter-title)"
 # Keep overrides in the same batched tmux snapshot as the tree. The renderer
 # reads these fields in this order, after the existing configuration fields.
-for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush copilot grok; do
+for app in nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush copilot grok hermes; do
   config+="${sep}$(text "@tmux-canopy-icon-$app")"
 done
 # Appearance before agents so agents remains the final D field for tree-source.
@@ -74,7 +74,7 @@ done
 # tmux reports Pi's executable (node). Show pi/omp when that process is the agent.
 # Only a pane row's command field counts; a window or title named node does not.
 field="[^${sep}]*${sep}"
-node_row="(^|"$'\n'")P${sep}${field}${field}${field}(node|nodejs)${sep}"
+node_row="(^|"$'\n'")P${sep}${field}${field}${field}(node|nodejs|python[0-9.]*|Python)${sep}"
 if [[ "$snapshot" =~ $node_row ]]; then
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/../lib/agent-process.sh"
@@ -84,7 +84,7 @@ if [[ "$snapshot" =~ $node_row ]]; then
   while IFS= read -r line || [[ -n $line ]]; do
     if [[ $line == P$sep* ]]; then
       IFS="$sep" read -ra fields <<< "$line"
-      if [[ ${fields[4]:-} == node || ${fields[4]:-} == nodejs ]]; then
+      if [[ ${fields[4]:-} =~ ^(node|nodejs|python[0-9.]*|Python)$ ]]; then
         canopy_pane_agent "${fields[16]:-}" >/dev/null
         kind=$CANOPY_REPLY
         if [[ -n $kind ]]; then

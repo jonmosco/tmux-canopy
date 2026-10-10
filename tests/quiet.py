@@ -23,7 +23,7 @@ def main():
             state.write_text(state_text)
             d = ['D', icons, 'activity,bell', theme, 'normal', '', '', '',
                  '%0', '@0', '$0', str(width), 'host']
-            d.extend([''] * (38 - len(d)))
+            d.extend([''] * (39 - len(d)))
             d.extend([appearance, '', 'on' if agents else 'off'])
             pane = ['P', '%0', '@0', '0', 'claude', '', '/projects/api', '0', '', '',
                     '', '', '', '', '', '0', '100', 'claude-hook', 'session', '100',

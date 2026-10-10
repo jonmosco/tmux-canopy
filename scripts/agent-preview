@@ -35,9 +35,17 @@ case "$base" in
   codex) kind=codex ;;
   claude|claude-code) kind=claude ;;
   opencode|gemini|pi|omp|agy|crush|copilot|grok) kind=$base ;;
+  hermes|hermes-agent) kind=hermes ;;
   antigravity) kind=agy ;;
   agent) kind=cursor-agent ;;
 esac
+if [[ -z "$kind" && "$pid" =~ ^[0-9]+$ && "$base" =~ ^(node|nodejs|python[0-9.]*|Python)$ ]]; then
+  # A runtime is the agent only when it hosts one (Pi under node, Hermes under
+  # python); its process name alone cannot say.
+  # shellcheck disable=SC1091
+  source "$(dirname "$0")/../lib/agent-process.sh"
+  canopy_pane_agent "$pid" >/dev/null && kind=$CANOPY_REPLY
+fi
 if [[ -z "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
   # Agents can be children of a pane shell. Resolve only descendants of that
   # pane, and prefer the closest matching process when there is more than one.
@@ -69,6 +77,7 @@ case "$kind" in
   crush) agent='Crush' ;;
   copilot) agent='Copilot CLI' ;;
   grok) agent='Grok Build' ;;
+  hermes) agent='Hermes' ;;
 esac
 if [[ -z "$agent" ]]; then
   printf 'No supported agent process found in pane %s.\n' "$pane"

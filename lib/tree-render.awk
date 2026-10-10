@@ -16,11 +16,11 @@ $1 == "D" {
     icons=($2 == "" ? "unicode" : $2); notices=($3 == "" ? "none" : $3)
     theme=($4 == "" ? "ansi" : $4); density=($5 == "" ? "normal" : $5)
     custom_s=$6; custom_w=$7; custom_p=$8
-    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush copilot grok",icon_keys," ")
+    nicons=split("nvim vim shell node python git ssh kubectl claude codex gemini pi omp opencode agent antigravity make top crush copilot grok hermes",icon_keys," ")
     for (i=1;i<=nicons;i++) icon_override[icon_keys[i]]=$(17+i)
-    appearance=($39 == "lazygit" || $39 == "pills" || $39 == "places" || $39 == "quiet" ? $39 : "classic")
-    # Standalone/legacy snapshots still end with agents at field 40.
-    agents_enabled=($41 == "on" || (NF == 40 && $40 == "on"))
+    appearance=($40 == "lazygit" || $40 == "pills" || $40 == "places" || $40 == "quiet" ? $40 : "classic")
+    # Standalone/legacy snapshots still end with agents at field 41.
+    agents_enabled=($42 == "on" || (NF == 41 && $41 == "on"))
     if (!agents_enabled) agent_view=0
     current_p=$9; current_w=$10; current_s=$11; width=$12; host=$13; compact_single=($14 == "on" || density == "minimal")
     if (!filter_set) filter=$15
@@ -60,7 +60,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     pid=process_field[1]; parent[pid]=process_field[2]
     name=process_field[3]; sub(/^.*\//,"",name); sub(/\.exe$/,"",name)
     process_name[pid]=name
-    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush" || name=="copilot" || name=="grok") agent_process[pid]=name
+    if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush" || name=="copilot" || name=="grok" || name=="hermes") agent_process[pid]=name
     else if (name=="antigravity") agent_process[pid]="agy"
     else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
     else if (name=="agent") agent_process[pid]="cursor-agent"
@@ -548,7 +548,7 @@ function canonical_agent(value) {
     if (value == "claude-code") return "claude"
     if (value == "agent") return "cursor-agent"
     if (value == "antigravity") return "agy"
-    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent" || value == "crush" || value == "copilot" || value == "grok") return value
+    if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent" || value == "crush" || value == "copilot" || value == "grok" || value == "hermes") return value
     return ""
 }
 function agent_name(kind) {
@@ -561,6 +561,7 @@ function agent_name(kind) {
     if (kind == "agy") return "Antigravity"
     if (kind == "cursor-agent") return "cursor-agent"
     if (kind == "crush") return "Crush"
+    if (kind == "hermes") return "Hermes"
     if (kind == "copilot") return "Copilot CLI"
     if (kind == "grok") return "Grok Build"
     return kind
@@ -903,7 +904,7 @@ function appcolor_lookup(value, n, parts) {
     if (value ~ /^(kubectl|k9s)$/) return icon_blue
     if (value ~ /^(ssh|codex|top|htop|btop|agy)$/) return icon_cyan
     if (value == "pi" || value == "crush") return icon_purple
-    if (value == "omp") return icon_yellow
+    if (value == "omp" || value == "hermes") return icon_yellow
     if (value == "opencode" || value == "agent" || value == "cursor-agent" || value == "copilot" || value == "grok") return icon_neutral
     if (value ~ /^(claude|claude-code)$/) return icon_yellow
     if (value == "gemini") return icon_blue
@@ -929,6 +930,7 @@ function app_key(value) {
     if (value ~ /^(make|cmake|ninja)$/) return "make"
     if (value ~ /^(top|htop|btop)$/) return "top"
     if (value == "crush") return "crush"
+    if (value == "hermes") return "hermes"
     if (value == "copilot") return "copilot"
     if (value == "grok") return "grok"
     return ""
@@ -959,6 +961,7 @@ function appicon_lookup(value, n, parts,key,override) {
         if (value == "agent" || value == "cursor-agent") return "▸"
         if (value ~ /^(agy|antigravity)$/) return "◎"
         if (value == "crush") return "❖"
+        if (value == "hermes") return "⚕"
         if (value == "copilot") return "⊚"
         if (value == "grok") return "⨯"
         if (value ~ /^(make|cmake|ninja)$/) return "✱"
@@ -981,6 +984,8 @@ function appicon_lookup(value, n, parts,key,override) {
     if (value == "agent" || value == "cursor-agent") return ""
     if (value ~ /^(agy|antigravity)$/) return "󰀘"
     if (value == "crush") return "❖"
+    # Nerd Fonts has no Hermes mark; the plain Unicode staff renders in any font.
+    if (value == "hermes") return "⚕"
     if (value == "copilot") return ""
     if (value == "grok") return "⨯"
     if (value ~ /^(make|cmake|ninja)$/) return ""
