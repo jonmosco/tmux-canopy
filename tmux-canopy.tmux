@@ -199,6 +199,14 @@ fi
 # Dedicated array indexes avoid replacing hooks owned by the user's
 # configuration or other plugins. Reloading removes stale hooks when modes
 # change.
+# Canopy's own commands, typed at prefix-: or run as `tmux canopy-branch`. They
+# sit at indexes Canopy owns, so a reload replaces them and never touches the
+# user's aliases. An alias cannot pass an argument to run-shell, so each one
+# toggles; `canopy details` and the settings take on and off.
+canopy_queue set-option -suq 'command-alias[9100]'
+canopy_queue set-option -suq 'command-alias[9101]'
+canopy_queue set-option -s 'command-alias[9100]' "canopy-branch=$(plugin_job -b details branch toggle)"
+canopy_queue set-option -s 'command-alias[9101]' "canopy-directory=$(plugin_job -b details directory toggle)"
 canopy_queue set-hook -gu 'after-select-window[9001]'
 canopy_queue set-hook -gu 'after-new-window[9001]'
 canopy_queue set-hook -gu 'client-session-changed[9001]'

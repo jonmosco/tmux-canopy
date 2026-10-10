@@ -19,10 +19,10 @@ def main():
             data = [
                 ['D', icons, 'activity,bell' if notices else 'none', 'mono', density, '', '', '', '%0', '@0', '$0', str(width), 'host', compact],
                 ['S', '$0', 'work', '1'],
-                ['W', '$0', '@0', '0', 'main', '2' if linked else '1', 'off', '', '', ''],
+                ['W', '$0', '@0', '0', 'main', '2' if linked else '1', 'off', '1' if notices else '', '1' if notices else '', ''],
             ]
             if linked:
-                data += [['S', '$1', 'linked', '0'], ['W', '$1', '@0', '1', 'main', '2', 'off', '', '', '']]
+                data += [['S', '$1', 'linked', '0'], ['W', '$1', '@0', '1', 'main', '2', 'off', '1' if notices else '', '1' if notices else '', '']]
             for i, path in enumerate(paths):
                 data.append(['P', f'%{i}', '@0', str(i), 'bash', '', path, '0', '', '', '1' if notices else '', '1' if notices else '', '', '', '', ''])
             if internal:
@@ -60,6 +60,23 @@ def main():
             rows = render(['/work/project'], icons=icons, appearance='places', collapsed_dir=True)
             folder = next(row[1] for row in rows if row[0].startswith('DIR:'))
             assert closed in folder, (icons, folder)
+        for appearance in ('places', 'quiet'):
+            for icons, session_icon, window_icon in (('unicode', '◈', '▣'),
+                                                     ('ascii', 'S', 'W'),
+                                                     ('nerdfont', '', '󰖯')):
+                rows = render(['/work/project']*2, appearance=appearance, icons=icons)
+                assert session_icon in rows[0][1], rows
+                window = next(row[1] for row in rows if row[0] == 'W:@0:$0')
+                assert f'{window_icon} 0:main' in window, window
+                panes = [row[1] for row in rows if row[0].startswith('P:')]
+                assert '0:bash' in panes[0] and '1:bash' in panes[1], panes
+                folded = render(['/work/project']*2, appearance=appearance, icons=icons,
+                                collapsed=True, linked=True, notices=True)
+                assert not any(row[2].startswith('P:') and row[2].endswith(':$0') for row in folded)
+                assert len([row for row in folded if row[0].startswith('P:')]) == 2
+                window = next(row[1] for row in folded if row[0] == 'W:@0:$0')
+                assert '[2p]' in window and ('>' if icons == 'ascii' else '▶') in window, window
+                assert ('B' if icons == 'ascii' else '🔔' if icons == 'unicode' else '') in window
         for paths in (['/work/project'], ['/work/project', '/other/project'], ['', '/work/project'], ['', '']):
             rows = render(paths)
             assert all('\n' not in row[1] for row in rows if row[0].startswith('W:'))

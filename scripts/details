@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Show, hide, or toggle the tree's directory and Git branch details, then
+# refresh every open sidebar. The canopy-branch and canopy-directory tmux
+# commands (toggles) and `canopy details` run this.
+#   details branch|directory [on|off|toggle]
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+usage() { printf 'usage: details branch|directory [on|off|toggle]\n' >&2; exit 2; }
+what="${1:-}" action="${2:-toggle}"
+case "$what" in
+  branch) option=@tmux-canopy-git-context shown=branch default=off ;;
+  directory) option=@tmux-canopy-directory shown=on default=on ;;
+  *) usage ;;
+esac
+current="$(tmux show-option -gqv "$option" 2>/dev/null)"
+[[ -n "$current" ]] || current=$default
+case "$action" in
+  on) value=$shown ;;
+  off) value=off ;;
+  toggle) if [[ "$current" == "$shown" ]]; then value=off; else value=$shown; fi ;;
+  *) usage ;;
+esac
+tmux set-option -g "$option" "$value" || exit 1
+refresh_sidebars
+state=shown
+[[ "$value" != off ]] || state=hidden
+# Under run-shell, a message reaches the client; on a terminal, print it.
+if [[ -t 1 ]]; then
+  printf '%s details %s\n' "$what" "$state"
+else
+  tmux display-message "Canopy: $what details $state" 2>/dev/null || true
+fi

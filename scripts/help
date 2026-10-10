@@ -111,6 +111,7 @@ help_records() {
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'Set @tmux-canopy-appearance quiet for the same grouped tree with a quieter header, guides and right-edge attention marks. Default is unchanged. Reload the plugin and reopen the sidebar after changing it; quiet also works with ASCII icons and mono.'
   note 'Optional: set @tmux-canopy-git-context branch for read-only Git branch labels. Narrow rows omit them; pane previews show the full branch. Ctrl-r updates branch or directory changes.'
+  note 'Toggle branch labels or quiet directory details anywhere with prefix-: canopy-branch or canopy-directory.'
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. Default off.'
   note 'Press Shift-a to show or hide agent mode. @tmux-canopy-agents on is only the default for clients that have not chosen. Integrations stay installed either way.'
   note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight. Session and window selections use their active content pane.'
@@ -126,7 +127,8 @@ legend_records() {
   legend_item '📂 api' 'Folder: panes grouped by working directory. h / l fold and unfold it.'
   note 'Session and window names use the tree guides; they have no default icon.'
   legend_item '├─ ╰─ │' 'Tree guides show which pane belongs to which window and session.' dim
-  legend_item 'dotfiles' 'Window name. The classic appearance adds the index, as in 1:dotfiles.'
+  legend_item '◈ work / ▣ 1:server' 'Session and numbered window. Directory groups keep related panes together; h / l also fold windows.'
+  legend_item '0:claude' 'Pane index and command in the grouped tree. Numbers are tmux indexes, not agent counts.' dim
   legend_item '2p' 'Two content panes hidden in a collapsed window. Sidebar and reserve panes are excluded.' dim
   legend_item '[11w]' 'Eleven windows inside a collapsed session.' dim
   legend_item '[1/2p]' 'With a filter, one of two panes matches inside a collapsed window.' dim

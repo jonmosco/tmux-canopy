@@ -257,6 +257,7 @@ Set options before loading the plugin:
 ```tmux
 set -g @tmux-canopy-mode 'sidebar' # 'sidebar', 'popup', or 'auto'
 set -g @tmux-canopy-git-context 'off' # 'branch' to show read-only Git context
+set -g @tmux-canopy-directory 'on' # 'off' hides quiet's directory details
 set -g @tmux-canopy-popup-threshold '100' # column width below which 'auto' uses popup
 set -g @tmux-canopy-popup-width '85%' # popup modal width (% or columns)
 set -g @tmux-canopy-popup-height '80%' # popup modal height (% or lines)
@@ -423,15 +424,39 @@ The option model is provider-neutral: each notification provider owns a namespac
 ### Appearance
 
 `@tmux-canopy-appearance` defaults to `default`, grouping panes by working
-directory and showing folder and application icons. `quiet` is an opt-in variant
-of that tree, with the same sessions, folders, windows, panes, folds, filters,
-actions, agent rows, and selection identities. It replaces the tab bar with a
+directory and showing folder and application icons. Session symbols (`◈`) and
+window symbols (`▣`) distinguish tmux objects from folders; windows show their
+index (`▣ 1:server`) and panes show their index before the command (`0:claude`).
+These numbers are tmux indexes, not agent counts. Window names are bold at the
+current location. Window folds hide their panes inside each directory group
+and show pane counts and rolled-up attention. ASCII uses `S` and `W`; Nerd Font
+and custom session/window icons are respected. `quiet` is an opt-in variant
+that follows tmux's own structure instead of grouping by folder, with the same
+sessions, windows, panes, folds, filters, actions, agent rows, and selection
+identities.
+
+In `quiet`, sessions, windows, and panes appear in tmux's order and each window
+appears once, even when its panes are in different directories. A directory, and
+its Git branch when enabled, is a dim detail at the right of the highest row whose
+panes all share it: the session heading when the whole session is in one
+directory, otherwise each window whose panes agree, otherwise each pane of a mixed
+window. Nothing mixed claims one directory or branch. On a narrow row the detail
+gives way first: the branch is shortened, then dropped, then the directory, so the
+name and marks always fit. Sessions are bold headings behind an accent glyph,
+separated by a blank line in `normal` and `detailed` density. A window holding one
+pane is a single row with the pane's icon and, when the window is named something
+else, its command (`@tmux-canopy-compact-single-panes 'off'` keeps separate pane
+rows). Pane names start right of their window's name and line up whether or not
+they have an icon. A shell idling at its prompt, other than your current pane and
+with no activity, bell, or silence to report, is dimmed, and plain activity is a
+dim mark so bells, silence, and agents waiting on you keep the amber. A folder
+folded in another appearance does not hide panes in `quiet`. It replaces the tab bar with a
 short `Tree · All`/`Agents · All` header (`Tree - All` with ASCII icons) and a compact agent summary when agent
 mode is on. In Tree view it subdues guides, uses small chevrons for folds, places
 the green active-pane dot beside its name (`>` with ASCII icons), and right-aligns agent attention and
 unread notices as separate marks. A waiting subagent can raise its parent's
 mark; unverified process detection never claims a confirmed state. Git branches,
-when enabled, appear at the right edge of directory rows if they fit. The Tree
+when enabled, are part of the directory details above. The Tree
 footer shows shortcut hints instead of workspace/agent counts; `f` and
 `@tmux-canopy-footer` still control its visibility. Other views keep their
 existing tabs. The examples in [Quiet tree](sidebar-visual-examples.html) are
@@ -497,9 +522,11 @@ its current width; Ctrl-g searches full paths even when they are hidden.
 
 #### Git branch context
 
-Set `@tmux-canopy-git-context 'branch'` to show read-only branch labels; the default `off` starts no Git process. For each non-internal, live pane, Canopy walks upward from its snapshot `pane_current_path` to find a `.git` directory or file (including linked Git worktrees). It queries `git symbolic-ref --short HEAD` once per distinct discovered repository root path on each reload; a detached HEAD also uses `git rev-parse --short HEAD` and displays `detached@<commit>`. Non-repository paths, inaccessible paths, Git errors, and missing Git simply have no label. No `git status`, working-tree scan, hook, daemon, or repository mutation is involved.
+Set `@tmux-canopy-git-context 'branch'` to show read-only branch labels; the default `off` starts no Git process. `@tmux-canopy-directory 'off'` hides the directory details in `quiet`, leaving the branch alone (`⎇ main`) when branch labels are on; folder rows in the other appearances are unaffected.
 
-In the directory-grouped appearances, the label appears on the directory row (`⎇ feature/name`, or `[git:feature/name]` in ASCII); `quiet` aligns it at the right edge when it fits. In other appearances it appears beside the relevant pane/combined window row when width allows; the pane preview shows its full branch, and `Ctrl-g` quick switching includes it. A pane in a different repository in the same window keeps its own branch; sessions and mixed windows do not claim one branch. Git labels do not displace existing narrow-row content or alter tree identities, folds, filters, notifications, or agent badges. Git branch names and detached commits are not interpreted as shell commands or tmux formats.
+Canopy registers two tmux commands for switching these while tmux runs: `canopy-branch` and `canopy-directory`. Type them at the command prompt (`prefix :`) or run `tmux canopy-branch` from a shell. Each toggles its setting and refreshes every open sidebar, then shows a short message. They are command aliases at indexes Canopy owns (`command-alias[9100]` and `[9101]`), replaced on each plugin load and listed by `canopy doctor`; aliases of your own are untouched. tmux does not pass an alias's arguments to a shell command, so they toggle; for an explicit state use the settings or `canopy details branch|directory on|off|toggle`. A change made this way lasts until the plugin reloads, which applies the values in your configuration. For each non-internal, live pane, Canopy walks upward from its snapshot `pane_current_path` to find a `.git` directory or file (including linked Git worktrees). It queries `git symbolic-ref --short HEAD` once per distinct discovered repository root path on each reload; a detached HEAD also uses `git rev-parse --short HEAD` and displays `detached@<commit>`. Non-repository paths, inaccessible paths, Git errors, and missing Git simply have no label. No `git status`, working-tree scan, hook, daemon, or repository mutation is involved.
+
+In the directory-grouped appearances, the label appears on the directory row (`⎇ feature/name`, or `[git:feature/name]` in ASCII). In `quiet`, it follows its directory as a right-aligned detail on the highest row whose panes share it, shortened when space is tight. In other appearances it appears beside the relevant pane/combined window row when width allows; the pane preview shows its full branch, and `Ctrl-g` quick switching includes it. A pane in a different repository in the same window keeps its own branch; sessions and mixed windows do not claim one branch. Git labels do not displace existing narrow-row content or alter tree identities, folds, filters, notifications, or agent badges. Git branch names and detached commits are not interpreted as shell commands or tmux formats.
 
 Changing this option or switching branches takes effect on the next Tree reload; press `Ctrl-r` if nothing else triggers one. A directory-only change can likewise require `Ctrl-r` (see [Directory-change refresh investigation](#directory-change-refresh-investigation)). A directory whose control bytes have been replaced in the tmux snapshot may not resolve reliably and is unsupported for Git context. This setting does not install Git or add worktree actions.
 
@@ -569,6 +596,7 @@ Claude Code and Grok send `Stop` when a turn ends even if a `run_in_background` 
 An agent run inside a sandbox wrapper such as `bwrap`, `firejail`, `sandbox-exec`, `nono`, or `fence` is still found by its process, because the wrapper stays its parent. A sandbox that clears the environment or hides the tmux socket also stops lifecycle hooks from reaching tmux; the agent then shows as `[process]`.
 
 Crush (Charm's `crush`) is detected by its process only: it appears in the Agents view, the footer, and the drawer as `[process]`, without a verified state. Its released hook support covers only `PreToolUse`, which cannot report a finished turn or a request for input, so Canopy has no Crush adapter yet. Crush can ring the terminal bell when it needs permission or finishes (its `notifications` setting); with `bell` in `@tmux-canopy-notifications`, Canopy then marks that pane with its bell badge.
+
 Hermes Agent (NousResearch's `hermes`) is also detected by its process only, for now. Its installer puts a shell launcher named `hermes` on your `PATH` that runs Hermes' bundled Python (`python3 -I -c …`, importing `hermes_cli`), and its TUI runs as `python3 -m tui_gateway`, so no process is named `hermes`. Canopy recognizes a Python process as Hermes when its arguments import `hermes_cli`, run the `tui_gateway` module, or run a script named `hermes` or `hermes-agent`; any other Python process stays Python. The pane shows Hermes' `⚕` icon and appears in the Agents view, the footer, and the drawer as `[process]`.
 
 ### Alerts
