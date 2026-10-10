@@ -378,7 +378,7 @@ function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,
         }
     }
     if (appearance == "quiet") {
-        quiet_total=total; quiet_need=need; quiet_work=work; quiet_settled=settled
+        quiet_total=total; quiet_need=need; quiet_work=work; quiet_settled=settled; quiet_unknown=unknown
         return
     }
     if (!total) return
@@ -401,9 +401,10 @@ function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,
     hint=(need && text_width("Agents  " footer_plain "   n jumps to input") <= width-4 ? dim "   n jumps to input" reset : "")
     row("F:", dim "Agents" reset "  " footer_color hint, "F:")
 }
-# A quiet header presents the current view and its filter, then one compact
-# agent count if it fits. In-flight MOVE/LINK/DELETE takes that count's place.
-function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,text,available) {
+# A quiet header presents the current view and its filter, then a count of
+# agents in each state if it fits, or the most urgent state with the total.
+# In-flight MOVE/LINK/DELETE takes that count's place.
+function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,text,available,full_plain,full_color) {
     title=(agent_view ? "Agents" : "Tree")
     joiner=(icons == "ascii" ? " - " : " · ")
     scope=(agent_view ? "All" : filter_label)
@@ -412,18 +413,30 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
         agent_overview()
         summary=overview_short_plain
         summary_color=overview_short_color
+        full_plain=overview_plain; full_color=overview_color
     } else if (agents_enabled) {
         agent_footer()
         if (quiet_total) {
+            overview_plain=""; overview_color=""
+            overview_add(icons == "ascii" ? "!" : agent_need_badge,quiet_need,attention)
+            overview_add(agent_work_badge,quiet_work,accent)
+            overview_add(agent_done_badge,quiet_settled,dim)
+            overview_add(icons == "ascii" ? "o" : "○",quiet_unknown,dim)
+            full_plain=overview_plain; full_color=overview_color
             if (quiet_need) { summary=(icons == "ascii" ? "!" : "◆") quiet_need "/" quiet_total; style=attention }
             else if (quiet_work) { summary=agent_work_badge quiet_work "/" quiet_total; style=accent }
             else if (quiet_settled) { summary=agent_done_badge quiet_settled "/" quiet_total; style=dim }
             else summary=(icons == "ascii" ? "o" : "○") quiet_total
         }
     }
-    if (mode != "") { summary=mode; summary_color=""; style=mode_color }
     if (summary != "" && summary_color == "") summary_color=style summary reset
     available=width-3
+    # Every state at a glance ("◆1 ▷1 ○1") when it fits beside the title and
+    # filter; otherwise the most urgent state with the total ("◆1/3").
+    if (full_plain != "" && text_width(title joiner scope)+text_width(full_plain)+2 <= available) {
+        summary=full_plain; summary_color=full_color
+    }
+    if (mode != "") { summary=mode; summary_color=mode_color mode reset }
     plain=title joiner scope
     if (text_width(plain)+text_width(summary)+2>available) {
         if (scope != "All") scope=substr(scope,1,1)
