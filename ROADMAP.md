@@ -3,6 +3,20 @@
 Remaining work for tmux-canopy. This list does not promise a release date. The
 [README](README.md#features) describes what is available today.
 
+## Stabilization (current focus)
+
+New features are on hold until the existing ones are dependable. In order:
+
+- [x] Find flaky tests by running every suite repeatedly, and fix their causes
+  rather than adding retries. Ten rounds of every suite found two: the mouse
+  wheel (a real bug, fixed) and a Git test whose window names changed.
+- [ ] Check each lifecycle adapter, and `>`, against the real agent, including
+  exit, restart, and pane reuse.
+- [ ] Count forks and tmux calls per refresh on a realistic server and compare
+  with 0.2.0.
+- [ ] Run the suite on Linux.
+- [ ] Review the README, help, and legend against the code.
+
 ## Agent status reliability
 
 - [ ] Extend lifecycle regression coverage beyond Codex to verify that agent
@@ -128,24 +142,6 @@ consistent across views:
 - [ ] Test light/dark terminal palettes, tmux themes with partial/default
   colors, 256-color/truecolor terminals, and monochrome output. Document what
   terminal colors can be inherited rather than queried reliably.
-
-## Mouse wheel in the quiet tree (backlog)
-
-`tests/mouse.py` scrolls the sidebar with the wheel. It passes reliably with
-the `folders` appearance (and at v0.1.0), but fails about one run in three with
-`quiet`, the default since 0.2.0. When it fails, the sidebar's foreground
-process is the shell rather than fzf, so tmux's default wheel binding puts the
-pane into copy mode instead of scrolling the tree. Users may occasionally land
-in copy mode (`q` leaves it) when scrolling right after the sidebar opens or
-refreshes. Activity-alert refreshes and window switching from the test's click
-are ruled out.
-
-- [ ] Trace when the sidebar's fzf exits or restarts during the test and find
-  what in `quiet` triggers it; fix that cause.
-- [ ] As a backstop, keep wheel events over a sidebar pane going to the
-  sidebar rather than into copy mode, without changing the user's own
-  bindings for other panes.
-- [ ] Make `tests/mouse.py` pass reliably in `quiet` (run it repeatedly).
 
 ## Scope
 

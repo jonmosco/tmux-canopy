@@ -7,6 +7,10 @@
 - An agent waiting on you shows what it asks for on a dim line beneath its pane: the command it wants to run, then its description or question when that says more (`make test · Run the tests`). The drawer still has the full request.
 - `>` types a line into the selected pane through a tmux prompt and presses Enter, so you can answer an agent or run a command in another pane without leaving the sidebar. It is also in the pane and window action menus. The text is sent literally, never parsed by tmux or a shell.
 
+### Fixed
+
+- The mouse wheel could stop scrolling the sidebar, and keys Canopy sends the sidebar could appear as `^T` or `^R` across it, for example while help was open and an agent was working. fzf pauses its screen when a command keeps it waiting for more than a second, and resuming left mouse tracking off and the terminal echoing input. Help, the legend, the actions menu, the quick switcher, filters, the preview popup, and the rename, new-session and send prompts now run without keeping fzf waiting, and returning the pointer to your pane (`Ctrl-o`, or focusing the sidebar) runs in the background, where it could take over a second with many windows.
+
 ## 0.3.0 - 2026-10-10
 
 ### Changed

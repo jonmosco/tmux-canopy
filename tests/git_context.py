@@ -68,10 +68,13 @@ def main():
         try:
             a = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'app', '-x', '120', '-y', '35',
                    '-c', str(nested), '-P', '-F', '#{pane_id}', 'sleep 600')
-            b = tm('new-window', '-d', '-t', 'app:', '-c', str(other), '-P', '-F', '#{pane_id}', 'sleep 600')
-            c = tm('new-window', '-d', '-t', 'app:', '-c', str(plain), '-P', '-F', '#{pane_id}', 'sleep 600')
-            d = tm('new-window', '-d', '-t', 'app:', '-c', str(first), '-P', '-F', '#{pane_id}', 'sleep 600')
-            e = tm('new-window', '-d', '-t', 'app:', '-c', str(worktree), '-P', '-F', '#{pane_id}', 'sleep 600')
+            b = tm('new-window', '-d', '-t', 'app:', '-n', 'b', '-c', str(other), '-P', '-F', '#{pane_id}', 'sleep 600')
+            c = tm('new-window', '-d', '-t', 'app:', '-n', 'c', '-c', str(plain), '-P', '-F', '#{pane_id}', 'sleep 600')
+            d = tm('new-window', '-d', '-t', 'app:', '-n', 'd', '-c', str(first), '-P', '-F', '#{pane_id}', 'sleep 600')
+            e = tm('new-window', '-d', '-t', 'app:', '-n', 'e', '-c', str(worktree), '-P', '-F', '#{pane_id}', 'sleep 600')
+            # Fixed names: on macOS an automatic name can catch a process as it
+            # starts (tmux, kernel_task), and a longer name shortens the label.
+            tm('rename-window', '-t', a, 'a')
             mixed = tm('split-window', '-d', '-h', '-t', a, '-c', str(other),
                        '-P', '-F', '#{pane_id}', 'sleep 600')
             for pane, path in ((a, nested), (b, other), (c, plain), (d, first), (e, worktree),

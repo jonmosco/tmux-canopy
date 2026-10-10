@@ -64,10 +64,13 @@ def main():
             client = sp.Popen(['tmux', '-L', socket, 'attach', '-t', 'one'], stdin=slave, stdout=slave,
                               stderr=slave, env=base, start_new_session=True)
             os.close(slave)
+            output = bytearray()
+
             def drain():
                 try:
-                    while os.read(master, 65536):
-                        pass
+                    while data := os.read(master, 65536):
+                        output.extend(data)
+                        del output[:-65536]
                 except OSError:
                     pass
             threading.Thread(target=drain, daemon=True).start()
@@ -161,6 +164,29 @@ def main():
             tm('select-pane', '-t', sidebar)
             wait(lambda: selected() == live, 'keyboard entry jumps to the live row')
             print('ok - entering the sidebar from the keyboard selects the live row')
+
+            # fzf pauses its screen when a command keeps it waiting over a
+            # second, and resuming leaves mouse tracking off and the tty
+            # echoing the keys Canopy sends the sidebar. A prompt waits on the
+            # user, so it must not keep fzf waiting.
+            tm('set-option', '-g', 'status-keys', 'emacs')
+            tm('set-option', '-g', 'escape-time', '10')
+            output.clear()
+            os.write(master, b'r')
+            wait(lambda: b'Rename ' in output, 'rename prompt opens')
+            time.sleep(1.5)
+            tm('send-keys', '-t', sidebar, 'C-t')
+            time.sleep(.3)
+            os.write(master, b'\x1b')
+            time.sleep(1)
+            assert tm('display-message', '-p', '-t', sidebar, '#{mouse_any_flag}') == '1', 'mouse tracking survives a prompt'
+            assert '^T' not in tm('capture-pane', '-p', '-t', sidebar), 'keys sent during a prompt are not echoed'
+            top = top_row()
+            for _ in range(3):
+                mouse(65, 10)
+                time.sleep(.08)
+            wait(lambda: top_row() != top, 'wheel scrolls after a prompt')
+            print('ok - a prompt from the sidebar leaves the mouse working and echoes nothing')
         finally:
             if client is not None:
                 client.kill()
