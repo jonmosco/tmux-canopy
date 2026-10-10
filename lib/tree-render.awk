@@ -42,7 +42,7 @@ $1 == "P" {
     pw[p]=$3; pi[p]=$4; command[p]=$5; title[p]=$6; path[p]=$7; dead[p]=$8
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
     pane_pid[p]=$17; report_source[p]=$18; report_session[p]=$19; report_pid[p]=$20; report_status[p]=$21; report_updated[p]=$22
-    subagent_list[p]=$25; pane_zoomed[p]=($26+0 == 1)
+    subagent_list[p]=$25; pane_zoomed[p]=($26+0 == 1); request_summary[p]=$27; request_command[p]=$28
     if (sidebar[p] != 1 && slot[p] != 1) {
         panes[$3,++np[$3]]=p
         if (pa[p] || pb[p] || pz[p]) unread_panes[$3]++
@@ -633,14 +633,28 @@ function subagent_word(state, narrow) {
     if (state == "needs-input") return narrow ? "req" : "NEEDS INPUT"
     return narrow ? "?" : "UNKNOWN"
 }
-# One continuation line per subagent, drawn as children of the pane row.
-# A subagent line speaks the same status language as its parent row: words
-# in classic and pills, the quiet glyphs (▷ working, ! needs input) in places,
-# and lazygit's edge glyph alone.
+# What an agent waiting on you asks for, on a dim line beneath its pane: the
+# command it wants to run, then its own words when they say more than that it
+# wants approval. The drawer keeps the full text.
+function request_line(p, continuation,    text,generic,plain,more) {
+    if (agent_label(p) != "approval") return ""
+    generic=(request_summary[p] ~ /(^|: )(Approval|Input) requested/ || request_summary[p] ~ / permission requested$/)
+    text=request_command[p]
+    if (request_summary[p] != "" && !generic) text=text (text == "" ? "" : " · ") request_summary[p]
+    if (text == "") return ""
+    plain=continuation; gsub(/\033\[[0-9;]*m/,"",plain)
+    more=(icons == "ascii" ? "~" : "…")
+    if (text_width(plain)+text_width(text) <= width-3) return "\n" continuation dim text reset
+    return "\n" quiet_clip(continuation dim text, width-3-text_width(more)) dim more reset
+}
+# One continuation line per subagent, drawn as children of the pane row,
+# after the pane's own request line. A subagent line speaks the same status
+# language as its parent row: words in classic and pills, the quiet glyphs
+# (▷ working, ! needs input) in places, and lazygit's edge glyph alone.
 function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed,glyph,status) {
     if (!agents_enabled || !subagent_lines_shown()) return ""
+    lines=request_line(p, continuation)
     n=load_subagents(p)
-    lines=""
     for (i=1;i<=n;i++) {
         state=sub_state[p,i]
         style=(state == "working" ? bold accent : state == "needs-input" ? bold attention : dim)

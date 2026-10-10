@@ -226,6 +226,50 @@ create_session_prompt() {
   fi
 }
 
+# Type a line into a pane without leaving the sidebar: a reply for an agent
+# waiting on you, or a command for a shell. The text is sent as literal keys,
+# never parsed by tmux or a shell, followed by Enter.
+send_to_pane() {
+  local token="$1" target='' panes pane active last dead sidebar slot name rank best=4 label='' target_dead=''
+  local prompt_target='' response response_key
+  case "$token" in
+    P:*) target="${token#P:}" ;;
+    W:*) target="$(window_id_for_token "$token")" ;;
+    *) sidebar_message 'tmux-canopy: select a pane or window to send text to'; return ;;
+  esac
+  [[ -n "$target" ]] || return 0
+  # A window sends to its active content pane. The sidebar is often the
+  # active pane, so fall back to the last pane used, then the first.
+  panes="$(tmux list-panes -t "$target" -F '#{pane_id}|#{pane_active}|#{pane_last}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null)" || return 0
+  target=''
+  while IFS='|' read -r pane active last dead sidebar slot name; do
+    [[ "$sidebar" != 1 && "$slot" != 1 ]] || continue
+    if [[ "$token" == P:* ]]; then
+      [[ "$pane" == "${token#P:}" ]] || continue
+      rank=1
+    elif [[ "$active" == 1 ]]; then rank=1
+    elif [[ "$last" == 1 ]]; then rank=2
+    else rank=3
+    fi
+    if ((rank < best)); then best=$rank; target=$pane; label=$name; target_dead=$dead; fi
+  done <<< "$panes"
+  [[ -n "$target" && "$target_dead" != 1 ]] || return 0
+  response_key="@tmux_canopy_send_${BASHPID}_${RANDOM}"
+  [[ -n "$client" ]] && prompt_target="-t $(tmux_quote "$client")"
+  # shellcheck disable=SC2064
+  trap "$(shell_join tmux set-option -gu "$response_key") 2>/dev/null || true" EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  # -p is a format; the block is parsed before the response is substituted.
+  tmux if-shell -F 1 \
+    "command-prompt -l $prompt_target -p $(tmux_quote "Send to ${label//#/##}:") { set-option -g $response_key %% }"
+  response="$(tmux show-option -gv "$response_key" 2>/dev/null)" || return 0
+  [[ -n "$response" ]] || return 0
+  # The pane may have exited while the prompt was open.
+  [[ "$(tmux display-message -p -t "$target" '#{pane_dead}' 2>/dev/null)" == 0 ]] || return 0
+  tmux send-keys -t "$target" -l -- "$response" \; send-keys -t "$target" Enter 2>/dev/null || true
+}
+
 session_for_token() {
   local target_pane occurrence_session
   case "$1" in
@@ -560,6 +604,7 @@ show_action_menu() {
         'Focus' f "$(action_menu_command activate "$target")" \
         'Zoom/unzoom' z "$(action_menu_command zoom "$target")" \
         'Rename' r "$(action_menu_command rename "$target")" \
+        'Send text…' '>' "$(action_menu_command send "$target")" \
         'Move up' k "$(action_menu_command window-up "$target")" \
         'Move down' j "$(action_menu_command window-down "$target")" \
         'Mark to move sessions' m "$(action_menu_command move-toggle "$target")" \
@@ -580,6 +625,7 @@ show_action_menu() {
         'Swap up' k "$(action_menu_command pane-up "$target")" \
         'Swap down' j "$(action_menu_command pane-down "$target")" \
         'Mark to move' m "$(action_menu_command move-toggle "$target")" \
+        'Send text…' '>' "$(action_menu_command send "$target")" \
         'Break into window' b "$(action_menu_command break-window "$target")" \
         'Respawn dead pane' R "$(action_menu_command respawn "$target")" \
         'Information' i "$(action_menu_command info "$target")" \
@@ -770,6 +816,10 @@ case "$action" in
 
   rename)
     rename_token "$token"
+    ;;
+
+  send)
+    send_to_pane "$token"
     ;;
 
   rename-apply)

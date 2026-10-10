@@ -54,8 +54,8 @@ sidebar_ui_options() {
   # Current-line arrow is drawn at the row edge. Leave the left pointer blank.
   pointer=' '; prompt='search › '; marker='●'; scrollbar='│'
   local activate_suffix='' jump_agent_bind="n:execute-silent($jump_agent_cmd)"
-  local search_unbind='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?'
-  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,?)'
+  local search_unbind='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?'
+  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?)'
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     activate_suffix='+accept'
     jump_agent_bind="n:execute-silent($jump_agent_cmd)+accept"
@@ -110,6 +110,7 @@ sidebar_ui_options() {
     --bind="m:execute-silent($action_cmd move-toggle {1})+reload-sync($source_cmd --stable)"
     --bind="c:execute-silent($action_cmd move-cancel {1})+reload-sync($source_cmd --stable)"
     --bind="r:execute-silent($action_cmd rename {1})+reload-sync($source_cmd --stable)"
+    --bind=">:execute-silent($action_cmd send {1})"
     --bind="x:execute-silent($action_cmd delete {1})+reload-sync($source_cmd --stable)"
     --bind="u:execute-silent($action_cmd notification-clear {1})+reload-sync($source_cmd --stable)"
     --bind="U:execute-silent($action_cmd notifications-clear-all {1})+reload-sync($source_cmd --stable)"
