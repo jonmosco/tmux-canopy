@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-10-10
+
 ### Changed
 
 - `quiet` session headings carry a dim rule to the right edge instead of a blank line between sessions, so a selection never covers an empty line and the tree is a row shorter per session. Session glyphs are tmux green, and the session you are in has a full green glyph and a cyan name, so its heading shows where you are even when folded.
