@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Claude Code background sessions, and any agent whose hooks run without `TMUX_PANE`, never updated their pane: the reporter gave up when it could not tell which pane it was in. It now finds the pane from the process tree, or, for a background session running outside tmux, from the pane whose `claude` resumes or attaches to the same session. When two panes match, it reports to neither.
 - A long Claude Code conversation that moved to a new session id (after compacting its context, `/clear`, or resume) stopped updating its pane: Canopy discarded every later report because only a fresh start could change a pane's session. The same verified Claude process now carries its state over to the new id, and a new prompt from it adopts its session even when no start event arrived. Reports from another process, and late events from the old session, are still ignored.
 
 ## 0.2.0 - 2026-10-10

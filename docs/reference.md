@@ -661,6 +661,10 @@ Clicking a `terminal-notifier` alert brings your terminal forward and moves tmux
 
 Agent alerts need a lifecycle adapter, since a `[process]`-only agent reports no state; a bell alert can stand in for one that rings the bell. The reporter reads the setting in a tmux call it already makes, so reports that do not alert cost nothing extra; an alert starts one short-lived script that the agent's hook does not wait for. Run `canopy alerts test` (optionally with `desktop`, `tmux`, or `both`) to send a sample. It says which notifier delivered it and which refused, and exits non-zero when none did. macOS asks each notifier for permission once: if `terminal-notifier` is refused, allow it under System Settings → Notifications (open its app once with `open` if it is not listed). `osascript` exits successfully even when macOS hides its notification, so check that one on screen. `canopy doctor` shows the setting and the notifiers found, in the order they are tried.
 
+#### Hooks without a pane
+
+An agent's hooks normally inherit `TMUX_PANE` from the pane the agent runs in. When it is missing, Canopy finds the pane itself rather than dropping the report. If the agent runs inside a pane, the pane is the one whose root process is an ancestor of that agent. A Claude Code background session runs outside tmux altogether, viewed from a pane by a client such as `claude attach <id>` or the original `claude --resume <id>`; its pane is the one whose `claude` resumes or attaches to the same session (an attach id may be a prefix). Only a single matching pane counts, so two clients viewing one session report to neither. Without `TMUX` either, Canopy asks the default tmux server. The usual identity checks still apply, with the pane's client as the agent process.
+
 ### Common reporter contract
 
 External integrations can report normalized state without implementing an agent-specific Canopy adapter. Send one JSON object to `scripts/agent-report` from the supported agent's process context inside its tmux pane:
