@@ -55,6 +55,16 @@ def test_process_name_prefers_argv0():
               "node hosting the pi launcher is pi")
         fake_proc(proc, 46, comm="node",
                   cmdline=b"node\0/opt/pi-coding-agent/dist/cli.js\0")
+        fake_proc(proc, 47, comm="python3.14",
+                  cmdline=b"/home/u/.hermes/tools/python-3.14.7/bin/python3\0-I\0-c\0"
+                          b"import sys; from hermes_cli.main import main; main()\0-p\0default\0")
+        check(process_name(47, proc_root=str(proc)) == "hermes", "Hermes' installer launcher is hermes")
+        fake_proc(proc, 48, comm="python3", cmdline=b"python3\0-m\0tui_gateway.entry\0")
+        check(process_name(48, proc_root=str(proc)) == "hermes", "Hermes' TUI gateway is hermes")
+        fake_proc(proc, 49, comm="python3", cmdline=b"python3\0-c\0print(1)\0")
+        check(process_name(49, proc_root=str(proc)) == "python3", "other Python stays python3")
+        fake_proc(proc, 50, comm="python3", cmdline=b"python3\0app.py\0hermes\0")
+        check(process_name(50, proc_root=str(proc)) == "python3", "an argument named hermes is not Hermes")
         check(process_name(46, proc_root=str(proc)) == "pi",
               "node hosting pi-coding-agent is pi")
 
@@ -159,6 +169,36 @@ printf '%scalls=%s pids=%s' "$out" "${{#calls}}" "${{#CANOPY_KIND_PIDS[@]}}"
     check(probe.returncode == 0 and probe.stdout == "10=pi 20=omp 30= calls=1 pids=2",
           probe.stderr or probe.stdout)
     print("ok - node pane relabeling reads the process table once")
+    # Hermes runs as Python, so its pane lookup, the Agents view's process
+    # list, and the ps identity check go by its kind, not its process name.
+    probe = subprocess.run(["bash", "-c", f"""
+set -u
+source {script}
+ps() {{ printf '%s\n' \
+  '10 1 Mon Sep 28 18:47:49 2026 -zsh' '11 10 Mon Sep 28 18:54:08 2026 /u/.hermes/tools/python-3.14.7/bin/python3 -I -c import sys; from hermes_cli.main import main; main() -p default' \
+  '20 1 Mon Sep 28 18:47:49 2026 -zsh' '21 20 Mon Sep 28 18:54:08 2026 python3.14 -m tui_gateway.entry' \
+  '22 21 Mon Sep 28 18:54:09 2026 node /u/.hermes/ui/tui.js' \
+  '30 1 Mon Sep 28 18:47:49 2026 -zsh' '31 30 Mon Sep 28 18:54:08 2026 python3 manage.py runserver' \
+  '40 1 Mon Sep 28 18:47:49 2026 -zsh' '41 40 Mon Sep 28 18:54:08 2026 node /opt/bin/pi --x'; }}
+canopy_load_ps_snapshot
+out=''
+for root in 10 20 30 40; do canopy_pane_agent "$root" >/dev/null; out+="$root=$CANOPY_REPLY "; done
+canopy_ps_snapshot_lines >/dev/null
+lines=$CANOPY_REPLY
+[[ $lines == *'11 10 hermes'* && $lines == *'31 30 python3'* ]] && out+='listed '
+if [[ ! -d /proc/self ]]; then
+  canopy_process_identity 10 11 'Mon Sep 28 18:54:08 2026' hermes && out+='hermes-verified '
+  canopy_process_identity 40 41 'Mon Sep 28 18:54:08 2026' pi && out+='pi-verified '
+  canopy_process_identity 30 31 'Mon Sep 28 18:54:08 2026' hermes || out+='python-rejected'
+else
+  out+='hermes-verified pi-verified python-rejected'
+fi
+printf '%s' "$out"
+"""], capture_output=True, text=True, timeout=10)
+    check(probe.returncode == 0 and probe.stdout ==
+          "10=hermes 20=hermes 30= 40=pi listed hermes-verified pi-verified python-rejected",
+          probe.stderr or probe.stdout)
+    print("ok - Hermes under Python is found, listed, and verified by its kind")
     # macOS ps pads single-digit days in lstart ("Oct  1"); a hook-recorded
     # start time must still match the parsed snapshot on days 1-9.
     if not Path("/proc/self").exists():

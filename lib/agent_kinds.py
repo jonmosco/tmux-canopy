@@ -12,6 +12,7 @@ KINDS = {
     'crush': 'crush',
     'copilot': 'copilot',
     'grok': 'grok',
+    'hermes': 'hermes', 'hermes-agent': 'hermes',
 }
 
 # Shells, launchers, runtimes, and sandbox wrappers an agent may run under and
@@ -37,8 +38,26 @@ NAMES = {
     'codex': 'Codex', 'claude': 'Claude Code', 'opencode': 'OpenCode',
     'gemini': 'Gemini CLI', 'pi': 'Pi', 'omp': 'Oh My Pi',
     'agy': 'Antigravity', 'cursor-agent': 'cursor-agent',
-    'crush': 'Crush', 'copilot': 'Copilot CLI', 'grok': 'Grok Build',
+    'crush': 'Crush', 'copilot': 'Copilot CLI', 'grok': 'Grok Build', 'hermes': 'Hermes',
 }
+
+
+def is_python(name):
+    return name in ('python', 'Python') or (name.startswith('python') and name[6:].replace('.', '').isdigit())
+
+
+def hermes_args(args):
+    # ps splits a -c launcher's source into words, so look at every argument.
+    if any('hermes_cli' in arg for arg in args):
+        return True
+    for index, arg in enumerate(args):
+        if arg.startswith('-'):
+            if arg == '-m' and index + 1 < len(args) and args[index + 1].split('.')[0] == 'tui_gateway':
+                return True
+            continue
+        # The first operand is the script; anything after it is its arguments.
+        return os.path.basename(arg).removesuffix('.exe') in ('hermes', 'hermes-agent')
+    return False
 
 
 def name_from_args(args):
@@ -46,7 +65,9 @@ def name_from_args(args):
 
     Pi and Oh My Pi are Node programs. When argv0 is ``node`` or ``nodejs``,
     a later argument that is the ``pi``/``omp`` launcher identifies the agent.
-    Any other Node process stays ``node``.
+    Any other Node process stays ``node``. Hermes is a Python program whose
+    installer shim runs ``python3 -I -c <launcher importing hermes_cli>``, and
+    whose TUI runs ``python3 -m tui_gateway``; any other Python stays itself.
     """
     names = []
     for arg in args or ():
@@ -57,6 +78,8 @@ def name_from_args(args):
     if not names:
         return ''
     base = os.path.basename(names[0]).removesuffix('.exe')
+    if is_python(base):
+        return 'hermes' if hermes_args(names[1:]) else base
     if base not in ('node', 'nodejs'):
         return base
     for arg in names[1:]:
