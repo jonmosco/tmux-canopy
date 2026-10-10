@@ -138,6 +138,24 @@ consistent across views:
   colors, 256-color/truecolor terminals, and monochrome output. Document what
   terminal colors can be inherited rather than queried reliably.
 
+## Mouse wheel in the quiet tree (backlog)
+
+`tests/mouse.py` scrolls the sidebar with the wheel. It passes reliably with
+the `folders` appearance (and at v0.1.0), but fails about one run in three with
+`quiet`, the default since 0.2.0. When it fails, the sidebar's foreground
+process is the shell rather than fzf, so tmux's default wheel binding puts the
+pane into copy mode instead of scrolling the tree. Users may occasionally land
+in copy mode (`q` leaves it) when scrolling right after the sidebar opens or
+refreshes. Activity-alert refreshes and window switching from the test's click
+are ruled out.
+
+- [ ] Trace when the sidebar's fzf exits or restarts during the test and find
+  what in `quiet` triggers it; fix that cause.
+- [ ] As a backstop, keep wheel events over a sidebar pane going to the
+  sidebar rather than into copy mode, without changing the user's own
+  bindings for other panes.
+- [ ] Make `tests/mouse.py` pass reliably in `quiet` (run it repeatedly).
+
 ## Scope
 
 Planned request controls would add user-initiated responses to agent requests.
