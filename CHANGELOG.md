@@ -4,6 +4,7 @@
 
 ### Changed
 
+- `quiet` session headings carry a dim rule to the right edge instead of a blank line between sessions, so a selection never covers an empty line and the tree is a row shorter per session. Session glyphs are tmux green, and the session you are in has a full green glyph and a cyan name, so its heading shows where you are even when folded.
 - The `quiet` header counts agents in every state (`◆1 ▷2 ✓1 ○1`) instead of only the most urgent one with the total (`◆1/5`), which it still shows when the header is too narrow.
 
 ### Fixed

@@ -128,6 +128,7 @@ legend_records() {
   note 'Session and window names use the tree guides; they have no default icon.'
   legend_item '├─ ╰─ │' 'Tree guides show which pane belongs to which window and session.' dim
   legend_item '◈ work / ▣ 1:server' 'Session and numbered window. Directory groups keep related panes together; h / l also fold windows.'
+  legend_item '◈ work ────' 'Quiet session heading: a dim rule separates sessions. Glyphs are tmux green; the current session has a full green glyph and a cyan name.'
   legend_item '0:claude' 'Pane index and command in the grouped tree. Numbers are tmux indexes, not agent counts.' dim
   legend_item '2p' 'Two content panes hidden in a collapsed window. Sidebar and reserve panes are excluded.' dim
   legend_item '[11w]' 'Eleven windows inside a collapsed session.' dim

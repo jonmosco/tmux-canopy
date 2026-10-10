@@ -112,14 +112,19 @@ def main():
         # Icon or not, every pane label starts in one column, right of its window's.
         assert len(set(panes.values())) == 1, (icons, panes, {key: ANSI.sub('', tree[key]) for key in panes})
         assert panes['P:%0:$0'] > window, (icons, panes, window)
-        # Every session is a bold heading behind an accent glyph, current or not;
-        # automatic names stay dim. A blank line sets each session after the first apart.
+        # Every session is a one-line heading with a dim rule to the edge, so
+        # no blank line shares its selection. The current session has a tmux-
+        # green glyph and an accent name; the others are bold behind a dimmed
+        # green glyph, and automatic names stay dim.
         first, second, automatic = tree['S:$0'], tree['S:$1'], tree['S:$2']
-        assert '\n' not in first and '\x1b[1mwork' in first, first
-        gap, heading = second.split('\n')
-        assert gap == '', second
-        assert '\x1b[1mreference' in heading and '\x1b[1;36m' in heading, heading
-        assert '\x1b[1m\x1b[2msession-3' in automatic.split('\n')[1], automatic
+        rule = '-' if icons == 'ascii' else '─'
+        assert not any('\n' in tree[key] for key in tree if key.startswith('S:')), tree
+        assert '\x1b[1;36mwork' in first and '\x1b[1m\x1b[38;5;34m' in first, first
+        assert '\x1b[1mreference' in second and '\x1b[2;38;5;34m' in second and '\x1b[1;36m' not in second, second
+        assert '\x1b[1m\x1b[2msession-3' in automatic, automatic
+        assert rule * 4 in ANSI.sub('', first) and rule * 4 in ANSI.sub('', second), (first, second)
+        # A heading's rule stops before its detail.
+        assert re.search(rf'reference {re.escape(rule)}+ docs$', ANSI.sub('', second).rstrip()), second
         # Plain output is a dim notice; a bell keeps the amber.
         assert '\x1b[2m' + ('*' if icons == 'ascii' else '●') + '\x1b[0m' in tree['P:%1:$0'], tree['P:%1:$0']
         assert '\x1b[1;33m' in tree['P:%2:$0'], tree['P:%2:$0']
@@ -148,7 +153,7 @@ def main():
     split = render('unicode', compact='off')
     assert 'P:%3:$0' in split and ' · ' not in ANSI.sub('', split['W:@1:$0']), 'compact-single-panes off keeps pane rows'
     for density in ('compact', 'minimal'):
-        assert not any('\n' in row for key, row in render('unicode', density).items() if key.startswith('S:')), density
+        assert all('─' in ANSI.sub('', row) for key, row in render('unicode', density).items() if key.startswith('S:')), density
     print('ok - quiet follows tmux order, lines panes up, shows directories as details, and dims idle shells')
 
 

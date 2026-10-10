@@ -10,9 +10,9 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=4)](docs/assets/canopy-demo.gif?v=4)
+[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=5)](docs/assets/canopy-demo.gif?v=5)
 
-**See every project. Spot the blocker. Jump to it with `n`.** This 19-second preview was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=4) for browsing, search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=4).
+**See every project. Spot the blocker. Jump to it with `n`.** This 19-second preview was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=5) for browsing, search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=5).
 
 ## Quick start
 
@@ -239,18 +239,16 @@ A sidebar with agent mode on, one agent waiting for approval, and a folded sessi
 
 ```text
 Tree · All                         ◆1 ▷1   ① ②
-▾ ◈ acme                                   ③
+▾ ◈ acme ─────────────────────────────     ③
    ▾ ▣ 0:server             api ⎇ main     ④ ⑤
    ●  ✳  1:claude                    !     ⑥ ⑦ ⑧
             Explore                  ▷     ⑨
             Plan                     !
              2:zsh                         ⑩
       ✳ 1:ui · claude      web ⎇ ui  ▷     ⑪
-
-▾ ◈ notes
+▾ ◈ notes ────────────────────────────
       ▣ 0:today · zsh                ●     ⑫
-
-▸ ◈ scratch [2w]                           ⑬
+▸ ◈ scratch [2w] ─────────────────────     ⑬
 ───────────────────────────────────
  1 Tree   4 Agents   n Next                ⑭
 ```
@@ -259,7 +257,7 @@ Tree · All                         ◆1 ▷1   ① ②
 |---|---|---|
 | ① | **View and filter.** The open view (`Tree`, `Agents`, `Proc`, `Buff`) and the tree filter: `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
 | ② | **Agent summary:** how many agents are in each state: `◆` needs input, `▷` working, `✓` ended, `○` found by process only. A narrow sidebar shows the most urgent state and the total instead, such as `◆1/3`. | `n` jump to the agent waiting |
-| ③ | **Session**, a bold heading. Sessions are separated by a blank line. | `h` / `l` fold and unfold, `H` / `L` all |
+| ③ | **Session heading**, followed by a dim rule that separates it from the session above. The session you are in has a tmux-green glyph and a cyan name. | `h` / `l` fold and unfold, `H` / `L` all |
 | ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
 | ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them: the session, a window, or a pane. | `canopy-branch`, `canopy-directory` at `prefix :` |
 | ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; it can differ. | `Ctrl-o` jump back to your pane |

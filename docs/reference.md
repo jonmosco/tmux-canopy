@@ -444,8 +444,11 @@ panes all share it: the session heading when the whole session is in one
 directory, otherwise each window whose panes agree, otherwise each pane of a mixed
 window. Nothing mixed claims one directory or branch. On a narrow row the detail
 gives way first: the branch is shortened, then dropped, then the directory, so the
-name and marks always fit. Sessions are bold headings behind an accent glyph,
-separated by a blank line in `normal` and `detailed` density. A window holding one
+name and marks always fit. Sessions are bold one-line headings, each followed by a
+dim rule to the right edge (or to its detail) that separates it from the session
+above, so a selection never covers a blank line. Session glyphs are tmux green; the
+session you are in has a full green glyph and an accent-coloured name, and the others
+have a dimmed glyph. A window holding one
 pane is a single row with the pane's icon and, when the window is named something
 else, its command (`@tmux-canopy-compact-single-panes 'off'` keeps separate pane
 rows). Pane names start right of their window's name and line up whether or not

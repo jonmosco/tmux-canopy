@@ -67,7 +67,8 @@ def main():
         assert '◈' in quiet['S:$0'] and '▣' in quiet['W:@0:$0']
         assert '\x1b[1mserver\x1b[0m' in quiet['W:@0:$0'], quiet['W:@0:$0']
         assert '0:' in quiet['W:@0:$0'] and '0:' in quiet['P:%0:$0']
-        assert 'DIR:%0:$0' not in quiet and not any('─' in ANSI.sub('', quiet[key]) for key in ('S:$0', 'W:@0:$0'))
+        # No tree guides; the session heading's dim rule is its separator.
+        assert 'DIR:%0:$0' not in quiet and '─' not in ANSI.sub('', quiet['W:@0:$0']) and '──' in ANSI.sub('', quiet['S:$0'])
         assert 'Tree Agents Proc Buff' in ANSI.sub('', render(appearance='places')['H:tree']), 'default appearance changed'
         print('ok - quiet appearance keeps tree identities and separates active, agent, and unread marks')
 

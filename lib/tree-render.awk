@@ -749,6 +749,17 @@ function quiet_edge(value, p, edge, budget,    plain,room,name,branch,opening,cl
     else return edge
     return dim detail reset (edge == "" ? "" : "  " edge)
 }
+# A quiet session heading carries its own separator: a dim rule from the name
+# to the right edge (or to its detail), so sessions stand apart without a blank
+# line that a selection would cover.
+function quiet_rule_row(value, suffix, budget,    plain,suffix_plain,room,rule) {
+    plain=value; gsub(/\033\[[0-9;]*m/,"",plain)
+    suffix_plain=suffix; gsub(/\033\[[0-9;]*m/,"",suffix_plain)
+    room=budget-text_width(plain)-text_width(suffix_plain)-(suffix == "" ? 1 : 2)
+    if (room < 2) return edge_colored(value, suffix, budget)
+    rule=sprintf("%*s", room, ""); gsub(/ /, (icons == "ascii" ? "-" : "─"), rule)
+    return value " " dim rule reset (suffix == "" ? "" : " " suffix)
+}
 # A shell at its prompt is scaffolding next to what is running. It recedes
 # unless it is where you are or has something to report.
 function idle_shell(p, s) {
@@ -1121,6 +1132,8 @@ END {
         icon_white="\033[97m"
         green="\033[1;32m"
         accent="\033[1;36m"; attention="\033[1;33m"; path_color=dim
+        # tmux's own green (its logo, about #1BB91F) for quiet session glyphs.
+        tmux_green="\033[38;5;34m"; tmux_green_dim="\033[2;38;5;34m"
     }
     session_icon=(icons == "nerdfont" ? "" : icons == "ascii" ? "S" : "◈")
     window_icon=(icons == "nerdfont" ? "󰖯" : icons == "ascii" ? "W" : "▣")
@@ -1332,14 +1345,14 @@ END {
         }
         session_glyph=(show_session_glyph ? dim session_icon reset " " : "")
         session_style=(sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim (s == current_s ? bold : "") : (s == current_s ? bold : ""))
-        session_rule=""
         if (appearance == "quiet") {
-            # Without guides, sessions are the headings: every one bold behind an
-            # accent glyph, and a blank line above each after the first. Where you
-            # are shows through the window, pane, and folded-session marks instead.
-            session_glyph=(show_session_glyph ? accent session_icon reset " " : "")
-            session_style=bold (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
-            if (quiet_sessions++ && density != "compact" && density != "minimal") session_rule="\n"
+            # Without guides, sessions are the headings: bold, each followed by a
+            # dim rule, behind a glyph in tmux green. The session you are in has
+            # a full green glyph and an accent-coloured name, so its heading says
+            # where you are even when folded; the others' glyphs are dimmed.
+            current_heading=(s == current_s)
+            session_glyph=(show_session_glyph ? (current_heading ? bold tmux_green : tmux_green_dim) session_icon reset " " : "")
+            session_style=(current_heading ? accent : bold) (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
         }
         if (appearance == "quiet") quiet_home_place(s)
         session_body=(collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset
@@ -1348,7 +1361,7 @@ END {
         # alone; a branch still adds something.
         if (appearance == "quiet" && !(place_name(quiet_place[s]) == sname[s] && git_branch[quiet_place_pane[s]] == ""))
             session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
-        row(st,session_rule edge_colored(session_body, session_mark, width-3),st)
+        row(st,(appearance == "quiet" ? quiet_rule_row(session_body, session_mark, width-3) : edge_colored(session_body, session_mark, width-3)),st)
         if (collapsed[st]) continue
         if (appearance == "places" || appearance == "quiet") { places_panes(s); continue }
         visible_wpos=0
