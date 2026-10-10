@@ -527,11 +527,16 @@ def main():
         return
     if kind == 'cursor-agent' and event.get('hook_event_name') == 'subagentStart':
         cursor_response = '{"permission":"allow"}'
-    if (oversized or
-            kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent', 'copilot', 'grok') or
-            not os.environ.get('TMUX') or not re.fullmatch(r'%[0-9]+', core.PANE)):
+    if oversized or kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent', 'copilot', 'grok'):
         emit()
         return
+    if not re.fullmatch(r'%[0-9]+', core.PANE):
+        # No pane in the environment, as in a Claude Code background session:
+        # find it from the process tree, or the pane attached to the session.
+        core.PANE = core.pane_from_ancestry(kind, core.field(event.get('session_id'), 128))
+        if not core.PANE:
+            emit()
+            return
     # Exactly one emit() must run past this point, however report() exits:
     # a single try/except/finally, followed by one unconditional emit().
     try:

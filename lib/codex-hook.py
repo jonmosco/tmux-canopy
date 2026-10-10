@@ -33,34 +33,7 @@ def fingerprint(event):
 
 def hook_ancestors():
     """Argument lists of this hook's ancestors, nearest first."""
-    if os.path.isdir("/proc/self"):
-        current = os.getppid()
-        for _ in range(64):
-            if current <= 1:
-                return
-            try:
-                with open(f"/proc/{current}/cmdline", "rb") as handle:
-                    args = [part.decode("utf-8", "replace") for part in handle.read().split(b"\0") if part]
-            except OSError:
-                return
-            yield args
-            stat = core.linux_stat(current)
-            if not stat:
-                return
-            current = stat[0]
-        return
-    table = {}
-    for line in core.process_table() or ():
-        fields = line.split(None, 2)
-        if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
-            table[int(fields[0])] = (int(fields[1]), fields[2].split())
-    current = os.getppid()
-    for _ in range(64):
-        if current <= 1 or current not in table:
-            return
-        parent, args = table[current]
-        yield args
-        current = parent
+    return (args for _, args in core.ancestors())
 
 
 def from_app_server():
@@ -210,8 +183,6 @@ def report(event):
 
 
 def main():
-    if not os.environ.get("TMUX") or not re.fullmatch(r"%[0-9]+", core.PANE):
-        return
     try:
         raw = sys.stdin.buffer.read(131073)
         if len(raw) > 131072:
@@ -220,11 +191,14 @@ def main():
         if not isinstance(event, dict):
             return
         if from_app_server():
-            core.PANE = app_server_pane(event)
-            if not core.PANE:
-                if event.get("hook_event_name") in ("Stop", "SubagentStop"):
-                    print("{}")
-                return
+            core.PANE = app_server_pane(event) if os.environ.get("TMUX") else ""
+        elif not re.fullmatch(r"%[0-9]+", core.PANE):
+            # No pane in the environment: find it from the process tree.
+            core.PANE = core.pane_from_ancestry("codex", core.field(event.get("session_id"), 128))
+        if not re.fullmatch(r"%[0-9]+", core.PANE):
+            if event.get("hook_event_name") in ("Stop", "SubagentStop"):
+                print("{}")
+            return
         lock_fd = core.pane_lock(core.PANE[1:])
         if not lock_fd:
             return

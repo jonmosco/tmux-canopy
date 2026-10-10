@@ -134,13 +134,17 @@ def linux_stat(pid):
         return None
 
 
+# Executable names (as name_from_args reports them) for each reporting kind.
+AGENT_NAMES = {"codex": {"codex"}, "claude": {"claude", "claude-code"},
+               "opencode": {"opencode"}, "gemini": {"gemini"}, "pi": {"pi"},
+               "omp": {"omp"}, "agy": {"agy", "antigravity"},
+               "cursor-agent": {"agent"}, "copilot": {"copilot"}, "grok": {"grok"},
+               "hermes": {"hermes"}}
+
+
 def process_identity(root, kind="codex"):
     """Find a live agent process in this pane, including nested shells."""
-    names = {"codex": {"codex"}, "claude": {"claude", "claude-code"},
-             "opencode": {"opencode"}, "gemini": {"gemini"}, "pi": {"pi"},
-             "omp": {"omp"}, "agy": {"agy", "antigravity"},
-             "cursor-agent": {"agent"}, "copilot": {"copilot"}, "grok": {"grok"},
-             "hermes": {"hermes"}}.get(kind, set())
+    names = AGENT_NAMES.get(kind, set())
     if not names:
         return None
     try:
@@ -244,6 +248,119 @@ def process_table():
         except (OSError, subprocess.TimeoutExpired):
             return None
     return _TABLE
+
+
+def ancestors():
+    """(pid, argv) for each ancestor of this hook, nearest first."""
+    if os.path.isdir("/proc/self"):
+        current = os.getppid()
+        for _ in range(64):
+            if current <= 1:
+                return
+            try:
+                with open(f"/proc/{current}/cmdline", "rb") as handle:
+                    args = [part.decode("utf-8", "replace") for part in handle.read().split(b"\0") if part]
+            except OSError:
+                return
+            yield current, args
+            stat = linux_stat(current)
+            if not stat:
+                return
+            current = stat[0]
+        return
+    table = {}
+    for line in process_table() or ():
+        fields = line.split(None, 2)
+        if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
+            table[int(fields[0])] = (int(fields[1]), fields[2].split())
+    current = os.getppid()
+    for _ in range(64):
+        if current <= 1 or current not in table:
+            return
+        parent, args = table[current]
+        yield current, args
+        current = parent
+
+
+def processes():
+    """pid -> (ppid, argv) for every process."""
+    table = {}
+    if os.path.isdir("/proc/self"):
+        for entry in os.scandir("/proc"):
+            if not entry.name.isdigit():
+                continue
+            stat = linux_stat(entry.name)
+            try:
+                with open(f"/proc/{entry.name}/cmdline", "rb") as handle:
+                    args = [part.decode("utf-8", "replace") for part in handle.read().split(b"\0") if part]
+            except OSError:
+                continue
+            if stat:
+                table[int(entry.name)] = (stat[0], args)
+        return table
+    for line in process_table() or ():
+        fields = line.split(None, 2)
+        if len(fields) == 3 and fields[0].isdigit() and fields[1].isdigit():
+            table[int(fields[0])] = (int(fields[1]), fields[2].split())
+    return table
+
+
+def session_links(args):
+    """Session ids an agent's argv runs, resumes, or attaches to."""
+    links = set()
+    for flag, value in zip(args, args[1:]):
+        if flag in ("--resume", "-r", "--session-id", "attach"):
+            value = os.path.basename(value).removesuffix(".jsonl")
+            if len(value) >= 8:
+                links.add(value)
+    return links
+
+
+def linked(left, right):
+    # `claude attach` takes a session id prefix.
+    return any(a.startswith(b) or b.startswith(a) for a in left for b in right)
+
+
+def pane_from_ancestry(kind, session=""):
+    """The pane a hook belongs to when it arrives without TMUX_PANE. Usually
+    the pane whose root process is an ancestor of the agent that ran the hook.
+    A Claude Code background session runs outside tmux, so its pane is instead
+    the one whose agent client resumes or attaches to the same session; only a
+    single such pane counts. Without TMUX, plain tmux reaches the default
+    server; a hook from an agent outside tmux finds no pane."""
+    names = AGENT_NAMES.get(kind, set())
+    rows = tmux("list-panes", "-a", "-F", "#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}")
+    if rows.returncode or not names:
+        return ""
+    roots = {}
+    for line in rows.stdout.splitlines():
+        pane, root, dead, sidebar, slot = (line.split("|") + [""] * 5)[:5]
+        if root.isdigit() and dead != "1" and sidebar != "1" and slot != "1":
+            roots[int(root)] = pane
+    found = False
+    links = {session} if len(session) >= 8 else set()
+    for pid, args in ancestors():
+        if name_from_args(args) in names:
+            found = True
+            links |= session_links(args)
+        if found and pid in roots:
+            return roots[pid]
+    if not found or not links:
+        return ""
+    table = processes()
+    panes = set()
+    for pid, (_, args) in table.items():
+        if name_from_args(args) not in names or not linked(session_links(args), links):
+            continue
+        current = pid
+        for _ in range(64):
+            if current in roots:
+                panes.add(roots[current])
+                break
+            if current not in table or current <= 1:
+                break
+            current = table[current][0]
+    return panes.pop() if len(panes) == 1 else ""
 
 
 def agent_panes(kind, fields=()):
