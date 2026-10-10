@@ -213,25 +213,33 @@ def main():
             sidebar = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy}').splitlines() if row.endswith('|1'))
             wait_for(lambda: any('two' in line for line in tm('capture-pane', '-p', '-t', sidebar).splitlines()), 'initial sidebar render')
             sidebar_pid_before = tm('display-message', '-p', '-t', sidebar, '#{pane_pid}')
+            def reload_until(predicate, description):
+                # A Ctrl-r that arrives while fzf is busy (or not yet in the
+                # foreground) is dropped, so repeat it until the result shows.
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    tm('send-keys', '-t', sidebar, 'C-r')
+                    pause = time.monotonic() + 1
+                    while time.monotonic() < pause:
+                        if predicate():
+                            return
+                        time.sleep(.03)
+                raise AssertionError(description)
             tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')
-            tm('send-keys', '-t', sidebar, 'C-r')
-            wait_for(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar), 'quiet appearance in attached client')
+            reload_until(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar), 'quiet appearance in attached client')
             quiet_frame = tm('capture-pane', '-p', '-t', sidebar)
             assert '1 Tree' in quiet_frame and 'Proc Buff' not in quiet_frame, quiet_frame
             # Single-pane windows take one row in quiet: the window, then its command.
             assert '◈ one' in quiet_frame and '▣ ' in quiet_frame and 'stable-beta · sleep' in quiet_frame, quiet_frame
             assert tm('display-message', '-p', '-t', sidebar, '#{pane_pid}') == sidebar_pid_before
             tm('resize-pane', '-t', sidebar, '-x', '30')
-            tm('send-keys', '-t', sidebar, 'C-r')
-            wait_for(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar)
-                     and tm('display-message', '-p', '-t', sidebar, '#{pane_width}') == '30',
-                     'quiet appearance at 30 columns')
-            assert '1 Tree' in tm('capture-pane', '-p', '-t', sidebar)
+            reload_until(lambda: 'Tree · All' in (frame := tm('capture-pane', '-p', '-t', sidebar)) and '1 Tree' in frame
+                         and tm('display-message', '-p', '-t', sidebar, '#{pane_width}') == '30',
+                         'quiet appearance at 30 columns')
             tm('resize-pane', '-t', sidebar, '-x', '42')
             tm('send-keys', '-t', sidebar, 'C-r')
             tm('set-option', '-g', '@tmux_canopy_appearance', 'classic')
-            tm('send-keys', '-t', sidebar, 'C-r')
-            wait_for(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'classic appearance restored')
+            reload_until(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'classic appearance restored')
             print('ok - quiet appearance renders in an attached sidebar and reloads in place')
             time.sleep(.3)
             script_env['TMUX_PANE'] = sidebar
