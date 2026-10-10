@@ -301,8 +301,6 @@ def report(kind, event, event_name=None):
         if not target:
             return
         core.PANE = target
-    if kind == 'claude' and name == 'SessionStart' and event.get('source') == 'compact':
-        return
     meta = core.tmux('display-message', '-p', '-t', core.PANE,
                      '#{pane_id}|#{pane_pid}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}|#{@tmux_canopy_agent_alerts}')
     if meta.returncode:
@@ -319,10 +317,22 @@ def report(kind, event, event_name=None):
     if (current['source'] != kind + '-hook' or current['pane_pid'] != pid or
             current['process_pid'] != process_pid or current['process_birth'] != process_birth):
         current = {key: '' for key in core.FIELDS}
+    # Claude can move a long conversation to a new session id when it compacts
+    # it. The same verified process keeps its state under the new id; a compact
+    # start never resets status mid-turn, and one from another process is ignored.
+    if kind == 'claude' and name == 'SessionStart' and event.get('source') == 'compact':
+        if current['session'] and current['session'] != session:
+            if core.write(dict(current, session=session)):
+                core.refresh()
+        return
     # Events can be delayed across agent session resets. Once a session is
-    # associated with a pane, only a fresh start may replace its identity.
+    # associated with a pane, only a fresh start may replace its identity. A
+    # Claude prompt from the same verified process counts too (as in Codex):
+    # it fires only for a prompt you submit, so a missed start cannot leave
+    # the pane following a session that no longer reports. Other agents' turn
+    # events can come from subagents' sessions, so they keep the strict rule.
     start = name in ('SessionStart', 'session_start', 'session.created', 'PreInvocation', 'sessionStart') or \
-        (is_contract and state == 'ready')
+        (is_contract and state == 'ready') or (kind == 'claude' and name == 'UserPromptSubmit')
     agent = subagent_id(kind, event, current)
     child_event = kind in ('opencode', 'agy') and bool(agent)
     if kind == 'opencode' and name == 'session.updated' and not child_event:

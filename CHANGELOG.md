@@ -6,6 +6,10 @@
 
 - The `quiet` header counts agents in every state (`◆1 ▷2 ✓1 ○1`) instead of only the most urgent one with the total (`◆1/5`), which it still shows when the header is too narrow.
 
+### Fixed
+
+- A long Claude Code conversation that moved to a new session id (after compacting its context, `/clear`, or resume) stopped updating its pane: Canopy discarded every later report because only a fresh start could change a pane's session. The same verified Claude process now carries its state over to the new id, and a new prompt from it adopts its session even when no start event arrived. Reports from another process, and late events from the old session, are still ignored.
+
 ## 0.2.0 - 2026-10-10
 
 ### Changed
