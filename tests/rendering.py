@@ -257,8 +257,9 @@ def main():
             assert highlighted(frame[second_session_line]) and not highlighted(frame[second_session_line - 1]), frame
             tm('send-keys', '-t', sidebar, 'M-a')
             assert selection()[0] == window_token
+            # The jump runs in the background, so fzf never waits on it.
             tm('send-keys', '-t', sidebar, 'C-o')
-            assert selection()[1] == f'P:{pane_a}:{sid_a}'
+            wait_for(lambda: selection()[1] == f'P:{pane_a}:{sid_a}', 'Ctrl-o jumps to the current pane')
             print('ok - Ctrl-o returns the pointer to the current content pane')
             sidebar_pid = tm('display-message', '-p', '-t', sidebar, '#{pane_pid}')
             fzf_pid = sp.check_output(['pgrep', '-P', sidebar_pid, '-x', 'fzf'], text=True).strip()

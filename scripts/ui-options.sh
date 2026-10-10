@@ -15,6 +15,12 @@ sidebar_ui_options() {
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
   local animate_cmd='"$TMUX_CANOPY_ROOT/scripts/animate-frame"'
   local mode_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-mode"'
+  # fzf pauses its screen when a command keeps it waiting over a second, and
+  # resuming leaves mouse tracking off and the tty echoing what Canopy sends
+  # the sidebar (^T, ^R). Popups, menus and prompts wait on the user, so they
+  # run detached; a prompt that changes the tree refreshes it when it closes.
+  local detach='</dev/null >/dev/null 2>&1 &'
+  local refresh='tmux send-keys -t "$TMUX_PANE" C-r'
   local pane_flag=()
   [[ -n "$pane" ]] && pane_flag=(-t "$pane")
   IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance < <(
@@ -79,10 +85,10 @@ sidebar_ui_options() {
     # reaches the edge, while j/k still show a row of context there. When the
     # list cannot scroll, fzf moves the selection instead.
     --bind='scroll-up:offset-up,scroll-down:offset-down' --scroll-off=1
-    --bind="ctrl-g:execute-silent($switcher_cmd)"
-    --bind="ctrl-o:transform($jump_cmd)"
-    --bind="F:execute-silent($filter_cmd)"
-    --bind="ctrl-f:execute-silent($filter_cmd)"
+    --bind="ctrl-g:execute-silent($switcher_cmd $detach)"
+    --bind="ctrl-o:bg-transform($jump_cmd)"
+    --bind="F:execute-silent($filter_cmd $detach)"
+    --bind="ctrl-f:execute-silent($filter_cmd $detach)"
     # Force header replacement after reload-sync (including error recovery).
     # Both actions run in one event, without an intermediate painted frame.
     # The same shell shows the agent summary sidebar-source stored for this
@@ -91,8 +97,8 @@ sidebar_ui_options() {
     --bind="/:execute-silent([ -z \"\$TMUX_CANOPY_STATE\" ] || touch \"\$TMUX_CANOPY_STATE.search\")+show-input+enable-search+clear-query+unbind($search_unbind)"
     --bind="esc:$esc_cmd"
     # Help owns a separate popup terminal; keep the current sidebar painted.
-    --bind="?:execute-silent($help_cmd)"
-    --bind="g:execute-silent($help_cmd --legend)"
+    --bind="?:execute-silent($help_cmd $detach)"
+    --bind="g:execute-silent($help_cmd --legend $detach)"
     # View changes must work even when the current view has no selectable row.
     --bind="1:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-tree)+reload-sync($source_cmd --stable)"
     --bind="2:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-processes)+reload-sync($source_cmd --stable)"
@@ -102,15 +108,15 @@ sidebar_ui_options() {
     --bind="f:execute-silent($action_cmd toggle-footer)+reload-sync($source_cmd --stable)"
     --bind="$jump_agent_bind"
     --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
-    --bind="a:execute-silent($action_cmd actions {1})"
+    --bind="a:execute-silent($action_cmd actions {1} $detach)"
     --bind='p:toggle-preview'
-    --bind="P:execute-silent($popup_cmd {1})"
+    --bind="P:execute-silent($popup_cmd {1} $detach)"
     --bind="enter:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})$activate_suffix"
     --bind="double-click:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})$activate_suffix"
     --bind="m:execute-silent($action_cmd move-toggle {1})+reload-sync($source_cmd --stable)"
     --bind="c:execute-silent($action_cmd move-cancel {1})+reload-sync($source_cmd --stable)"
-    --bind="r:execute-silent($action_cmd rename {1})+reload-sync($source_cmd --stable)"
-    --bind=">:execute-silent($action_cmd send {1})"
+    --bind="r:execute-silent(($action_cmd rename {1}; $refresh) $detach)"
+    --bind=">:execute-silent($action_cmd send {1} $detach)"
     --bind="x:execute-silent($action_cmd delete {1})+reload-sync($source_cmd --stable)"
     --bind="u:execute-silent($action_cmd notification-clear {1})+reload-sync($source_cmd --stable)"
     --bind="U:execute-silent($action_cmd notifications-clear-all {1})+reload-sync($source_cmd --stable)"
@@ -127,7 +133,7 @@ sidebar_ui_options() {
     --bind="v:execute-silent($action_cmd split-vertical {1})+reload-sync($source_cmd --stable)"
     --bind="t:execute-silent($action_cmd create-window {1})+reload-sync($source_cmd --stable)"
     --bind="S:execute-silent($action_cmd create-session {1})+reload-sync($source_cmd --stable)"
-    --bind="N:execute-silent($action_cmd create-session-prompt {1})+reload-sync($source_cmd --stable)"
+    --bind="N:execute-silent(($action_cmd create-session-prompt {1}; $refresh) $detach)"
     --bind="z:execute-silent($action_cmd zoom {1})+reload-sync($source_cmd --stable)"
     --bind="b:execute-silent($action_cmd break-window {1})+reload-sync($source_cmd --stable)"
     --bind="ctrl-r:clear-screen+reload-sync($source_cmd --stable)"
