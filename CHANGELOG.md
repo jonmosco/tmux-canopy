@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-10-10
+
 ### Changed
 
 - `quiet` is now the default appearance: sessions, windows, and panes in tmux's own order, each window once, with directories and Git branches as details and idle shells dimmed. Set `@tmux-canopy-appearance 'folders'` to keep the directory-grouped tree with view tabs and tree guides (`places` is still accepted). `default` now means `quiet`, and `ascii` is `quiet` without Unicode glyphs.
