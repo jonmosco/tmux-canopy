@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- OpenCode 2 never reported its state: it can run plugins in a shared background service with no `TMUX_PANE`, and the plugin gave up without one. It now reports from the service, and Canopy finds the pane from the session and its directory, as it does for Codex's shared daemon. Reinstall with `canopy integration install opencode` and restart the OpenCode service.
 - A sidebar could outlive the terminal that opened it when Canopy missed that terminal's detach, for example across a plugin reload or from an older version, and stay behind in a window as a second sidebar. Sidebars whose terminal is no longer attached now close when a terminal attaches. The cleanup scan also read a sidebar with no target pane incorrectly, because empty tab-separated fields collapsed.
 - The mouse wheel could stop scrolling the sidebar, and keys Canopy sends the sidebar could appear as `^T` or `^R` across it, for example while help was open and an agent was working. fzf pauses its screen when a command keeps it waiting for more than a second, and resuming left mouse tracking off and the terminal echoing input. Help, the legend, the actions menu, the quick switcher, filters, the preview popup, and the rename, new-session and send prompts now run without keeping fzf waiting, and returning the pointer to your pane (`Ctrl-o`, or focusing the sidebar) runs in the background, where it could take over a second with many windows.
 

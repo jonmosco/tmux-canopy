@@ -5,10 +5,13 @@ runs outside tmux, through the pane whose claude resumes the same session.
 Two such panes, or none, mean no report."""
 import json
 import os
+import sys
 from pathlib import Path
 import subprocess as sp
 import tempfile
 import time
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from support import install_agent_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = str(ROOT / 'scripts/agent-hook')
@@ -101,6 +104,29 @@ try:
         time.sleep(0.3)
         assert all(status(p) in ('|', 'inside-1|working', 'forked-session-1|turn-ended', 'attachsess-1234|working')
                    for p in (pane, viewer, twin, attached))
-    print('ok - hooks without TMUX_PANE reach their pane by process tree or linked session, and never guess')
+        print('ok - hooks without TMUX_PANE reach their pane by process tree or linked session, and never guess')
+
+        # 6. OpenCode 2 runs plugins in a shared service outside tmux: events
+        # reach the OpenCode pane by session and directory, never another.
+        install_agent_fixture(temp / 'opencode')
+        project = temp / 'project'
+        project.mkdir()
+        oc = tm('new-window', '-d', '-t', 'work:', '-c', str(project), '-P', '-F', '#{pane_id}',
+                f"{temp / 'opencode'} 600")
+        project = Path(tm('display-message', '-p', '-t', oc, '#{pane_current_path}'))
+
+        def service(payload):
+            sp.run([HOOK, 'opencode'], input=json.dumps(payload), env=hook_env, text=True,
+                   check=True, timeout=10, capture_output=True)
+        service({'type': 'session.created', 'properties': {'sessionID': 'oc-1',
+                 'info': {'id': 'oc-1', 'directory': str(project)}}})
+        wait(lambda: status(oc) == 'oc-1|ready', f'service session binds its pane: {status(oc)}')
+        service({'type': 'session.status', 'properties': {'sessionID': 'oc-1', 'status': {'type': 'busy'}}})
+        wait(lambda: status(oc) == 'oc-1|working', f'later service events follow the session: {status(oc)}')
+        service({'type': 'session.created', 'properties': {'sessionID': 'oc-elsewhere',
+                 'info': {'id': 'oc-elsewhere', 'directory': '/somewhere/else'}}})
+        time.sleep(.3)
+        assert status(oc) == 'oc-1|working', status(oc)
+        print('ok - OpenCode service events without TMUX_PANE reach the pane by session and directory')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True, timeout=10)

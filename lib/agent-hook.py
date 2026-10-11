@@ -531,9 +531,15 @@ def main():
         emit()
         return
     if not re.fullmatch(r'%[0-9]+', core.PANE):
-        # No pane in the environment, as in a Claude Code background session:
-        # find it from the process tree, or the pane attached to the session.
-        core.PANE = core.pane_from_ancestry(kind, core.field(event.get('session_id'), 128))
+        if kind == 'opencode':
+            # OpenCode 2 runs plugins in a shared service outside tmux: route
+            # by the event's session and directory, as report() does.
+            core.PANE = opencode_pane(opencode_parent_session(event) or session_id(kind, event), event)
+        else:
+            # No pane in the environment, as in a Claude Code background
+            # session: find it from the process tree, or the pane attached to
+            # the session.
+            core.PANE = core.pane_from_ancestry(kind, core.field(event.get('session_id'), 128))
         if not core.PANE:
             emit()
             return
