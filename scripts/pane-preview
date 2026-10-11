@@ -12,10 +12,10 @@ sep=$'\037'
 # Scrub metadata control characters before splitting. The captured screen's
 # colors are retained separately by capture-pane -e.
 clean=$'s/[\001-\037\177]/ /'
-format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}$sep#{@tmux_canopy_notice_pane_activity}$sep#{@tmux_canopy_notice_pane_bell}$sep#{@tmux_canopy_notice_pane_silence}$sep#{@tmux_canopy_notifications}$sep#{@tmux-canopy-git-context}"
+format="#{pane_width}$sep#{pane_height}$sep#{cursor_y}$sep#{history_size}$sep#{alternate_on}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_current_path}$sep#{@tmux_canopy_notice_pane_activity}$sep#{@tmux_canopy_notice_pane_bell}$sep#{@tmux_canopy_notice_pane_silence}$sep#{@tmux_canopy_notifications}$sep#{@tmux-canopy-git-context}$sep#{@tmux-canopy-labels}$sep#{${clean}:session_name}:#{window_index} #{${clean}:window_name}"
 metadata="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
 [[ -n "$metadata" ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
-IFS="$sep" read -r width height cursor history alternate command directory activity bell silence configured git_mode <<< "$metadata"
+IFS="$sep" read -r width height cursor history alternate command directory activity bell silence configured git_mode labels window <<< "$metadata"
 [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[1-9][0-9]*$ && "$cursor" =~ ^[0-9]+$ && "$history" =~ ^[0-9]+$ ]] || { printf 'Pane %s is no longer available.\n' "$pane"; exit 0; }
 git_context=''
 if [[ "$git_mode" == branch ]] && command -v git >/dev/null 2>&1; then
@@ -70,6 +70,8 @@ else
 fi
 hint="$mode"
 if ((width > columns)) || { [[ "$expanded" != 1 ]] && ((height > budget)); }; then hint+=' crop'; fi
+# Place labels can name a window differently from tmux; show tmux's name too.
+[[ "$labels" != places ]] || printf '%s · ' "$window"
 printf '%s · %s · %sx%s [%s]\n' "$pane" "$command" "$width" "$height" "$hint"
 ((rows >= 2)) || exit 0
 if [[ -n "${HOME:-}" ]]; then

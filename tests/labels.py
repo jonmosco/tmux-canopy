@@ -30,7 +30,7 @@ def main():
         state = Path(directory) / 'state'
         state.touch()
 
-        def render(labels='places', icons='nerdfont', width=47, git=True):
+        def render(labels='places', icons='nerdfont', width=47, git=True, tmux_names=False):
             d = ['D', icons, '', 'ansi', 'normal', '', '', '', '%9', '@9', '$9', str(width), 'host']
             d.extend([''] * (39 - len(d)))
             d.extend(['quiet', 'branch' if git else '', 'off'])
@@ -53,7 +53,7 @@ def main():
                             ['G', '%6', 'main'], ['G', '%7', 'vendored'], ['G', '%8', 'fix/auth']]
             snapshot = '\n'.join(SEP.join(r) for r in records) + '\n'
             run = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1', '-v', 'nul=1', '-v', f'now={int(time.time())}',
-                          '-v', f'labels={labels}', '-f', str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
+                          '-v', f'labels={labels}', '-v', f'tmux_names={int(tmux_names)}', '-f', str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
                          input=snapshot, text=True, capture_output=True, check=True,
                          env=os.environ | {'TMUX_CANOPY_RENDER_HOME': HOME, 'LC_COLLATE': 'C'})
             rows = [record.split('\t') for record in run.stdout.strip('\0').split('\0')]
@@ -112,6 +112,53 @@ def main():
         assert '1:zsh' in text(default, 'W:@1:$0'), text(default, 'W:@1:$0')
         assert '0:editor · nvim' in text(default, 'W:@0:$0'), text(default, 'W:@0:$0')
         print('ok - quiet keeps tmux window names unless places labels are on')
+
+        # A custom automatic-rename-format is your choice of window names: keep
+        # them, and label only panes.
+        named = render(tmux_names=True, width=60)
+        assert text(named, 'W:@1:$0').endswith('1:zsh'), text(named, 'W:@1:$0')
+        assert text(named, 'W:@3:$0').endswith('3:claude'), text(named, 'W:@3:$0')
+        assert text(named, 'P:%4:$0').endswith('1: canopy-footer ⎇ feature/footer codex'), text(named, 'P:%4:$0')
+        print('ok - a custom automatic-rename-format keeps tmux window names and labels only panes')
+
+        # tree-source reads both settings from tmux in its one snapshot call.
+        socket = f'canopy-labels-{os.getpid()}'
+        env = {k: v for k, v in os.environ.items() if k not in ('TMUX', 'TMUX_PANE')}
+
+        def tm(*args):
+            return sp.run(['tmux', '-L', socket, *args], env=env, capture_output=True, text=True, timeout=10).stdout.strip()
+        try:
+            work = Path(directory) / 'work'
+            (work / 'docs').mkdir(parents=True)
+            tm('-f', '/dev/null', 'new-session', '-d', '-s', 'w', '-x', '120', '-y', '30', '-c', str(work), 'sleep 600')
+            tm('new-window', '-d', '-t', 'w:', '-c', str(work / 'docs'), 'sleep 600')
+            sidebar = tm('split-window', '-d', '-h', '-l', '42', '-t', 'w:0', '-P', '-F', '#{pane_id}', 'sleep 600')
+            tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
+            tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')
+            tm('set-option', '-g', '@tmux_canopy_icon_theme', 'ascii')
+            tm('set-option', '-g', '@tmux-canopy-labels', 'places')
+            source_env = env | {'TMUX': tm('display-message', '-p', '#{socket_path},0,0'), 'TMUX_PANE': sidebar,
+                                'TMUX_CANOPY_STATE': str(state), 'TMUX_CANOPY_NUL': '1'}
+
+            def docs_row():
+                out = sp.run([str(ROOT / 'scripts/tree-source')], env=source_env, capture_output=True, text=True,
+                             timeout=10).stdout
+                return next(' '.join(ANSI.sub('', r.split('\t')[1]).split()) for r in out.split('\0')
+                            if r.startswith('W:') and ':1:' not in r.split('\t')[0] and '1:' in r)
+            assert '1:docs/ sleep' in docs_row(), docs_row()
+            # The preview names the window as tmux does, next to the label.
+            docs_pane = tm('display-message', '-p', '-t', 'w:1', '#{pane_id}')
+            preview = sp.run([str(ROOT / 'scripts/pane-preview'), docs_pane], env=source_env, capture_output=True,
+                             text=True, timeout=10).stdout.splitlines()[0]
+            name = tm('display-message', '-p', '-t', 'w:1', '#{window_name}')
+            assert preview.startswith(f'w:1 {name} · {docs_pane} · '), preview
+            tm('set-option', '-gw', 'automatic-rename-format', '#{b:pane_current_path}')
+            tm('rename-window', '-t', 'w:1', 'docs-by-tmux')
+            tm('set-option', '-w', '-t', 'w:1', 'automatic-rename', 'on')
+            assert 'docs/' not in docs_row(), docs_row()
+            print('ok - tree-source passes the labels setting and notices a custom automatic-rename-format')
+        finally:
+            sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True, timeout=10)
 
 
 if __name__ == '__main__':

@@ -329,7 +329,7 @@ Press `Ctrl-r` in the sidebar after changing a setting by hand or switching bran
 
 ## Place labels (preview)
 
-Idle windows are all called `zsh`, which says nothing. Set `@tmux-canopy-labels 'places'` and `quiet` names each row by what tells it apart instead: the session heading shows the session's directory and branch, a row elsewhere shows where it is (` docs`, ` notes ⎇ main`), an idle shell shows its folder, and a running program sits dim on the right. Names you gave your windows always win, and tmux's own names and status line are untouched. See [Place labels](docs/reference.md#place-labels-preview).
+Idle windows are all called `zsh`, which says nothing. Set `@tmux-canopy-labels 'places'` and `quiet` names each row by what tells it apart instead: the session heading shows the session's directory and branch, a row elsewhere shows where it is (` docs`, ` notes ⎇ main`), an idle shell shows its folder, and a running program sits dim on the right. Names you gave your windows always win, and tmux's own names and status line are untouched; if you have customised tmux's `automatic-rename-format`, Canopy keeps tmux's window names. See [Place labels](docs/reference.md#place-labels-preview).
 
 ```text
 ▾ ◈ canopy ──────────── tmux-canopy ⎇ main

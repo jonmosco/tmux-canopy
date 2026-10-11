@@ -541,7 +541,15 @@ its current width; Ctrl-g searches full paths even when they are hidden.
 - When a place names the row, a running program is shown dim on the right, ahead of agent and notice marks. A window with panes in several places is named after its first pane's, with a count of the others (` logs +1`); a window in the session's directory is named by the first program running there (`claude +1`).
 - On a narrow row the branch gives way first, then the program, and then the label is shortened; marks always stay.
 
-The setting changes only what the sidebar shows; tmux's own window names and your status line are untouched. Press `Ctrl-r` after changing it by hand.
+The setting changes only what the sidebar shows; tmux's own window names and your status line are untouched, so a window can have one name in the sidebar and another in the status line. The pane preview starts with tmux's name (`work:3 zsh · %12 · …`) to connect the two. If you have changed tmux's `automatic-rename-format`, you have already chosen how windows are named, so place labels keep tmux's window names and label only panes.
+
+To have tmux itself name windows this way everywhere, status line included, set its format instead of using Canopy's labels:
+
+```tmux
+set -g automatic-rename-format '#{?#{m:*sh,#{pane_current_command}},#{b:pane_current_path},#{pane_current_command}}'
+```
+
+Press `Ctrl-r` after changing either setting by hand.
 
 #### Git branch context
 
