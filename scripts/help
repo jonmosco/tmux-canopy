@@ -41,7 +41,7 @@ help_records() {
   key '2' 'Processes grouped by their pane'
   key '3' 'Paste buffers; Enter pastes into the target pane'
   key 'Shift-a' 'Turn agent mode on or off for this client; Tree stays on 1'
-  key 'f' 'Show or hide the Tree footer (in quiet, what you can do now)'
+  key 'f' 'Show or hide the footer (in quiet, what you can do now)'
   [[ "$agents_enabled" != on ]] || key '4' 'Detected agent panes, grouped by session and window'
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
   [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'

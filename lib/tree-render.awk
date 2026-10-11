@@ -51,7 +51,7 @@ $1 == "P" {
         if ($16 == 1) last_content[$3]=p
     }
 }
-$1 == "A" { agent_kind[$2]=$3 }
+$1 == "A" { agent_kind[$2]=$3; any_agent=1 }
 $1 == "G" { git_branch[$2]=$3 }
 $1 == "V" { verified[$2]=1 }
 agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
@@ -451,11 +451,13 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
         text=edge_colored(text,summary_color,available)
     row("H:",text,"H:tree")
 }
-# The quiet Tree footer says what you can do now: finish a pending move or
+# The quiet footer says what you can do now: finish a pending move or
 # delete, answer an agent waiting on you, or, when nothing is pending, where
-# the keys are. The most important part comes first and narrow sidebars keep
+# the keys are; in the Agents view, how to reach an agent and get back. The most important part comes first and narrow sidebars keep
 # only what fits. A search footer comes from the sidebar's search binding.
 function quiet_footer(    n,i,part,status,short,text,plain,budget) {
+    # The Agents header counts its own panes; waiting agents are server-wide.
+    if (agent_view) agent_footer()
     if (mode == "MOVE" || mode == "LINK") {
         status=accent (mode == "MOVE" ? "Moving" : "Linking") reset
         n=split("Enter|" (mode == "MOVE" ? "move here" : "link here") "|c|cancel", part, "|")
@@ -469,6 +471,8 @@ function quiet_footer(    n,i,part,status,short,text,plain,budget) {
     } else if (quiet_need > 1) {
         status=attention (icons == "ascii" ? "!" : agent_need_badge) " " quiet_need " waiting" reset
         n=split("n|next|>|reply", part, "|")
+    } else if (agent_view) {
+        n=split((quiet_total || any_agent ? "Enter|focus|i|details|" : "") "1|tree", part, "|")
     } else {
         n=split("?|keys|/|search|" (agents_enabled ? "4|agents" : "2|proc|3|buff"), part, "|")
     }
@@ -1302,7 +1306,7 @@ END {
         box_pad=(appearance == "lazygit" || appearance == "places" ? 3 : 0)
         if (appearance == "quiet") {
             quiet_header()
-            if (!agent_view && !footer_hidden) quiet_footer()
+            if (!footer_hidden) quiet_footer()
         } else {
         if (appearance == "pills") {
             place=(agent_view ? "agents" : (current_s in sname ? sname[current_s] : ""))

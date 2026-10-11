@@ -108,9 +108,16 @@ def main():
                     os.write(master, f'\x1b[<{code};{left + 12};{row + 1}m'.encode())
 
             tm('select-pane', '-t', sidebar)
-            time.sleep(.5)
+            # Focusing the sidebar moves the pointer in the background; a
+            # click must come after that lands, or the jump can undo it.
+            def settled():
+                first_seen = selected()
+                time.sleep(.6)
+                return first_seen not in (None, '') and selected() == first_seen
+            wait(settled, 'pointer settles after focus')
+            start = selected()
             mouse(0, 8, release=True)
-            wait(lambda: selected() not in (None, ''), 'click selects a row')
+            wait(lambda: selected() not in (None, '', start), 'click selects a row')
             time.sleep(.4)
             clicked, top = selected(), top_row()
 

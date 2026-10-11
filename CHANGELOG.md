@@ -9,7 +9,7 @@
 
 ### Changed
 
-- The `quiet` Tree footer says what you can do now instead of showing the same key hints: `◆ Claude Code waiting   n go   > reply` when an agent needs you, how to finish or cancel a move or link, that a delete is armed, `Esc clear   Enter focus` while searching, and otherwise `? keys   / search   4 agents`. It no longer offers the view you are already in, or `n` when nothing is waiting, and keeps only what fits a narrow sidebar.
+- The `quiet` Tree footer says what you can do now instead of showing the same key hints: `◆ Claude Code waiting   n go   > reply` when an agent needs you, how to finish or cancel a move or link, that a delete is armed, `Esc clear   Enter focus` while searching, and otherwise `? keys   / search   4 agents`. It no longer offers the view you are already in, or `n` when nothing is waiting, and keeps only what fits a narrow sidebar. The Agents view now has the footer too, showing `Enter focus   i details   1 tree` when nothing is pending.
 
 ### Fixed
 
