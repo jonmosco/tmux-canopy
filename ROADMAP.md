@@ -3,9 +3,9 @@
 Remaining work for tmux-canopy. This list does not promise a release date. The
 [README](README.md#features) describes what is available today.
 
-## Stabilization (current focus)
+## Stabilization (done in 0.4.0)
 
-New features are on hold until the existing ones are dependable. In order:
+New features were on hold until the existing ones were dependable:
 
 - [x] Find flaky tests by running every suite repeatedly, and fix their causes
   rather than adding retries. Ten rounds of every suite found two: the mouse
