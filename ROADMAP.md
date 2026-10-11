@@ -16,10 +16,15 @@ New features are on hold until the existing ones are dependable. In order:
   service (fixed). Gemini CLI could not sign in and is unchecked; Cursor Agent
   and Oh My Pi had no Canopy integration installed, and Copilot and Grok were
   not installed.
-- [ ] Count forks and tmux calls per refresh on a realistic server and compare
-  with 0.2.0.
+- [x] Count forks and tmux calls per refresh on a realistic server and compare
+  with 0.2.0. On 10 sessions, 76 panes, and 6 working agents, a refresh starts
+  14 programs and makes 6 tmux calls in about 140 ms in both versions (16 and 8
+  in the Agents view); branch labels add one `git` per repository, with place
+  labels or without.
 - [x] Run the suite on Linux: CI runs it on Ubuntu 24.04 for every push.
-- [ ] Review the README, help, and legend against the code.
+- [x] Review the README, help, and legend against the code: every bound key
+  is in help, the README, and the reference, every setting the code reads is
+  documented, and the legend describes the current footers.
 
 ## Agent status reliability
 
