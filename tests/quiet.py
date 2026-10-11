@@ -94,6 +94,13 @@ def main():
         assert footer(width=30) == '◆ Claude Code waiting', footer(width=30)
         assert footer(width=24) == '◆ 1 waiting   n go', footer(width=24)
         assert footer(width=24, status='working') == '? keys   / search', footer(width=24, status='working')
+        # The Agents view keeps a footer: reach an agent, read it, get back.
+        assert footer(agent_view=True, status='working') == 'Enter focus   i details   1 tree', \
+            footer(agent_view=True, status='working')
+        assert footer(agent_view=True) == '◆ Claude Code waiting   n go   > reply', footer(agent_view=True)
+        assert footer(agent_view=True, status='working', width=30) == 'Enter focus   i details', \
+            footer(agent_view=True, status='working', width=30)
+        assert footer(agent_view=True, status='working', state_text='FOOTER\toff\n') == ''
         print('ok - the quiet footer follows what is pending: a move, a delete, agents waiting, or the keys')
 
         for icons in ('unicode', 'ascii', 'nerdfont'):
