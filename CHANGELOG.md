@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-10-11
+
 ### Added
 
 - An agent waiting on you shows what it asks for on a dim line beneath its pane: the command it wants to run, then its description or question when that says more (`make test · Run the tests`). The drawer still has the full request.
