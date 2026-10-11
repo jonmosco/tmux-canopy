@@ -10,8 +10,12 @@ New features are on hold until the existing ones are dependable. In order:
 - [x] Find flaky tests by running every suite repeatedly, and fix their causes
   rather than adding retries. Ten rounds of every suite found two: the mouse
   wheel (a real bug, fixed) and a Git test whose window names changed.
-- [ ] Check each lifecycle adapter, and `>`, against the real agent, including
-  exit, restart, and pane reuse.
+- [x] Check each lifecycle adapter, and `>`, against the real agent, including
+  exit, restart, and pane reuse. Claude Code and Codex (approval answered with
+  `>`), Antigravity, and Pi passed; OpenCode 2 never reported from its shared
+  service (fixed). Gemini CLI could not sign in and is unchecked; Cursor Agent
+  and Oh My Pi had no Canopy integration installed, and Copilot and Grok were
+  not installed.
 - [ ] Count forks and tmux calls per refresh on a realistic server and compare
   with 0.2.0.
 - [x] Run the suite on Linux: CI runs it on Ubuntu 24.04 for every push.

@@ -13,8 +13,10 @@ const types = new Set([
   'session.next.step.started', 'session.next.step.failed', 'session.next.tool.called',
 ]);
 
+// OpenCode 2 runs plugins in a shared service with no TMUX_PANE; the reporter
+// then finds the pane from the event's session and directory.
 function report(event) {
-  if (!process.env.TMUX || !process.env.TMUX_PANE || !event || !types.has(event.type)) return;
+  if (!event || !types.has(event.type)) return;
   const child = spawn(reporter, ['opencode'], { stdio: ['pipe', 'ignore', 'ignore'] });
   const timer = setTimeout(() => child.kill(), 3000);
   child.on('error', () => clearTimeout(timer));
