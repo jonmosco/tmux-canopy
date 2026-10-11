@@ -28,19 +28,41 @@ if [[ "$mode" == 'split' ]]; then
   exit 0
 fi
 
-# One pane inventory replaces a list-panes | grep per cache entry and target.
-declare -A live=() is_sidebar=() sidebar_target=() sidebar_window=()
+# One inventory of panes and attached clients replaces a list-panes | grep
+# per cache entry and target.
+declare -A live=() is_sidebar=() sidebar_target=() sidebar_window=() sidebar_owner=() attached=()
 sidebar_count=0
-while IFS=$'\t' read -r pane flag target window; do
+# A tab separator would collapse empty fields (tab is IFS whitespace).
+inventory="$(tmux list-clients -F 'C|#{client_tty}' \; \
+  list-panes -a -F '#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_target}|#{window_id}|#{@tmux_canopy_client}' 2>/dev/null)" || exit 0
+while IFS='|' read -r pane flag target window owner; do
   [[ -n "$pane" ]] || continue
+  if [[ "$pane" == C ]]; then attached[$flag]=1; continue; fi
   live[$pane]=1
   if [[ "$flag" == 1 ]]; then
     is_sidebar[$pane]=1
     sidebar_target[$pane]=$target
     sidebar_window[$pane]=$window
+    sidebar_owner[$pane]=$owner
     ((sidebar_count += 1))
   fi
-done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy}\t#{@tmux_canopy_target}\t#{window_id}' 2>/dev/null)
+done <<< "$inventory"
+
+# A sidebar follows the terminal that opened it, so once that terminal is
+# gone nothing moves or closes it. client-detached closes it at once; this
+# catches one whose detach went unseen, such as across a plugin reload or
+# from an older version. A sidebar with no recorded owner is left for toggle
+# to adopt. A terminal attaching checks only this; closing a sidebar starts
+# the usual after-kill-pane cleanup for the rest.
+[[ "$mode" == orphans ]] && for sidebar in "${!is_sidebar[@]}"; do
+  owner=${sidebar_owner[$sidebar]}
+  [[ -n "$owner" && -z "${attached[$owner]:-}" ]] || continue
+  close_sidebar_pane "$sidebar" 2>/dev/null || true
+  clear_sidebar_cache "$owner"
+  unset 'is_sidebar[$sidebar]'
+  ((sidebar_count -= 1))
+done
+[[ "$mode" != orphans ]] || exit 0
 
 # Remove cache entries whose pane vanished or no longer identifies itself as a
 # sidebar. This also repairs interrupted toggles and killed sidebar processes.
