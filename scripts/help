@@ -156,7 +156,8 @@ legend_records() {
     section 'Agent state labels'
     legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
     note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
-    legend_item 'Agents ◆1 ▷2' 'Default Tree footer: every agent on the server, whatever the filters and folds. Quiet shows a compact count in the header and shortcuts in the footer. n jumps to one needing input.' amber
+    legend_item 'Agents ◆1 ▷2' 'Tree footer in folders and classic: every agent on the server, whatever the filters and folds. n jumps to one needing input.' amber
+    legend_item '◆ Claude Code waiting   n go' 'Quiet footer: what you can do now. An agent waiting on you, a pending move or delete, the search keys, or otherwise ? keys and / search.' amber
     legend_item '! / ▷ / ✓' 'Agent state on a pane: needs input, working (pulses while animation is on), ready or turn ended.' amber
     legend_item '  make test · Run…' 'What an agent waiting on you asks for: the command, then its description. i shows it in full; > replies.' dim
     legend_item '├─ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
@@ -174,7 +175,7 @@ legend_records() {
   fi
 
   if [[ "$agents_enabled" != on ]]; then
-    legend_item '◈ 3  ▣ 8  ▹ 14' 'Default Tree footer: sessions, windows, and panes. A filter shows visible/total, such as ◈ 1/3. Quiet shows shortcuts instead.' dim
+    legend_item '◈ 3  ▣ 8  ▹ 14' 'Tree footer in folders and classic without agent mode: sessions, windows, and panes. A filter shows visible/total, such as ◈ 1/3.' dim
   fi
 
   section 'Other tree markers'

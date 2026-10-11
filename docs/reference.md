@@ -63,6 +63,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | Key | Action |
 |---|---|
 | `1` / `2` / `3` | Switch to Tree, Processes, or Buffers view |
+| `4` | Agents view: only panes with an agent (agent mode on) |
 | `j` / `k` or arrows | Move selection |
 | `h` / Left | Collapse the selected node or pane's window |
 | `l` / Right | Expand the selected session or window |
@@ -73,6 +74,9 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `z` | Toggle zoom on the selected pane or window |
 | `b` | Break the selected pane into its own window |
 | `A` | Turn agent mode on or off for this client; Tree stays on `1` |
+| `n` | Jump to the next agent needing input, across all sessions and windows |
+| `i` | Switch the drawer between the terminal preview and the agent summary; show it if hidden |
+| `f` | Show or hide the footer |
 | `p` | Toggle the preview drawer on/off without closing the sidebar |
 | `Shift-p` | Open an enlarged read-only preview popup (`q` closes; arrows scroll) |
 | `prefix + Space` | Cycle content layouts while leaving the sidebar fixed |
@@ -93,6 +97,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `/` | Enter fuzzy-filter mode |
 | `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
+| `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
 | `?` | Open scrollable Help; the wheel, `j`/`k`, or arrows scroll, Space pages, `q`/Esc closes |
