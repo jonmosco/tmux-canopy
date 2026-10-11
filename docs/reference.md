@@ -534,11 +534,11 @@ its current width; Ctrl-g searches full paths even when they are hidden.
 
 `@tmux-canopy-labels 'places'` names each `quiet` row by what tells it apart instead of tmux's window name, which for an idle window is just `zsh`. The default, `tmux`, keeps tmux's names.
 
-- The session heading carries the session's own directory and branch, from where the session started (`session_path`), so rows only say where they differ from it.
+- The session heading carries the session's own directory and branch, from where the session started (`session_path`), so rows only say where they differ from it. A session started in your home directory shows none.
 - A window you named yourself (with `rename-window` or `r`, which turns off tmux's `automatic-rename`) keeps that name.
 - Otherwise a row is named by where it is: ` docs` for a subfolder of the session's directory (its branch only when it is a different repository), and ` notes` or ` canopy-footer ⎇ feature/x` for anywhere else. Without Nerd Fonts these are `docs/` and `↗ notes`, or `[notes] @feature/x` in ASCII. A session started in your home directory names every place this second way.
 - A row in the session's directory is named by its program (`claude`, `nvim`), or, for an idle shell, by the directory itself, dimmed. A pane in its window's directory with only a shell reads `shell`.
-- When a place names the row, a running program is shown dim on the right, ahead of agent and notice marks. A window with panes in several places is named after its first pane's, with a count of the others (` logs +1`).
+- When a place names the row, a running program is shown dim on the right, ahead of agent and notice marks. A window with panes in several places is named after its first pane's, with a count of the others (` logs +1`); a window in the session's directory is named by the first program running there (`claude +1`).
 - On a narrow row the branch gives way first, then the program, and then the label is shortened; marks always stay.
 
 The setting changes only what the sidebar shows; tmux's own window names and your status line are untouched. Press `Ctrl-r` after changing it by hand.

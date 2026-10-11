@@ -44,6 +44,8 @@ def main():
                        window('$0', '@4', 4, 'make', True), pane('%5', '@4', 0, 'make', REPO + '/tests'),
                        window('$0', '@5', 5, 'nvim', True), pane('%6', '@5', 0, 'nvim', REPO),
                        window('$0', '@6', 6, 'zsh', True), pane('%7', '@6', 0, 'zsh', REPO + '/vendor/lib'),
+                       window('$0', '@8', 8, 'codex', True), pane('%9', '@8', 0, 'codex', REPO),
+                       pane('%10', '@8', 1, 'zsh', REPO),
                        window('$1', '@7', 0, 'zsh', True), pane('%8', '@7', 0, 'zsh', HOME + '/code/api')]
             if git:
                 records += [['G', '$0', 'main'], ['G', '%0', 'main'], ['G', '%1', 'main'], ['G', '%2', 'main'],
@@ -75,8 +77,11 @@ def main():
         assert text(rows, 'W:@5:$0').endswith('5:nvim'), text(rows, 'W:@5:$0')
         # A nested repository keeps its own branch.
         assert text(rows, 'W:@6:$0').endswith('6: vendor/lib ⎇ vendored'), text(rows, 'W:@6:$0')
-        # A mixed window: its first pane's place, and how many panes are elsewhere.
-        assert text(rows, 'W:@3:$0').endswith('3:tmux-canopy +1'), text(rows, 'W:@3:$0')
+        # A window in the session's directory is named by its program, plus how
+        # many panes are elsewhere.
+        assert text(rows, 'W:@3:$0').endswith('3:claude +1'), text(rows, 'W:@3:$0')
+        assert text(rows, 'W:@8:$0').endswith('8:codex'), text(rows, 'W:@8:$0')
+        assert text(rows, 'P:%10:$0').endswith('1:shell'), text(rows, 'P:%10:$0')
         assert text(rows, 'P:%3:$0').endswith('0:claude'), text(rows, 'P:%3:$0')
         wide = render(width=60)
         assert text(wide, 'P:%4:$0').endswith('1: canopy-footer ⎇ feature/footer codex'), text(wide, 'P:%4:$0')
@@ -84,6 +89,7 @@ def main():
         # A session in your home directory has no subfolders worth naming.
         assert text(rows, 'W:@7:$1').endswith('0: api ⎇ fix/auth'), text(rows, 'W:@7:$1')
         assert 'code/api' not in text(rows, 'W:@7:$1')
+        assert 'home' not in text(rows, 'S:$1'), text(rows, 'S:$1')
         print('ok - places labels name rows by their window name, place, or program, with the program on the right')
 
         unicode = render(icons='unicode', width=60)
