@@ -1425,7 +1425,7 @@ END {
         if (place_labels()) {
             # The session's own directory heads it; rows then say only where
             # they differ from it.
-            if (!(place_name(session_anchor(s)) == sname[s] && git_branch[s] == ""))
+            if (session_anchor(s) != home && !(place_name(session_anchor(s)) == sname[s] && git_branch[s] == ""))
                 session_mark=quiet_edge_path(session_body, session_anchor(s), git_branch[s], session_mark, width-3)
         } else if (appearance == "quiet" && !(place_name(quiet_place[s]) == sname[s] && git_branch[quiet_place_pane[s]] == ""))
             session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
@@ -1554,21 +1554,24 @@ function label_row(p, s, wname, named,    place, idle) {
     label_program=""
     return command[p]
 }
-# A window's place is its first pane's; "+2" counts panes somewhere else.
-function label_window(w, s, wname, named,    ppos, p, first, others, place) {
+# A window's place is its first pane's; "+2" counts panes somewhere else. In
+# the session's own directory the place tells windows apart no better than
+# tmux's names, so the first program running there names the window instead.
+function label_window(w, s, wname, named,    ppos, p, first, others, place, program) {
     label_program=""
-    first=""; others=0
+    first=""; others=0; program=""
     for (ppos=1; ppos<=np[w]; ppos++) {
         p=panes[w,ppos]
         if (!visible_p[p]) continue
         if (first == "") first=p
         else if (path[p] != path[first]) others++
+        if (program == "" && path[p] == path[first] && !label_shell(command[p])) program=command[p]
     }
     label_home[w]=(first == "" ? "" : path[first])
     if (named && wname != "") return wname
     if (first == "") return wname
     place=label_place(first, s)
-    if (place == "") place=dim place_name(path[first]) reset
+    if (place == "") place=(program != "" ? program : dim place_name(path[first]) reset)
     return place (others ? " " dim "+" others reset : "")
 }
 # A pane in its window's place is named by what runs in it; one elsewhere by
