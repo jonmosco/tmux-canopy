@@ -223,6 +223,7 @@ set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
 set -g @tmux-canopy-min-content-width '40'
 set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
 set -g @tmux-canopy-appearance 'quiet'    # quiet (default), folders, or ascii
+set -g @tmux-canopy-labels 'tmux'         # tmux (default) or places (preview)
 set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
 set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
 set -g @tmux-canopy-alerts 'off'     # desktop, tmux, or both: alert when an agent needs you
@@ -285,7 +286,10 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `h` / `l` | Collapse / expand |
 | `H` / `L` | Collapse / expand all |
 | `/`, then `Esc` | Search, then clear the search query |
-| `1` / `2` / `3` | Tree / Processes / Buffers |
+| `1` / `2` / `3` / `4` | Tree / Processes / Buffers / Agents |
+| `A` | Toggle agent mode on or off for this client |
+| `n` | Jump to the next agent needing input (across all sessions) |
+| `i` | Switch drawer between terminal preview and agent summary |
 | `a` | Actions for the selected object |
 | `z` | Toggle zoom on the selected pane or window |
 | `b` | Break selected pane into its own window |
@@ -302,7 +306,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
 | `p` / `P` | Toggle preview / open enlarged terminal preview |
 | `f` | Show / hide the footer |
-| `[` / `]` | Previous / next width preset |
+| `[` / `]` / `w` | Previous / next / cycle width presets |
 | `Ctrl-r` | Refresh |
 | `?` | Scrollable help popup (wheel or `j`/`k` to scroll) |
 | `g` | Scrollable symbol and color legend (wheel also works) |

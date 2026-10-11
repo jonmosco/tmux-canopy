@@ -14,7 +14,7 @@ New features are on hold until the existing ones are dependable. In order:
   exit, restart, and pane reuse.
 - [ ] Count forks and tmux calls per refresh on a realistic server and compare
   with 0.2.0.
-- [ ] Run the suite on Linux.
+- [x] Run the suite on Linux: CI runs it on Ubuntu 24.04 for every push.
 - [ ] Review the README, help, and legend against the code.
 
 ## Agent status reliability
@@ -28,10 +28,15 @@ New features are on hold until the existing ones are dependable. In order:
 
 ## Jump to an agent needing input
 
+- [x] Implement global jump (`n`) to the next pane reporting needs-input across all
+  sessions and windows, with wraparound and tree-order traversal.
 - [ ] Test stale targets, agent exits, linked windows, and multiple clients.
 
 ## Additional subagent integrations
 
+- [x] Report Antigravity (`agy`) subagents spawned via `invoke_subagent` and
+  track their lifecycle (`manage_subagents`, `manage_task`, `Stop`).
+- [x] Report Cursor Agent (`agent`) subagents via `subagentStart` / `subagentStop` hooks.
 - [ ] Report Gemini CLI subagents if its integration exposes enough lifecycle
   and identity information.
 - [ ] Report GitHub Copilot CLI and Grok Build subagents. Copilot's
