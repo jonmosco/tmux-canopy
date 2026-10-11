@@ -132,8 +132,12 @@ case "$action" in
         exit 0
       fi
     fi
-    [[ -z "$state_file" ]] || rm -f "$state_file.search"
-    printf 'disable-search+clear-query+hide-input+search()+rebind(%s)\n' "$search_keys"
+    footer=''
+    if [[ -n "$state_file" ]]; then
+      rm -f "$state_file.search"
+      [[ ! -r "$state_file.footer" ]] || IFS= read -r footer < "$state_file.footer"
+    fi
+    printf 'disable-search+clear-query+hide-input+search()+rebind(%s)+change-footer:%s\n' "$search_keys" "$footer"
     ;;
 
   popup-focus)

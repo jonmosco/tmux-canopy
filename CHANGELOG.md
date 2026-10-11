@@ -7,6 +7,10 @@
 - An agent waiting on you shows what it asks for on a dim line beneath its pane: the command it wants to run, then its description or question when that says more (`make test · Run the tests`). The drawer still has the full request.
 - `>` types a line into the selected pane through a tmux prompt and presses Enter, so you can answer an agent or run a command in another pane without leaving the sidebar. It is also in the pane and window action menus. The text is sent literally, never parsed by tmux or a shell.
 
+### Changed
+
+- The `quiet` Tree footer says what you can do now instead of showing the same key hints: `◆ Claude Code waiting   n go   > reply` when an agent needs you, how to finish or cancel a move or link, that a delete is armed, `Esc clear   Enter focus` while searching, and otherwise `? keys   / search   4 agents`. It no longer offers the view you are already in, or `n` when nothing is waiting, and keeps only what fits a narrow sidebar.
+
 ### Fixed
 
 - The mouse wheel could stop scrolling the sidebar, and keys Canopy sends the sidebar could appear as `^T` or `^R` across it, for example while help was open and an agent was working. fzf pauses its screen when a command keeps it waiting for more than a second, and resuming left mouse tracking off and the terminal echoing input. Help, the legend, the actions menu, the quick switcher, filters, the preview popup, and the rename, new-session and send prompts now run without keeping fzf waiting, and returning the pointer to your pane (`Ctrl-o`, or focusing the sidebar) runs in the background, where it could take over a second with many windows.

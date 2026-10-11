@@ -61,7 +61,10 @@ sidebar_ui_options() {
   pointer=' '; prompt='search › '; marker='●'; scrollbar='│'
   local activate_suffix='' jump_agent_bind="n:execute-silent($jump_agent_cmd)"
   local search_unbind='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?'
-  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?)'
+  # The footer sidebar-source stored for this load, or a search hint while
+  # searching, so a refresh during a search keeps the hint.
+  local footer_cmd='[ -n "$TMUX_CANOPY_STATE" ] || exit 0; f=; if [ -e "$TMUX_CANOPY_STATE.search" ]; then f="Esc clear   Enter focus"; elif [ -r "$TMUX_CANOPY_STATE.footer" ]; then IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; fi; printf "change-footer:%s" "$f"'
+  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?)'"+transform($footer_cmd)"
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     activate_suffix='+accept'
     jump_agent_bind="n:execute-silent($jump_agent_cmd)+accept"
@@ -93,8 +96,8 @@ sidebar_ui_options() {
     # Both actions run in one event, without an intermediate painted frame.
     # The same shell shows the agent summary sidebar-source stored for this
     # load; an empty one hides the footer and its separator.
-    --bind='load:+transform([ -n "$TMUX_CANOPY_STATE" ] || exit 0; touch "$TMUX_CANOPY_STATE.ready"; f=; [ -r "$TMUX_CANOPY_STATE.footer" ] && IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; printf "change-footer:%s" "$f")+change-header-lines(0)+change-header-lines(1)'
-    --bind="/:execute-silent([ -z \"\$TMUX_CANOPY_STATE\" ] || touch \"\$TMUX_CANOPY_STATE.search\")+show-input+enable-search+clear-query+unbind($search_unbind)"
+    --bind="load:+transform([ -n \"\$TMUX_CANOPY_STATE\" ] && touch \"\$TMUX_CANOPY_STATE.ready\"; $footer_cmd)+change-header-lines(0)+change-header-lines(1)"
+    --bind="/:execute-silent([ -z \"\$TMUX_CANOPY_STATE\" ] || touch \"\$TMUX_CANOPY_STATE.search\")+show-input+enable-search+clear-query+unbind($search_unbind)+transform($footer_cmd)"
     --bind="esc:$esc_cmd"
     # Help owns a separate popup terminal; keep the current sidebar painted.
     --bind="?:execute-silent($help_cmd $detach)"
@@ -144,7 +147,7 @@ sidebar_ui_options() {
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     SIDEBAR_FZF_ARGS+=(
       --bind='q:abort'
-      --bind='load:transform([ -n "$TMUX_CANOPY_STATE" ] || exit 0; touch "$TMUX_CANOPY_STATE.ready"; f=; [ -r "$TMUX_CANOPY_STATE.footer" ] && IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; printf "change-footer:%s" "$f")'
+      --bind="load:transform([ -n \"\$TMUX_CANOPY_STATE\" ] && touch \"\$TMUX_CANOPY_STATE.ready\"; $footer_cmd)"
       --bind="result-final:transform($action_cmd popup-focus)+unbind(result-final)"
     )
   fi

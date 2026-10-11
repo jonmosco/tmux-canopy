@@ -19,7 +19,7 @@ def main():
 
         def render(*, appearance='quiet', width=42, icons='unicode', theme='ansi',
                    agent_view=False, agents=True, notice=True, subagent=False,
-                   verified=True, long_command=False, state_text=''):
+                   verified=True, long_command=False, state_text='', status='needs-input', second_agent=False):
             state.write_text(state_text)
             d = ['D', icons, 'activity,bell', theme, 'normal', '', '', '',
                  '%0', '@0', '$0', str(width), 'host']
@@ -27,18 +27,24 @@ def main():
             d.extend([appearance, '', 'on' if agents else 'off'])
             pane = ['P', '%0', '@0', '0', 'claude', '', '/projects/api', '0', '', '',
                     '', '', '', '', '', '0', '100', 'claude-hook', 'session', '100',
-                    'working' if subagent else 'needs-input', str(now), '', '',
+                    'working' if subagent else status, str(now), '', '',
                     f'1,Explore,needs-input,{now},' if subagent else '', '0']
             other = ['P', '%1', '@0', '1',
                      'a-very-long-application-command' if long_command else 'nvim',
                      '', '/projects/api', '0', '', '',
                      '1' if notice else '', '', '', '', '', '0', '101']
+            if second_agent:
+                other = ['P', '%1', '@0', '1', 'codex', '', '/projects/api', '0', '', '',
+                         '', '', '', '', '', '0', '101', 'codex-hook', 'other', '101',
+                         'needs-input', str(now), '', '', '', '0']
             records = [d, ['S', '$0', 'acme-api', '1'],
                        ['W', '$0', '@0', '0', 'server', '1', 'off', '', '', '', '0'],
                        pane, other, ['A', '%0', 'claude'],
                        ['G', '%0', 'feature/auth'], ['G', '%1', 'feature/auth']]
             if verified:
                 records.append(['V', '%0'])
+            if second_agent:
+                records += [['A', '%1', 'codex'], ['V', '%1']]
             snapshot = '\n'.join(SEP.join(r) for r in records) + '\n'
             run = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1', '-v', 'nul=1',
                           '-v', f'agent_view={int(agent_view)}', '-v', f'now={now}',
@@ -54,7 +60,10 @@ def main():
         quiet = render()
         header = ANSI.sub('', quiet['H:tree'])
         assert 'Tree · All' in header and header.rstrip().endswith('◆1') and 'Proc Buff' not in header, header
-        assert '1 Tree' in quiet['F:'] and '4 Agents' in quiet['F:'] and 'n Next' in quiet['F:']
+        # The footer says what to do now: here, answer the agent waiting.
+        footer = ANSI.sub('', quiet['F:'])
+        assert footer == '◆ Claude Code waiting   n go   > reply', footer
+        assert '\x1b[1;33m' in quiet['F:'], quiet['F:']
         # tmux order: no folder rows; the session's directory and branch are a
         # detail on its heading, and rows in that directory carry none.
         assert ANSI.sub('', quiet['S:$0']).rstrip().endswith('api ⎇ feature/auth'), quiet['S:$0']
@@ -71,6 +80,21 @@ def main():
         assert 'DIR:%0:$0' not in quiet and '─' not in ANSI.sub('', quiet['W:@0:$0']) and '──' in ANSI.sub('', quiet['S:$0'])
         assert 'Tree Agents Proc Buff' in ANSI.sub('', render(appearance='places')['H:tree']), 'default appearance changed'
         print('ok - quiet appearance keeps tree identities and separates active, agent, and unread marks')
+
+        def footer(**options):
+            return ANSI.sub('', render(**options).get('F:', ''))
+        assert footer(status='working') == '? keys   / search   4 agents', footer(status='working')
+        assert footer(status='working', agents=False) == '? keys   / search   2 proc   3 buff'
+        assert footer(second_agent=True) == '◆ 2 waiting   n next   > reply', footer(second_agent=True)
+        assert footer(icons='ascii') == '! Claude Code waiting   n go   > reply', footer(icons='ascii')
+        assert footer(state_text='MOVE\tP:%0\n') == 'Moving   Enter move here   c cancel'
+        assert footer(state_text='LINK\tW:@0:$0\n') == 'Linking   Enter link here   c cancel'
+        assert footer(state_text=f'DELETE\tP:%1\t{now}\n') == 'x again within 5 s to delete'
+        # Narrow sidebars keep the most important part and drop what will not fit.
+        assert footer(width=30) == '◆ Claude Code waiting', footer(width=30)
+        assert footer(width=24) == '◆ 1 waiting   n go', footer(width=24)
+        assert footer(width=24, status='working') == '? keys   / search', footer(width=24, status='working')
+        print('ok - the quiet footer follows what is pending: a move, a delete, agents waiting, or the keys')
 
         for icons in ('unicode', 'ascii', 'nerdfont'):
             for width in (24, 30, 42, 56):
