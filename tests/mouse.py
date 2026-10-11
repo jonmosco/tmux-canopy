@@ -171,6 +171,15 @@ def main():
             # user, so it must not keep fzf waiting.
             tm('set-option', '-g', 'status-keys', 'emacs')
             tm('set-option', '-g', 'escape-time', '10')
+            # Rename needs a session or window row; a pane row has no prompt.
+            # Entering the sidebar moved the pointer in the background: let
+            # that land before choosing the row.
+            wait(lambda: selected() == live, 'pointer settles on the live row')
+            time.sleep(1)
+            post('first')
+            wait(lambda: (selected() or '').startswith('S:'), 'session row selected')
+            time.sleep(.5)
+            assert (selected() or '').startswith('S:'), selected()
             output.clear()
             os.write(master, b'r')
             wait(lambda: b'Rename ' in output, 'rename prompt opens')
