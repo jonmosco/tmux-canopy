@@ -903,7 +903,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
                 prefix=prefix (icon != "" && icon != " " ? appcolor(cmd) icon reset : dim window_icon reset) " " dim wi[s SUBSEP w] ":" reset
                 cmd_disp=(cmd == "" || cmd == win_names[windex] ? "" : dim " · " cmd reset)
                 if (place_labels()) {
-                    line=(w == current_w && s == current_s ? bold : "") label_row(p, s, win_names[windex], !wauto[w]) reset
+                    line=(w == current_w && s == current_s ? bold : "") label_row(p, s, win_names[windex], !wauto[w] || tmux_names) reset
                     line=label_line(prefix, line, (w_zoomed[w] ? " " dim "[Z]" reset : "") subagent_count(p), quiet_pane_edge(p))
                 } else {
                     line=(w == current_w && s == current_s ? bold : "") name_disp reset
@@ -914,7 +914,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
                 row(wt, line subagent_lines(p, sprintf("%*s", text_width(continuation), "")), wt)
                 continue
             }
-            if (place_labels()) name_disp=label_window(w, s, win_names[windex], !wauto[w])
+            if (place_labels()) name_disp=label_window(w, s, win_names[windex], !wauto[w] || tmux_names)
             line=dim dir_stem (wlast ? branch_end : branch_mid) reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " ? mark(wm) " " : "") dim window_icon " " wi[s SUBSEP w] ":" reset (w == current_w && s == current_s ? bold : "") name_disp reset (w_zoomed[w] ? " [Z]" : "")
             if (collapsed[wt]) {
                 line=line notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) agent_summary(w_need[w],w_work[w],w_done[w]) dim " [" shown_p[w] "p]" reset
@@ -1522,7 +1522,8 @@ END {
 # @tmux-canopy-labels 'places': in quiet, each row is named by what tells it
 # apart. A name you gave a window wins; otherwise where it is, said from the
 # session's own directory; otherwise what runs there. A running program the
-# label does not already name is shown dim on the right (label_program).
+# label does not already name is shown dim on the right (label_program). With
+# a custom automatic-rename-format (tmux_names), windows keep tmux's names.
 function place_labels() { return appearance == "quiet" && labels == "places" }
 function label_shell(cmd) { return cmd ~ /^-?(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh)$/ }
 # Where the session started, or its first pane's directory without one.

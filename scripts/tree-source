@@ -38,14 +38,18 @@ fi
 snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
   list-sessions -F "$sessions" \; list-windows -a -F "$windows" \; \
   list-panes -a -F "$panes" \; list-clients -F "$clients" \; \
-  display-message -p -t "${TMUX_PANE:-}" "X${sep}#{@tmux-canopy-directory}${sep}#{@tmux-canopy-labels}" 2>/dev/null)" || exit 1
+  display-message -p -t "${TMUX_PANE:-}" "X${sep}#{@tmux-canopy-directory}${sep}#{@tmux-canopy-labels}${sep}#{automatic-rename-format}" 2>/dev/null)" || exit 1
 # The directory-details and labels settings ride along as a last line rather
 # than D fields, so the renderer's fixed D layout stays put.
-details_directory=on labels=tmux
+details_directory=on labels=tmux tmux_names=0
 if [[ "$snapshot" == *$'\n'"X${sep}"* ]]; then
-  settings_row=${snapshot##*$'\n'"X${sep}"}
-  [[ "${settings_row%%"$sep"*}" != off ]] || details_directory=off
-  [[ "${settings_row#*"$sep"}" != places ]] || labels=places
+  IFS="$sep" read -r directory_setting labels_setting rename_format <<< "${snapshot##*$'\n'"X${sep}"}"
+  [[ "$directory_setting" != off ]] || details_directory=off
+  [[ "$labels_setting" != places ]] || labels=places
+  # A changed automatic-rename-format means you chose how tmux names windows;
+  # place labels then keep those names and label only panes.
+  # shellcheck disable=SC2016 # tmux's default format, compared literally.
+  [[ "$rename_format" == '#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}' ]] || tmux_names=1
 fi
 snapshot="${snapshot%$'\n'"X${sep}"*}"
 config_row="${snapshot%%$'\n'*}"
@@ -111,6 +115,25 @@ fi
 if [[ "$agents_enabled" != on ]]; then
   [[ -z "$TMUX_CANOPY_NEEDS_INPUT" ]] || exit 0
   agent_view=0
+fi
+if [[ "$labels" == places ]]; then
+  # Pane paths are resolved directories; a session's start directory is as it
+  # was typed. Resolve it the same way (builtin cd, no process) so a symlinked
+  # project still contains its panes.
+  origin=$PWD
+  while IFS= read -r line; do
+    case "$line" in
+      S$sep*) ;;
+      W$sep*|P$sep*) break ;;
+      *) continue ;;
+    esac
+    IFS="$sep" read -ra fields <<< "$line"
+    if [[ -z "${fields[4]:-}" ]] || ! builtin cd -P -- "${fields[4]}" 2>/dev/null; then continue; fi
+    [[ "$PWD" != "${fields[4]}" ]] || continue
+    resolved="${line%"$sep"*}${sep}${PWD}"
+    snapshot=${snapshot/"$line"/"$resolved"}
+  done <<< "$snapshot"
+  builtin cd -- "$origin" 2>/dev/null || true
 fi
 # Git is strictly opt-in. Find roots with shell builtins and ask git once per
 # distinct repository; no process is started for unrelated directories.
@@ -181,6 +204,6 @@ fi
 # the user's character set kept (LC_ALL would override both, so clear it).
 ctype="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
 LC_ALL='' LC_CTYPE="$ctype" LC_COLLATE=C awk -v switcher="$switcher" -v agent_view="$agent_view" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
-  -v details_directory="$details_directory" -v labels="$labels" \
+  -v details_directory="$details_directory" -v labels="$labels" -v tmux_names="$tmux_names" \
   -v nul="${TMUX_CANOPY_NUL:-0}" -v header="${TMUX_CANOPY_HEADER:-0}" -f "$SCRIPT_DIR/../lib/tree-render.awk" \
   "$state_file" - <<< "$snapshot"
