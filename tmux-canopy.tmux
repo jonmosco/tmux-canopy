@@ -221,6 +221,7 @@ canopy_queue set-hook -gu 'client-session-changed[9002]'
 canopy_queue set-hook -gu 'after-kill-pane[9003]'
 canopy_queue set-hook -gu 'after-split-window[9003]'
 canopy_queue set-hook -gu 'client-detached[9003]'
+canopy_queue set-hook -gu 'client-attached[9003]'
 canopy_queue set-hook -gu 'client-resized[9003]'
 canopy_queue set-hook -gu 'after-resize-window[9003]'
 canopy_queue set-hook -gu 'after-rename-session[9003]'
@@ -304,6 +305,10 @@ canopy_queue set-hook -g 'after-split-window[9003]' \
   "if-shell -F $(tmux_quote "$any_sidebar_event") $(tmux_quote "$(plugin_job '' cleanup split)")"
 # client_tty may already resolve to a surviving client after a detach.
 canopy_queue set-hook -g 'client-detached[9003]' "$(plugin_job -b cleanup client '#{hook_client}')"
+# Sidebars left without their terminal, by a detach Canopy did not see, close
+# when a terminal attaches. With no sidebar anywhere, no job starts.
+canopy_queue set-hook -g 'client-attached[9003]' \
+  "if-shell -F $(tmux_quote "$any_sidebar_event") $(tmux_quote "$(plugin_job -b cleanup orphans)")"
 for hook in client-resized after-resize-window; do
   canopy_queue set-hook -g "${hook}[9003]" "$(plugin_job -b responsive-width)"
 done
