@@ -61,7 +61,9 @@ def main():
                 assert result.returncode == 0, result.stderr
                 return result.stdout
 
-            assert 'Agents' not in source() and 'Agents' not in source('--agents')
+            # The quiet Tree footer offers the Agents view only in agent mode.
+            agent_mode = lambda text: '4 agents' in re.sub(r'\x1b\[[0-9;]*m', '', text)
+            assert not agent_mode(source()) and 'Agents' not in source('--agents')
             assert source('--needs-input') == ''
             binds = ui_options()
             assert '--bind=4:' in binds and '--bind=n:' in binds and '--bind=A:' in binds
@@ -72,20 +74,20 @@ def main():
             assert '--bind=ctrl-t:' in binds
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             load()
-            assert 'Agents' in source() and 'Agents · All' in re.sub(r'\x1b\[[0-9;]*m', '', source('--agents'))
+            assert agent_mode(source()) and 'Agents · All' in re.sub(r'\x1b\[[0-9;]*m', '', source('--agents'))
             client = '/dev/ttys-agent-test'
             key = sp.check_output(['cksum'], input=client.encode()).split()[0].decode()
             tm('set-option', '-g', '@tmux_canopy_agents_' + key, 'off')
             hidden = sp.run([str(ROOT / 'scripts/tree-source')], env=source_env | {'TMUX_CANOPY_CLIENT': client},
                             capture_output=True, text=True, timeout=15)
-            assert hidden.returncode == 0 and 'Agents' not in hidden.stdout, hidden.stderr
+            assert hidden.returncode == 0 and not agent_mode(hidden.stdout), hidden.stderr
             tm('set-option', '-g', '@tmux_canopy_agents_' + key, 'on')
             tm('set-option', '-g', '@tmux-canopy-agents', 'off')
             load()
             shown = sp.run([str(ROOT / 'scripts/tree-source')], env=source_env | {'TMUX_CANOPY_CLIENT': client},
                            capture_output=True, text=True, timeout=15)
-            assert shown.returncode == 0 and 'Agents' in shown.stdout, shown.stderr
-            assert 'Agents' not in source()
+            assert shown.returncode == 0 and agent_mode(shown.stdout), shown.stderr
+            assert not agent_mode(source())
             print('ok - agent mode follows the client toggle and the global default')
         assert tm('show-option', '-gqv', '@tmux_canopy_icon_theme') == 'unicode'
         tm('set-option', '-g', '@tmux-canopy-icon-theme', 'nerdfont')

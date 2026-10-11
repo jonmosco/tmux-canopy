@@ -370,7 +370,10 @@ function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,
                 seen[p]=1; total++
                 label=agent_label(p)
                 load_subagents(p)
-                if (label == "approval" || label == "interrupted" || sub_need[p]) need++
+                if (label == "approval" || label == "interrupted" || sub_need[p]) {
+                    if (!need) quiet_need_kind=canonical_agent(command[p])
+                    need++
+                }
                 else if (label == "working" || sub_work[p]) work++
                 else if (label == "ready" || label == "turn ended" || label == "session ended") settled++
                 else unknown++
@@ -448,11 +451,40 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
         text=edge_colored(text,summary_color,available)
     row("H:",text,"H:tree")
 }
-function quiet_footer(    text) {
-    text=(agents_enabled ? "1 Tree   4 Agents   n Next" : "1 Tree   2 Proc   3 Buff")
-    if (text_width(text)>width-4) text=(agents_enabled ? "1 Tree   4 Agents" : "1 Tree   2 Proc")
-    if (text_width(text)>width-4) text="1 Tree"
-    row("F:",dim text reset,"F:")
+# The quiet Tree footer says what you can do now: finish a pending move or
+# delete, answer an agent waiting on you, or, when nothing is pending, where
+# the keys are. The most important part comes first and narrow sidebars keep
+# only what fits. A search footer comes from the sidebar's search binding.
+function quiet_footer(    n,i,part,status,short,text,plain,budget) {
+    if (mode == "MOVE" || mode == "LINK") {
+        status=accent (mode == "MOVE" ? "Moving" : "Linking") reset
+        n=split("Enter|" (mode == "MOVE" ? "move here" : "link here") "|c|cancel", part, "|")
+    } else if (mode == "DELETE") {
+        status=attention "x again within 5 s to delete" reset
+        n=0
+    } else if (quiet_need == 1) {
+        status=attention (icons == "ascii" ? "!" : agent_need_badge) " " (quiet_need_kind == "" ? "An agent" : agent_name(quiet_need_kind)) " waiting" reset
+        short=attention (icons == "ascii" ? "!" : agent_need_badge) " 1 waiting" reset
+        n=split("n|go|>|reply", part, "|")
+    } else if (quiet_need > 1) {
+        status=attention (icons == "ascii" ? "!" : agent_need_badge) " " quiet_need " waiting" reset
+        n=split("n|next|>|reply", part, "|")
+    } else {
+        n=split("?|keys|/|search|" (agents_enabled ? "4|agents" : "2|proc|3|buff"), part, "|")
+    }
+    budget=width-4
+    text=status
+    plain=text; gsub(/\033\[[0-9;]*m/,"",plain)
+    if (text_width(plain) > budget && short != "") {
+        text=short; plain=text; gsub(/\033\[[0-9;]*m/,"",plain)
+    }
+    if (text_width(plain) > budget) text=quiet_clip(text, budget)
+    for (i=1;i<n;i+=2) {
+        if (text_width(plain (plain == "" ? "" : "   ") part[i] " " part[i+1]) > budget) break
+        text=text (plain == "" ? "" : "   ") part[i] " " dim part[i+1] reset
+        plain=plain (plain == "" ? "" : "   ") part[i] " " part[i+1]
+    }
+    row("F:",text,"F:")
 }
 function footer_add(glyph,count,color, space) {
     if (!count) return

@@ -252,7 +252,7 @@ Tree · All                         ◆1 ▷1   ① ②
       ▣ 0:today · zsh                ●     ⑫
 ▸ ◈ scratch [2w] ─────────────────────     ⑬
 ───────────────────────────────────
- 1 Tree   4 Agents   n Next                ⑭
+ ◆ Claude Code waiting   n go   > reply   ⑭
 ```
 
 | | What it shows | Keys |
@@ -270,7 +270,7 @@ Tree · All                         ◆1 ▷1   ① ②
 | ⑪ | **A window with one pane**, on one row. The command follows `·` when the window has another name. | |
 | ⑫ | **Unread output** (dim `●`); a bell or silence alert is amber. | `u` clear, `U` clear all |
 | ⑬ | **Folded session**, with the number of windows inside. | `l` unfold |
-| ⑭ | **Key hints.** | `f` hide or show |
+| ⑭ | **What you can do now:** answer an agent waiting on you, finish a move (`Enter`) or a delete (`x`), or clear a search (`Esc`). When nothing is pending, where the keys are. | `f` hide or show |
 
 Prefer panes grouped by directory, with tab headers and tree guides? Set `@tmux-canopy-appearance 'folders'`.
 
