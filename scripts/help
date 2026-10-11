@@ -141,6 +141,7 @@ legend_records() {
   note 'Set @tmux-canopy-icon-codex (or another app name) to replace its glyph; none hides it. Press Ctrl-r to refresh.'
   legend_item 'dim title' 'Pane title, shortened to fit the available width.' dim
   legend_item 'dim path' 'Working directory, inline or below the command depending on width. Adjacent panes sharing it can show it once.' dim
+  legend_item ' docs /  notes' 'Place labels (@tmux-canopy-labels places): a subfolder of the session directory, or somewhere else. docs/ and ↗ notes without Nerd Fonts; a dim program on the right.' dim
   legend_item '⎇ feature/x' 'Optional Git branch of the pane directory; quiet aligns it right. ASCII uses [git:feature/x]. Hidden in narrow rows; shown in pane previews. Enable @tmux-canopy-git-context branch.' dim
   legend_item '×' 'Retained pane whose command exited.' amber
 

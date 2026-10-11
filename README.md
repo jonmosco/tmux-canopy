@@ -327,6 +327,20 @@ To switch branch labels while tmux runs, type `canopy-branch` at the tmux comman
 
 Press `Ctrl-r` in the sidebar after changing a setting by hand or switching branches. Directory groups display `⎇ feature/name` (ASCII: `[git:feature/name]`); compact layouts show the branch beside the pane when space permits. The pane preview shows the full name even if a narrow tree omits it. A detached HEAD appears as `detached@<commit>`. This requires Git; if it is unavailable, no label is shown. Canopy reads Git metadata only on reload, once per distinct repository, and never runs `git status`, watches files, checks out branches, or creates worktrees. A `cd` without another tmux event may also require `Ctrl-r`.
 
+## Place labels (preview)
+
+Idle windows are all called `zsh`, which says nothing. Set `@tmux-canopy-labels 'places'` and `quiet` names each row by what tells it apart instead: the session heading shows the session's directory and branch, a row elsewhere shows where it is (` docs`, ` notes ⎇ main`), an idle shell shows its folder, and a running program sits dim on the right. Names you gave your windows always win, and tmux's own names and status line are untouched. See [Place labels](docs/reference.md#place-labels-preview).
+
+```text
+▾ ◈ canopy ──────────── tmux-canopy ⎇ main
+    ✳ 0:editor                         nvim
+    ▣ 1:tmux-canopy
+    ▣ 2: docs
+  ▾ ▣ 3:agents
+        0:claude
+        1: canopy-footer             codex
+```
+
 ## Customizing the look
 
 The default appearance, `quiet`, follows tmux's own structure: sessions, windows, and panes in tmux's order, each window once, with directories and Git branches as dim details on the right. Sessions read as bold headings, a window holding one pane takes one row, and shells idling at their prompt are dimmed so what is running stands out. A compact `Tree · All` header replaces the view tabs, the active pane dot sits by its name, agent and unread marks sit at the right edge, and the footer shows key hints (`f` hides it). Set `@tmux-canopy-appearance 'folders'` to group panes by working directory with folder rows, view tabs, and tree guides instead, `ascii` for `quiet` without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows. Reload the plugin after changing appearance, then reopen the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).

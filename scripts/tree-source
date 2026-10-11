@@ -26,8 +26,8 @@ if [[ -n "$agents_client" ]]; then
 else
   config+="${sep}#{@tmux-canopy-agents}"
 fi
-sessions="S${sep}#{session_id}${sep}$(text session_name)${sep}#{session_attached}"
-windows="W${sep}#{session_id}${sep}#{window_id}${sep}#{window_index}${sep}$(text window_name)${sep}#{window_linked_sessions}${sep}#{synchronize-panes}${sep}#{@tmux_canopy_notice_activity}${sep}#{@tmux_canopy_notice_bell}${sep}#{@tmux_canopy_notice_silence}${sep}#{window_zoomed_flag}"
+sessions="S${sep}#{session_id}${sep}$(text session_name)${sep}#{session_attached}${sep}$(text session_path)"
+windows="W${sep}#{session_id}${sep}#{window_id}${sep}#{window_index}${sep}$(text window_name)${sep}#{window_linked_sessions}${sep}#{synchronize-panes}${sep}#{@tmux_canopy_notice_activity}${sep}#{@tmux_canopy_notice_bell}${sep}#{@tmux_canopy_notice_silence}${sep}#{window_zoomed_flag}${sep}#{automatic-rename}"
 panes="P${sep}#{pane_id}${sep}#{window_id}${sep}#{pane_index}${sep}$(text pane_current_command)${sep}$(text pane_title)${sep}$(text pane_current_path)${sep}#{pane_dead}${sep}#{@tmux_canopy}${sep}#{@tmux_canopy_slot}${sep}#{@tmux_canopy_notice_pane_activity}${sep}#{@tmux_canopy_notice_pane_bell}${sep}#{@tmux_canopy_notice_pane_silence}${sep}#{@tmux_canopy_target}${sep}#{@tmux_canopy_target_session}${sep}#{pane_last}${sep}#{pane_pid}${sep}#{@tmux_canopy_agent_source}${sep}$(text @tmux_canopy_agent_session)${sep}#{@tmux_canopy_agent_pane_pid}${sep}#{@tmux_canopy_agent_status}${sep}#{@tmux_canopy_agent_updated}${sep}#{@tmux_canopy_agent_process_pid}${sep}$(text @tmux_canopy_agent_process_birth)${sep}$(text @tmux_canopy_agent_subagents)${sep}#{?window_zoomed_flag,#{pane_active},0}${sep}$(text @tmux_canopy_agent_summary)${sep}$(text @tmux_canopy_agent_command)"
 clients="C${sep}#{client_tty}${sep}#{session_id}${sep}#{window_id}${sep}#{pane_id}"
 if ! printf -v now '%(%s)T' -1 2>/dev/null || [[ -z "$now" ]]; then
@@ -38,11 +38,15 @@ fi
 snapshot="$(tmux display-message -p -t "${TMUX_PANE:-}" "$config" \; \
   list-sessions -F "$sessions" \; list-windows -a -F "$windows" \; \
   list-panes -a -F "$panes" \; list-clients -F "$clients" \; \
-  display-message -p -t "${TMUX_PANE:-}" "X${sep}#{@tmux-canopy-directory}" 2>/dev/null)" || exit 1
-# The directory-details setting rides along as a last line rather than a D
-# field, so the renderer's fixed D layout stays put.
-details_directory=on
-[[ "$snapshot" != *$'\n'"X${sep}off" ]] || details_directory=off
+  display-message -p -t "${TMUX_PANE:-}" "X${sep}#{@tmux-canopy-directory}${sep}#{@tmux-canopy-labels}" 2>/dev/null)" || exit 1
+# The directory-details and labels settings ride along as a last line rather
+# than D fields, so the renderer's fixed D layout stays put.
+details_directory=on labels=tmux
+if [[ "$snapshot" == *$'\n'"X${sep}"* ]]; then
+  settings_row=${snapshot##*$'\n'"X${sep}"}
+  [[ "${settings_row%%"$sep"*}" != off ]] || details_directory=off
+  [[ "${settings_row#*"$sep"}" != places ]] || labels=places
+fi
 snapshot="${snapshot%$'\n'"X${sep}"*}"
 config_row="${snapshot%%$'\n'*}"
 if [[ -n "$agents_client" ]]; then
@@ -116,10 +120,17 @@ if [[ "$git_mode" == branch ]] && command -v git >/dev/null 2>&1; then
   declare -A git_paths=() git_branches=()
   git_rows=''
   while IFS= read -r line; do
-    [[ "$line" == P$sep* ]] || continue
-    IFS="$sep" read -ra fields <<< "$line"
-    [[ "${fields[7]:-}" != 1 && "${fields[8]:-}" != 1 && "${fields[9]:-}" != 1 ]] || continue
-    directory=${fields[6]:-}
+    if [[ "$line" == S$sep* && "$labels" == places ]]; then
+      # A session's start directory heads it in places labels.
+      IFS="$sep" read -ra fields <<< "$line"
+      directory=${fields[4]:-}
+    elif [[ "$line" == P$sep* ]]; then
+      IFS="$sep" read -ra fields <<< "$line"
+      [[ "${fields[7]:-}" != 1 && "${fields[8]:-}" != 1 && "${fields[9]:-}" != 1 ]] || continue
+      directory=${fields[6]:-}
+    else
+      continue
+    fi
     [[ -n "$directory" ]] || continue
     if [[ -z ${git_paths[x$directory]+set} ]]; then
       canopy_git_root "$directory" || true
@@ -170,6 +181,6 @@ fi
 # the user's character set kept (LC_ALL would override both, so clear it).
 ctype="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
 LC_ALL='' LC_CTYPE="$ctype" LC_COLLATE=C awk -v switcher="$switcher" -v agent_view="$agent_view" -v now="$now" -v stable="${TMUX_CANOPY_STABLE:-0}" \
-  -v details_directory="$details_directory" \
+  -v details_directory="$details_directory" -v labels="$labels" \
   -v nul="${TMUX_CANOPY_NUL:-0}" -v header="${TMUX_CANOPY_HEADER:-0}" -f "$SCRIPT_DIR/../lib/tree-render.awk" \
   "$state_file" - <<< "$snapshot"
