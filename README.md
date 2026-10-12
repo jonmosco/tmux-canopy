@@ -10,9 +10,9 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=5)](docs/assets/canopy-demo.gif?v=5)
+[![Canopy in tmux: the sidebar shows three projects, two subagents appear, another project's agent requests approval, and n jumps to it](docs/assets/canopy-demo.gif?v=6)](docs/assets/canopy-demo.gif?v=6)
 
-**See every project. Spot the blocker. Jump to it with `n`.** This 19-second preview was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=5) for browsing, search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=5).
+**See every project. Spot the blocker. Jump to it with `n`.** This 22-second preview opens directly on the Quiet tree and was recorded in a real tmux client with fictional projects and scripted agent events. [Watch the longer walkthrough](docs/assets/canopy-walkthrough.gif?v=6) for browsing, search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=6).
 
 ## Quick start
 
