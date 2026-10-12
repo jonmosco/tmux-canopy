@@ -74,11 +74,9 @@ if ((width > columns)) || { [[ "$expanded" != 1 ]] && ((height > budget)); }; th
 [[ "$labels" != places ]] || printf '%s · ' "$window"
 printf '%s · %s · %sx%s [%s]\n' "$pane" "$command" "$width" "$height" "$hint"
 ((rows >= 2)) || exit 0
-if [[ -n "${HOME:-}" ]]; then
-  [[ "$directory" != "$HOME" ]] || directory='~'
-  # shellcheck disable=SC2088 # Literal tilde for display, not a filesystem path.
-  [[ "$directory" != "$HOME/"* ]] || directory='~/'"${directory#"$HOME/"}"
-fi
+# shellcheck disable=SC1091
+source "${BASH_SOURCE[0]%/*}/path-lib.sh"
+canopy_home_path directory
 if ((${#directory} > columns)) && [[ "$directory" == */* ]]; then directory="…/${directory##*/}"; fi
 printf '%s\n' "$directory"
 ((git_extra)) && printf 'Git: %s\n' "$git_context"

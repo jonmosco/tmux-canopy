@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Previews show a directory under your home directory as `~/…` in the window preview and the agent summary too, as the pane preview already did, leaving room for the rest of the path.
 - Each plugin load removes everything at Canopy's own tmux hook indexes (9000-9099) and command-alias indexes (9100-9199) before adding what the current settings need, instead of a fixed list of hooks. A hook an older version left at those indexes is cleared too; your own hooks and aliases at other indexes are untouched. Settings with fixed values or a number now share one check each, with the default written once.
 
 ### Fixed

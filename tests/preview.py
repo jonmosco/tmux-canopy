@@ -169,6 +169,15 @@ while True:
                 tm('set-option', '-wu', '-t', window, '@tmux_canopy_notice_' + provider)
                 tm('set-option', '-pu', '-t', pane, '@tmux_canopy_notice_pane_' + provider)
             print('ok - preview lists all notification types without exceeding its row budget')
+            # Directories under HOME read as ~/..., leaving room for the rest.
+            where = Path(display(pane, '#{pane_current_path}'))
+            window_rows = run('sidebar-preview', 'W:' + window, extra={'HOME': str(where.parent)})
+            assert f'  ~/{where.name}' in window_rows and str(where) not in window_rows, window_rows
+            pane_rows = run('sidebar-preview', 'P:' + pane, extra={'HOME': str(where.parent)}).splitlines()
+            assert pane_rows[1] == f'~/{where.name}', pane_rows[:2]
+            assert run('sidebar-preview', 'P:' + pane, extra={'HOME': str(where)}).splitlines()[1] == '~'
+            assert run('sidebar-preview', 'W:' + window, extra={'HOME': '/elsewhere'}).rstrip().endswith(str(where))
+            print('ok - previews show directories under HOME as ~')
 
 
             tm('send-keys', '-t', sidebar, 'M-t')
