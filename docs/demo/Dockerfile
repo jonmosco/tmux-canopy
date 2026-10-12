@@ -5,7 +5,7 @@
 #   docker build -f docs/demo/Dockerfile -t canopy-demo .
 #   docker run --rm -it canopy-demo
 #
-# Press Ctrl-b T to open Canopy. Exiting tmux removes the container.
+# Press Ctrl-a T to open Canopy, and Ctrl-a | to split a pane side by side. Exiting tmux removes the container.
 
 # tmux is built from source: Canopy is tested with 3.7c, newer than the
 # distribution's package.
@@ -67,6 +67,10 @@ RUN set -eu; \
 # Canopy's settings for demos; change them here or at prefix-: inside tmux.
 COPY --chown=demo <<'EOF' /home/demo/.tmux.conf
 set -g default-terminal tmux-256color
+set -g prefix C-a
+unbind C-b
+bind C-a send-prefix
+bind | split-window -h -c '#{pane_current_path}'
 set -g mouse on
 set -g escape-time 10
 set -g @tmux-canopy-appearance quiet
