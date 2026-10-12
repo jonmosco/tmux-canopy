@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- The default quiet sidebar could show “Sidebar data unavailable” with Git context off. Rendering discarded directory rows still accessed an absent Git label, triggering a fatal GNU awk error. Quiet no longer formats those unused rows.
+
 ## 0.4.0 - 2026-10-11
 
 ### Added

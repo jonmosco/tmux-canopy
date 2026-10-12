@@ -249,14 +249,6 @@ function git_line(value,p,budget,    plain,label) {
     if (budget > 0 && text_width(plain)+text_width(label)>budget) return value
     return value dim label reset
 }
-function quiet_git_row(value,p,budget,    suffix,plain,plain_suffix) {
-    suffix=git_line("",p,0)
-    if (suffix == "") return value
-    plain=value; gsub(/\033\[[0-9;]*m/,"",plain)
-    plain_suffix=suffix; gsub(/\033\[[0-9;]*m/,"",plain_suffix)
-    if (text_width(plain)+text_width(plain_suffix)+2>budget) return value
-    return edge_colored(value,suffix,budget)
-}
 # Compact status is independent of tmux's unread notice and of fzf selection.
 # A live subagent request outranks its parent's working state, as in rollups.
 function quiet_pane_edge(p,    label,glyph,style,notice_mark,signal) {
@@ -860,22 +852,18 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
         dir_last=(i == n)
         dir_branch=(dir_last ? branch_end : branch_mid)
         dir_stem=(appearance == "quiet" ? "" : dir_last ? stem_blank : stem_mid)
-        dir_key="DIR:" place_pane[id, 1]
-        dir_open=!(dir_key in collapsed)
-        if (icons == "nerdfont") folder=(dir_open ? "󰝰" : "󰉋")
-        else if (icons == "unicode") folder=(dir_open ? "📂" : "📁")
-        else if (icons == "ascii") folder="/"
-        else folder=(dir_open ? "📂" : "📁")
-        folder_color=(theme == "mono" ? "" : "\033[38;5;74m")
-        folder_line=dim dir_branch reset " " (dir_open ? fold_open : fold_closed) folder_color folder reset " " label
-        if (appearance == "quiet") {
-            if (!dir_open && s == current_s && visible_p[current_p] && place == current_place)
-                folder_line=edge_colored(folder_line,green (icons == "ascii" ? ">" : "▶") reset,width-3)
-            else folder_line=quiet_git_row(folder_line,place_pane[id,1],width-3)
-        } else folder_line=git_line(folder_line,place_pane[id,1],width-5)
-        if (appearance == "quiet") dir_open=1
-        else {
-            row(dir_key, folder_line, dir_key ":" s)
+        # Quiet has no directory row or directory fold. Avoid formatting a
+        # row we will discard (and a needless Git lookup for its first pane).
+        if (appearance != "quiet") {
+            dir_key="DIR:" place_pane[id, 1]
+            dir_open=!(dir_key in collapsed)
+            if (icons == "nerdfont") folder=(dir_open ? "󰝰" : "󰉋")
+            else if (icons == "unicode") folder=(dir_open ? "📂" : "📁")
+            else if (icons == "ascii") folder="/"
+            else folder=(dir_open ? "📂" : "📁")
+            folder_color=(theme == "mono" ? "" : "\033[38;5;74m")
+            folder_line=dim dir_branch reset " " (dir_open ? fold_open : fold_closed) folder_color folder reset " " label
+            row(dir_key, git_line(folder_line,place_pane[id,1],width-5), dir_key ":" s)
             if (!dir_open) continue
         }
         wc=0

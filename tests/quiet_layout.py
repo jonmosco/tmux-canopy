@@ -89,6 +89,28 @@ def header(statuses, width=42, icons='unicode', agent_view=False):
 
 
 def main():
+    # A plain tmux server has no Git context records. The quiet window must
+    # render without requiring a G record for its pane.
+    with tempfile.TemporaryDirectory(prefix='canopy-quiet-no-git-') as directory:
+        state = Path(directory) / 'state'
+        state.write_text('')
+        d = ['D', 'unicode', 'activity,bell', 'ansi', 'normal', '', '', '',
+             '%0', '@0', '$0', '42', 'host']
+        d.extend([''] * (39 - len(d)))
+        d.extend(['quiet', '', 'on'])
+        records = [d, ['S', '$1', 'reference', '0'],
+                   ['W', '$1', '@2', '1', 'zsh', '1', 'off', '', '', '', '0'],
+                   ['P', '%4', '@2', '1', 'zsh', '', '/projects/docs', '0', '', '',
+                    '', '', '', '', '', '0', '104']]
+        result = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1', '-v', 'nul=1',
+                         '-f', str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
+                        input='\n'.join(SEP.join(record) for record in records) + '\n',
+                        text=True, capture_output=True, env=os.environ |
+                        {'TMUX_CANOPY_RENDER_HOME': '/home/test'})
+        assert result.returncode == 0, result.stderr
+        assert 'W:@2:$1' in result.stdout
+    print('ok - quiet renders a single window when Git context is off')
+
     # The header counts every agent state ("◆1 ▷1 ○1"), not only the most
     # urgent one, and falls back to that state with the total when narrow.
     mixed = ('needs-input', 'working', '', 'turn-ended', 'working')
