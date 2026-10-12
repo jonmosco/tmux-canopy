@@ -1,0 +1,7 @@
+# Build context for docs/demo/Dockerfile: the plugin, not history or media.
+.git
+.github
+docs/assets
+**/*.cast
+**/__pycache__
+shot.png
