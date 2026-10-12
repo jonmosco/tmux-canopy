@@ -39,6 +39,20 @@ canopy_flush() {
   CANOPY_BATCH_BYTES=0
 }
 
+# Queue the removal of every global hook at Canopy's indexes (9000-9099) and
+# every server command alias at its own (9100-9199), read in one tmux call.
+# Run before queueing the hooks the current settings need, in the same batch.
+canopy_clear_owned_hooks() {
+  local name _rest
+  while read -r name _rest; do
+    if [[ "$name" =~ ^command-alias\[91[0-9][0-9]\]$ ]]; then
+      canopy_queue set-option -suq "$name"
+    elif [[ "$name" =~ ^[a-z-]+\[90[0-9][0-9]\]$ ]]; then
+      canopy_queue set-hook -gu "$name"
+    fi
+  done < <(tmux show-hooks -g \; show-options -s command-alias 2>/dev/null)
+}
+
 canopy_load_keys() {
   local table key command
   CANOPY_KEYS=()

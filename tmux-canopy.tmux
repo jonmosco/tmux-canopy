@@ -40,70 +40,49 @@ setting popup_width popup-width; setting popup_height popup-height
 setting alerts alerts; setting alert_events alert-events
 setting alert_sound alert-sound; setting alert_detail alert-detail
 
+# Free-form settings take a default when unset.
 : "${sidebar_key:=T}"
-: "${sidebar_width:=42}"
-: "${sidebar_scope:=global}"
-: "${smooth_navigation:=on}"
 : "${last_window_key:=Tab}"
-: "${sidebar_transition:=slot}"
+: "${smooth_navigation:=on}"
 : "${notification_sources:=activity,bell}"
-: "${notification_target:=sidebar}"
-: "${silence_seconds:=30}"
-: "${icon_theme:=auto}"
-: "${appearance:=default}"
-: "${animate:=on}"
-: "${resize_mode:=live}"
 : "${width_presets:=30,42,48}"
-: "${sidebar_mode:=sidebar}"
-: "${popup_threshold:=100}"
-: "${popup_width:=85%}"
-: "${popup_height:=80%}"
-: "${alerts:=off}"
+: "${appearance:=default}"
 : "${alert_events:=agents}"
-: "${alert_sound:=off}"
-: "${alert_detail:=brief}"
 
-if [[ "$sidebar_mode" != 'popup' && "$sidebar_mode" != 'auto' && "$sidebar_mode" != 'sidebar' ]]; then
-  sidebar_mode=sidebar
-fi
-if [[ ! "$popup_threshold" =~ ^[1-9][0-9]*$ ]]; then
-  popup_threshold=100
-fi
-if [[ ! "$popup_width" =~ ^[1-9][0-9]*%?$ ]]; then
-  popup_width='85%'
-fi
-if [[ ! "$popup_height" =~ ^[1-9][0-9]*%?$ ]]; then
-  popup_height='80%'
-fi
+# The others name their default first, then what else they accept. Anything
+# else, like an unset setting, gets the default.
+choose() {
+  local name="$1" value="${!1}" allowed
+  shift
+  for allowed in "$@"; do [[ "$value" == "$allowed" ]] && return; done
+  printf -v "$name" '%s' "$1"
+}
+# A positive whole number.
+number() { [[ "${!1}" =~ ^[1-9][0-9]*$ ]] || printf -v "$1" '%s' "$2"; }
+# Columns or rows, or a percentage of them.
+size() { [[ "${!1}" =~ ^[1-9][0-9]*%?$ ]] || printf -v "$1" '%s' "$2"; }
 
-if [[ ! "$sidebar_width" =~ ^[1-9][0-9]*%?$ ]]; then
-  sidebar_width=42
-fi
-if [[ "$sidebar_scope" != 'window' && "$sidebar_scope" != 'global' ]]; then
-  sidebar_scope=global
-fi
-if [[ "$sidebar_transition" != 'move' && "$sidebar_transition" != 'slot' ]]; then
-  sidebar_transition=slot
-fi
-if [[ ! "$silence_seconds" =~ ^[1-9][0-9]*$ ]]; then
-  silence_seconds=30
-fi
-if [[ "$notification_target" != 'sidebar' && "$notification_target" != 'status' && "$notification_target" != 'both' ]]; then
-  notification_target=sidebar
-fi
-
-if [[ "$resize_mode" != 'staged' && "$resize_mode" != 'preset' && "$resize_mode" != 'live' ]]; then
-  resize_mode=live
-fi
-
-if [[ "$icon_theme" == 'auto' ]]; then
-  # tmux cannot inspect the font selected by each attached terminal client.
-  # A Nerd Font installed on the server is not evidence that its glyphs render.
-  icon_theme=unicode
-fi
-if [[ "$icon_theme" != 'nerdfont' && "$icon_theme" != 'unicode' && "$icon_theme" != 'ascii' ]]; then
-  icon_theme=unicode
-fi
+declare sidebar_mode popup_threshold popup_width popup_height sidebar_width sidebar_scope \
+  sidebar_transition silence_seconds notification_target resize_mode animate alerts alert_detail icon_theme
+choose sidebar_mode sidebar popup auto
+number popup_threshold 100
+size popup_width 85%
+size popup_height 80%
+size sidebar_width 42
+choose sidebar_scope global window
+choose sidebar_transition slot move
+number silence_seconds 30
+choose notification_target sidebar status both
+choose resize_mode live staged preset
+choose animate on off
+choose alerts off desktop tmux both
+choose alert_detail brief full
+# tmux cannot inspect the font selected by each attached terminal client, and
+# a Nerd Font installed on the server is not evidence that its glyphs render,
+# so auto means unicode.
+choose icon_theme unicode nerdfont ascii
+# A macOS or freedesktop sound name, passed to the notifier as one argument.
+[[ "$alert_sound" =~ ^[A-Za-z0-9._-]+$ ]] || alert_sound=off
 # quiet, the tmux-ordered tree, is the default; folders keeps the directory-
 # grouped tree (places, its internal name, and classic are still accepted).
 case "$appearance" in
@@ -112,10 +91,6 @@ case "$appearance" in
   classic) appearance=classic ;; # Preserve explicitly configured older setups.
   *) appearance=quiet ;;
 esac
-if [[ "$animate" != 'on' && "$animate" != 'off' ]]; then
-  animate=on
-fi
-case "$alerts" in desktop|tmux|both) ;; *) alerts=off ;; esac
 # Keep the known event names, in a fixed order; all means every one.
 [[ ",$alert_events," != *,all,* ]] || alert_events=agents,bell,silence,activity
 events=''
@@ -126,9 +101,6 @@ alert_events=$events
 # Lifecycle reporters read the agents' share in a tmux call they already make.
 agent_alerts=off
 [[ ",$alert_events," != *,agents,* ]] || agent_alerts=$alerts
-# A macOS or freedesktop sound name, passed to the notifier as one argument.
-[[ "$alert_sound" =~ ^[A-Za-z0-9._-]+$ ]] || alert_sound=off
-[[ "$alert_detail" == full ]] || alert_detail=brief
 
 sidebar_notification_sources="$notification_sources"
 if [[ "$notification_target" == 'status' ]]; then
@@ -197,42 +169,17 @@ if [[ "$smooth_navigation" != 'off' ]]; then
   fi
 fi
 
-# Dedicated array indexes avoid replacing hooks owned by the user's
-# configuration or other plugins. Reloading removes stale hooks when modes
-# change.
+# Hooks and command aliases sit at array indexes Canopy owns (9000-9099 and
+# 9100-9199), so the user's own and other plugins' are never replaced. Each
+# load first clears whatever is at those indexes, then adds what the current
+# settings need: a hook a setting no longer wants never outlives it.
 # Canopy's own commands, typed at prefix-: or run as `tmux canopy-branch`. They
 # sit at indexes Canopy owns, so a reload replaces them and never touches the
 # user's aliases. An alias cannot pass an argument to run-shell, so each one
 # toggles; `canopy details` and the settings take on and off.
-canopy_queue set-option -suq 'command-alias[9100]'
-canopy_queue set-option -suq 'command-alias[9101]'
+canopy_clear_owned_hooks
 canopy_queue set-option -s 'command-alias[9100]' "canopy-branch=$(plugin_job -b details branch toggle)"
 canopy_queue set-option -s 'command-alias[9101]' "canopy-directory=$(plugin_job -b details directory toggle)"
-canopy_queue set-hook -gu 'after-select-window[9001]'
-canopy_queue set-hook -gu 'after-new-window[9001]'
-canopy_queue set-hook -gu 'client-session-changed[9001]'
-canopy_queue set-hook -gu 'after-resize-pane[9001]'
-canopy_queue set-hook -gu 'alert-activity[9002]'
-canopy_queue set-hook -gu 'alert-bell[9002]'
-canopy_queue set-hook -gu 'alert-silence[9002]'
-canopy_queue set-hook -gu 'after-select-window[9002]'
-canopy_queue set-hook -gu 'after-select-pane[9002]'
-canopy_queue set-hook -gu 'client-session-changed[9002]'
-canopy_queue set-hook -gu 'after-kill-pane[9003]'
-canopy_queue set-hook -gu 'after-split-window[9003]'
-canopy_queue set-hook -gu 'client-detached[9003]'
-canopy_queue set-hook -gu 'client-attached[9003]'
-canopy_queue set-hook -gu 'client-resized[9003]'
-canopy_queue set-hook -gu 'after-resize-window[9003]'
-canopy_queue set-hook -gu 'after-rename-session[9003]'
-canopy_queue set-hook -gu 'after-rename-window[9003]'
-canopy_queue set-hook -gu 'window-layout-changed[9005]'
-canopy_queue set-hook -gu 'window-unlinked[9005]'
-canopy_queue set-hook -gu 'after-resize-pane[9006]'
-canopy_queue set-hook -gu 'window-layout-changed[9007]'
-for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
-  canopy_queue set-hook -gu "${focus_hook}[9004]"
-done
 
 if [[ "$sidebar_scope" == 'global' ]]; then
   # Detached new-window resolves to the unchanged live client, hence a no-op.
@@ -314,7 +261,6 @@ for hook in client-resized after-resize-window; do
 done
 # Right-edge marks are padded to the sidebar width at render time. One reload
 # after the width settles, not a tree rebuild on every column of a drag.
-canopy_queue set-hook -gu 'after-resize-pane[9006]'
 canopy_queue set-hook -g 'after-resize-pane[9006]' \
   "if-shell -F $(tmux_quote "$sidebar_pane_event") $(tmux_quote "$(plugin_job -b edge-refresh '#{pane_id}')")"
 for hook in after-rename-session after-rename-window; do

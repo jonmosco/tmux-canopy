@@ -166,6 +166,62 @@ def main():
         assert tm('show-window-option', '-gv', 'monitor-silence') == '42'
         assert tm('show-window-option', '-gv', 'window-status-activity-style') == 'fg=red'
         print('ok - later user bindings and monitor settings survive reload and disable')
+
+        # A reload clears whatever sits at Canopy's own hook and alias indexes,
+        # including entries an older version left there, and nothing else.
+        tm('set-hook', '-g', 'after-select-window[9042]', 'display-message stale-canopy-hook')
+        tm('set-hook', '-g', 'after-select-window[42]', 'display-message user-hook')
+        tm('set-hook', '-g', 'after-select-window[8999]', 'display-message user-hook-below')
+        tm('set-option', '-s', 'command-alias[9150]', 'stale-canopy=display-message stale')
+        tm('set-option', '-s', 'command-alias[42]', 'mine=display-message mine')
+        tm('set-option', '-g', '@tmux-canopy-notifications', 'activity,bell')
+        tm('set-option', '-g', '@tmux-canopy-alerts', 'tmux')
+        tm('set-option', '-g', '@tmux-canopy-alert-events', 'agents,silence')
+        load()
+        hooks, aliases = tm('show-hooks', '-g'), tm('show-options', '-s', 'command-alias')
+        assert '[9042]' not in hooks and 'command-alias[9150]' not in aliases, (hooks, aliases)
+        assert 'after-select-window[42]' in hooks and 'after-select-window[8999]' in hooks, hooks
+        assert 'command-alias[42]' in aliases and 'command-alias[9100]' in aliases, aliases
+        assert 'alert-silence[9002]' in hooks and 'after-select-window[9002]' in hooks, hooks
+        # Hooks a setting no longer needs go with it.
+        tm('set-option', '-g', '@tmux-canopy-notifications', 'none')
+        tm('set-option', '-g', '@tmux-canopy-alerts', 'off')
+        load()
+        hooks = tm('show-hooks', '-g')
+        assert 'alert-silence[9002]' not in hooks and 'after-select-window[9002]' not in hooks, hooks
+        assert 'after-select-window[42]' in hooks and 'after-select-window[9004]' in hooks, hooks
+        print('ok - a reload clears only Canopy-indexed hooks and aliases, including stale ones, and keeps the user\'s')
+
+        # Each checked setting keeps a valid value and falls back to its default
+        # for anything else, as when unset.
+        published = {'mode': ('@tmux_canopy_mode', 'sidebar', 'popup'),
+                     'popup-threshold': ('@tmux_canopy_popup_threshold', '100', '120'),
+                     'popup-width': ('@tmux_canopy_popup_width', '85%', '90'),
+                     'popup-height': ('@tmux_canopy_popup_height', '80%', '70%'),
+                     'animate': ('@tmux_canopy_animate', 'on', 'off'),
+                     'resize-mode': ('@tmux_canopy_resize_mode', 'live', 'staged'),
+                     'notification-target': ('@tmux_canopy_notification_target', 'sidebar', 'both'),
+                     'alerts': ('@tmux_canopy_alerts', 'off', 'desktop'),
+                     'alert-detail': ('@tmux_canopy_alert_detail', 'brief', 'full'),
+                     'icon-theme': ('@tmux_canopy_icon_theme', 'unicode', 'ascii')}
+        for value_kind in ('bad', 'good'):
+            for setting, (option, default, good) in published.items():
+                tm('set-option', '-g', f'@tmux-canopy-{setting}', '0%' if value_kind == 'bad' and setting.startswith('popup-') else
+                   'bogus' if value_kind == 'bad' else good)
+            for setting in ('width', 'scope', 'transition'):
+                tm('set-option', '-g', f'@tmux-canopy-{setting}', 'bogus' if value_kind == 'bad' else
+                   {'width': '30%', 'scope': 'window', 'transition': 'move'}[setting])
+            load()
+            for setting, (option, default, good) in published.items():
+                expected = default if value_kind == 'bad' else good
+                assert tm('show-option', '-gqv', option) == expected, (setting, value_kind, tm('show-option', '-gqv', option))
+            toggle = next(line for line in tm('list-keys', '-T', 'prefix').splitlines() if 'scripts/toggle' in line)
+            expected_args = "'42' 'global'" if value_kind == 'bad' else "'30%' 'window'"
+            assert expected_args in toggle and ("'slot'" if value_kind == 'bad' else "'move'") in toggle, (value_kind, toggle)
+        for setting in list(published) + ['width', 'scope', 'transition']:
+            tm('set-option', '-gu', f'@tmux-canopy-{setting}')
+        load()
+        print('ok - checked settings keep valid values and fall back to their defaults otherwise')
     finally:
         sp.run(['tmux', '-L', socket, 'kill-server'], env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)
 

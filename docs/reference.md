@@ -820,6 +820,8 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `scripts/help` | Display responsive, scrollable Help in an overlay or the current pane |
 | `scripts/lib.sh` | Shared sidebar ownership and pane helpers |
 
+Canopy's tmux hooks sit at array indexes it owns, 9000 to 9099 (`after-select-window[9001]` and so on), and its command aliases at 9100 to 9199. Every plugin load first removes whatever is at those indexes, then adds what the current settings need, so a hook a setting no longer needs never outlives it and entries left by an older version are cleared. Hooks and aliases of your own at other indexes are never touched; avoid those two ranges for them.
+
 Stable tmux IDs (`$session`, `@window`, and `%pane`) are used internally. Display names are presentation only and can be renamed without invalidating the selected object.
 
 ## Development
