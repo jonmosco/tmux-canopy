@@ -85,6 +85,22 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert "outdated path" in run(cli, "integration", "status", "codex", env=env).stdout
     cursor.write_text(cursor.read_text().replace(str(ROOT), "/previous/install"))
     assert "outdated path" in run(cli, "integration", "status", "cursor-agent", env=env).stdout
+    # Both merged formats classify the same way: one event without Canopy's
+    # reporter is partial, and a file with only the user's hooks is absent.
+    codex_data = json.loads(first)
+    codex_data["hooks"].pop(next(iter(codex_data["hooks"])))
+    codex.write_text(json.dumps(codex_data))
+    assert "partial" in run(cli, "integration", "status", "codex", env=env).stdout
+    cursor_partial = json.loads(cursor.read_text())
+    cursor_partial["hooks"].pop("sessionStart")
+    cursor.write_text(json.dumps(cursor_partial))
+    assert "partial" in run(cli, "integration", "status", "cursor-agent", env=env).stdout
+    codex.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "/usr/bin/mine"}]}]}}))
+    cursor.write_text(json.dumps({"version": 1, "hooks": {"stop": [{"command": "/usr/bin/mine"}]}}))
+    assert "absent" in run(cli, "integration", "status", "codex", env=env).stdout
+    assert "absent" in run(cli, "integration", "status", "cursor-agent", env=env).stdout
+    codex.write_text(first.replace(str(ROOT), "/previous/install"))
+    cursor.write_text(json.dumps(cursor_data, indent=2, ensure_ascii=False).replace(str(ROOT), "/previous/install") + "\n")
     run(cli, "integration", "install", "codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", env=env)
     assert codex.read_text() == first
     assert cursor.read_text() == json.dumps(cursor_data, indent=2, ensure_ascii=False) + "\n"

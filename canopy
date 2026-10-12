@@ -69,15 +69,21 @@ def hook_commands(data):
             if isinstance(action, dict) for field in ("bash", "command") if field in action]
 
 
-def owned_template(kind):
-    data = json.loads((ROOT / "docs" / TEMPLATES[kind]).read_text())
-    command = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
+def rewrite_owned_commands(data, rewrite):
+    """Apply rewrite to every command in an owned hook file, in the field
+    (bash or command) the file uses."""
     for groups in data["hooks"].values():
         for group in groups:
             for action in group.get("hooks", [group]):
                 field = "bash" if "bash" in action else "command"
-                action[field] = action[field].replace(PLACEHOLDER + "/scripts/agent-hook", command)
+                action[field] = rewrite(action[field])
     return json.dumps(data, indent=2) + "\n"
+
+
+def owned_template(kind):
+    data = json.loads((ROOT / "docs" / TEMPLATES[kind]).read_text())
+    command = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
+    return rewrite_owned_commands(data, lambda text: text.replace(PLACEHOLDER + "/scripts/agent-hook", command))
 
 
 def owned_state(kind):
@@ -97,12 +103,8 @@ def owned_state(kind):
     if not commands or not all(is_ours(command, kind) for command in commands):
         return "modified (review manually)"
     script = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
-    for groups in data["hooks"].values():
-        for group in groups:
-            for action in group.get("hooks", [group]):
-                field = "bash" if "bash" in action else "command"
-                action[field] = " ".join([script] + shlex.split(action[field])[1:])
-    return "outdated path" if json.dumps(data, indent=2) + "\n" == template(kind) else "modified (review manually)"
+    moved = rewrite_owned_commands(data, lambda text: " ".join([script] + shlex.split(text)[1:]))
+    return "outdated path" if moved == template(kind) else "modified (review manually)"
 
 
 def template(kind):
@@ -285,42 +287,56 @@ def agy_state():
     return "legacy install" if has_legacy else "absent"
 
 
-def integration_state(kind):
+def nested_actions(entries):
+    """Claude-style hook files: each event lists groups holding a hooks list."""
+    return [action for group in entries if isinstance(group, dict)
+            for action in group.get("hooks", []) if isinstance(action, dict)]
+
+
+def flat_actions(entries):
+    """Cursor Agent's hook file: each event lists the actions themselves."""
+    return [action for action in entries if isinstance(action, dict)]
+
+
+def merged_state(kind, actions, count):
+    """A hook file Canopy merges its entries into, alongside the user's own:
+    installed when every event runs this checkout's reporter, outdated path
+    when every event runs a Canopy reporter from another path, partial when
+    only some do, absent when none do."""
+    data = read_json(config_path(kind))
+    expected = template(kind)["hooks"]
+    hooks = data.get("hooks", {})
+    present = current = 0
+    for event, wanted in expected.items():
+        found = actions(hooks.get(event, []))
+        present += any(is_ours(action.get("command"), kind) for action in found)
+        required = {action["command"] for action in actions(wanted[:1])}
+        current += any(action.get("command") in required for action in found)
+    if current == len(expected):
+        return "installed"
+    if present == len(expected):
+        return "outdated path"
+    return "partial" if count(data, kind) else "absent"
+
+
+def file_state(kind):
+    """A file Canopy writes whole (the Pi, Oh My Pi, and OpenCode adapters)."""
     path = config_path(kind)
+    if not path.exists():
+        return "absent"
+    return "installed" if path.read_text() == template(kind) else "modified (review manually)"
+
+
+def integration_state(kind):
     if kind == "agy":
         return agy_state()
     if kind in OWNED_HOOK_FILES:
         return owned_state(kind)
     if kind in ("codex", "claude", "gemini"):
-        data = read_json(path)
-        expected = template(kind)["hooks"]
-        present = [event for event in expected if any(
-            isinstance(group, dict) and any(isinstance(action, dict) and is_ours(action.get("command"), kind)
-                                            for action in group.get("hooks", []))
-            for group in data.get("hooks", {}).get(event, []))]
-        current = [event for event, groups in expected.items() if any(
-            isinstance(group, dict) and any(isinstance(action, dict) and action.get("command") == required["command"]
-                                            for action in group.get("hooks", []))
-            for group in data.get("hooks", {}).get(event, []) for required in groups[0]["hooks"])]
-        state = ("installed" if len(current) == len(expected) else
-                 "outdated path" if len(present) == len(expected) else
-                 "partial" if count_hooks(data, kind) else "absent")
-    elif kind == "cursor-agent":
-        data = read_json(path)
-        expected = template(kind)["hooks"]
-        present = [event for event in expected if any(
-            is_cursor_entry(item, kind) for item in data.get("hooks", {}).get(event, []) if isinstance(item, dict))]
-        current = [event for event, entries in expected.items() if any(
-            isinstance(item, dict) and item.get("command") == entries[0]["command"]
-            for item in data.get("hooks", {}).get(event, []))]
-        state = ("installed" if len(current) == len(expected) else
-                 "outdated path" if len(present) == len(expected) else
-                 "partial" if count_cursor_hooks(data, kind) else "absent")
-    elif not path.exists():
-        state = "absent"
-    else:
-        state = "installed" if path.read_text() == template(kind) else "modified (review manually)"
-    return state
+        return merged_state(kind, nested_actions, count_hooks)
+    if kind == "cursor-agent":
+        return merged_state(kind, flat_actions, count_cursor_hooks)
+    return file_state(kind)
 
 
 def status(kind):
