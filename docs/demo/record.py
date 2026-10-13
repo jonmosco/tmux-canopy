@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Record the README preview and longer walkthrough from a real tmux client.
+"""Record the README demo and focused feature walkthrough from real tmux clients.
 
-Builds fictional workspaces on a private tmux server, attaches a headless
-asciinema client, drives keys and real (scripted) agent hook events, then
-renders GIFs with agg. No user's sessions, config, or projects are captured.
+The preview starts at a blank shell and visibly builds its workspace. Both
+recordings use private tmux servers, fictional projects, and real scripted
+agent hook events, then render asciinema captures with agg. No user's sessions,
+config, or projects are captured.
 
     python3 docs/demo/record.py --output /tmp/canopy-demo-review
-    python3 docs/demo/record.py --demo preview  # only the short README GIF
+    python3 docs/demo/record.py --demo preview  # only the README demo
 
 Requires tmux, fzf, Python 3, asciinema 3, agg, and on macOS coreutils
 (gsleep). ffmpeg exports the preview still. Review the GIFs at README size and
@@ -25,7 +26,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 SOCKET = f'canopy-demo-{os.getpid()}'
-COLS, ROWS = 112, 30
+STAGE_SOCKET = f'{SOCKET}-stage'
+COLS, ROWS = 120, 32
 
 
 def main():
@@ -33,7 +35,7 @@ def main():
     parser.add_argument('--output', default=str(ROOT / 'docs' / 'assets'), help='directory for the .cast and .gif')
     parser.add_argument('--font-family', default='Hack Nerd Font Mono,JetBrains Mono,Menlo')
     parser.add_argument('--theme', default='dracula')
-    parser.add_argument('--poster', type=float, default=8, help='preview GIF time in seconds for the still')
+    parser.add_argument('--poster', type=float, default=26, help='preview GIF time in seconds for the still')
     parser.add_argument('--demo', choices=('both', 'preview', 'walkthrough'), default='both')
     args = parser.parse_args()
     if args.demo == 'both':
@@ -54,18 +56,25 @@ def main():
     cast, gif = output / f'{name}.cast', output / f'{name}.gif'
 
     with tempfile.TemporaryDirectory(prefix='canopy-demo-') as directory:
-        home = Path(directory) / 'home'
+        home = Path(directory).resolve() / 'home'
         bin_dir = Path(directory) / 'bin'
         for path in (home / 'acme-api', home / 'acme-web', home / 'notes', bin_dir):
             path.mkdir(parents=True)
         env = {'PATH': os.environ['PATH'], 'HOME': str(home), 'TERM': 'xterm-256color',
-               'LANG': os.environ.get('LANG', 'en_US.UTF-8'), 'SHELL': '/bin/bash'}
+               'LANG': os.environ.get('LANG', 'en_US.UTF-8'), 'SHELL': '/bin/bash',
+               'BASH_SILENCE_DEPRECATION_WARNING': '1'}
 
-        def tm(*argv):
-            result = sp.run(['tmux', '-L', SOCKET, *argv], env=env, capture_output=True, text=True, timeout=15)
+        def run_tm(socket, *argv):
+            result = sp.run(['tmux', '-L', socket, *argv], env=env, capture_output=True, text=True, timeout=15)
             if result.returncode:
                 raise RuntimeError((argv, result.stderr))
             return result.stdout.strip()
+
+        def tm(*argv):
+            return run_tm(SOCKET, *argv)
+
+        def stage(*argv):
+            return run_tm(STAGE_SOCKET, *argv)
 
         # Agents are detected by process name, so each fake agent is a renamed
         # sleep binary. A wrapper prints a fictional transcript, then execs it.
@@ -101,7 +110,7 @@ def main():
  \033[1m›\033[0m write release notes for v2.4
 
  \033[2mwaiting for your next prompt\033[0m''', f'exec {bin_dir}/codex 3600')
-        tests = program('tests', '''\033[32m~/acme-api\033[0m $ npm test
+        tests = program('tests', '''\033[32m~/acme-api\033[0m $ make test
 
  \033[32mPASS\033[0m  src/auth/login.test.ts
  \033[32mPASS\033[0m  src/auth/session.test.ts
@@ -117,40 +126,183 @@ def main():
 - review the rate limit PR
 - ship v2.4 release notes''', shell)
 
+        test_output = bin_dir / 'test-output.sh'
+        test_output.write_text('''#!/bin/bash
+cat <<'DEMO'
+
+ \033[32mPASS\033[0m  src/auth/login.test.ts
+ \033[32mPASS\033[0m  src/auth/session.test.ts
+ \033[32mPASS\033[0m  src/routes/health.test.ts
+
+ Tests:  \033[32m42 passed\033[0m, 42 total
+DEMO
+''')
+        test_output.chmod(0o755)
+        shell_rc = Path(directory) / 'demo.bashrc'
+        shell_rc.write_text(f'''PS1='\\[\\033[32m\\]\\w\\[\\033[0m\\] $ '
+claude() {{
+    if [[ $PWD == "$HOME/acme-web"* ]]; then
+        exec {web_agent}
+    else
+        exec {api_agent}
+    fi
+}}
+make() {{
+    if [[ $1 == test ]]; then
+        {test_output}
+    else
+        printf 'demo supports make test only\\n' >&2
+        return 2
+    fi
+}}
+''')
+
         config = Path(directory) / 'tmux.conf'
         config.write_text(f'''
 set -g default-terminal tmux-256color
 set -g default-shell /bin/bash
+set -g default-command 'exec /bin/bash --noprofile --rcfile "{shell_rc}" -i'
 set -g escape-time 10
 set -g mouse on
+set -g display-time 2200
 set -g status on
 set -g status-interval 0
 set -g status-style 'bg=#21222c,fg=#f8f8f2'
-set -g status-format[0] '#[align=centre]#{{@demo_caption}}'
+set -g message-style 'bg=#44475a,fg=#f8f8f2'
+set -g status-left-length 24
+set -g status-left '#[fg=#8be9fd,bold] #S #[default]'
+set -g status-right-length 72
+set -g status-right '#{{@demo_caption}} '
+set -g window-status-format ' #I:#W '
+set -g window-status-current-format '#[fg=#282a36,bg=#50fa7b,bold] #I:#W #[default]'
 set -g pane-border-style 'fg=#44475a'
 set -g pane-active-border-style 'fg=#6272a4'
 set -g @tmux-canopy-icon-theme nerdfont
 set -g @tmux-canopy-agents on
-set -g @tmux-canopy-width 38
+set -g @tmux-canopy-width 40
 set -g @tmux-canopy-animate on
 set -g @tmux-canopy-alerts tmux
 set -g @tmux-canopy-appearance quiet
 set -g @demo_caption ''
+run-shell '{ROOT / "tmux-canopy.tmux"}'
 ''')
+
         try:
-            api = tm('-f', str(config), 'new-session', '-d', '-s', 'acme-api', '-x', str(COLS), '-y', str(ROWS),
-                     '-n', 'server', '-c', str(home / 'acme-api'), '-P', '-F', '#{pane_id}', api_agent)
-            tm('split-window', '-d', '-v', '-l', '50%', '-t', api, '-c', str(home / 'acme-api'), tests)
-            tm('new-window', '-d', '-t', 'acme-api:', '-n', 'release', '-c', str(home / 'acme-api'), codex)
-            web = tm('new-session', '-d', '-s', 'acme-web', '-n', 'ui', '-c', str(home / 'acme-web'),
-                     '-P', '-F', '#{pane_id}', web_agent)
-            tm('split-window', '-d', '-h', '-l', '50%', '-t', web, '-c', str(home / 'acme-web'), git)
-            tm('new-session', '-d', '-s', 'notes', '-n', 'today', '-c', str(home / 'notes'), notes)
-            tm('select-pane', '-t', api)
+            if args.demo == 'walkthrough':
+                api = tm('-f', str(config), 'new-session', '-d', '-s', 'acme-api', '-x', str(COLS), '-y', str(ROWS),
+                         '-n', 'server', '-c', str(home / 'acme-api'), '-P', '-F', '#{pane_id}', api_agent)
+                tm('split-window', '-d', '-v', '-l', '50%', '-t', api, '-c', str(home / 'acme-api'), tests)
+                tm('new-window', '-d', '-t', 'acme-api:', '-n', 'release', '-c', str(home / 'acme-api'), codex)
+                web = tm('new-session', '-d', '-s', 'acme-web', '-n', 'ui', '-c', str(home / 'acme-web'),
+                         '-P', '-F', '#{pane_id}', web_agent)
+                tm('split-window', '-d', '-h', '-l', '50%', '-t', web, '-c', str(home / 'acme-web'), git)
+                tm('new-session', '-d', '-s', 'notes', '-n', 'today', '-c', str(home / 'notes'), notes)
+                tm('select-pane', '-t', api)
+                record_socket = SOCKET
+                record_target = 'acme-api'
+                control = tm
+            else:
+                stage_config = Path(directory) / 'stage.conf'
+                stage_config.write_text('set -g status off\nset -g prefix None\nset -g escape-time 0\n')
+                stage_rc = Path(directory) / 'stage.bashrc'
+                tmux = shutil.which('tmux')
+                stage_rc.write_text(f'''PS1='\\[\\033[32m\\]\\w\\[\\033[0m\\] $ '
+cd "$HOME/acme-api"
+tmux() {{
+    TMUX= command {tmux} -L {SOCKET} -f {config} "$@"
+}}
+''')
+                stage('-f', str(stage_config), 'new-session', '-d', '-s', 'recording',
+                      '-x', str(COLS), '-y', str(ROWS),
+                      f'exec /bin/bash --noprofile --rcfile "{stage_rc}" -i')
+                record_socket = STAGE_SOCKET
+                record_target = 'recording'
+                control = stage
+
+            recorder = sp.Popen(['asciinema', 'rec', '--headless', '--overwrite', '--quiet',
+                                 '--window-size', f'{COLS}x{ROWS}', '--idle-time-limit', '2',
+                                 '--title', 'tmux-canopy', '-c',
+                                 f'tmux -L {record_socket} attach -t {record_target}', str(cast)],
+                                env=env)
+            control_client = ''
+            for _ in range(100):
+                control_client = control('list-clients', '-F', '#{client_name}')
+                if control_client:
+                    break
+                time.sleep(.05)
+            if not control_client:
+                raise RuntimeError('the recorded client did not attach')
+
+            def keys(*names, pause=.35):
+                for name in names:
+                    control('send-keys', '-K', '-c', control_client, name)
+                    time.sleep(pause)
+
+            def typed(text, pause=.08):
+                for char in text:
+                    control('send-keys', '-K', '-c', control_client, '-l', char)
+                    time.sleep(pause)
+
+            key = '#[fg=#bd93f9,bold]'
+            plain = '#[fg=#f8f8f2,nobold]'
+
+            if args.demo == 'preview':
+                time.sleep(1)
+                typed('tmux new -s acme-api', pause=.07)
+                keys('Enter', pause=.2)
+                client = ''
+                for _ in range(100):
+                    result = sp.run(['tmux', '-L', SOCKET, 'list-clients', '-F', '#{client_name}'],
+                                    env=env, capture_output=True, text=True, timeout=15)
+                    client = result.stdout.strip() if result.returncode == 0 else ''
+                    if client:
+                        break
+                    time.sleep(.05)
+                if not client:
+                    raise RuntimeError('the demo tmux client did not attach')
+                time.sleep(1.2)
+
+                def caption(text):
+                    tm('set-option', '-g', '@demo_caption', text)
+                    tm('refresh-client', '-S', '-t', client)
+
+                caption(f'{key}prefix ,{plain}  rename the first window')
+                keys('C-b', ',', pause=.2)
+                keys('C-u', pause=.1)
+                typed('server')
+                keys('Enter', pause=.2)
+                time.sleep(1)
+                caption(f'{key}prefix c{plain}  create another window')
+                keys('C-b', 'c', pause=.2)
+                keys('C-b', ',', pause=.2)
+                keys('C-u', pause=.1)
+                typed('tests')
+                keys('Enter', pause=.2)
+                time.sleep(1)
+                caption(f'{key}prefix "{plain}  split the server window')
+                keys('C-b', '0', pause=.2)
+                keys('C-b', '"', pause=.2)
+                typed('claude', pause=.08)
+                keys('Enter', pause=.2)
+                time.sleep(1.5)
+                api = next(line for line in tm('list-panes', '-t', 'acme-api:server',
+                                               '-F', '#{?pane_active,#{pane_id},}').splitlines() if line)
+                caption(f'{plain}Add a second project as another tmux session')
+                keys('C-b', ':', pause=.2)
+                typed('new-session -d -s acme-web -n ui -c ~/acme-web', pause=.035)
+                keys('Enter', pause=.2)
+                time.sleep(1)
+                web = tm('list-panes', '-t', 'acme-web:ui', '-F', '#{pane_id}')
+                tm('send-keys', '-t', web, 'claude', 'Enter')
+                time.sleep(1)
+            else:
+                client = tm('list-clients', '-F', '#{client_name}')
+
+                def caption(text):
+                    tm('set-option', '-g', '@demo_caption', text)
+                    tm('refresh-client', '-S', '-t', client)
+
             base = env | {'TMUX': tm('display-message', '-p', '-t', api, '#{socket_path},#{pid},0')}
-            load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=base, capture_output=True, text=True)
-            if load.returncode:
-                raise RuntimeError(load.stderr)
 
             def hook(pane, session, payload):
                 sp.run([str(ROOT / 'scripts' / 'agent-hook'), 'claude'], env=base | {'TMUX_PANE': pane},
@@ -161,59 +313,33 @@ set -g @demo_caption ''
                 hook(pane, session, {'hook_event_name': 'SessionStart'})
                 hook(pane, session, {'hook_event_name': 'UserPromptSubmit'})
 
-            recorder = sp.Popen(['asciinema', 'rec', '--headless', '--overwrite', '--quiet',
-                                 '--window-size', f'{COLS}x{ROWS}', '--idle-time-limit', '2',
-                                 '--title', 'tmux-canopy', '-c', f'tmux -L {SOCKET} attach -t acme-api', str(cast)],
-                                env=env)
-            client = ''
-            for _ in range(100):
-                client = tm('list-clients', '-F', '#{client_name}')
-                if client:
-                    break
-                time.sleep(.05)
-            if not client:
-                raise RuntimeError('the recorded client did not attach')
-
             def permission():
                 tty = tm('display-message', '-p', '-t', web, '#{pane_tty}')
                 with open(tty, 'wb', buffering=0) as pane:
-                    pane.write(b'\r\n\r\n Run npm run e2e? [y/N]\r\n')
+                    pane.write(b'\r\n\r\n Run make test? [y/N]\r\n')
                 hook(web, 'web', {'hook_event_name': 'PermissionRequest', 'tool_name': 'Bash',
-                                  'tool_input': {'command': 'npm run e2e'}})
+                                  'tool_input': {'command': 'make test'}})
 
-            def caption(text):
-                tm('set-option', '-g', '@demo_caption', text)
-                tm('refresh-client', '-S', '-t', client)
-
-            def keys(*names, pause=.35):
-                for name in names:
-                    tm('send-keys', '-K', '-c', client, name)
-                    time.sleep(pause)
-
-            def typed(text, pause=.12):
-                for char in text:
-                    tm('send-keys', '-K', '-c', client, '-l', char)
-                    time.sleep(pause)
-
-            key = '#[fg=#bd93f9,bold]'
-            plain = '#[fg=#f8f8f2,nobold]'
             if args.demo == 'preview':
-                caption(f'{plain}Your whole tmux workspace, in one tree')
+                caption(f'{key}prefix T{plain}  open Canopy')
                 keys('C-b', 'T', pause=.15)
-                time.sleep(2.8)
+                time.sleep(2.2)
+                caption(f'{key}j k{plain}  browse · {key}h l{plain}  fold branches')
+                keys('j', 'j', 'k', pause=.3)
+                time.sleep(1.3)
                 caption(f'{plain}Agents and subagents stay visible across projects')
                 hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's1', 'agent_type': 'Explore'})
-                time.sleep(.6)
+                time.sleep(.4)
                 hook(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's2', 'agent_type': 'Plan'})
-                time.sleep(2.8)
-                # The real tmux alert takes over the status line for five seconds.
+                time.sleep(1.5)
+                caption('')
                 permission()
-                time.sleep(5.2)
+                time.sleep(2.4)
                 caption(f'{key}n{plain}  jump straight to the waiting agent')
                 keys('n', pause=.2)
-                time.sleep(3.5)
-                caption(f'{plain}One sidebar follows you · no daemon')
                 time.sleep(2.5)
+                caption(f'{plain}One sidebar follows every tmux session · no daemon')
+                time.sleep(2)
             else:
                 caption(f'{plain}Navigate sessions, windows, and panes')
                 keys('C-b', 'T', pause=.15)
@@ -241,8 +367,9 @@ set -g @demo_caption ''
                 caption(f'{key}4{plain}  only show work with agents')
                 keys('4', pause=.3)
                 time.sleep(2)
+                caption('')
                 permission()
-                time.sleep(5.2)
+                time.sleep(2.4)
                 caption(f'{key}n{plain}  jump to the blocker')
                 keys('n', pause=.2)
                 time.sleep(2.5)
@@ -254,7 +381,7 @@ set -g @demo_caption ''
                 time.sleep(3)
                 caption(f'{key}q / Esc{plain}  close the popup without switching panes')
                 time.sleep(2)
-            tm('detach-client', '-t', client)
+            control('detach-client', '-t', control_client)
             recorder.wait(timeout=20)
             # tmux clears the screen on detach. Keep the last real frame so the
             # GIF loops from the product, not a black "detached" terminal.
@@ -271,10 +398,11 @@ set -g @demo_caption ''
                 recording.write(header)
                 recording.writelines(events[:teardown])
         finally:
-            sp.run(['tmux', '-L', SOCKET, 'kill-server'], env=env, capture_output=True)
+            for socket in (SOCKET, STAGE_SOCKET):
+                sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)
 
-    sp.run(['agg', '--quiet', '--font-family', args.font_family, '--font-size', '14', '--line-height', '1.3',
-            '--theme', args.theme, '--idle-time-limit', '2', '--fps-cap', '30', '--last-frame-duration', '3',
+    sp.run(['agg', '--quiet', '--font-family', args.font_family, '--font-size', '20', '--line-height', '1.25',
+            '--theme', args.theme, '--idle-time-limit', '2', '--fps-cap', '30', '--last-frame-duration', '2',
             str(cast), str(gif)], check=True)
     print(f'wrote {cast}\nwrote {gif}')
     # A still for the README link and for viewers that do not animate GIFs:
