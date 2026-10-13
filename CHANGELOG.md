@@ -7,7 +7,7 @@
 - In `quiet`, every view names itself the same way. The Processes and Buffers views read `Processes` and `Buffers` with their row count on the right (`12 processes`) instead of a tab strip, and gain a footer with their main action and the way back (`Enter focus   1 tree   a actions`). With agent mode off, the Tree header says `agent mode off`, so it no longer looks like a server with no agents running.
 - Previews show a directory under your home directory as `~/…` in the window preview and the agent summary too, as the pane preview already did, leaving room for the rest of the path.
 - Each plugin load removes everything at Canopy's own tmux hook indexes (9000-9099) and command-alias indexes (9100-9199) before adding what the current settings need, instead of a fixed list of hooks. A hook an older version left at those indexes is cleared too; your own hooks and aliases at other indexes are untouched. Settings with fixed values or a number now share one check each, with the default written once.
-- The README demo now starts at a blank terminal and builds a tmux workspace before opening Canopy. Its high-resolution 16:9 recording uses larger text, a cleaner tmux status line, and a visible session/window/pane workflow before the sidebar and agent-monitoring tour.
+- The README demo now starts at a blank terminal and builds a tmux workspace before opening Canopy. Its high-resolution 16:9 recording uses larger text, a cleaner tmux status line, and a visible session/window/pane workflow. Fictional repositories, branches, nested project directories, a development server, and test files make the resulting panes look like active work before the sidebar and agent-monitoring tour.
 
 ### Fixed
 

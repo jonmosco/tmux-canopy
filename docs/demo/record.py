@@ -9,7 +9,7 @@ config, or projects are captured.
     python3 docs/demo/record.py --output /tmp/canopy-demo-review
     python3 docs/demo/record.py --demo preview  # only the README demo
 
-Requires tmux, fzf, Python 3, asciinema 3, agg, and on macOS coreutils
+Requires tmux, fzf, git, Python 3, asciinema 3, agg, and on macOS coreutils
 (gsleep). ffmpeg exports the preview still. Review the GIFs at README size and
 check the .cast files for private data before copying assets into docs/assets.
 The .cast files are ignored by git and can be played with `asciinema play`.
@@ -44,7 +44,7 @@ def main():
                     '--font-family', args.font_family, '--theme', args.theme,
                     '--poster', str(args.poster)], check=True)
         return
-    for tool in ('tmux', 'fzf', 'asciinema', 'agg'):
+    for tool in ('tmux', 'fzf', 'git', 'asciinema', 'agg'):
         if not shutil.which(tool):
             sys.exit(f'{tool} is required')
     sleeper = shutil.which('gsleep' if sys.platform == 'darwin' else 'sleep')
@@ -58,8 +58,31 @@ def main():
     with tempfile.TemporaryDirectory(prefix='canopy-demo-') as directory:
         home = Path(directory).resolve() / 'home'
         bin_dir = Path(directory) / 'bin'
-        for path in (home / 'acme-api', home / 'acme-web', home / 'notes', bin_dir):
+        for path in (home / 'acme-api' / 'src' / 'auth',
+                     home / 'acme-api' / 'tests' / 'integration',
+                     home / 'acme-api' / 'config',
+                     home / 'acme-web' / 'src' / 'pages',
+                     home / 'acme-web' / 'src' / 'components',
+                     home / 'acme-web' / 'tests',
+                     home / 'notes', bin_dir):
             path.mkdir(parents=True)
+        fixtures = {
+            home / 'acme-api' / 'src' / 'auth' / 'login.ts': 'export function login() {}\\n',
+            home / 'acme-api' / 'tests' / 'integration' / 'login.test.ts': 'describe(\"login\", () => {});\\n',
+            home / 'acme-api' / 'tests' / 'integration' / 'session.test.ts': 'describe(\"session\", () => {});\\n',
+            home / 'acme-api' / 'config' / 'routes.yml': 'health: /health\\n',
+            home / 'acme-web' / 'src' / 'pages' / 'settings.tsx': 'export function Settings() {}\\n',
+            home / 'acme-web' / 'src' / 'components' / 'Profile.tsx': 'export function Profile() {}\\n',
+            home / 'acme-web' / 'tests' / 'settings.test.tsx': 'describe(\"settings\", () => {});\\n',
+        }
+        for path, content in fixtures.items():
+            path.write_text(content)
+        for project, branch in ((home / 'acme-api', 'main'), (home / 'acme-web', 'feature/settings')):
+            sp.run(['git', '-C', str(project), 'init', '-q', '-b', branch], check=True)
+            sp.run(['git', '-C', str(project), '-c', 'user.name=Canopy Demo',
+                    '-c', 'user.email=demo@example.com', 'add', '.'], check=True)
+            sp.run(['git', '-C', str(project), '-c', 'user.name=Canopy Demo',
+                    '-c', 'user.email=demo@example.com', 'commit', '-q', '-m', 'demo fixture'], check=True)
         env = {'PATH': os.environ['PATH'], 'HOME': str(home), 'TERM': 'xterm-256color',
                'LANG': os.environ.get('LANG', 'en_US.UTF-8'), 'SHELL': '/bin/bash',
                'BASH_SILENCE_DEPRECATION_WARNING': '1'}
@@ -78,7 +101,7 @@ def main():
 
         # Agents are detected by process name, so each fake agent is a renamed
         # sleep binary. A wrapper prints a fictional transcript, then execs it.
-        for name in ('claude', 'codex'):
+        for name in ('claude', 'codex', 'api-server'):
             shutil.copy(sleeper, bin_dir / name)
 
         def program(name, text, then):
@@ -110,7 +133,7 @@ def main():
  \033[1m›\033[0m write release notes for v2.4
 
  \033[2mwaiting for your next prompt\033[0m''', f'exec {bin_dir}/codex 3600')
-        tests = program('tests', '''\033[32m~/acme-api\033[0m $ make test
+        tests = program('tests', '''\033[32m~/acme-api/tests/integration\033[0m $ make test
 
  \033[32mPASS\033[0m  src/auth/login.test.ts
  \033[32mPASS\033[0m  src/auth/session.test.ts
@@ -150,8 +173,12 @@ claude() {{
 make() {{
     if [[ $1 == test ]]; then
         {test_output}
+    elif [[ $1 == dev ]]; then
+        printf '\\n \\033[32mready\\033[0m  API server at http://localhost:4000\\n'
+        printf '        watching src/ and config/\\n'
+        exec {bin_dir}/api-server 3600
     else
-        printf 'demo supports make test only\\n' >&2
+        printf 'demo supports make dev and make test only\\n' >&2
         return 2
     fi
 }}
@@ -183,6 +210,7 @@ set -g @tmux-canopy-width 40
 set -g @tmux-canopy-animate on
 set -g @tmux-canopy-alerts tmux
 set -g @tmux-canopy-appearance quiet
+set -g @tmux-canopy-git-context branch
 set -g @demo_caption ''
 run-shell '{ROOT / "tmux-canopy.tmux"}'
 ''')
@@ -190,10 +218,13 @@ run-shell '{ROOT / "tmux-canopy.tmux"}'
         try:
             if args.demo == 'walkthrough':
                 api = tm('-f', str(config), 'new-session', '-d', '-s', 'acme-api', '-x', str(COLS), '-y', str(ROWS),
-                         '-n', 'server', '-c', str(home / 'acme-api'), '-P', '-F', '#{pane_id}', api_agent)
-                tm('split-window', '-d', '-v', '-l', '50%', '-t', api, '-c', str(home / 'acme-api'), tests)
+                         '-n', 'server', '-c', str(home / 'acme-api' / 'src' / 'auth'),
+                         '-P', '-F', '#{pane_id}', api_agent)
+                tm('split-window', '-d', '-v', '-l', '50%', '-t', api,
+                   '-c', str(home / 'acme-api' / 'tests' / 'integration'), tests)
                 tm('new-window', '-d', '-t', 'acme-api:', '-n', 'release', '-c', str(home / 'acme-api'), codex)
-                web = tm('new-session', '-d', '-s', 'acme-web', '-n', 'ui', '-c', str(home / 'acme-web'),
+                web = tm('new-session', '-d', '-s', 'acme-web', '-n', 'ui',
+                         '-c', str(home / 'acme-web' / 'src' / 'pages'),
                          '-P', '-F', '#{pane_id}', web_agent)
                 tm('split-window', '-d', '-h', '-l', '50%', '-t', web, '-c', str(home / 'acme-web'), git)
                 tm('new-session', '-d', '-s', 'notes', '-n', 'today', '-c', str(home / 'notes'), notes)
@@ -271,25 +302,29 @@ tmux() {{
                 keys('C-u', pause=.1)
                 typed('server')
                 keys('Enter', pause=.2)
-                time.sleep(1)
+                typed('make dev', pause=.07)
+                keys('Enter', pause=.2)
+                time.sleep(1.3)
                 caption(f'{key}prefix c{plain}  create another window')
                 keys('C-b', 'c', pause=.2)
                 keys('C-b', ',', pause=.2)
                 keys('C-u', pause=.1)
                 typed('tests')
                 keys('Enter', pause=.2)
-                time.sleep(1)
+                typed('cd tests/integration && ls', pause=.045)
+                keys('Enter', pause=.2)
+                time.sleep(1.2)
                 caption(f'{key}prefix "{plain}  split the server window')
                 keys('C-b', '0', pause=.2)
                 keys('C-b', '"', pause=.2)
-                typed('claude', pause=.08)
+                typed('cd src/auth && claude', pause=.06)
                 keys('Enter', pause=.2)
                 time.sleep(1.5)
                 api = next(line for line in tm('list-panes', '-t', 'acme-api:server',
                                                '-F', '#{?pane_active,#{pane_id},}').splitlines() if line)
                 caption(f'{plain}Add a second project as another tmux session')
                 keys('C-b', ':', pause=.2)
-                typed('new-session -d -s acme-web -n ui -c ~/acme-web', pause=.035)
+                typed('new-session -d -s acme-web -n ui -c ~/acme-web/src/pages', pause=.035)
                 keys('Enter', pause=.2)
                 time.sleep(1)
                 web = tm('list-panes', '-t', 'acme-web:ui', '-F', '#{pane_id}')
@@ -406,7 +441,7 @@ tmux() {{
             str(cast), str(gif)], check=True)
     print(f'wrote {cast}\nwrote {gif}')
     # A still for the README link and for viewers that do not animate GIFs:
-    # the moment the waiting agent appears, sidebar open with subagents.
+    # project paths and branches visible, sidebar open with subagents.
     if args.demo == 'preview' and shutil.which('ffmpeg'):
         png = output / 'canopy-demo.png'
         sp.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-ss', str(args.poster), '-i', str(gif),
