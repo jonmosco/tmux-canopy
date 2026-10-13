@@ -86,7 +86,7 @@ def main():
         assert footer(status='working') == '? keys   / search   4 agents', footer(status='working')
         assert footer(status='working', agents=False) == '? keys   / search   2 proc   3 buff'
         off = ANSI.sub('', render(agents=False)['H:tree']).rstrip()
-        assert off.endswith('agents off'), off
+        assert off.endswith('agent mode off'), off
         assert footer(second_agent=True) == '◆ 2 waiting   n next   > reply', footer(second_agent=True)
         assert footer(icons='ascii') == '! Claude Code waiting   n go   > reply', footer(icons='ascii')
         assert footer(state_text='MOVE\tP:%0\n') == 'Moving   Enter move here   c cancel'

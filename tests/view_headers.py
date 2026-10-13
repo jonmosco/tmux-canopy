@@ -48,7 +48,7 @@ try:
         assert view('tree')[0] == 'Tree · All', view('tree')
         assert view('agents')[0].startswith('Agents · All'), view('agents')
         tm('set-option', '-g', '@tmux-canopy-agents', 'off')
-        assert view('tree') == ('Tree · All                   agents off', '? keys   / search   2 proc   3 buff'), \
+        assert view('tree') == ('Tree · All' + ' ' * 15 + 'agent mode off', '? keys   / search   2 proc   3 buff'), \
             view('tree')
         tm('delete-buffer', '-b', 'two')
         assert view('buffers')[0].endswith('1 buffer'), view('buffers')
@@ -56,6 +56,6 @@ try:
         assert view('processes') == ('Processes   2 processes', 'Enter focus   1 tree'), view('processes')
         tm('set-option', '-g', '@tmux_canopy_appearance', 'places')
         assert 'Proc' in view('processes')[0] and 'Buff' in view('processes')[0], 'other appearances keep tabs'
-    print('ok - quiet views share one header with their counts, footers act and lead back, and agents off shows')
+    print('ok - quiet views share one header with their counts, footers act and lead back, and agent mode off shows')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True, timeout=10)

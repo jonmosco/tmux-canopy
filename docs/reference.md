@@ -465,7 +465,7 @@ dim mark so bells, silence, and agents waiting on you keep the amber. A folder
 folded in another appearance does not hide panes in `quiet`. It replaces the tab bar with a
 short header naming the view: `Tree · All`/`Agents · All` (`Tree - All` with ASCII icons) and, when agent mode is on, a count
 of agents in each state (`◆1 ▷2 ✓1 ○1`), shortened to the most urgent state and the total (`◆1/5`) when
-the header is too narrow; with agent mode off the Tree header says `agents off`. The Processes and
+the header is too narrow; with agent mode off the Tree header says `agent mode off`. The Processes and
 Buffers views read `Processes` and `Buffers` with their row count on the right (`12 processes`), and a
 footer with their main action and the way back (`Enter focus   1 tree   a actions`). In Tree view it subdues guides, uses small chevrons for folds, places
 the green active-pane dot beside its name (`>` with ASCII icons), and right-aligns agent attention and

@@ -426,7 +426,7 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
     }
     # With agent mode off the Tree says so, rather than looking like a
     # server where no agent is running.
-    if (!agent_view && !agents_enabled) { summary="agents off"; style=dim }
+    if (!agent_view && !agents_enabled) { summary="agent mode off"; style=dim }
     if (summary != "" && summary_color == "") summary_color=style summary reset
     available=width-3
     # Every state at a glance ("◆1 ▷1 ○1") when it fits beside the title and
