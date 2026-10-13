@@ -258,8 +258,8 @@ Tree · All                         ◆1 ▷1   ① ②
 
 | | What it shows | Keys |
 |---|---|---|
-| ① | **View and filter.** The open view (`Tree`, `Agents`, `Proc`, `Buff`) and the tree filter: `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
-| ② | **Agent summary:** how many agents are in each state: `◆` needs input, `▷` working, `✓` ended, `○` found by process only. A narrow sidebar shows the most urgent state and the total instead, such as `◆1/3`. | `n` jump to the agent waiting |
+| ① | **View and filter.** The open view (`Tree`, `Agents`, `Processes`, `Buffers`) and the tree filter: `All`, `Session` (only the current session), or `Unread`. `+W` / `+T` means a window-name or pane-title filter is also on. | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
+| ② | **Agent summary:** how many agents are in each state: `◆` needs input, `▷` working, `✓` ended, `○` found by process only. A narrow sidebar shows the most urgent state and the total instead, such as `◆1/3`. With agent mode off it reads `agents off`; the Processes and Buffers views count their rows here. | `n` jump to the agent waiting |
 | ③ | **Session heading**, followed by a dim rule that separates it from the session above. The session you are in has a tmux-green glyph and a cyan name. | `h` / `l` fold and unfold, `H` / `L` all |
 | ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
 | ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them: the session, a window, or a pane. | `canopy-branch`, `canopy-directory` at `prefix :` |

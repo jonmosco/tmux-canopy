@@ -33,11 +33,17 @@ render_source() {
     exec "$SCRIPT_DIR/tree-source"
   fi
   {
-    "$SCRIPT_DIR/view-header" || return
+    # The header counts the view's rows, so they are built first.
+    local body line count=0
     case "$view" in
-      processes) "$SCRIPT_DIR/process-source" ;;
-      buffers) "$SCRIPT_DIR/buffer-source" ;;
+      processes) body="$("$SCRIPT_DIR/process-source")" || return ;;
+      buffers) body="$("$SCRIPT_DIR/buffer-source")" || return ;;
     esac
+    while IFS= read -r line; do
+      case "$line" in Q:*|X:*|B:*|B2:*) count=$((count + 1)) ;; esac
+    done <<< "$body"
+    TMUX_CANOPY_VIEW_COUNT=$count "$SCRIPT_DIR/view-header" || return
+    [[ -z "$body" ]] || printf '%s\n' "$body"
   } | awk -F '\t' -v stable="$TMUX_CANOPY_STABLE" -v nul="$TMUX_CANOPY_NUL" '
     !seen[$1]++ {
       if (stable) printf "%s\t%s\t%s", $1,$2,$1; else printf "%s", $0

@@ -85,6 +85,43 @@ for tier in full compact tiny; do
 done
 accent=$'\033[1;36m'; reset=$'\033[0m'; dim=$'\033[2m'
 if [[ "$theme" == mono ]]; then accent=''; reset=''; dim=''; mode_color=''; fi
+
+# quiet names the view like Tree and Agents do, with how many rows it holds on
+# the right, and a footer with its main action and the way back. Other
+# appearances keep their tabs.
+if [[ "$appearance" == quiet && ( "$view" == processes || "$view" == buffers ) ]]; then
+  count="${TMUX_CANOPY_VIEW_COUNT:-}"
+  if [[ "$view" == processes ]]; then
+    title=Processes short=Proc noun=process plural=processes
+    footer=('Enter' 'focus' '1' 'tree' 'a' 'actions' '3' 'buff')
+  else
+    title=Buffers short=Buff noun=buffer plural=buffers
+    footer=('Enter' 'paste' '1' 'tree' 'a' 'actions' '2' 'proc')
+  fi
+  [[ "$agents_enabled" != on ]] || footer+=('4' 'agents')
+  summary=''
+  if [[ "$count" =~ ^[0-9]+$ ]]; then
+    summary="$count $plural"; ((count != 1)) || summary="1 $noun"
+  fi
+  right="$summary" right_style="$dim"
+  [[ -z "$mode" ]] || { right="$mode"; right_style="$mode_color"; }
+  available=$((width - 3))
+  ((${#title} + ${#right} + 2 <= available)) || title=$short
+  ((${#title} + ${#right} + 2 <= available)) || right=''
+  printf 'H:\t%s%s%s' "$accent" "$title" "$reset"
+  [[ -z "$right" ]] || printf '%*s%s%s%s' "$((available - ${#title} - ${#right}))" '' "$right_style" "$right" "$reset"
+  printf '\n'
+  # The footer keeps what fits, most important first.
+  plain='' text=''
+  for ((index = 0; index < ${#footer[@]}; index += 2)); do
+    part="${footer[index]} ${footer[index + 1]}"
+    ((${#plain} + ${#part} + (${#plain} ? 3 : 0) <= width - 4)) || break
+    [[ -z "$plain" ]] || { plain+='   '; text+='   '; }
+    plain+="$part"; text+="${footer[index]} $dim${footer[index + 1]}$reset"
+  done
+  [[ -n "$text" ]] && printf 'F:\t%s\n' "$text"
+  exit 0
+fi
 printf 'H:\t'
 if [[ "$appearance" == lazygit ]]; then
   printf '%s╭─ %s' "$accent" "$reset"
