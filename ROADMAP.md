@@ -157,6 +157,20 @@ consistent across views:
   colors, 256-color/truecolor terminals, and monochrome output. Document what
   terminal colors can be inherited rather than queried reliably.
 
+## vim-tmux-navigator in the sidebar (backlog)
+
+vim-tmux-navigator sends `Ctrl-h/j/k/l` to a pane running fzf instead of moving
+to the next pane, so its users cannot leave Canopy's sidebar with `Ctrl-l`:
+fzf receives it, and Canopy binds it to redraw. tmux-nav-master, which leaves
+`Ctrl-h` and `Ctrl-l` to tmux, is not affected.
+
+- [ ] In the sidebar, bind `Ctrl-l` and `Ctrl-h` to move focus to the pane on
+  that side (right of a left sidebar, left of a right one). `Ctrl-r` still
+  redraws and refreshes.
+- [ ] Keep `Ctrl-j` and `Ctrl-k` moving the selection, and keep `Ctrl-h` as
+  backspace while searching (some terminals send it for Backspace).
+- [ ] Test with vim-tmux-navigator's own binding loaded on a private server.
+
 ## Scope
 
 Planned request controls would add user-initiated responses to agent requests.
