@@ -10,9 +10,9 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
-[![Canopy demo: start tmux, create and rename windows, split a pane, open the sidebar, browse the tree, and jump to an agent waiting in another session](docs/assets/canopy-demo.gif?v=9)](docs/assets/canopy-demo.gif?v=9)
+[![Canopy demo: build a tmux workspace, open the sidebar, toggle agent monitoring, view help, browse the tree, and jump to a waiting agent](docs/assets/canopy-demo.gif?v=10)](docs/assets/canopy-demo.gif?v=10)
 
-**Build a tmux workspace, then see it from above.** This 38-second demo starts at a blank shell, builds windows and panes across two fictional projects, runs a development server, opens Canopy, and jumps to an agent waiting in another session. Scripted fixtures and agent events keep the recording reproducible and private. [Watch the focused feature tour](docs/assets/canopy-walkthrough.gif?v=9) for search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=9).
+**Build a tmux workspace, then see it from above.** This 47-second demo starts at a blank shell, builds windows and panes across two fictional projects, runs a development server, opens Canopy, toggles agent monitoring, shows the built-in help, and jumps to an agent waiting in another session. Scripted fixtures and agent events keep the recording reproducible and private. [Watch the focused feature tour](docs/assets/canopy-walkthrough.gif?v=10) for search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=10).
 
 ## Quick start
 
