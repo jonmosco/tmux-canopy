@@ -19,10 +19,10 @@ _balance_one_window_body() {
   local window_id="$1"
   local snapshot
   snapshot="$(tmux display-message -p -t "$window_id" \
-    "#{window_width}|#{window_zoomed_flag}|#{@tmux_canopy_drag_native}|#{@tmux_canopy_staged_sidebar}" 2>/dev/null)" || return 0
+    "#{window_width}|#{window_zoomed_flag}|#{@tmux_canopy_drag_native}|#{@tmux_canopy_staged_sidebar}|#{@tmux-canopy-width}|#{@tmux-canopy-min-width}|#{@tmux-canopy-max-width}|#{@tmux-canopy-min-content-width}|#{@tmux_canopy_runtime_width}" 2>/dev/null)" || return 0
 
-  local window_width zoomed drag_native staged
-  IFS="|" read -r window_width zoomed drag_native staged <<< "$snapshot"
+  local window_width zoomed drag_native staged configured minimum maximum min_content runtime
+  IFS="|" read -r window_width zoomed drag_native staged configured minimum maximum min_content runtime <<< "$snapshot"
   [[ "$zoomed" == 0 ]] || return 0
   [[ "$drag_native" != 1 && -z "$staged" ]] || return 0
 
@@ -52,12 +52,7 @@ _balance_one_window_body() {
     return 0
   fi
 
-  local configured minimum maximum min_content runtime requested
-  configured="$(tmux show-option -gqv @tmux-canopy-width 2>/dev/null || true)"
-  minimum="$(tmux show-option -gqv @tmux-canopy-min-width 2>/dev/null || true)"
-  maximum="$(tmux show-option -gqv @tmux-canopy-max-width 2>/dev/null || true)"
-  min_content="$(tmux show-option -gqv @tmux-canopy-min-content-width 2>/dev/null || true)"
-  runtime="$(tmux show-option -gqv @tmux_canopy_runtime_width 2>/dev/null || true)"
+  local requested
   : "${configured:=42}" "${minimum:=24}" "${maximum:=0}" "${min_content:=40}"
 
   requested="$configured"
