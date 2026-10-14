@@ -146,7 +146,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             wait(lambda: len(sidebars()) == 1, 'sidebar creation')
             side = sidebars()[0]
             script_env['TMUX_PANE'] = side
-            wait(lambda: loads.stat().st_size >= 1 or '[Tree]' in tm('capture-pane', '-p', '-t', side), 'initial UI load')
+            wait(lambda: loads.stat().st_size >= 1 or 'Tree · All' in tm('capture-pane', '-p', '-t', side), 'initial UI load')
             assert display(side, '#{pane_in_mode}') == '0'
             return side
 
@@ -324,7 +324,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
 
             # Exercise failures inside the actual subordinate providers.
             tm('send-keys', '-t', sidebar, 'Escape')
-            wait(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar).splitlines()[0], 'navigation header with hidden search input')
+            wait(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar).splitlines()[0], 'navigation header with hidden search input')
             assert probe().endswith('|'), 'Escape must clear the search query'
             ps_failure = binary_dir / 'ps'
             ps_failure.write_text('#!/bin/bash\necho NOT_FOR_DIAGNOSTICS >&2\nexit 6\n')
@@ -333,24 +333,24 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             wait(lambda: 'data unavailable' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider failure')
             ps_failure.unlink()
             tm('send-keys', '-t', sidebar, 'C-r')
-            wait(lambda: '[Proc]' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider recovery')
+            wait(lambda: 'Processes' in tm('capture-pane', '-p', '-t', sidebar), 'ps provider recovery')
             buffer_failure.touch()
             tm('send-keys', '-t', sidebar, '3')
             wait(lambda: 'data unavailable' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider failure')
             assert 'PARTIAL_NOT_A_BUFFER' not in tm('capture-pane', '-p', '-t', sidebar)
             buffer_failure.unlink()
             tm('send-keys', '-t', sidebar, 'C-r')
-            wait(lambda: '[Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider recovery')
+            wait(lambda: 'Buffers' in tm('capture-pane', '-p', '-t', sidebar), 'buffer provider recovery')
             assert sp.check_output(['pgrep', '-P', parent, '-x', 'fzf'], text=True).strip() == ui_pid
             tm('send-keys', '-t', sidebar, '1')
-            wait(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored')
+            wait(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored')
             print('ok - ps and tmux buffer failures propagate through the real providers and recover in place')
 
             format_marker = temp / 'format-job-executed'
             buffer_name = "buf' quoted, $literal #{version} #(touch " + shlex.quote(str(format_marker)) + ')'
             tm('set-buffer', '-b', buffer_name, 'fixture')
             tm('send-keys', '-t', sidebar, '3')
-            wait(lambda: '[Buff]' in tm('capture-pane', '-p', '-t', sidebar), 'buffer view')
+            wait(lambda: 'Buffers' in tm('capture-pane', '-p', '-t', sidebar), 'buffer view')
             terminal_output.clear()
             tm('send-keys', '-t', sidebar, 'a')
             wait(lambda: b'Buffer actions' in terminal_output, 'literal buffer context menu')
@@ -365,7 +365,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             assert not format_marker.exists()
             tm('delete-buffer', '-b', buffer_name)
             tm('send-keys', '-t', sidebar, '1')
-            wait(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored after buffer menu')
+            wait(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar), 'tree restored after buffer menu')
             print('ok - buffer context actions and diagnostics treat format-like buffer names as data')
 
             terminal_output.clear()
@@ -409,7 +409,7 @@ exec REAL --bind BINDING --bind LOAD "$@" 2>>/tmp/canopy-fzf-err
             mode.write_text('ok')
             loads.write_text('')
             os.write(master, b'\x02T')
-            wait(lambda: len(sidebars()) == 1 and (loads.stat().st_size >= 1 or '[Tree]' in tm('capture-pane', '-p', '-t', sidebars()[0])), 'native toggle binding')
+            wait(lambda: len(sidebars()) == 1 and (loads.stat().st_size >= 1 or 'Tree · All' in tm('capture-pane', '-p', '-t', sidebars()[0])), 'native toggle binding')
             sidebar = sidebars()[0]
             assert display(sidebar, '#{pane_in_mode}') == '0'
             os.write(master, b'\x02T')

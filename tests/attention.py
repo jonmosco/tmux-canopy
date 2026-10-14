@@ -133,14 +133,14 @@ def main():
         ascii_header = overview(42, icons='ascii', theme='mono')
         state.write_text('MOVE\tP:%10\n')
         narrow_with_action = overview(24)
-        assert 'Tree [Agents] Proc Buff ◆2 ▷1 ✓1 ○1' in normal, normal
-        assert '\x1b[0m\x1b[1;36m[Agents]' in overview(42, raw=True)
-        assert 'T [Agents] P B ◆2/5' in narrow, narrow
-        assert 'Tree [Agents] Proc Buff !2 +1 d1 o1' in ascii_header, ascii_header
-        assert 'T [A] P B ◆2/5' in narrow_with_action and narrow_with_action.endswith('MOVE'), narrow_with_action
+        assert normal.startswith('Agents · All') and normal.endswith('◆2 ▷1 ✓1 ○1'), normal
+        assert '\x1b[1;36mAgents' in overview(42, raw=True)
+        assert narrow.startswith('Agents') and narrow.endswith('◆2/5') and len(narrow) <= 24, narrow
+        assert ascii_header.startswith('Agents | All') and ascii_header.endswith('!2 +1 d1 o1'), ascii_header
+        assert narrow_with_action.startswith('Agents') and narrow_with_action.endswith('MOVE'), narrow_with_action
         overview_data = overview_data[:5]
         empty_with_action = overview(24)
-        assert 'T [A] P B 0' in empty_with_action and empty_with_action.endswith('MOVE'), empty_with_action
+        assert empty_with_action.startswith('Agents') and empty_with_action.endswith('MOVE'), empty_with_action
         assert len(empty_with_action) <= 24, empty_with_action
 
         print('ok - agent attention summaries and unique-pane Agents overview with narrow and ASCII layouts')

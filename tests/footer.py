@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Without agent mode, the Tree view footer counts sessions, windows, and panes."""
+"""The Tree footer exposes actions, responds to width, and can be hidden."""
 import os
 from pathlib import Path
 import re
@@ -43,18 +43,19 @@ def main():
                 records = [r.split('\t') for r in result.stdout.split('\0') if r.startswith('F:\t')]
                 return re.sub(r'\x1b\[[0-9;]*m', '', records[0][1]) if records else None
 
-            assert footer(wide) == '◈ 3 sessions  ▣ 4 windows  ▹ 5 panes', footer(wide)
-            print('ok - the workspace footer counts linked windows once and skips sidebar panes')
+            expected = '↵ focus  a actions  / search  ? help'
+            assert footer(wide) == expected, footer(wide)
+            print('ok - the Tree footer exposes the actions available in the view')
 
             state.write_text('FILTER\tsession\n')
-            assert footer(wide) == '◈ 1/3 sessions  ▣ 2/4 windows  ▹ 3/5 panes', footer(wide)
+            assert footer(wide) == expected, footer(wide)
             state.write_text('')
-            print('ok - a tree filter shows visible out of total')
+            print('ok - filters do not replace the stable action rail')
 
-            # A narrow sidebar keeps icons and numbers only.
+            # A narrow sidebar keeps the highest-priority actions.
             narrow = tm('split-window', '-d', '-h', '-l', '24', '-t', 'three:', '-P', '-F', '#{pane_id}')
-            assert footer(narrow) == '◈ 3  ▣ 4  ▹ 6', footer(narrow)
-            print('ok - a narrow sidebar drops the nouns')
+            assert footer(narrow) == '↵ focus  a actions', footer(narrow)
+            print('ok - a narrow sidebar drops lower-priority actions')
 
             # f flips the footer for this sidebar through its private state.
             def toggle():
@@ -64,21 +65,19 @@ def main():
             toggle()
             assert 'FOOTER\toff' in state.read_text() and footer(wide) is None
             toggle()
-            assert 'FOOTER\ton' in state.read_text() and footer(wide).startswith('◈ 3 sessions')
+            assert 'FOOTER\ton' in state.read_text() and footer(wide) == expected
             assert state.read_text().count('FOOTER') == 1
             state.write_text('')
             print('ok - f hides and shows the footer for one sidebar')
 
-            tm('set-option', '-g', '@tmux-canopy-icon-session', 'S')
-            assert footer(wide).startswith('S 3 sessions'), footer(wide)
-            print('ok - the footer follows icon overrides')
+            tm('set-option', '-g', '@tmux_canopy_icon_theme', 'ascii')
+            assert footer(wide) == 'Enter focus  a actions  / search  ? help', footer(wide)
+            print('ok - the ASCII footer uses an ASCII Enter label')
 
-            # Agent mode owns the footer: its summary replaces the workspace
-            # counts, and with no agent running there is no footer at all.
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
-            assert footer(wide) is None, footer(wide)
-            assert footer(wide, '--agents') is None, 'the Agents view has no footer'
-            print('ok - agent mode replaces the workspace footer with its own')
+            assert footer(wide) == 'Enter focus  a actions  / search  ? help', footer(wide)
+            assert footer(wide, '--agents') == 'Enter focus  n waiting  > reply  i summary'
+            print('ok - Tree and Agents expose their own stable action rails')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)
 

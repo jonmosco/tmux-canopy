@@ -61,8 +61,8 @@ def main():
                 assert result.returncode == 0, result.stderr
                 return result.stdout
 
-            # The quiet Tree footer offers the Agents view only in agent mode.
-            agent_mode = lambda text: '4 agents' in re.sub(r'\x1b\[[0-9;]*m', '', text)
+            # Agent mode controls whether the Agents view can be rendered.
+            agent_mode = lambda text: 'agent mode off' not in re.sub(r'\x1b\[[0-9;]*m', '', text)
             assert not agent_mode(source()) and 'Agents' not in source('--agents')
             assert source('--needs-input') == ''
             binds = ui_options()
@@ -74,7 +74,7 @@ def main():
             assert '--bind=ctrl-t:' in binds
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             load()
-            assert agent_mode(source()) and 'Agents · All' in re.sub(r'\x1b\[[0-9;]*m', '', source('--agents'))
+            assert 'Agents · All' in re.sub(r'\x1b\[[0-9;]*m', '', source('--agents'))
             client = '/dev/ttys-agent-test'
             key = sp.check_output(['cksum'], input=client.encode()).split()[0].decode()
             tm('set-option', '-g', '@tmux_canopy_agents_' + key, 'off')

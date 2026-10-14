@@ -56,13 +56,13 @@ def main():
             return {row[2]: row[1] for row in rows}
 
         classic = render(appearance='places')
-        assert 'Tree Agents Proc Buff' in ANSI.sub('', classic['H:tree'])
+        assert '╭─ Tree ─ All' in ANSI.sub('', classic['H:tree'])
         quiet = render()
         header = ANSI.sub('', quiet['H:tree'])
         assert 'Tree · All' in header and header.rstrip().endswith('◆1') and 'Proc Buff' not in header, header
-        # The footer says what to do now: here, answer the agent waiting.
+        # A waiting agent takes priority over the normal view actions.
         footer = ANSI.sub('', quiet['F:'])
-        assert footer == '◆ Claude Code waiting   n go   > reply', footer
+        assert footer == '◆ Claude Code waiting  n go  > reply', footer
         assert '\x1b[1;33m' in quiet['F:'], quiet['F:']
         # tmux order: no folder rows; the session's directory and branch are a
         # detail on its heading, and rows in that directory carry none.
@@ -78,30 +78,31 @@ def main():
         assert '0:' in quiet['W:@0:$0'] and '0:' in quiet['P:%0:$0']
         # No tree guides; the session heading's dim rule is its separator.
         assert 'DIR:%0:$0' not in quiet and '─' not in ANSI.sub('', quiet['W:@0:$0']) and '──' in ANSI.sub('', quiet['S:$0'])
-        assert 'Tree Agents Proc Buff' in ANSI.sub('', render(appearance='places')['H:tree']), 'default appearance changed'
+        assert '╭─ Tree ─ All' in ANSI.sub('', render(appearance='places')['H:tree']), 'folder header changed'
         print('ok - quiet appearance keeps tree identities and separates active, agent, and unread marks')
 
         def footer(**options):
             return ANSI.sub('', render(**options).get('F:', ''))
-        assert footer(status='working') == '? keys   / search   4 agents', footer(status='working')
-        assert footer(status='working', agents=False) == '? keys   / search   2 proc   3 buff'
+        assert footer(status='working') == '↵ focus  a actions  / search  ? help', footer(status='working')
+        assert footer(status='working', agents=False) == '↵ focus  a actions  / search  ? help'
         off = ANSI.sub('', render(agents=False)['H:tree']).rstrip()
         assert off.endswith('agent mode off'), off
-        assert footer(second_agent=True) == '◆ 2 waiting   n next   > reply', footer(second_agent=True)
-        assert footer(icons='ascii') == '! Claude Code waiting   n go   > reply', footer(icons='ascii')
-        assert footer(state_text='MOVE\tP:%0\n') == 'Moving   Enter move here   c cancel'
-        assert footer(state_text='LINK\tW:@0:$0\n') == 'Linking   Enter link here   c cancel'
+        assert footer(second_agent=True) == '◆ 2 waiting  n next  > reply', footer(second_agent=True)
+        assert footer(icons='ascii') == '! Claude Code waiting  n go  > reply', footer(icons='ascii')
+        assert footer(state_text='MOVE\tP:%0\n') == 'Moving  ↵ move here  c cancel'
+        assert footer(state_text='LINK\tW:@0:$0\n') == 'Linking  ↵ link here  c cancel'
         assert footer(state_text=f'DELETE\tP:%1\t{now}\n') == 'x again within 5 s to delete'
         # Narrow sidebars keep the most important part and drop what will not fit.
         assert footer(width=30) == '◆ Claude Code waiting', footer(width=30)
-        assert footer(width=24) == '◆ 1 waiting   n go', footer(width=24)
-        assert footer(width=24, status='working') == '? keys   / search', footer(width=24, status='working')
-        # The Agents view keeps a footer: reach an agent, read it, get back.
-        assert footer(agent_view=True, status='working') == 'Enter focus   i details   1 tree', \
+        assert footer(width=24) == '◆ 1 waiting  n go', footer(width=24)
+        assert footer(width=24, status='working') == '↵ focus  a actions', footer(width=24, status='working')
+        # Agents advertises its own actions; a waiting request still overrides it.
+        assert footer(agent_view=True, status='working') == '↵ focus  n waiting  > reply  i summary', \
             footer(agent_view=True, status='working')
-        assert footer(agent_view=True) == '◆ Claude Code waiting   n go   > reply', footer(agent_view=True)
-        assert footer(agent_view=True, status='working', width=30) == 'Enter focus   i details', \
+        assert footer(agent_view=True) == '◆ Claude Code waiting  n go  > reply', footer(agent_view=True)
+        assert footer(agent_view=True, status='working', width=30) == '↵ focus  n waiting', \
             footer(agent_view=True, status='working', width=30)
+        assert footer(appearance='places', status='working') == '↵ focus  a actions  / search  ? help'
         assert footer(agent_view=True, status='working', state_text='FOOTER\toff\n') == ''
         print('ok - the quiet footer follows what is pending: a move, a delete, agents waiting, or the keys')
 

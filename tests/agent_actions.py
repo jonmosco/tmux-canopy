@@ -22,6 +22,7 @@ socket = f'canopy-agent-actions-{os.getpid()}'
 env = os.environ.copy()
 env.pop('TMUX', None)
 env.pop('TMUX_PANE', None)
+env['TERM'] = 'xterm-256color'
 plain = lambda text: re.sub(r'\x1b\[[0-9;]*m', '', text)
 
 

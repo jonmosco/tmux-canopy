@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""quiet names every view the same way, with what it holds on the right and a
-footer to act and get back; agent mode off says so in the Tree."""
+"""Every view names itself, counts what it holds, and exposes responsive
+view-specific actions in the footer."""
 import os
 from pathlib import Path
 import re
 import subprocess as sp
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
@@ -32,8 +33,8 @@ try:
         source_env = env | {'TMUX': tm('display-message', '-p', '#{socket_path},0,0'), 'TMUX_PANE': sidebar,
                             'TMUX_CANOPY_STATE': str(state)}
 
-        def view(name):
-            state.write_text(f'VIEW\t{name}\n')
+        def view(name, state_extra=''):
+            state.write_text(f'VIEW\t{name}\n{state_extra}')
             out = sp.run([str(ROOT / 'scripts/sidebar-source'), '--stable', '--read0'], env=source_env,
                          capture_output=True, text=True, timeout=20).stdout
             header = next(r.split('\t')[1] for r in out.split('\0') if r.startswith('H:'))
@@ -41,21 +42,27 @@ try:
             return ANSI.sub('', header).rstrip(), ANSI.sub('', footer.read_text()).strip() if footer.exists() else ''
 
         tm('set-option', '-g', '@tmux-canopy-agents', 'on')
-        assert view('processes') == ('Processes                   2 processes', 'Enter focus   1 tree   a actions'), \
+        assert view('processes') == ('Processes                   2 processes', '↵ focus  a actions  p preview'), \
             view('processes')
-        assert view('buffers') == ('Buffers                       2 buffers', 'Enter paste   1 tree   a actions'), \
+        assert view('buffers') == ('Buffers                       2 buffers', '↵ paste  a actions  x delete  / search'), \
             view('buffers')
+        assert view('processes', 'MOVE\tP:%0\n')[1] == 'Moving  ↵ move here  c cancel'
+        assert view('buffers', f'DELETE\tB2:one\t{int(time.time())}\n')[1] == \
+            'x again within 5 s to delete'
         assert view('tree')[0] == 'Tree · All', view('tree')
         assert view('agents')[0].startswith('Agents · All'), view('agents')
         tm('set-option', '-g', '@tmux-canopy-agents', 'off')
-        assert view('tree') == ('Tree · All' + ' ' * 15 + 'agent mode off', '? keys   / search   2 proc   3 buff'), \
+        assert view('tree') == ('Tree · All' + ' ' * 15 + 'agent mode off', '↵ focus  a actions  / search  ? help'), \
             view('tree')
         tm('delete-buffer', '-b', 'two')
         assert view('buffers')[0].endswith('1 buffer'), view('buffers')
         tm('resize-pane', '-t', sidebar, '-x', '26')
-        assert view('processes') == ('Processes   2 processes', 'Enter focus   1 tree'), view('processes')
+        assert view('processes') == ('Processes   2 processes', '↵ focus  a actions'), view('processes')
         tm('set-option', '-g', '@tmux_canopy_appearance', 'places')
-        assert 'Proc' in view('processes')[0] and 'Buff' in view('processes')[0], 'other appearances keep tabs'
-    print('ok - quiet views share one header with their counts, footers act and lead back, and agent mode off shows')
+        process_view = view('processes')
+        assert process_view[0].startswith('╭─ Proc') and 'Buff' not in process_view[0], process_view
+        assert process_view[1] == '↵ focus  a actions', process_view
+        assert view('buffers', 'FOOTER\toff\n')[1] == ''
+    print('ok - every view names itself and exposes responsive action footers')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True, timeout=10)

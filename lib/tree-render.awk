@@ -348,10 +348,10 @@ function overview_add(glyph,count,color, space) {
     overview_plain=overview_plain space glyph count
     overview_color=overview_color space color glyph count reset
 }
-# The Tree view's footer: every agent pane on the server, whatever the tree's
-# filters and folds, counted like the Agents header. sidebar-source moves this
-# record into fzf's footer; nothing is emitted when no agent is running.
-function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,seen,hint) {
+# Count every agent pane on the server, whatever the tree's filters and folds.
+# A caller requesting only the summary leaves rendering to the action footer;
+# legacy callers may still emit the count as a footer.
+function agent_footer(summary_only, si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,seen,hint) {
     for (si=1;si<=ns;si++) {
         s=sessions[si]
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -372,7 +372,7 @@ function agent_footer( si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,
             }
         }
     }
-    if (appearance == "quiet") {
+    if (appearance == "quiet" || summary_only) {
         quiet_total=total; quiet_need=need; quiet_work=work; quiet_settled=settled; quiet_unknown=unknown
         return
     }
@@ -437,7 +437,7 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
     if (mode != "") { summary=mode; summary_color=mode_color mode reset }
     plain=title joiner scope
     if (text_width(plain)+text_width(summary)+2>available) {
-        if (scope != "All") scope=substr(scope,1,1)
+        if (scope != "All") sub(/^(Session|Unread|All)/,substr(scope,1,1),scope)
         plain=title joiner scope
     }
     if (text_width(plain)+text_width(summary)+2>available) { scope=""; plain=title }
@@ -446,16 +446,46 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
         text=edge_colored(text,summary_color,available)
     row("H:",text,"H:tree")
 }
-# The quiet footer says what you can do now: finish a pending move or
-# delete, answer an agent waiting on you, or, when nothing is pending, where
-# the keys are; in the Agents view, how to reach an agent and get back. The most important part comes first and narrow sidebars keep
-# only what fits. A search footer comes from the sidebar's search binding.
-function quiet_footer(    n,i,part,status,short,text,plain,budget) {
-    # The Agents header counts its own panes; waiting agents are server-wide.
-    if (agent_view) agent_footer()
+# Other appearances use the same information hierarchy: current view and scope
+# on the left, with the Agents summary or an in-flight operation on the right.
+# Lazygit/folders retain their box opener.
+function current_view_header(    title,scope,joiner,summary,summary_color,plain,text,budget,prefix) {
+    title=(agent_view ? "Agents" : "Tree")
+    joiner=(icons == "ascii" ? " | " : appearance == "lazygit" || appearance == "places" ? " ─ " : " · ")
+    scope=(agent_view ? "All" : filter_label)
+    summary=""; summary_color=""
+    if (agent_view) {
+        agent_overview()
+        summary=overview_plain
+        summary_color=overview_color
+        if (text_width(title joiner scope)+text_width(summary)+2 > width-5) {
+            summary=overview_short_plain
+            summary_color=overview_short_color
+        }
+    }
+    if (mode != "") { summary=mode; summary_color=mode_color mode reset }
+    prefix=(appearance == "lazygit" || appearance == "places" ? "╭─ " : "")
+    budget=width-2-text_width(prefix)
+    plain=title joiner scope
+    if (text_width(plain)+text_width(summary)+2 > budget && scope != "All") {
+        sub(/^(Session|Unread|All)/,substr(scope,1,1),scope)
+        plain=title joiner scope
+    }
+    if (text_width(plain)+text_width(summary)+2 > budget) { scope=""; plain=title }
+    text=accent title reset (scope == "" ? "" : dim joiner scope reset)
+    if (summary != "" && text_width(plain)+text_width(summary)+2 <= budget)
+        text=edge_colored(text,summary_color,budget)
+    row("H:",(prefix == "" ? "" : accent prefix reset) text,"H:tree")
+}
+# The footer is an action rail for the open view. Pending operations and agents
+# waiting for input take priority; otherwise stable shortcuts build muscle
+# memory. Important actions come first, so narrow sidebars truncate safely.
+function action_footer(    n,i,part,status,short,text,plain,budget,enter_key,gap) {
+    if (agents_enabled && (appearance != "quiet" || agent_view)) agent_footer(1)
+    enter_key=(icons == "ascii" ? "Enter" : "↵")
     if (mode == "MOVE" || mode == "LINK") {
         status=accent (mode == "MOVE" ? "Moving" : "Linking") reset
-        n=split("Enter|" (mode == "MOVE" ? "move here" : "link here") "|c|cancel", part, "|")
+        n=split(enter_key "|" (mode == "MOVE" ? "move here" : "link here") "|c|cancel", part, "|")
     } else if (mode == "DELETE") {
         status=attention "x again within 5 s to delete" reset
         n=0
@@ -467,11 +497,12 @@ function quiet_footer(    n,i,part,status,short,text,plain,budget) {
         status=attention (icons == "ascii" ? "!" : agent_need_badge) " " quiet_need " waiting" reset
         n=split("n|next|>|reply", part, "|")
     } else if (agent_view) {
-        n=split((quiet_total || any_agent ? "Enter|focus|i|details|" : "") "1|tree", part, "|")
+        n=split(enter_key "|focus|n|waiting|>|reply|i|summary", part, "|")
     } else {
-        n=split("?|keys|/|search|" (agents_enabled ? "4|agents" : "2|proc|3|buff"), part, "|")
+        n=split(enter_key "|focus|a|actions|/|search|?|help", part, "|")
     }
     budget=width-4
+    gap="  "
     text=status
     plain=text; gsub(/\033\[[0-9;]*m/,"",plain)
     if (text_width(plain) > budget && short != "") {
@@ -479,9 +510,9 @@ function quiet_footer(    n,i,part,status,short,text,plain,budget) {
     }
     if (text_width(plain) > budget) text=quiet_clip(text, budget)
     for (i=1;i<n;i+=2) {
-        if (text_width(plain (plain == "" ? "" : "   ") part[i] " " part[i+1]) > budget) break
-        text=text (plain == "" ? "" : "   ") part[i] " " dim part[i+1] reset
-        plain=plain (plain == "" ? "" : "   ") part[i] " " part[i+1]
+        if (text_width(plain (plain == "" ? "" : gap) part[i] " " part[i+1]) > budget) break
+        text=text (plain == "" ? "" : gap) part[i] " " dim part[i+1] reset
+        plain=plain (plain == "" ? "" : gap) part[i] " " part[i+1]
     }
     row("F:",text,"F:")
 }
@@ -1310,63 +1341,21 @@ END {
         box_pad=(appearance == "lazygit" || appearance == "places" ? 3 : 0)
         if (appearance == "quiet") {
             quiet_header()
-            if (!footer_hidden) quiet_footer()
         } else {
-        if (appearance == "pills") {
-            place=(agent_view ? "agents" : (current_s in sname ? sname[current_s] : ""))
-            if (place == "" && ns > 0) place=sname[sessions[1]]
-            hints=(filter != "all" || window_filter != "" || title_filter != "" ? filter_label : "")
-            header_text=(agent_view ? accent : dim) place reset
-            if (hints != "" && text_width(place)+text_width(hints)+2 <= available)
-                header_text=header_text sprintf("%*s", available-text_width(place)-text_width(hints), "") dim hints reset
-            if (mode != "") header_text=header_text " " mode_color mode reset
-            row("H:",header_text,"H:tree")
-        } else if (agent_view) {
-            agent_overview()
-            tabs="Tree [Agents] Proc Buff"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) {
-                overview_plain=overview_short_plain; overview_color=overview_short_color
+            if (appearance == "pills") {
+                place=(agent_view ? "agents" : (current_s in sname ? sname[current_s] : ""))
+                if (place == "" && ns > 0) place=sname[sessions[1]]
+                hints=(filter != "all" || window_filter != "" || title_filter != "" ? filter_label : "")
+                header_text=(agent_view ? accent : dim) place reset
+                if (hints != "" && text_width(place)+text_width(hints)+2 <= available)
+                    header_text=header_text sprintf("%*s", available-text_width(place)-text_width(hints), "") dim hints reset
+                if (mode != "") header_text=header_text " " mode_color mode reset
+                row("H:",header_text,"H:tree")
+            } else {
+                current_view_header()
             }
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T [Agents] P B"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="T [A] P B"
-            if (text_width(tabs)+text_width(overview_plain)+length(mode)+mode_gap+1+box_pad>available-2) tabs="[A]"
-        } else if (appearance == "lazygit" || appearance == "places") {
-            tabs=(agents_enabled ? "Tree Agents Proc Buff" : "Tree Proc Buff")
-            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "Tree A P B" : "Tree P B")
-            if (text_width(tabs)+reserved+box_pad>available-2) tabs=(agents_enabled ? "T A P B" : "T P B")
-            if (text_width(tabs)+reserved+box_pad>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
-            if (text_width(tabs)+text_width(filter_sep filter_label)+box_pad+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="Tree"
-            tabs=tabs filter_sep filter_label
-        } else {
-            tabs=(agents_enabled ? "[Tree] Agents Proc Buff" : "[Tree] Proc Buff")
-            # Leave room for fzf's right edge and an active operation label.
-            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[Tree] A P B" : "[Tree] P B")
-            if (text_width(tabs)+reserved>available-2) tabs=(agents_enabled ? "[T] A P B" : "[T] P B")
-            if (text_width(tabs)+reserved>available-2) sub(/^(Session|Unread|All)/,substr(filter_label,1,1),filter_label)
-            if (text_width(tabs)+text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)>available-2) tabs="[T]"
-            tabs=tabs filter_sep filter_label
         }
-        if (appearance != "pills") {
-        padding=available-text_width(tabs)-length(mode)-box_pad-(agent_view ? text_width(overview_plain)+1 : 0); if (padding<1) padding=1
-        if ((appearance == "lazygit" || appearance == "places") && !agent_view) {
-            styled_tabs=tabs
-            if (match(styled_tabs, /^(Tree|T|Proc|P|Buff|B|Agents|A)/)) {
-                active=substr(styled_tabs, RSTART, RLENGTH)
-                rest=substr(styled_tabs, RSTART+RLENGTH)
-                styled_tabs=accent active reset dim rest
-            } else styled_tabs=dim styled_tabs
-            header_text=accent "╭─ " reset styled_tabs reset
-        } else {
-            styled_tabs=tabs; sub(/\[/,reset accent "[",styled_tabs); sub(/\]/,"]" reset dim,styled_tabs); styled_tabs=dim styled_tabs
-            header_text=styled_tabs reset
-        }
-        row("H:",header_text (agent_view ? " " overview_color : "") (mode != "" ? sprintf("%*s",padding,"") mode_color mode reset : ""),"H:tree")
-        }
-        if (!agent_view && !footer_hidden) {
-            if (agents_enabled) agent_footer()
-            else workspace_footer()
-        }
-        }
+        if (!footer_hidden) action_footer()
     }
     # A separate flat inventory ignores presentation folds without editing state.
     # Every linked occurrence retains its session, including pane targets.

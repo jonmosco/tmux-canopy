@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canopy attention inbox — before and after</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --page: #0d0f12;
+    --panel: #14171c;
+    --terminal: #090b0e;
+    --terminal-2: #0d1014;
+    --ink: #e2e6ec;
+    --muted: #9199a7;
+    --faint: #5f6877;
+    --line: #292f39;
+    --line-strong: #394250;
+    --selection: #24334a;
+    --cyan: #72d7d2;
+    --green: #7dd3a7;
+    --amber: #e8bd68;
+    --red: #ef7d86;
+    --blue: #84a7ff;
+    --violet: #c8a7ee;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--page); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 15% -10%, rgba(114, 215, 210, .08), transparent 34rem),
+      radial-gradient(circle at 85% 0%, rgba(132, 167, 255, .07), transparent 30rem),
+      var(--page);
+    font: 15px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .page {
+    width: min(1480px, calc(100% - 40px));
+    margin: 0 auto;
+    padding: 48px 0 64px;
+  }
+  header { max-width: 820px; margin-bottom: 28px; }
+  .eyebrow {
+    color: var(--cyan);
+    font: 600 12px/1.3 ui-monospace, "SFMono-Regular", Menlo, monospace;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  h1 { margin: 9px 0 10px; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; letter-spacing: -.025em; }
+  .lede { margin: 0; color: var(--muted); max-width: 72ch; font-size: 17px; }
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .concept {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(20, 23, 28, .9);
+    box-shadow: 0 18px 55px rgba(0, 0, 0, .22);
+    overflow: hidden;
+  }
+  .concept-head { display: flex; gap: 16px; align-items: flex-start; padding: 18px 20px 16px; border-bottom: 1px solid var(--line); }
+  .step {
+    display: grid; place-items: center; flex: 0 0 28px; height: 28px;
+    border-radius: 8px; background: #202630; color: var(--muted);
+    font: 700 13px ui-monospace, Menlo, monospace;
+  }
+  .after .step { color: #081210; background: var(--cyan); }
+  h2 { margin: 0 0 3px; font-size: 18px; }
+  .concept-head p { margin: 0; color: var(--muted); font-size: 13px; }
+  .terminal {
+    margin: 18px;
+    min-height: 610px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--terminal);
+    font: 12.5px/1.4 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    box-shadow: inset 0 1px rgba(255,255,255,.025);
+  }
+  .term-title {
+    display: flex; align-items: center; min-height: 34px; padding: 0 11px;
+    border-bottom: 1px solid var(--line); color: var(--muted); background: #101318;
+  }
+  .dots { display: flex; gap: 5px; margin-right: 10px; }
+  .dots i { display: block; width: 7px; height: 7px; border-radius: 50%; background: #3b424d; }
+  .term-title .status { margin-left: auto; color: var(--faint); }
+  .workspace { display: grid; grid-template-columns: minmax(275px, .98fr) minmax(245px, 1.02fr); min-height: 542px; }
+  .list { min-width: 0; padding: 9px 0 0; border-right: 1px solid var(--line); }
+  .preview { min-width: 0; padding: 14px 15px; background: var(--terminal-2); color: var(--muted); }
+  .row { display: flex; align-items: baseline; min-width: 0; gap: 7px; padding: 2px 10px; white-space: nowrap; }
+  .row.selected { background: var(--selection); }
+  .row.request { padding-top: 0; color: var(--amber); }
+  .indent-1 { padding-left: 17px; }
+  .indent-2 { padding-left: 31px; }
+  .indent-3 { padding-left: 46px; }
+  .tree { color: var(--faint); }
+  .session { color: var(--ink); font-weight: 700; }
+  .window { color: #b8c0cb; }
+  .label { overflow: hidden; text-overflow: ellipsis; }
+  .push { margin-left: auto; }
+  .dim { color: var(--faint); }
+  .muted { color: var(--muted); }
+  .cyan { color: var(--cyan); }
+  .green { color: var(--green); }
+  .amber { color: var(--amber); }
+  .red { color: var(--red); }
+  .blue { color: var(--blue); }
+  .violet { color: var(--violet); }
+  .badge { flex: 0 0 auto; font-weight: 700; }
+  .age { color: var(--faint); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .section-label {
+    display: flex; align-items: center; gap: 8px; padding: 10px 10px 5px;
+    color: var(--muted); font-size: 10px; letter-spacing: .11em; text-transform: uppercase;
+  }
+  .section-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .section-label:first-child { padding-top: 3px; }
+  .preview h3 { margin: 0 0 2px; color: var(--ink); font-size: 13px; }
+  .preview .place { color: var(--faint); margin-bottom: 14px; }
+  .kv { display: grid; grid-template-columns: 68px 1fr; gap: 6px 8px; margin-bottom: 15px; }
+  .kv dt { color: var(--faint); }
+  .kv dd { margin: 0; color: #c5ccd6; overflow-wrap: anywhere; }
+  .command { margin: 9px 0 15px; padding: 9px 10px; border-left: 2px solid var(--amber); background: #16150f; color: #e9d3a5; }
+  .screen { margin-top: 12px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; color: #aeb6c2; background: #090b0e; white-space: pre-wrap; }
+  .privacy { margin-top: 13px; color: var(--faint); font-size: 11px; }
+  .footer {
+    display: flex; flex-wrap: wrap; gap: 11px; padding: 8px 10px;
+    border-top: 1px solid var(--line); color: var(--faint); background: #0c0f13;
+  }
+  .footer b { color: var(--muted); }
+  .callouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 22px; }
+  .callout { padding: 15px 16px; border-top: 1px solid var(--line-strong); color: var(--muted); }
+  .callout b { display: block; margin-bottom: 5px; color: var(--ink); }
+  .callout code { color: var(--cyan); }
+  .bar-section { margin-top: 58px; }
+  .bar-intro { display: flex; justify-content: space-between; gap: 28px; align-items: end; margin-bottom: 18px; }
+  .bar-intro h2 { margin: 7px 0 5px; font-size: clamp(24px, 3vw, 34px); }
+  .bar-intro p { max-width: 68ch; margin: 0; color: var(--muted); }
+  .bar-principles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .principle { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: rgba(20, 23, 28, .75); color: var(--muted); }
+  .principle b { display: block; margin-bottom: 3px; color: var(--ink); }
+  .bar-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .bar-card { min-width: 0; border: 1px solid var(--line); border-radius: 13px; background: rgba(20, 23, 28, .9); overflow: hidden; }
+  .bar-card-head { padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+  .bar-card-head h3 { margin: 0 0 3px; font-size: 15px; }
+  .bar-card-head p { margin: 0; color: var(--muted); font-size: 12px; }
+  .bar-shell { margin: 14px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--terminal); font: 12.5px/1.4 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  .canopy-top, .canopy-bottom { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; white-space: nowrap; }
+  .canopy-top { color: var(--cyan); border-bottom: 1px solid var(--line); background: #0f1318; font-weight: 700; }
+  .canopy-top .context { color: var(--muted); font-weight: 400; }
+  .canopy-top .counts { display: flex; gap: 8px; margin-left: auto; font-weight: 600; }
+  .canopy-bottom { flex-wrap: wrap; border-top: 1px solid var(--line); color: var(--faint); background: #0c0f13; }
+  .canopy-bottom .key { color: #c1c8d2; font-weight: 700; }
+  .fake-content { min-height: 86px; padding: 10px; color: var(--faint); }
+  .fake-line { height: 7px; margin: 0 0 8px; border-radius: 3px; background: #1b2027; }
+  .fake-line.short { width: 57%; }
+  .fake-line.mid { width: 76%; }
+  .bar-card.urgent .canopy-top { color: var(--ink); }
+  .bar-card.operation .canopy-top .mode { margin-left: auto; color: var(--amber); }
+  .bar-card.searching .canopy-bottom { color: var(--muted); }
+  .bar-card.empty .fake-content { display: grid; place-items: center; color: var(--muted); }
+  .responsive-bars { margin-top: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(20, 23, 28, .75); }
+  .responsive-bars h3 { margin: 0 0 4px; font-size: 15px; }
+  .responsive-bars > p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .tier-grid { display: grid; grid-template-columns: 1.35fr 1fr .75fr; gap: 12px; align-items: start; }
+  .tier { min-width: 0; }
+  .tier-label { margin-bottom: 6px; color: var(--faint); font: 11px ui-monospace, Menlo, monospace; text-transform: uppercase; letter-spacing: .08em; }
+  .tier .bar-shell { margin: 0; }
+  .tier .canopy-top { overflow: hidden; }
+  .tier.compact .canopy-top .context, .tier.tiny .canopy-top .context { display: none; }
+  .tier.tiny .counts .secondary { display: none; }
+  .tier.tiny .canopy-bottom span:nth-child(n+3) { display: none; }
+  .design-note { margin: 14px 2px 0; color: var(--muted); font-size: 13px; }
+  .design-note b { color: var(--ink); }
+  @media (max-width: 1180px) {
+    .comparison { grid-template-columns: 1fr; }
+    .terminal { min-height: 540px; }
+    .workspace { min-height: 475px; }
+    .bar-gallery { grid-template-columns: 1fr; }
+    .tier-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 680px) {
+    .page { width: min(100% - 20px, 1480px); padding-top: 25px; }
+    .terminal { margin: 10px; min-height: 0; }
+    .workspace { display: block; min-height: 0; }
+    .list { border-right: 0; border-bottom: 1px solid var(--line); min-height: 350px; }
+    .preview { min-height: 350px; }
+    .callouts { grid-template-columns: 1fr; }
+    .bar-intro { display: block; }
+    .bar-principles { grid-template-columns: 1fr; }
+    .bar-section { margin-top: 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="eyebrow">Canopy interaction sketch</div>
+    <h1>Agent view → attention inbox</h1>
+    <p class="lede">The inbox belongs in the main list, not the preview. The list decides what needs attention; the preview explains the selected agent without moving you to its pane.</p>
+  </header>
+
+  <main class="comparison">
+    <section class="concept before">
+      <div class="concept-head">
+        <div class="step">1</div>
+        <div><h2>Before: current Agents view</h2><p>Tree order, every detected agent, lifecycle state mixed with location.</p></div>
+      </div>
+      <div class="terminal">
+        <div class="term-title"><span class="dots"><i></i><i></i><i></i></span>Canopy <span class="status">Agents · 5</span></div>
+        <div class="workspace">
+          <div class="list">
+            <div class="row cyan">╭─ <b>Agents</b> <span class="dim">Tree Proc Buff</span><span class="push amber">◆2</span><span class="cyan">▷2</span><span class="dim">✓1</span></div>
+            <div class="row"><span class="cyan">▼</span><span class="session">shop-api</span><span class="push dim">~/work/shop-api</span></div>
+            <div class="row indent-1"><span class="tree">╰─</span><span class="window">▼ 1:agent</span></div>
+            <div class="row indent-2 selected"><span class="tree">├─</span><span class="amber">› ✳</span><span class="label">claude</span><span class="push amber">NEEDS INPUT ·hook</span></div>
+            <div class="row request indent-3"><span class="label">make test · Run the test suite?</span></div>
+            <div class="row indent-2"><span class="tree">╰─</span><span class="cyan">◈</span><span class="label">codex</span><span class="push dim">TURN ENDED ·hook</span></div>
+            <div class="row"><span class="cyan">▼</span><span class="session">storefront</span><span class="push dim">~/work/storefront</span></div>
+            <div class="row indent-1"><span class="tree">╰─</span><span class="window">▼ 2:review</span></div>
+            <div class="row indent-2"><span class="tree">├─</span><span class="violet">✦</span><span class="label">gemini</span><span class="push amber">NEEDS INPUT ·hook</span></div>
+            <div class="row request indent-3"><span class="label">Allow shell command</span></div>
+            <div class="row indent-2"><span class="tree">╰─</span><span class="green">✳</span><span class="label">claude</span><span class="push cyan">WORKING ·hook</span></div>
+            <div class="row"><span class="cyan">▼</span><span class="session">tmux-canopy</span><span class="push dim">~/src/tmux-canopy</span></div>
+            <div class="row indent-1"><span class="tree">╰─</span><span class="window">▼ 1:work</span></div>
+            <div class="row indent-2"><span class="tree">╰─</span><span class="green">π</span><span class="label">pi</span><span class="push cyan">WORKING ·hook</span></div>
+            <div class="footer"><span><b>1</b> Tree</span><span><b>4</b> Agents</span><span><b>n</b> next</span><span><b>i</b> summary</span></div>
+          </div>
+          <aside class="preview">
+            <h3><span class="amber">✳ Claude Code</span></h3>
+            <div class="place">shop-api:1 agent · %12</div>
+            <dl class="kv">
+              <dt>Status</dt><dd class="amber">Needs input</dd>
+              <dt>Updated</dt><dd>2 minutes ago</dd>
+              <dt>Source</dt><dd>Claude hook</dd>
+              <dt>Request</dt><dd>Run shell command</dd>
+            </dl>
+            <div class="command">make test</div>
+            <div class="screen">Run this command?
+
+make test
+
+❯ 1. Yes
+  2. No</div>
+            <div class="privacy">Visible terminal snapshot only. Terminal text does not prove request state.</div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="concept after">
+      <div class="concept-head">
+        <div class="step">2</div>
+        <div><h2>After: Attention mode</h2><p>Same view and preview; reviewed idle agents disappear and urgency becomes scannable.</p></div>
+      </div>
+      <div class="terminal">
+        <div class="term-title"><span class="dots"><i></i><i></i><i></i></span>Canopy <span class="status">Agents · Attention</span></div>
+        <div class="workspace">
+          <div class="list">
+            <div class="row cyan"><b>Agents · Attention</b><span class="push amber">◆2</span><span class="cyan">▷2</span><span class="green">✓1</span></div>
+
+            <div class="section-label amber">Needs you · 2</div>
+            <div class="row selected"><span class="amber badge">› !</span><span class="label">Claude Code</span><span class="muted">shop-api:1</span><span class="age">2m</span></div>
+            <div class="row request indent-1"><span class="label">Approve: make test</span></div>
+            <div class="row"><span class="amber badge">!</span><span class="label">Gemini</span><span class="muted">storefront:2</span><span class="age">34s</span></div>
+            <div class="row request indent-1"><span class="label">Allow shell command</span></div>
+
+            <div class="section-label green">Ready to review · 1</div>
+            <div class="row"><span class="green badge">✓</span><span class="label">Codex</span><span class="muted">shop-api:1</span><span class="age">11m</span></div>
+            <div class="row indent-1 muted"><span class="label">Turn ended · not yet viewed</span></div>
+
+            <div class="section-label cyan">Working · 2</div>
+            <div class="row"><span class="cyan badge">▷</span><span class="label">Claude Code</span><span class="muted">storefront:2</span><span class="age">18s</span></div>
+            <div class="row indent-1 muted"><span class="label">Fixing checkout lifecycle</span></div>
+            <div class="row"><span class="cyan badge">▷</span><span class="label">Pi</span><span class="muted">tmux-canopy:1</span><span class="age">4m</span></div>
+            <div class="row indent-1 muted"><span class="label">Reviewing alert handling</span></div>
+
+            <div class="footer"><span><b>Enter</b> visit</span><span><b>n</b> next blocker</span><span><b>i</b> summary</span><span><b>F</b> all agents</span></div>
+          </div>
+          <aside class="preview">
+            <h3><span class="amber">✳ Claude Code</span></h3>
+            <div class="place">shop-api:1 agent · %12</div>
+            <dl class="kv">
+              <dt>Status</dt><dd class="amber">Needs input</dd>
+              <dt>For</dt><dd>2 minutes</dd>
+              <dt>Source</dt><dd>Claude hook</dd>
+              <dt>Request</dt><dd>Run shell command</dd>
+            </dl>
+            <div class="command">make test</div>
+            <div class="screen">Run this command?
+
+make test
+
+❯ 1. Yes
+  2. No</div>
+            <div class="privacy">The preview is intentionally unchanged. Attention mode reorganizes the list, not the detail surface.</div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="callouts">
+    <article class="callout"><b>The list is the inbox.</b>Only blocked, unreviewed, and working agents remain. Reviewed idle agents stay available in the ordinary Agents view.</article>
+    <article class="callout"><b>The preview stays contextual.</b><code>i</code> still switches between verified agent details and a read-only terminal snapshot.</article>
+    <article class="callout"><b>Viewing is not approving.</b>Visiting a finished pane marks it reviewed. A blocker remains until the integration reports that its request was resolved.</article>
+  </section>
+
+  <section class="bar-section">
+    <div class="bar-intro">
+      <div>
+        <div class="eyebrow">Header and footer system</div>
+        <h2>State above. Actions below.</h2>
+        <p>The recommended header replaces the permanent tab strip with the current view, active subset, and global summary. The footer changes with the selected row or active operation.</p>
+      </div>
+    </div>
+
+    <div class="bar-principles">
+      <article class="principle"><b>Top bar = orientation</b>View and filter on the left. Counts or an urgent mode on the right. Selection details stay in the row and preview so the header does not jump.</article>
+      <article class="principle"><b>Footer = immediate actions</b>Primary action first, then agent-specific actions, navigation, and finally view/help shortcuts. Items disappear from the right as space narrows.</article>
+    </div>
+
+    <div class="bar-gallery">
+      <article class="bar-card">
+        <div class="bar-card-head"><h3>Ordinary Tree view</h3><p>Orientation plus object totals; the footer describes the selected pane.</p></div>
+        <div class="bar-shell">
+          <div class="canopy-top"><span>Tree</span><span class="context">· All</span><span class="counts"><span class="green">◈3</span><span class="blue">▣8</span><span class="muted">▹14</span></span></div>
+          <div class="fake-content"><div class="fake-line mid"></div><div class="fake-line"></div><div class="fake-line short"></div></div>
+          <div class="canopy-bottom"><span><span class="key">Enter</span> focus</span><span><span class="key">a</span> actions</span><span><span class="key">p</span> preview</span><span><span class="key">/</span> search</span></div>
+        </div>
+      </article>
+
+      <article class="bar-card urgent">
+        <div class="bar-card-head"><h3>Attention view · blocker selected</h3><p>The summary remains stable while the footer exposes the safe actions for this request.</p></div>
+        <div class="bar-shell">
+          <div class="canopy-top"><span>Agents</span><span class="context">· Attention</span><span class="counts"><span class="amber">◆2</span><span class="cyan">▷2</span><span class="green">✓1</span></span></div>
+          <div class="fake-content"><div class="fake-line"></div><div class="fake-line short"></div><div class="fake-line mid"></div></div>
+          <div class="canopy-bottom"><span><span class="key">Enter</span> open</span><span><span class="key">&gt;</span> reply</span><span><span class="key">i</span> details</span><span><span class="key">n</span> next</span><span><span class="key">1</span> tree</span></div>
+        </div>
+      </article>
+
+      <article class="bar-card">
+        <div class="bar-card-head"><h3>Ready-to-review agent selected</h3><p>Visiting acknowledges the ended turn; it does not imply task completion.</p></div>
+        <div class="bar-shell">
+          <div class="canopy-top"><span>Agents</span><span class="context">· Attention</span><span class="counts"><span class="amber">◆2</span><span class="cyan">▷2</span><span class="green">✓1</span></span></div>
+          <div class="fake-content"><div class="fake-line short"></div><div class="fake-line mid"></div><div class="fake-line"></div></div>
+          <div class="canopy-bottom"><span><span class="key">Enter</span> review</span><span><span class="key">i</span> details</span><span><span class="key">n</span> blocker</span><span><span class="key">1</span> tree</span></div>
+        </div>
+      </article>
+
+      <article class="bar-card searching">
+        <div class="bar-card-head"><h3>Search or filter active</h3><p>Temporary navigation state replaces ordinary action hints until it is cleared.</p></div>
+        <div class="bar-shell">
+          <div class="canopy-top"><span>Tree</span><span class="context">· Unread · “api”</span><span class="counts"><span class="muted">4/14</span></span></div>
+          <div class="fake-content"><div class="fake-line mid"></div><div class="fake-line short"></div><div class="fake-line"></div></div>
+          <div class="canopy-bottom"><span><span class="key">Esc</span> clear</span><span><span class="key">Enter</span> focus</span><span><span class="key">Ctrl-f</span> filters</span></div>
+        </div>
+      </article>
+
+      <article class="bar-card operation">
+        <div class="bar-card-head"><h3>Move, link, or delete pending</h3><p>An urgent mode displaces counts, and its completion controls own the footer.</p></div>
+        <div class="bar-shell">
+          <div class="canopy-top"><span>Tree</span><span class="context">· All</span><span class="mode">MOVE</span></div>
+          <div class="fake-content"><div class="fake-line"></div><div class="fake-line mid"></div><div class="fake-line short"></div></div>
+          <div class="canopy-bottom"><span><span class="key">Enter</span> move here</span><span><span class="key">c</span> cancel</span></div>
+        </div>
+      </article>
+
+      <article class="bar-card empty">
+        <div class="bar-card-head"><h3>Nothing needs attention</h3><p>The empty state is positive and offers the two useful exits.</p></div>
+        <div class="bar-shell">
+          <div class="canopy-top"><span>Agents</span><span class="context">· Attention</span><span class="counts"><span class="green">All clear</span></span></div>
+          <div class="fake-content">No agents need attention</div>
+          <div class="canopy-bottom"><span><span class="key">F</span> all agents</span><span><span class="key">1</span> tree</span><span><span class="key">?</span> help</span></div>
+        </div>
+      </article>
+    </div>
+
+    <div class="responsive-bars">
+      <h3>One hierarchy at three widths</h3>
+      <p>Keep the leading state and primary action. Drop context, secondary counts, and trailing shortcuts in that order.</p>
+      <div class="tier-grid">
+        <div class="tier">
+          <div class="tier-label">Wide popup</div>
+          <div class="bar-shell">
+            <div class="canopy-top"><span>Agents</span><span class="context">· Attention · Global</span><span class="counts"><span class="amber">◆2</span><span class="cyan secondary">▷2</span><span class="green secondary">✓1</span></span></div>
+            <div class="canopy-bottom"><span><span class="key">Enter</span> open</span><span><span class="key">&gt;</span> reply</span><span><span class="key">i</span> details</span><span><span class="key">n</span> next</span><span><span class="key">1</span> tree</span></div>
+          </div>
+        </div>
+        <div class="tier compact">
+          <div class="tier-label">Normal sidebar</div>
+          <div class="bar-shell">
+            <div class="canopy-top"><span>Attention</span><span class="counts"><span class="amber">◆2</span><span class="cyan secondary">▷2</span><span class="green secondary">✓1</span></span></div>
+            <div class="canopy-bottom"><span><span class="key">Enter</span> open</span><span><span class="key">&gt;</span> reply</span><span><span class="key">i</span> details</span></div>
+          </div>
+        </div>
+        <div class="tier tiny">
+          <div class="tier-label">Narrow</div>
+          <div class="bar-shell">
+            <div class="canopy-top"><span>Attn</span><span class="counts"><span class="amber">!2/5</span></span></div>
+            <div class="canopy-bottom"><span><span class="key">Enter</span> open</span><span><span class="key">&gt;</span> reply</span><span><span class="key">i</span> details</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="design-note"><b>Recommended direction:</b> remove the permanent <code>Tree Agents Proc Buff</code> strip. Keep view keys in the contextual footer and full key list in <code>?</code> help.</p>
+    </div>
+  </section>
+</div>
+</body>
+</html>

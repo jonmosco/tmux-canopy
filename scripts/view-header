@@ -8,6 +8,7 @@ state_file="${TMUX_CANOPY_STATE:?}"
 view='tree'
 mode=''
 mode_color=$'\033[2m'
+footer_hidden=0
 printf -v now '%(%s)T' -1
 
 if [[ -r "$state_file" ]]; then
@@ -22,6 +23,7 @@ if [[ -r "$state_file" ]]; then
           has_delete=1
         fi
         ;;
+      FOOTER) [[ "$val" == off ]] && footer_hidden=1 ;;
     esac
   done < "$state_file"
 
@@ -39,101 +41,64 @@ pane_flag=()
 client="$(canopy_agents_client)"
 agents_fmt="$(canopy_agents_format "$client")"
 
-IFS='|' read -r width appearance theme agents_enabled < <(
+IFS='|' read -r width appearance theme icons agents_enabled < <(
   tmux display-message -p "${pane_flag[@]}" \
-    "#{pane_width}|#{@tmux_canopy_appearance}|#{@tmux-canopy-theme}|${agents_fmt}" 2>/dev/null || true
+    "#{pane_width}|#{@tmux_canopy_appearance}|#{@tmux-canopy-theme}|#{@tmux_canopy_icon_theme}|${agents_fmt}" 2>/dev/null || true
 )
 
 [[ "$width" =~ ^[1-9][0-9]*$ ]] || width=42
 : "${appearance:=classic}"
 [[ "$agents_enabled" == on ]] || agents_enabled=off
-# Match the tree renderer, including fzf's pointer gutter and right edge.
-case "$view" in
-  processes) selected=1 ;;
-  buffers) selected=2 ;;
-  agents) selected=1 ;;
-  *) selected=0 ;;
-esac
-# Agents sits beside Tree, so later tabs shift one place while the mode is on.
-if [[ "$agents_enabled" == on && "$selected" -gt 0 && "$view" != agents ]]; then
-  selected=$((selected + 1))
-fi
-if [[ "$agents_enabled" != on && "$view" == agents ]]; then selected=0; fi
-reserved=0
-[[ -z "$mode" ]] || reserved=$((${#mode}+1))
-box_pad=0
-[[ "$appearance" == lazygit ]] && box_pad=3
-for tier in full compact tiny; do
-  case "$tier" in
-    full) labels=('Tree') ;;
-    compact) labels=('Tree') ;;
-    tiny) labels=('T') ;;
-  esac
-  if [[ "$agents_enabled" == on ]]; then
-    if [[ "$tier" == full ]]; then labels+=('Agents'); else labels+=('A'); fi
-  fi
-  case "$tier" in
-    full) labels+=('Proc' 'Buff') ;;
-    compact) labels+=('Proc' 'B') ;;
-    tiny) labels+=('P' 'B') ;;
-  esac
-  if [[ "$appearance" != lazygit ]]; then
-    labels[selected]="[${labels[selected]}]"
-  fi
-  tabs="${labels[*]}"
-  (( ${#tabs} + reserved + box_pad <= width - 4 )) && break
-done
 accent=$'\033[1;36m'; reset=$'\033[0m'; dim=$'\033[2m'
 if [[ "$theme" == mono ]]; then accent=''; reset=''; dim=''; mode_color=''; fi
+# Processes and Buffers name only the open view. Their footer advertises
+# actions that work in that view rather than repeating inventory counts.
+count="${TMUX_CANOPY_VIEW_COUNT:-}"
+enter_key='↵'
+[[ "$icons" != ascii ]] || enter_key=Enter
+if [[ "$view" == processes ]]; then
+  title=Processes short=Proc noun=process plural=processes
+  footer=("$enter_key" 'focus' 'a' 'actions' 'p' 'preview' '/' 'search' '?' 'help')
+else
+  title=Buffers short=Buff noun=buffer plural=buffers
+  footer=("$enter_key" 'paste' 'a' 'actions' 'x' 'delete' '/' 'search' '?' 'help')
+fi
+summary=''
+if [[ "$count" =~ ^[0-9]+$ ]]; then
+  summary="$count $plural"; ((count != 1)) || summary="1 $noun"
+fi
+right="$summary" right_style="$dim"
+[[ -z "$mode" ]] || { right="$mode"; right_style="$mode_color"; }
+prefix=''
+if [[ "$appearance" == lazygit || "$appearance" == places ]]; then prefix='╭─ '; fi
+available=$((width - 3 - ${#prefix}))
+((${#title} + ${#right} + 2 <= available)) || title=$short
+((${#title} + ${#right} + 2 <= available)) || right=''
+printf 'H:\t'
+[[ -z "$prefix" ]] || printf '%s%s%s' "$accent" "$prefix" "$reset"
+printf '%s%s%s' "$accent" "$title" "$reset"
+[[ -z "$right" ]] || printf '%*s%s%s%s' "$((available - ${#title} - ${#right}))" '' "$right_style" "$right" "$reset"
+printf '\n'
 
-# quiet names the view like Tree and Agents do, with how many rows it holds on
-# the right, and a footer with its main action and the way back. Other
-# appearances keep their tabs.
-if [[ "$appearance" == quiet && ( "$view" == processes || "$view" == buffers ) ]]; then
-  count="${TMUX_CANOPY_VIEW_COUNT:-}"
-  if [[ "$view" == processes ]]; then
-    title=Processes short=Proc noun=process plural=processes
-    footer=('Enter' 'focus' '1' 'tree' 'a' 'actions' '3' 'buff')
+if ((footer_hidden == 0)); then
+  if [[ "$mode" == MOVE ]]; then
+    footer_status=Moving
+    footer=("$enter_key" 'move here' 'c' 'cancel')
+  elif [[ "$mode" == LINK ]]; then
+    footer_status=Linking
+    footer=("$enter_key" 'link here' 'c' 'cancel')
+  elif [[ "$mode" == DELETE ]]; then
+    footer_status='x again within 5 s to delete'
+    footer=()
   else
-    title=Buffers short=Buff noun=buffer plural=buffers
-    footer=('Enter' 'paste' '1' 'tree' 'a' 'actions' '2' 'proc')
+    footer_status=''
   fi
-  [[ "$agents_enabled" != on ]] || footer+=('4' 'agents')
-  summary=''
-  if [[ "$count" =~ ^[0-9]+$ ]]; then
-    summary="$count $plural"; ((count != 1)) || summary="1 $noun"
-  fi
-  right="$summary" right_style="$dim"
-  [[ -z "$mode" ]] || { right="$mode"; right_style="$mode_color"; }
-  available=$((width - 3))
-  ((${#title} + ${#right} + 2 <= available)) || title=$short
-  ((${#title} + ${#right} + 2 <= available)) || right=''
-  printf 'H:\t%s%s%s' "$accent" "$title" "$reset"
-  [[ -z "$right" ]] || printf '%*s%s%s%s' "$((available - ${#title} - ${#right}))" '' "$right_style" "$right" "$reset"
-  printf '\n'
-  # The footer keeps what fits, most important first.
-  plain='' text=''
+  plain="$footer_status" text="$footer_status"
   for ((index = 0; index < ${#footer[@]}; index += 2)); do
     part="${footer[index]} ${footer[index + 1]}"
-    ((${#plain} + ${#part} + (${#plain} ? 3 : 0) <= width - 4)) || break
-    [[ -z "$plain" ]] || { plain+='   '; text+='   '; }
+    ((${#plain} + ${#part} + (${#plain} ? 2 : 0) <= width - 4)) || break
+    [[ -z "$plain" ]] || { plain+='  '; text+='  '; }
     plain+="$part"; text+="${footer[index]} $dim${footer[index + 1]}$reset"
   done
   [[ -n "$text" ]] && printf 'F:\t%s\n' "$text"
-  exit 0
 fi
-printf 'H:\t'
-if [[ "$appearance" == lazygit ]]; then
-  printf '%s╭─ %s' "$accent" "$reset"
-fi
-for index in "${!labels[@]}"; do
-  ((index == 0)) || printf ' '
-  style="$dim"; ((index != selected)) || style="$accent"
-  printf '%s%s%s' "$style" "${labels[index]}" "$reset"
-done
-if [[ -n "$mode" ]]; then
-  padding=$((width - 2 - ${#tabs} - ${#mode} - box_pad))
-  ((padding < 1)) && padding=1
-  printf '%*s%b%s%s' "$padding" '' "$mode_color" "$mode" "$reset"
-fi
-printf '\n'

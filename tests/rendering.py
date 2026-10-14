@@ -226,20 +226,20 @@ def main():
                         time.sleep(.03)
                 raise AssertionError(description)
             tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')
-            reload_until(lambda: 'Tree · All' in tm('capture-pane', '-p', '-t', sidebar), 'quiet appearance in attached client')
+            reload_until(lambda: 'Tree · All' in (frame := tm('capture-pane', '-p', '-t', sidebar)) and '↵ focus' in frame and '◈ one' in frame and 'stable-beta · sleep' in frame, 'quiet appearance in attached client')
             quiet_frame = tm('capture-pane', '-p', '-t', sidebar)
-            assert '? keys' in quiet_frame and 'Proc Buff' not in quiet_frame, quiet_frame
+            assert '↵ focus' in quiet_frame and 'Proc Buff' not in quiet_frame, quiet_frame
             # Single-pane windows take one row in quiet: the window, then its command.
             assert '◈ one' in quiet_frame and '▣ ' in quiet_frame and 'stable-beta · sleep' in quiet_frame, quiet_frame
             assert tm('display-message', '-p', '-t', sidebar, '#{pane_pid}') == sidebar_pid_before
             tm('resize-pane', '-t', sidebar, '-x', '30')
-            reload_until(lambda: 'Tree · All' in (frame := tm('capture-pane', '-p', '-t', sidebar)) and '? keys' in frame
+            reload_until(lambda: 'Tree · All' in (frame := tm('capture-pane', '-p', '-t', sidebar)) and '↵ focus' in frame
                          and tm('display-message', '-p', '-t', sidebar, '#{pane_width}') == '30',
                          'quiet appearance at 30 columns')
             tm('resize-pane', '-t', sidebar, '-x', '42')
             tm('send-keys', '-t', sidebar, 'C-r')
             tm('set-option', '-g', '@tmux_canopy_appearance', 'classic')
-            reload_until(lambda: '[Tree]' in tm('capture-pane', '-p', '-t', sidebar), 'classic appearance restored')
+            reload_until(lambda: 'Tree · All' in (frame := tm('capture-pane', '-p', '-t', sidebar)) and '├─' in frame, 'classic appearance restored')
             print('ok - quiet appearance renders in an attached sidebar and reloads in place')
             time.sleep(.3)
             script_env['TMUX_PANE'] = sidebar

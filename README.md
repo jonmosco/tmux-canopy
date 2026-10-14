@@ -60,15 +60,8 @@ Startup checks tmux capabilities and fzf options before splitting an application
 
 ## Install
 
-Install the requirements first. If you use [TPM](https://github.com/tmux-plugins/tpm), add this before its `run '~/.tmux/plugins/tpm/tpm'` line:
-
-```tmux
-set -g @plugin 'jonmosco/tmux-canopy'
-```
-
-Press **prefix + I** to install, then **prefix + T** to open Canopy.
-
-For a manual installation, clone the project:
+The [Quick start](#quick-start) uses TPM. For a manual installation, clone the
+project:
 
 ```bash
 git clone https://github.com/jonmosco/tmux-canopy.git ~/.tmux/plugins/tmux-canopy
@@ -97,7 +90,7 @@ With agent mode on, Canopy finds agents running in any pane of any session and s
 - **Agents view (`4`):** only the sessions, windows, and panes that contain an agent, with a summary such as `◆1 ▷2` in the header.
 - **Status on every agent pane:** working (an animated `▷`) and needs input (`!`). Folded windows and sessions roll these up as `◆` and `▷` counts.
 - **Subagents:** listed under their parent pane while they run, each with its own status.
-- **Summary footer:** the bottom of the Tree view counts every agent on the server, such as `Agents ◆1 ▷2`, so you can see who needs you without leaving your place in the tree.
+- **At-a-glance summary:** the default Tree header and the Agents header count agents by state, while the footer shows the actions available in the open view.
 - **What it's waiting for:** an agent that needs input shows the command it wants to run, or its question, on a dim line beneath its pane.
 - **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
 - **Reply without switching (`>`):** type a line into the selected pane from a tmux prompt; your focus stays where it is.
@@ -160,81 +153,48 @@ On macOS, install `terminal-notifier` (`brew install terminal-notifier`): clicki
 
 Run `canopy alerts test` to send a sample. It reports which notifier delivered it, or which one macOS refused. See [Alerts](docs/reference.md#alerts) for the details.
 
-### Using as a popup
+### Popup mode
 
-Canopy can run either as a docked sidebar split pane (the default) or inside a floating modal popup using `tmux display-popup`—ideal for smaller laptop screens, compact windows, or keeping your existing pane splits and layouts undisturbed.
-
-#### Always open as a popup
-
-To make **prefix + T** open Canopy in a floating popup:
+Canopy normally docks as a sidebar. Use `popup` for a floating
+`tmux display-popup`, or `auto` to dock on wide windows and use a popup below
+the configured threshold:
 
 ```tmux
-set -g @tmux-canopy-mode 'popup'
+set -g @tmux-canopy-mode 'auto'            # sidebar, popup, or auto
+set -g @tmux-canopy-popup-threshold '100'  # auto switches below this width
+set -g @tmux-canopy-popup-width '85%'      # percentage or columns
+set -g @tmux-canopy-popup-height '80%'     # percentage or lines
 ```
 
-#### Adaptive auto mode for small screens
+The popup does not alter pane geometry. It preserves the active view, folds,
+filters, and search between openings. `Enter` focuses a target and closes it;
+`q`, `Esc`, or **prefix + T** dismisses it. See
+[Display modes](docs/reference.md#display-modes) for sizing and lifecycle details.
 
-If you prefer the docked sidebar on large monitors but want Canopy to automatically switch to a popup when your terminal window is narrow (e.g., on a laptop screen or half-screen window):
+### Common configuration
 
-```tmux
-set -g @tmux-canopy-mode 'auto'
-set -g @tmux-canopy-popup-threshold '100'  # column threshold (default: 100)
-```
+Canopy defaults to a 42-column sidebar on the left, follows the client that
+opened it, and preserves application geometry with stable slots. Mouse resizing
+is live and leaves at least 40 columns for content.
 
-In `auto` mode:
-- When the window width meets or exceeds the threshold (100 columns by default), Canopy docks as a sidebar.
-- When the window width is below the threshold, or when the window is too narrow to fit both the sidebar and your content, Canopy automatically opens as a popup modal instead of refusing to open.
-
-#### Customizing popup dimensions
-
-You can adjust the size of the popup modal using percentages or column and line counts:
+Place settings before the plugin’s `run-shell` line:
 
 ```tmux
-set -g @tmux-canopy-popup-width '85%'   # default: 85%
-set -g @tmux-canopy-popup-height '80%'  # default: 80%
-```
-
-#### How the popup works
-
-- **Toggle:** Press **prefix + T** to open or close the popup.
-- **Active highlight:** When opened, the selection bar automatically highlights your currently active window and pane.
-- **Focus and switch:** Press `Enter` on any pane or window to switch to it and close the popup.
-- **Dismiss:** Press `q`, `Esc`, or re-press **prefix + T** to close the popup without switching focus.
-- **Preserved state:** Tree folds, active views (`1` Tree, `4` Agents, `2` Proc, `3` Buff), and search queries are remembered across popup sessions.
-- **No daemon:** The popup is ephemeral; when closed, no background process or daemon remains.
-
-### Defaults
-
-Canopy opens on the **left**, follows its client across windows and sessions, and uses stable slots to keep application geometry steady when revisiting windows. It starts at 42 columns. Mouse resizing is live, with no fixed maximum; at least 40 columns are reserved for content.
-
-Place settings **before** the `run-shell` line:
-
-```tmux
-set -g @tmux-canopy-mode 'sidebar'        # sidebar, popup, or auto (popup on narrow screens)
-set -g @tmux-canopy-popup-threshold '100' # column width threshold for auto popup
-set -g @tmux-canopy-popup-width '85%'     # popup width (% or columns)
-set -g @tmux-canopy-popup-height '80%'    # popup height (% or lines)
 set -g @tmux-canopy-position 'left'       # left or right
 set -g @tmux-canopy-width '42'
 set -g @tmux-canopy-scope 'global'        # global or window
-set -g @tmux-canopy-transition 'slot'     # slot or move
-set -g @tmux-canopy-resize-mode 'live'    # live, staged, or preset
-set -g @tmux-canopy-max-width '0'         # 0 means no fixed cap
-set -g @tmux-canopy-min-content-width '40'
-set -g @tmux-canopy-density 'normal'    # normal, minimal, compact, or detailed
-set -g @tmux-canopy-appearance 'quiet'    # quiet (default), folders, or ascii
-set -g @tmux-canopy-labels 'tmux'         # tmux (default) or places (preview)
-set -g @tmux-canopy-animate 'on'          # off: disable the WORKING status animation
-set -g @tmux-canopy-zoom-action 'refuse'   # refuse (default) or unzoom
-set -g @tmux-canopy-alerts 'off'     # desktop, tmux, or both: alert when an agent needs you
-set -g @tmux-canopy-alert-events 'agents' # add bell, silence, or activity for tmux's own alerts
-set -g @tmux-canopy-alert-sound 'off' # or a sound name such as default or Glass
-set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
+set -g @tmux-canopy-appearance 'quiet'    # quiet, folders, or ascii
+set -g @tmux-canopy-density 'normal'      # normal, minimal, compact, detailed
+set -g @tmux-canopy-labels 'tmux'         # tmux or places (preview)
+set -g @tmux-canopy-git-context 'off'     # off or branch
+set -g @tmux-canopy-footer 'on'
+set -g @tmux-canopy-preview 'off'
 ```
 
-In `popup` mode (or `auto` mode when the window width is below `popup-threshold`), Canopy opens as a floating overlay via `tmux display-popup` without altering your window splits or pane geometry. Tree folds, active view, and filters are preserved across popup opens. Press `q` or `Esc` to close.
-
-Reload your tmux configuration after changing settings. Close and reopen Canopy after changing position or startup appearance options.
+Reload your tmux configuration after changing settings. Close and reopen Canopy
+after changing its position, mode, or startup appearance. The
+[configuration reference](docs/reference.md#configuration) lists every option,
+including transitions, resizing, icons, notifications, and alerts.
 
 ## The sidebar at a glance
 
@@ -253,7 +213,7 @@ Tree · All                         ◆1 ▷1   ① ②
       ▣ 0:today · zsh                ●     ⑫
 ▸ ◈ scratch [2w] ─────────────────────     ⑬
 ───────────────────────────────────
- ◆ Claude Code waiting   n go   > reply   ⑭
+ ◆ Claude Code waiting  n go  > reply      ⑭
 ```
 
 | | What it shows | Keys |
@@ -271,9 +231,9 @@ Tree · All                         ◆1 ▷1   ① ②
 | ⑪ | **A window with one pane**, on one row. The command follows `·` when the window has another name. | |
 | ⑫ | **Unread output** (dim `●`); a bell or silence alert is amber. | `u` clear, `U` clear all |
 | ⑬ | **Folded session**, with the number of windows inside. | `l` unfold |
-| ⑭ | **What you can do now:** answer an agent waiting on you, finish a move (`Enter`) or a delete (`x`), or clear a search (`Esc`). When nothing is pending, where the keys are. | `f` hide or show |
+| ⑭ | **What you can do now:** stable, view-specific actions such as focus, actions, search, preview, paste, or reply. An agent waiting for input or a pending move, link, or delete temporarily takes priority. Lower-priority hints disappear as the sidebar narrows. | `f` hide or show |
 
-Prefer panes grouped by directory, with tab headers and tree guides? Set `@tmux-canopy-appearance 'folders'`.
+Prefer panes grouped by directory, with boxed view titles and tree guides? Set `@tmux-canopy-appearance 'folders'`.
 
 Press `g` in the sidebar for every symbol and color, and `?` for every key.
 
@@ -347,7 +307,22 @@ Idle windows are all called `zsh`, which says nothing. Set `@tmux-canopy-labels 
 
 ## Customizing the look
 
-The default appearance, `quiet`, follows tmux's own structure: sessions, windows, and panes in tmux's order, each window once, with directories and Git branches as dim details on the right. Sessions read as bold headings, a window holding one pane takes one row, and shells idling at their prompt are dimmed so what is running stands out. A compact `Tree · All` header replaces the view tabs, the active pane dot sits by its name, agent and unread marks sit at the right edge, and the footer shows key hints (`f` hides it). Set `@tmux-canopy-appearance 'folders'` to group panes by working directory with folder rows, view tabs, and tree guides instead, `ascii` for `quiet` without glyph-font requirements, or `@tmux-canopy-density 'minimal'` for the leanest rows. Reload the plugin after changing appearance, then reopen the sidebar. Application icons can be changed or hidden per app with options such as `@tmux-canopy-icon-codex` (`none` hides one); see [Icons](docs/reference.md#icons).
+The default `quiet` appearance follows tmux's session, window, and pane order.
+Sessions are bold headings, single-pane windows use one row, directories and
+Git branches are dim details, and idle shells are subdued. The current view is
+named in a compact header such as `Tree · All`; agent and unread marks remain at
+the right edge.
+
+Every appearance uses a responsive action footer. Tree starts with
+`↵ focus  a actions`, Agents with `↵ focus  n waiting`, Processes with
+`↵ focus  a actions`, and Buffers with `↵ paste  a actions`. More hints appear
+when space permits; `f` hides the footer.
+
+Use `@tmux-canopy-appearance 'folders'` for directory groups, boxed titles, and
+tree guides, or `ascii` for `quiet` without Unicode glyphs. Density settings
+provide leaner or more detailed rows. Application icons can be changed or hidden
+per app—for example, `@tmux-canopy-icon-codex 'none'`. See
+[Appearance](docs/reference.md#appearance) and [Icons](docs/reference.md#icons).
 
 See the [configuration and command reference](docs/reference.md) for every control, appearance setting, notification option, and the architecture.
 

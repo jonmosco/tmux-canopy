@@ -35,7 +35,7 @@ See the [README](../README.md) for installation, defaults, and supported platfor
 - Window reorder, cross-session link/unlink, layouts, pane rotation, and guarded synchronized input
 - Pane zoom, swap, break-to-window, dead-pane respawn, and object information popups
 - Switchable Tree, pane-attributed Processes, and tmux Buffers views; optional detected Agents view
-- ANSI semantic colors, compact tree guides, width-aware paths, dynamic mode tabs, and adaptive preview
+- ANSI semantic colors, compact tree guides, width-aware paths, responsive current-view titles, and adaptive preview
 - Responsive fixed or percentage widths with minimum sidebar/content constraints
 - Live mouse resizing by default, with staged one-shot and preset modes and compact/default/wide width presets
 - Geometry-stable window switches with debounced, owner-only active-location refreshes
@@ -211,7 +211,18 @@ The same long-running fzf process switches among three built-in sources, plus Ag
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
 3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste, yank to the system clipboard, or arm deletion; `x`, `x` deletes the selected buffer.
-4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent` → `cursor-agent`), GitHub Copilot CLI (`copilot`), Grok Build (`grok`), Crush, or Hermes Agent process. The header summarizes unique agent panes by reported state: `◆` needs input, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. The header shortens the view tabs as needed, then shows the leading state and total (such as `◆2/5`) when space is tight. ASCII uses `!`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. An agent counts for a pane only when it runs directly in that pane or under shells, runtimes, and sandbox wrappers (`bash`, `zsh`, `env`, `node`, `python`, `npx`, `uv`, `bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, and similar); one started by another foreground program, such as an editor plugin inside Neovim, belongs to that program, so the pane is not an agent pane. Ctrl-r refreshes the process inventory.
+4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent` → `cursor-agent`), GitHub Copilot CLI (`copilot`), Grok Build (`grok`), Crush, or Hermes Agent process. The header summarizes unique agent panes by reported state: `◆` needs input, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. When space is tight, the header shows the leading state and total (such as `◆2/5`). ASCII uses `!`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's agent summary. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. An agent counts for a pane only when it runs directly in that pane or under shells, runtimes, and sandbox wrappers (`bash`, `zsh`, `env`, `node`, `python`, `npx`, `uv`, `bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, and similar); one started by another foreground program, such as an editor plugin inside Neovim, belongs to that program, so the pane is not an agent pane. Ctrl-r refreshes the process inventory.
+
+The footer is a responsive action rail for the open view. Tree starts with
+`↵ focus  a actions  / search  ? help`; Agents with
+`↵ focus  n waiting  > reply  i summary`; Processes with
+`↵ focus  a actions  p preview`; and Buffers with
+`↵ paste  a actions  x delete  / search`. Lower-priority actions disappear
+from the right as the sidebar narrows. ASCII mode spells `Enter` instead of
+using `↵`. A waiting agent or pending move, link, or delete temporarily
+replaces the normal rail with the action needed to continue or cancel. Search
+continues to show `Esc clear  Enter focus`. Press `f` to hide or restore the
+footer in any view.
 
 Process signals are revalidated immediately before delivery by walking the current parent chain back to the owning `#{pane_pid}`. Stale or reused PIDs are ignored.
 
@@ -290,7 +301,7 @@ set -g @tmux-canopy-alert-sound 'off' # default or a sound name for desktop aler
 set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
 set -g @tmux-canopy-appearance 'quiet' # default; or 'folders', 'ascii' (classic still works)
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
-set -g @tmux-canopy-footer 'on' # off: open sidebars without the Tree view footer; f toggles it
+set -g @tmux-canopy-footer 'on' # off: open sidebars without the action footer; f toggles it
 set -g @tmux-canopy-theme 'ansi'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
@@ -462,20 +473,23 @@ rows). Pane names start right of their window's name and line up whether or not
 they have an icon. A shell idling at its prompt, other than your current pane and
 with no activity, bell, or silence to report, is dimmed, and plain activity is a
 dim mark so bells, silence, and agents waiting on you keep the amber. A folder
-folded in another appearance does not hide panes in `quiet`. It replaces the tab bar with a
-short header naming the view: `Tree · All`/`Agents · All` (`Tree - All` with ASCII icons) and, when agent mode is on, a count
-of agents in each state (`◆1 ▷2 ✓1 ○1`), shortened to the most urgent state and the total (`◆1/5`) when
-the header is too narrow; with agent mode off the Tree header says `agent mode off`. The Processes and
-Buffers views read `Processes` and `Buffers` with their row count on the right (`12 processes`), and a
-footer with their main action and the way back (`Enter focus   1 tree   a actions`). In Tree view it subdues guides, uses small chevrons for folds, places
-the green active-pane dot beside its name (`>` with ASCII icons), and right-aligns agent attention and
+folded in another appearance does not hide panes in `quiet`. Every appearance uses a
+short header naming only the open view instead of a permanent tab strip:
+`Tree · All`/`Agents · All` (`Tree | All` with ASCII icons), `Processes`, or
+`Buffers`. The Agents header counts agents in each state (`◆1 ▷2 ✓1 ○1`),
+shortened to the most urgent state and total (`◆1/5`) when narrow. The `quiet`
+Tree header carries the same global summary and says `agent mode off` when
+awareness is disabled. Processes and Buffers put their row count on the right
+(`12 processes`). Every appearance and view uses the responsive action footer
+described above instead of workspace or agent counts. In Tree view, `quiet`
+subdues guides, uses small chevrons for folds, places the green active-pane dot
+beside its name (`>` with ASCII icons), and right-aligns agent attention and
 unread notices as separate marks. A waiting subagent can raise its parent's
 mark; unverified process detection never claims a confirmed state. Git branches,
-when enabled, are part of the directory details above. The Tree
-footer shows shortcut hints instead of workspace/agent counts; `f` and
-`@tmux-canopy-footer` still control its visibility. Other views keep their
-existing tabs. The examples in [Quiet tree](sidebar-visual-examples.html) are
-illustrations, not pixel-exact screenshots.
+when enabled, are part of the directory details above. `f` and
+`@tmux-canopy-footer` control footer visibility. The examples in
+[Quiet tree](sidebar-visual-examples.html) are illustrations, not pixel-exact
+screenshots.
 
 `ascii` is `quiet` without Unicode glyphs, the same as
 `@tmux-canopy-icon-theme 'ascii'`; use the icon theme with `folders` for the
@@ -578,10 +592,12 @@ style uses a muted gray background and a cyan pointer while preserving icon and
 notification colors. Set `@tmux-canopy-selection-background` to a 0–255 palette
 index or `#RRGGBB` to customize it (default `236`; for light terminals, try `254`).
 `pointer` keeps selection text unchanged, `reverse` uses reverse video, and `solid`
-uses a cyan background. Monochrome mode also disables fzf UI colors. The header shows `Tree`, `Proc`, and `Buff`; enabling agent awareness adds `Agents`.
-The header marks the active view and shows the Tree filter (`· All`, `· Session`,
-or `· Unread`; `|` in ASCII). Labels shorten when space is tight, while the enabled
-view shortcuts remain in help.
+uses a cyan background. Monochrome mode also disables fzf UI colors. The header
+names only the open view (`Tree`, `Agents`, `Processes`, or `Buffers`) rather than
+spending space on a permanent tab strip. Tree includes its filter (`· All`,
+`· Session`, or `· Unread`; `|` with ASCII icons), while Agents and the inventory
+views put their summary or row count on the right. Labels and summaries shorten
+when space is tight; all view shortcuts remain in help.
 Pending `MOVE`, `LINK`, or `DELETE` operations remain visible. The search input appears
 only after `/` and disappears on `Esc`; fzf counters and the top separator are
 hidden. Tree rows use branch guides and the ASCII fallback uses plain-text
@@ -611,9 +627,15 @@ Claude Code, Codex, OpenCode, Cursor Agent, and Antigravity subagents appear as 
 
 An agent pane whose adapter reports **needs input** gets a dim line beneath it, above any subagent lines, with what it asks for: the command it wants to run, followed by its own description or question when that says more than that it wants approval (`make test · Run the tests`). The line is clipped to the sidebar's width; the drawer (`i`) keeps the full request. It disappears with the request and, like subagent lines, needs multi-line rows, so compact density leaves it out. Press `>` on the pane to type a reply without leaving the sidebar. At most eight are kept per pane. Subagent lines require multi-line rows and are omitted in compact density, where the pane row shows a count such as `+2` instead. Reinstall the relevant integration and restart its agent to receive its current hooks or plugin events.
 
-In `quiet`, the compact header carries the agent summary and the Tree footer says what you can do now, most important first, keeping only what fits a narrow sidebar: `◆ Claude Code waiting   n go   > reply` when one agent needs you (`◆ 2 waiting   n next   > reply` for more), `Moving   Enter move here   c cancel` during a move or link, `x again within 5 s to delete` while a delete is armed, `Esc clear   Enter focus` while searching, and otherwise `? keys   / search   4 agents` (`2 proc   3 buff` without agent mode). The Agents view keeps the footer too; with nothing pending it shows `Enter focus   i details   1 tree`, or just `1 tree` when no agent is running.
-
-In the other appearances, a footer pinned below the Tree list counts every agent pane on the server with the same marks as the Agents header (`◆` needs input, `▷` working, `✓` ready or ended, `○` unverified), whatever the tree's filters and folds. When an agent needs input and the sidebar is wide enough, it adds a reminder that `n` jumps there. The footer disappears when no agent is running. With agent mode off, the footer instead counts sessions, windows, and content panes, using the session, window, and pane icons (`◈ 3 sessions  ▣ 8 windows  ▹ 14 panes`). Linked windows count once, and Canopy's own sidebar and reserve panes are not counted. While a tree filter hides some, each count shows visible/total, such as `◈ 1/3 sessions`; folded branches still count. A narrow sidebar drops the words and keeps the icons and numbers. Press `f` to hide or show the footer in that sidebar, or set `@tmux-canopy-footer 'off'` to open sidebars without it. The footer lives only in the sidebar; Canopy does not change your status line.
+The default `quiet` Tree header carries the agent summary. In every appearance,
+the footer remains an action rail until higher-priority context replaces it:
+`◆ Claude Code waiting  n go  > reply` when one agent needs you
+(`◆ 2 waiting  n next  > reply` for more),
+`Moving  ↵ move here  c cancel` during a move,
+`Linking  ↵ link here  c cancel` during a link,
+`x again within 5 s to delete` while deletion is armed, and
+`Esc clear  Enter focus` while searching. The normal view-specific actions
+return when that state clears.
 
 Press `n` from any view to jump straight to the next pane reporting needs-input (approval requested or interrupted), across every session and window, ignoring active Tree filters — the same "search everything" scope `Ctrl-g` already uses. Detection always runs at Agents-view strength, so an agent running under a wrapper shell is found even from the Tree view. Order follows the tree's own natural session/window/pane order; a linked window contributes one entry per session it's linked into. Repeated presses wrap back to the first match after the last, and `n` does nothing when no agent currently needs input.
 
@@ -799,7 +821,7 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `scripts/notify` | Validate/deduplicate events, batch unread clears, and coalesce refresh workers |
 | `scripts/notification-lib.sh` | Native hook predicates and expiring clear claims |
 | `scripts/tree-filter` | Tree filter menu, literal text prompts, and per-sidebar overrides |
-| `scripts/view-header` | Render the Processes and Buffers header (tabs, or quiet's name, count, and footer) and operation mode state |
+| `scripts/view-header` | Render the current-view title and row count for Processes and Buffers, quiet's contextual footer, and operation mode state |
 | `scripts/sidebar-source` | Publish complete in-memory view snapshots or a recoverable error row |
 | `scripts/launch-lib.sh` | Shell/tmux quoting, preflight checks, and bounded owner-targeted failures |
 | `scripts/ui-options.sh` | Shared preflight and runtime fzf options/bindings |

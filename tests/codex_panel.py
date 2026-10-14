@@ -169,7 +169,7 @@ try:
         source = run('sidebar-source', '--stable')
         rows = [line.split('\t') for line in source.splitlines()]
         ids = [row[2] for row in rows]
-        assert ids[0] == 'H:tree' and '[Agents]' in rows[0][1]
+        assert ids[0] == 'H:tree' and 'Agents' in rows[0][1]
         assert f'P:{agent}:{session}' in ids and f'P:{claude}:{session}' in ids
         assert f'P:{other}:{session}' not in ids
         assert f'S:{empty_session}' not in ids

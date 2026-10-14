@@ -77,8 +77,8 @@ try:
         assert option('status') == 'working'
         print('ok - subagents appear as child lines of their pane in Tree and Agents views')
 
-        # The sidebar's Tree view carries a server-wide agent summary for fzf's
-        # sticky footer; sidebar-source keeps it out of the list and stores it.
+        # Header renders carry the view's action footer; sidebar-source keeps
+        # that record out of the list and stores it for fzf.
         import re
         plain = lambda text: re.sub(r'\x1b\[[0-9;]*m', '', text)
         header_env = {'TMUX_CANOPY_HEADER': '1'}
@@ -90,8 +90,8 @@ try:
             return {record.split('\t', 1)[0]: record.split('\t', 1)[1]
                     for record in result.stdout.split('\0') if '\t' in record}
 
-        assert plain(header_rows()['F:']) == 'Agents  ▷ 1', header_rows()
-        assert 'F:' not in header_rows('--agents'), 'the Agents header already has the counts'
+        assert plain(header_rows()['F:']) == '↵ focus  a actions  / search  ? help', header_rows()
+        assert plain(header_rows('--agents')['F:']) == '↵ focus  n waiting  > reply  i summary'
         assert 'F:' not in rows(), 'only the sidebar render carries a footer'
         footer = Path(str(state) + '.footer')
 
@@ -103,12 +103,12 @@ try:
 
         listed = sidebar_source()
         assert '\0F:\t' not in '\0' + listed and 'H:\t' in listed, listed[:200]
-        assert plain(footer.read_text()) == 'Agents  ▷ 1\n', footer.read_text()
+        assert plain(footer.read_text()) == '↵ focus  a actions  / search  ? help\n', footer.read_text()
         tm('set-option', '-g', '@tmux-canopy-agents', 'off')
         sidebar_source()
-        assert 'Agents' not in footer.read_text() and 'session' in footer.read_text(), footer.read_text()
+        assert plain(footer.read_text()) == '↵ focus  a actions  / search  ? help\n', footer.read_text()
         tm('set-option', '-g', '@tmux-canopy-agents', 'on')
-        print('ok - the Tree view footer summarizes every agent, and the workspace without agent mode')
+        print('ok - Tree and Agents publish their action footer outside the selectable rows')
 
         # The default appearance (places, folders and icons) and pills draw the
         # same child lines; the plugin sets this option, so set it as it does.
