@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Snapshot, notification-coalescing and real-fzf identity regressions."""
 import fcntl
-from support import install_fzf_probe
+from support import highlighted_spans, install_fzf_probe
 import os
 from pathlib import Path
 import pty
@@ -252,9 +252,7 @@ def main():
             wait_for(lambda: selection()[0] == f'S:{sid_b}', 'second session selection')
             frame = tm('capture-pane', '-e', '-p', '-t', sidebar).splitlines()
             second_session_line = next(i for i, line in enumerate(frame) if '▾' in line and 'two' in line)
-            def highlighted(line):
-                return '[7m' in line or '[1;7m' in line or '48;5;236' in line
-            assert highlighted(frame[second_session_line]) and not highlighted(frame[second_session_line - 1]), frame
+            assert any(highlighted_spans(frame[second_session_line])) and not any(highlighted_spans(frame[second_session_line - 1])), frame
             tm('send-keys', '-t', sidebar, 'M-a')
             assert selection()[0] == window_token
             # The jump runs in the background, so fzf never waits on it.
@@ -303,7 +301,7 @@ def main():
             assert '2p' not in next(row[1] for row in expanded_rows if row[0] == count_token)
             shared_rows = [row[1] for row in expanded_rows if row[0] in ('P:' + count_pane, 'P:' + count_peer)]
             assert len(shared_rows) == 2 and all('2p' not in value for value in shared_rows)
-            assert sum('shared' in value for value in shared_rows) == 1, shared_rows
+            assert sum('shared' in value for value in shared_rows) == 1, (shared_rows, tm('display-message', '-p', '-t', sidebar, '#{pane_width}'), tm('display-message', '-p', '-t', count_pane, '#{pane_current_path}'), tm('display-message', '-p', '-t', count_peer, '#{pane_current_path}'))
             state.write_text('FILTER_WINDOW\tshared-count\n')
             filtered_row = next(row[1] for row in rows() if row[0] == count_token)
             assert '2p' not in filtered_row, filtered_row
@@ -422,7 +420,7 @@ def main():
             time.sleep(.4)
             remaining = {row[2] for row in rows()[1:]}
             chosen = selection()[1]
-            assert chosen in remaining and chosen != pane_identity, chosen
+            assert chosen in remaining and chosen != pane_identity, (chosen, selection(), tm('capture-pane', '-p', '-t', sidebar))
             print('ok - deleting the tracked object falls back to a live row without freezing fzf')
         finally:
             sp.run([tmux, '-L', socket, 'kill-server'], env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)

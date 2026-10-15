@@ -43,8 +43,8 @@ For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/cano
 - AI agent monitoring: Track active agents across sessions with animated status badges, a dedicated Agents view (`4`), summary drawer (`i`), subagent trees, and a one-key jump (`n`) to panes waiting for user input or approval.
 - Optional alerts: a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, or when a pane rings the bell or goes quiet, skipped while you're watching that pane. On macOS, clicking one jumps to the agent's pane. No daemon; off by default.
 - Activity and bell notifications; optional silence monitoring.
-- Live mouse resizing and keyboard width presets.
-- One sidebar owned by the client that opened it; no daemon or agent service.
+- Live mouse resizing and keyboard width presets; stale resize callbacks cannot restore an earlier width.
+- One dock per tmux server, owned by the client that opened it; other clients can use popups. No daemon or agent service.
 
 ## Requirements and support
 
@@ -268,6 +268,8 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `f` | Show / hide the footer |
 | `[` / `]` / `w` | Previous / next / cycle width presets |
 | `Ctrl-r` | Refresh |
+| `Ctrl-h` / `Ctrl-l` | Focus the left / right pane from a dock; `Ctrl-h` edits the query while searching |
+| `Ctrl-j` / `Ctrl-k` | Move the selection down / up |
 | `?` | Scrollable help popup (wheel or `j`/`k` to scroll) |
 | `g` | Scrollable symbol and color legend (wheel also works) |
 | Mouse | In the tree, click selects, double-click focuses, and the wheel scrolls; in Help/Legend, the wheel scrolls (needs `set -g mouse on`) |
@@ -318,6 +320,11 @@ Every appearance uses a responsive action footer. Tree starts with
 `↵ focus  a actions`, and Buffers with `↵ paste  a actions`. More hints appear
 when space permits; `f` hides the footer.
 
+The default selection highlights the row with a dark-gray background while
+preserving application and notification colors. Set
+`@tmux-canopy-selection-background` to a palette index or RGB background to suit
+your theme; `reverse`, `solid`, and `pointer` selection styles are also available.
+
 Use `@tmux-canopy-appearance 'folders'` for directory groups, boxed titles, and
 tree guides, or `ascii` for `quiet` without Unicode glyphs. Density settings
 provide leaner or more detailed rows. Application icons can be changed or hidden
@@ -342,7 +349,7 @@ Canopy wraps `prefix + n`, `p`, `0`–`9`, and `Tab` for smooth window navigatio
 
 ## Current limitations
 
-- Stable slots are optimized for one active sidebar owner per tmux server. Multiple simultaneous owners can affect each other’s window geometry.
+- Only one client can own a dock on a tmux server. A competing dock request is refused without changing layouts; close it from the owning terminal first, or use `@tmux-canopy-mode 'popup'` in other clients.
 - A directory-only change may need `Ctrl-r`; there is no shell prompt integration or polling loop.
 - Activity means terminal output, not an AI agent’s task status. Without an [optional lifecycle adapter](docs/reference.md#agent-lifecycle-adapters), the agent drawer reads the selected pane’s current terminal screen and labels possible requests as unverified. Continuous logs can be noisy.
 - Desktop alerts appear on the machine running tmux, so over SSH only the `tmux` alert mode reaches you. Only `terminal-notifier` alerts on macOS can be clicked through to the pane.

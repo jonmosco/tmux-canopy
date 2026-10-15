@@ -250,8 +250,19 @@ canopy_bind root MouseDragEnd1Border \
 empty_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?$(sidebar_empty_window_condition),1,},}}}"
 canopy_hook window-layout-changed 9005 "$empty_event" -b reap-empty
 canopy_hook window-unlinked 9005 '' -b reap-empty
-balance_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?#{==:#{P:#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},,1}},1},1,},}}}"
-canopy_hook window-layout-changed 9007 "$balance_event" -b balance-window '#{hook_window}'
+# Balance only when multiple content panes become one. Native resizing also
+# emits layout changes; restoring the saved width then races its persistence.
+dock_window="#{!=:#{P:#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},1,}},}"
+balance_window_event="#{S:#{W:#{?#{&&:#{==:#{window_id},#{hook_window}},$dock_window},1,}}}"
+balance_event="#{S:#{W:#{?#{==:#{window_id},#{hook_window}},#{?#{&&:#{==:$CANOPY_CONTENT_FORMAT,1},#{m:11*,#{@tmux_canopy_content_shape}}},1,},}}}"
+balance_update="set-option -wF -t '#{hook_window}' @tmux_canopy_content_shape '#{l:$CANOPY_CONTENT_FORMAT}'"
+balance_body="if-shell -F $(tmux_quote "$balance_event") $(tmux_quote "$(plugin_job -b balance-window '#{hook_window}')") ; run-shell -C $(tmux_quote "$balance_update")"
+canopy_queue set-hook -g 'window-layout-changed[9007]' \
+  "if-shell -F $(tmux_quote "$balance_window_event") $(tmux_quote "$balance_body")"
+# Initialize existing docks on reload; new docks and slots publish their own
+# shape. Linked windows may repeat the same idempotent native setter.
+balance_initial="#{S:#{W:#{?$dock_window,set-option -w -t #{window_id} @tmux_canopy_content_shape '$CANOPY_CONTENT_FORMAT' ; ,}}}"
+canopy_queue if-shell -F "$any_sidebar_event" "run-shell -C $(tmux_quote "$balance_initial")"
 canopy_hook after-kill-pane 9003 '' -b cleanup refresh
 # Native and Canopy splits must repaint the tree immediately; waiting for a
 # later select-pane leaves the new pane missing until focus moves again.

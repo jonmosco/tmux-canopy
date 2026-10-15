@@ -2,6 +2,9 @@
 # shellcheck disable=SC1091
 source "${BASH_SOURCE[0]%/*}/launch-lib.sh"
 
+# One character per content pane, including retained dead panes.
+CANOPY_CONTENT_FORMAT='#{P:#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},,1}}'
+
 sidebar_client_key() {
   canopy_client_key "${1:-}"
   printf '%s\n' "$CANOPY_KEY"
@@ -90,9 +93,58 @@ clear_sidebar_cache() {
   tmux set-option -gu "$(sidebar_cache_option "${1:-}")" 2>/dev/null || true
 }
 
-unowned_sidebar() {
-  sidebar_rows |
-    awk -F '\t' '$2 == "1" && $3 == "" { print $1; exit }'
+# Only opening/closing docks uses this claim; popup lifetimes and refreshes do
+# not contend with it. A PID plus its start time recovers even a SIGKILLed
+# opener without expiring a slow but still-live launch.
+claim_sidebar_dock() {
+  local started observed holder live state body condition
+  started="$(LC_ALL=C ps -p "$$" -o lstart= 2>/dev/null)" || return 1
+  [[ -n "$started" ]] || return 1
+  CANOPY_DOCK_CLAIM="$$.$RANDOM|$started"
+  body="set-option -gq @tmux_canopy_dock_opening $(tmux_quote "$CANOPY_DOCK_CLAIM") ; display-message -p $(tmux_quote "$CANOPY_DOCK_CLAIM")"
+  observed="$(tmux if-shell -F '#{!:#{@tmux_canopy_dock_opening}}' "$body" \
+    "display-message -p '#{@tmux_canopy_dock_opening}'" 2>/dev/null)" || return 1
+  [[ "$observed" != "$CANOPY_DOCK_CLAIM" ]] || return 0
+  if [[ "$observed" =~ ^([1-9][0-9]*)\.[0-9]+\|(.+)$ ]]; then
+    holder="${BASH_REMATCH[1]}" started="${BASH_REMATCH[2]}"
+    live="$(LC_ALL=C ps -p "$holder" -o stat= -o lstart= 2>/dev/null || true)"
+    read -r state live <<< "$live"
+    [[ "$state" == Z* || "$state" == X* || "$live" != "$started" ]] || return 1
+  fi
+  # Compare-and-swap inside tmux: another contender may already have replaced
+  # the dead claim while this shell checked its process identity.
+  condition="#{==:#{@tmux_canopy_dock_opening},$observed}"
+  observed="$(tmux if-shell -F "$condition" "$body" \
+    "display-message -p '#{@tmux_canopy_dock_opening}'" 2>/dev/null)" || return 1
+  [[ "$observed" == "$CANOPY_DOCK_CLAIM" ]]
+}
+
+release_sidebar_dock() {
+  [[ -n "${CANOPY_DOCK_CLAIM:-}" ]] || return 0
+  tmux if-shell -F "#{==:#{@tmux_canopy_dock_opening},$CANOPY_DOCK_CLAIM}" \
+    'set-option -gu @tmux_canopy_dock_opening' 2>/dev/null || true
+  CANOPY_DOCK_CLAIM=''
+}
+
+live_sidebar_docks() {
+  # The launch marker covers the interval between split-window and ownership
+  # publication, including an opener killed immediately after the split.
+  tmux list-panes -a \
+    -f '#{&&:#{!=:#{pane_dead},1},#{||:#{==:#{@tmux_canopy},1},#{m:*tmux-canopy-dock:*,#{pane_start_command}}}}' \
+    -F '#{pane_id}|#{@tmux_canopy}|#{@tmux_canopy_client}' 2>/dev/null
+}
+
+publish_sidebar_dock() {
+  local pane="$1" owner="$2" target="$3" position="$4" restore_zoom="${5:-}" body
+  # Either the opener or its pane may arrive first. Publish once, and never
+  # overwrite a target already updated by an owner's navigation hook.
+  body="set-option -p -t $pane @tmux_canopy_client $(tmux_quote "$owner")"
+  body+=" ; set-option -p -t $pane @tmux_canopy_target $(tmux_quote "$target")"
+  body+=" ; set-option -p -t $pane @tmux_canopy_position $(tmux_quote "$position")"
+  body+=" ; set-option -p -t $pane @tmux_canopy_restore_zoom_pane $(tmux_quote "$restore_zoom")"
+  body+=" ; set-option -p -t $pane @tmux_canopy 1"
+  body+=" ; set-option -wF -t $pane @tmux_canopy_content_shape $(tmux_quote "$CANOPY_CONTENT_FORMAT")"
+  tmux if-shell -F -t "$pane" '#{!=:#{@tmux_canopy},1}' "$body"
 }
 
 pane_exists() {
@@ -160,7 +212,8 @@ ensure_slot_for_window() {
   tmux set-option -p -t "$slot_pane" @tmux_canopy_slot 1 \; \
     set-option -p -t "$slot_pane" @tmux_canopy_position "$position" \; \
     set-option -p -t "$slot_pane" allow-set-title off \; \
-    select-pane -t "$slot_pane" -T 'tmux-canopy-slot' 2>/dev/null || return 1
+    select-pane -t "$slot_pane" -T 'tmux-canopy-slot' \; \
+    set-option -wF -t "$slot_pane" @tmux_canopy_content_shape "$CANOPY_CONTENT_FORMAT" 2>/dev/null || return 1
   printf '%s\n' "$slot_pane"
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NUL-framed entries: shared directories, multiline selection and stable identities."""
 import fcntl
-from support import install_fzf_probe
+from support import highlighted_spans, install_fzf_probe
 import json
 import os
 from pathlib import Path
@@ -169,29 +169,10 @@ def main():
             assert b == a + 2 and 'sleep' in frame[a-1] and 'sleep' in frame[b-1]
             assert frame[a].index('…/') == frame[a-1].index('sleep')
             assert frame[b].index('…/') == frame[b-1].index('sleep')
-            # tmux's SGR capture lets us check that the whole logical entry,
-            # not just its first line, receives fzf's selection background.
-            bg = None
-            highlighted = set()
-            chunks = re.split(r'\x1b\[([0-9;]*)m', tm('capture-pane', '-ep', '-t', sidebar))
-            for index, chunk in enumerate(chunks):
-                if index % 2:
-                    codes = [int(code or 0) for code in chunk.split(';')]
-                    offset = 0
-                    while offset < len(codes):
-                        code = codes[offset]
-                        if code in (0, 49):
-                            bg = None
-                        if code in (38, 48) and offset + 2 < len(codes) and codes[offset+1] == 5:
-                            if code == 48:
-                                bg = codes[offset+2]
-                            offset += 3
-                        else:
-                            offset += 1
-                elif bg == 236:
-                    for label in ('sleep', '…/commercial/hcm-gitops'):
-                        if label in chunk:
-                            highlighted.add(label)
+            # Both physical lines of the logical entry receive selection
+            # emphasis, without assuming a fixed background or terminal theme.
+            highlighted = {label for span in highlighted_spans(tm('capture-pane', '-ep', '-t', sidebar))
+                           for label in ('sleep', '…/commercial/hcm-gitops') if label in span}
             assert highlighted == {'sleep', '…/commercial/hcm-gitops'}, highlighted
             choose('pos(4)', 'P:' + second)
             choose('pos(3)', 'P:' + first)

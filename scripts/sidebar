@@ -9,11 +9,18 @@ source "$SCRIPT_DIR/ui-options.sh"
 
 export TMUX_CANOPY_ROOT="${SCRIPT_DIR%/*}"
 export TMUX_CANOPY_RECORD_FORMAT=nul
+export TMUX_CANOPY_UI_HEADER=1
 if [[ -z "${TMUX_CANOPY_CLIENT:-}" ]]; then
   TMUX_CANOPY_CLIENT="$(tmux display-message -p '#{client_tty}')"
   export TMUX_CANOPY_CLIENT
 fi
 owner="${TMUX_CANOPY_CLIENT:-}"
+# The opener normally publishes this too. Publish from the pane itself so an
+# opener killed just after split-window cannot leave an unowned live dock.
+if [[ "${1:-}" == tmux-canopy-dock:* && "${TMUX_CANOPY_POPUP:-0}" != 1 ]]; then
+  publish_sidebar_dock "$TMUX_PANE" "$owner" "${TMUX_CANOPY_TARGET:-}" \
+    "${TMUX_CANOPY_POSITION:-left}" "${TMUX_CANOPY_RESTORE_ZOOM:-}"
+fi
 STATE_FILE="$(mktemp "${TMPDIR:-/tmp}/tmux-canopy.XXXXXX" 2>/dev/null)" || {
   sidebar_failure "$owner" temporary-state 'Cannot create private sidebar state. Check TMPDIR permissions.'
   exit 1

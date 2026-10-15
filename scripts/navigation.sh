@@ -131,7 +131,9 @@ sidebar_navigate() (
   if [[ "$nav_guarded" != 1 ]] && \
      [[ ( "$nav_current_window" == "$nav_window" && "$nav_current_session" == "$nav_session" ) || "$nav_mode" == follow ]] && \
      [[ "$nav_scope" != global || -z "$nav_sidebar" || "${nav_windows[$nav_sidebar]}" == "$nav_window" ]]; then
-    if [[ -n "$nav_sidebar" ]]; then
+    # Follow hooks with no window transition must not undo a native resize
+    # whose new preference is still being saved by its asynchronous worker.
+    if [[ -n "$nav_sidebar" && "$nav_mode" != follow ]]; then
       nav_source_width="$(clamp_sidebar_width_for_total "${nav_totals[$nav_sidebar]}" "$nav_requested" "$nav_minimum" "$nav_maximum" "$nav_min_content")" || nav_source_width=''
       if [[ -n "$nav_source_width" && "${nav_widths[$nav_sidebar]}" != "$nav_source_width" ]]; then
         commands+=(resize-pane -t "$nav_sidebar" -x "$nav_source_width" ';')

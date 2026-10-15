@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real-client active-location, pointer return, and debounce regressions."""
 import fcntl
-from support import install_fzf_probe
+from support import highlighted_spans, install_fzf_probe
 import os
 from pathlib import Path
 import pty
@@ -95,7 +95,7 @@ def main():
 
         def pointer_line(sidebar):
             lines = tm('capture-pane', '-e', '-p', '-t', sidebar).splitlines()
-            return next(i for i, line in enumerate(lines) if '[7m' in line or '[1;7m' in line or '48;5;236' in line)
+            return next(i for i, line in enumerate(lines) if any(highlighted_spans(line)))
 
         try:
             pane_a = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'one', '-x', '160', '-y', '44', '-P', '-F', '#{pane_id}', 'sleep 600')
@@ -267,7 +267,7 @@ def main():
             wait(lambda: location(sidebar) == f'{session_two}|{wb}|{pane_b}', 'linked session focus')
             assert f'W:{wb}:{session_two}' in active_rows()
             assert f'W:{wb}:{session}' not in active_rows()
-            # Restore the first client's session before attaching another owner.
+            # Restore the first client's session before attaching a guest.
             tm('switch-client', '-c', client, '-t', f'{session}:{wa}')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'restore first owner')
             tm('bind-key', '-n', 'F10', 'new-window', '-n', 'fresh', 'sleep 600')
@@ -283,14 +283,16 @@ def main():
             _second_master, second_client = attach('two')
             tm('select-window', '-t', display(pane_c, '#{window_id}'))
             run('toggle', second_client, pane_c, '42', 'global', 'T', 'Tab', 'slot')
-            other = next(row.split('|')[0] for row in tm('list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy_client}').splitlines() if row.endswith('|' + second_client))
-            wait(lambda: location(other) != '', 'second sidebar initialization')
+            assert not any(row.endswith('|' + second_client) for row in tm(
+                'list-panes', '-a', '-F', '#{pane_id}|#{@tmux_canopy_client}').splitlines())
+            before = location(sidebar)
+            count = deliveries.stat().st_size
+            run('refresh-sidebar', pane_c, second_client)
             time.sleep(.2)
-            count_other = sum(f"-t '{other}'" in line for line in deliveries.read_text().splitlines())
+            assert location(sidebar) == before and deliveries.stat().st_size == count
             os.write(master, b'\x1b[18~')
             wait(lambda: location(sidebar) == f'{session}|{wb}|{pane_b}', 'first owner window switch')
             time.sleep(.2)
-            assert sum(f"-t '{other}'" in line for line in deliveries.read_text().splitlines()) == count_other
             print('ok - linked-session markers and refresh delivery are owner-specific')
         finally:
             sp.run([executable, '-L', socket, 'kill-server'], env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)

@@ -5,6 +5,7 @@ from pathlib import Path
 import shlex
 import subprocess as sp
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,14 +26,15 @@ def main():
         temp = Path(directory)
         deliveries = temp / 'deliveries'
         deliveries.touch()
+        release_gate = temp / 'release-agent'
+        release_ready = temp / 'agent-ready'
+        gate_enabled = temp / 'gate-enabled'
+        os.mkfifo(release_gate)
         try:
             pane = tm('-f', '/dev/null', 'new-session', '-d', '-x', '120', '-y', '40', '-P', '-F', '#{pane_id}', 'sleep 600')
             env['TMUX'] = tm('display-message', '-p', '-t', pane, '#{socket_path},#{pid},0')
             load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=env, capture_output=True, text=True, timeout=30)
             assert load.returncode == 0 and not load.stderr, load.stderr
-            hooks = tm('show-hooks', '-g')
-            split_hook = next((line for line in hooks.splitlines() if line.startswith('after-split-window[9003]')), '')
-            assert split_hook and "cleanup' 'split'" in split_hook, hooks
 
             sidebar = tm('split-window', '-d', '-h', '-l', '42', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
@@ -45,10 +47,15 @@ def main():
                 'if [[ "$1" == send-keys ]]; then\n'
                 f'  printf "%s\\n" "$*" >> {shlex.quote(str(deliveries))}\n'
                 'fi\n'
+                f'if [[ -e {shlex.quote(str(gate_enabled))} && "$1" == if-shell && "$*" == *"set-option -gu @tmux_canopy_agent_refresh_pending"* ]]; then\n'
+                f'  printf x > {shlex.quote(str(release_ready))}\n'
+                f'  IFS= read -r _ < {shlex.quote(str(release_gate))}\n'
+                'fi\n'
                 f'exec {shlex.quote(real_tmux)} -L {shlex.quote(socket)} "$@"\n'
             )
             wrapper.chmod(0o755)
             wrapped = env | {'PATH': str(temp) + ':' + env['PATH']}
+            tm('set-environment', '-g', 'PATH', wrapped['PATH'])
 
             sp.run([str(ROOT / 'scripts/cleanup'), 'split'], env=wrapped, check=True, timeout=15)
             assert any(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()), \
@@ -70,43 +77,59 @@ def main():
 
             print('ok - split refresh hook installed; refresh_sidebars respects transition guards')
 
-            # Server-wide hooks are gated inside tmux: splits with no sidebar and
-            # resizes of ordinary panes start no shell.
-            hook_lines = tm('show-hooks', '-g').splitlines()
-            for name in ('after-split-window[9003]', 'after-resize-pane[9001]', 'after-resize-pane[9006]'):
-                line = next((line for line in hook_lines if line.startswith(name)), '')
-                assert line.startswith(name + ' if-shell -F '), line
-            marker = temp / 'split-ran'
-            tm('set-hook', '-g', 'after-split-window[9003]',
-               f"if-shell -F '#{{S:#{{W:#{{P:#{{?#{{==:#{{@tmux_canopy}},1}},1,}}}}}}}}' 'run-shell \"touch {marker}\"'")
+            # Exercise the installed split hook rather than replacing it with
+            # a copy of its condition. Disable unrelated kill refreshes here.
+            tm('set-hook', '-gu', 'after-kill-pane[9003]')
             tm('set-option', '-pu', '-t', sidebar, '@tmux_canopy')
-            tm('kill-pane', '-t', tm('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600'))
-            assert not marker.exists(), 'split hook ran with no sidebar on the server'
+            before_split = deliveries.stat().st_size
+            created = tm('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600')
+            assert deliveries.stat().st_size == before_split, 'a split with no sidebar requested a reload'
+            tm('kill-pane', '-t', created)
             tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
-            tm('kill-pane', '-t', tm('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600'))
-            assert marker.exists(), 'split hook skipped although a sidebar exists'
-            print('ok - split and resize hooks are gated inside tmux')
+            created = tm('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'sleep 600')
+            assert deliveries.stat().st_size > before_split, 'the installed split hook did not refresh the sidebar'
+            tm('kill-pane', '-t', created)
+            print('ok - the installed split hook refreshes only when a sidebar exists')
 
-            # A burst of pane-command events (zsh -> ls -> zsh ...) shares one
-            # delayed worker and one reload per agent-mode sidebar.
-            import time
+            # Hold the real worker at its release point so this is one pending
+            # burst regardless of process startup/scheduler speed. Sequential
+            # calls can legitimately span multiple 120ms refresh windows.
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
-            tm('set-environment', '-g', 'PATH', wrapped['PATH'])
+            gate_enabled.touch()
+            sp.run([str(ROOT / 'scripts/agent-refresh')], env=wrapped, check=True, timeout=15)
+            deadline = time.monotonic() + 5
+            while not release_ready.exists() and time.monotonic() < deadline:
+                time.sleep(.02)
+            assert release_ready.exists(), 'the pending worker did not reach its release gate'
+            # The worker is artificially paused; freeze claim expiry as well.
+            tm('set-option', '-g', '@tmux_canopy_agent_refresh_deadline', '9999999999')
             before = sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines())
-            for _ in range(6):
-                sp.run([str(ROOT / 'scripts/agent-refresh')], env=wrapped, check=True, timeout=15)
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline and tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending'):
-                time.sleep(.05)
-            time.sleep(.2)
+            jobs = [sp.Popen([str(ROOT / 'scripts/agent-refresh')], env=wrapped,
+                             stdout=sp.DEVNULL, stderr=sp.PIPE) for _ in range(6)]
+            for job in jobs:
+                _, err = job.communicate(timeout=15)
+                assert job.returncode == 0, err
+            gate_enabled.unlink()
+            with release_gate.open('w') as stream:
+                stream.write('release\n')
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and (
+                tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending') or
+                sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()) == before
+            ):
+                time.sleep(.02)
             after = sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines())
             assert after - before == 1, deliveries.read_text()
             assert tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending') == ''
-            # A later event after the claim is released starts a new refresh.
             sp.run([str(ROOT / 'scripts/agent-refresh')], env=wrapped, check=True, timeout=15)
-            time.sleep(.5)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and (
+                tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending') or
+                sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()) == after
+            ):
+                time.sleep(.02)
             assert sum(sidebar in line and 'C-r' in line for line in deliveries.read_text().splitlines()) - after == 1
-            print('ok - pane-command refresh bursts coalesce into one reload')
+            print('ok - concurrent requests share one pending refresh; a later event starts another')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 

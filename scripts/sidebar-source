@@ -13,6 +13,11 @@ for argument in "$@"; do
     --read0) TMUX_CANOPY_NUL=1 ;;
   esac
 done
+render_token=''
+if [[ "${TMUX_CANOPY_UI_HEADER:-0}" == 1 && -n "$state_file" ]]; then
+  render_token="${TMUX_CANOPY_RENDER_TOKEN:-$$.$RANDOM}"
+  printf '%s\n' "$render_token" > "${state_file}.render"
+fi
 
 render_source() {
   set -o pipefail
@@ -108,22 +113,32 @@ schedule_animate() {
   fi
 }
 
-# The Tree renderer may add an F: record for fzf's sticky footer (the agent
-# summary). Keep it out of the list and store it for the load binding, which
-# shows it; any other view clears it.
-take_footer() {
-  local record footer='' current='' index
+# Sticky chrome is kept out of the live UI's selectable records. Standalone
+# sources retain their header record for consumers of the snapshot protocol.
+take_chrome() {
+  local record footer='' header='' current='' index
   for index in "${!records[@]}"; do
     record=${records[index]}
-    [[ "$record" == F:$'\t'* ]] || continue
-    footer=${record#F:$'\t'}
-    footer=${footer%$'\t'F:}
+    if [[ "$record" == F:$'\t'* ]]; then
+      footer=${record#F:$'\t'}
+      [[ "$TMUX_CANOPY_STABLE" != 1 ]] || footer=${footer%$'\t'F:}
+    elif [[ "${TMUX_CANOPY_UI_HEADER:-0}" == 1 && "$record" == H:*$'\t'* ]]; then
+      header=${record#*$'\t'}
+      [[ "$TMUX_CANOPY_STABLE" != 1 ]] || header=${header%$'\t'*}
+    else
+      continue
+    fi
     unset 'records[index]'
   done
   records=("${records[@]}")
   [[ -n "$state_file" && "$TMUX_CANOPY_NUL" == 1 ]] || return 0
   [[ -r "${state_file}.footer" ]] && IFS= read -r current < "${state_file}.footer"
   [[ "$current" == "$footer" && -e "${state_file}.footer" ]] || printf '%s\n' "$footer" > "${state_file}.footer"
+  if [[ "${TMUX_CANOPY_UI_HEADER:-0}" == 1 ]]; then
+    current=''
+    [[ -r "${state_file}.header" ]] && IFS= read -r current < "${state_file}.header"
+    [[ "$current" == "$header" && -e "${state_file}.header" ]] || printf '%s\n' "$header" > "${state_file}.header"
+  fi
 }
 
 exec {source_fd}< <(render_source 2>/dev/null)
@@ -137,8 +152,15 @@ exec {source_fd}<&-
 wait "$source_pid"
 rc=$?
 source_pid=''
+# Only a staged background render can be discarded with no records: a direct
+# fzf reload must still publish a complete list, never a transient empty one.
+if [[ -n "$render_token" && -n "${TMUX_CANOPY_RENDER_TOKEN:-}" ]]; then
+  current_token=''
+  [[ -r "${state_file}.render" ]] && IFS= read -r current_token < "${state_file}.render"
+  [[ "$current_token" == "$render_token" ]] || exit 0
+fi
 if ((rc == 0)); then
-  take_footer
+  take_chrome
   if ((${#records[@]})); then
     if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then printf '%s\0' "${records[@]}"
     else printf '%s\n' "${records[@]}"
@@ -149,6 +171,11 @@ if ((rc == 0)); then
 fi
 sidebar_failure "${TMUX_CANOPY_CLIENT:-}" source "Sidebar data unavailable (source exit $rc). Ctrl-r retries; a opens diagnostics."
 record() {
+  if [[ "${TMUX_CANOPY_UI_HEADER:-0}" == 1 && "$1" == H:* ]]; then
+    printf '%s\n' "$2" > "${state_file}.header"
+    printf '\n' > "${state_file}.footer"
+    return
+  fi
   printf '%s\t%s' "$1" "$2"
   [[ "$TMUX_CANOPY_STABLE" == 1 ]] && printf '\t%s' "$1"
   if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then printf '\0'; else printf '\n'; fi

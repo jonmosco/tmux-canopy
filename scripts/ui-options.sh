@@ -53,7 +53,9 @@ sidebar_ui_options() {
     solid) fzf_colors+=',bg+:6,fg+:0,hl+:0:bold' ;;
     reverse) fzf_colors+=',fg+:-1:reverse,hl+:6:bold:reverse' ;;
     pointer) fzf_colors+=',fg+:-1:regular' ;;
-    *) fzf_colors+=",bg+:$selection_background,fg+:-1:regular" ;;
+    *)
+      fzf_colors+=",bg+:$selection_background,fg+:-1:regular"
+      ;;
   esac
   [[ "$theme" != mono ]] || fzf_colors='bw'
   : "${appearance:=classic}"
@@ -63,8 +65,12 @@ sidebar_ui_options() {
   local search_unbind='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?'
   # The footer sidebar-source stored for this load, or a search hint while
   # searching, so a refresh during a search keeps the hint.
-  local footer_cmd='[ -n "$TMUX_CANOPY_STATE" ] || exit 0; f=; if [ -e "$TMUX_CANOPY_STATE.search" ]; then f="Esc clear   Enter focus"; elif [ -r "$TMUX_CANOPY_STATE.footer" ]; then IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; fi; printf "change-footer:%s" "$f"'
-  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind(F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?)'"+transform($footer_cmd)"
+  local footer_read='[ -n "$TMUX_CANOPY_STATE" ] || exit 0; f=; if [ -e "$TMUX_CANOPY_STATE.search" ]; then f="Esc clear   Enter focus"; elif [ -r "$TMUX_CANOPY_STATE.footer" ]; then IFS= read -r f < "$TMUX_CANOPY_STATE.footer"; fi'
+  local footer_cmd="$footer_read"'; printf "change-footer:%s" "$f"'
+  # Footer text is generated actions; the header may contain a user path, so
+  # emit it last with fzf's literal, rest-of-action delimiter.
+  local load_cmd="$footer_read"'; h=; [ ! -r "$TMUX_CANOPY_STATE.header" ] || IFS= read -r h < "$TMUX_CANOPY_STATE.header"; printf "change-footer(%s)+change-header:%s" "$f" "$h"'
+  local esc_cmd='execute-silent(rm -f "$TMUX_CANOPY_STATE.search")+disable-search+clear-query+hide-input+search()+rebind('"$search_unbind"')'"+transform($footer_cmd)"
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     activate_suffix='+accept'
     jump_agent_bind="n:execute-silent($jump_agent_cmd)+accept"
@@ -78,7 +84,7 @@ sidebar_ui_options() {
     --color="$fzf_colors" --delimiter=$'\t' --with-nth=2 --nth=1..
     --no-sort --track --id-nth=3 --disabled --layout=reverse --border=none
     --gutter=' ' --scrollbar="$scrollbar"
-    --footer-border=line --no-input --info=hidden --no-separator --prompt="$prompt" --pointer="$pointer" --marker="$marker" --header-lines=1
+    --footer-border=line --no-input --info=hidden --no-separator --prompt="$prompt" --pointer="$pointer" --marker="$marker" --header=' '
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
     --preview-label=' Preview ' --preview-label-pos=2
     --bind='j:down,k:up'
@@ -92,11 +98,9 @@ sidebar_ui_options() {
     --bind="ctrl-o:bg-transform($jump_cmd)"
     --bind="F:execute-silent($filter_cmd $detach)"
     --bind="ctrl-f:execute-silent($filter_cmd $detach)"
-    # Force header replacement after reload-sync (including error recovery).
-    # Both actions run in one event, without an intermediate painted frame.
-    # The same shell shows the agent summary sidebar-source stored for this
-    # load; an empty one hides the footer and its separator.
-    --bind="load:+transform([ -n \"\$TMUX_CANOPY_STATE\" ] && touch \"\$TMUX_CANOPY_STATE.ready\"; $footer_cmd)+change-header-lines(0)+change-header-lines(1)"
+    # Explicit header text avoids reload-sync's stale input-header state and
+    # the full-list redraws caused by toggling the input-header line count.
+    --bind="load:+transform{[ -n \"\$TMUX_CANOPY_STATE\" ] && touch \"\$TMUX_CANOPY_STATE.ready\"; $load_cmd}"
     --bind="/:execute-silent([ -z \"\$TMUX_CANOPY_STATE\" ] || touch \"\$TMUX_CANOPY_STATE.search\")+show-input+enable-search+clear-query+unbind($search_unbind)+transform($footer_cmd)"
     --bind="esc:$esc_cmd"
     # Help owns a separate popup terminal; keep the current sidebar painted.
@@ -139,16 +143,23 @@ sidebar_ui_options() {
     --bind="N:execute-silent(($action_cmd create-session-prompt {1}; $refresh) $detach)"
     --bind="z:execute-silent($action_cmd zoom {1})+reload-sync($source_cmd --stable)"
     --bind="b:execute-silent($action_cmd break-window {1})+reload-sync($source_cmd --stable)"
-    --bind="ctrl-r:clear-screen+reload-sync($source_cmd --stable)"
-    --bind='ctrl-l:clear-screen'
+    --bind="ctrl-r:reload-sync($source_cmd --stable)"
+    --bind='ctrl-j:down,ctrl-k:up'
     --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'
   )
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     SIDEBAR_FZF_ARGS+=(
       --bind='q:abort'
-      --bind="load:transform([ -n \"\$TMUX_CANOPY_STATE\" ] && touch \"\$TMUX_CANOPY_STATE.ready\"; $footer_cmd)"
+      --bind="load:transform{[ -n \"\$TMUX_CANOPY_STATE\" ] && touch \"\$TMUX_CANOPY_STATE.ready\"; $load_cmd}"
       --bind="result-final:transform($action_cmd popup-focus)+unbind(result-final)"
+    )
+  else
+    # vim-tmux-navigator forwards these keys to fzf instead of moving panes.
+    # Ctrl-h is also Backspace in many terminals; search keeps text editing.
+    SIDEBAR_FZF_ARGS+=(
+      --bind="ctrl-h:transform(if [ -e \"\$TMUX_CANOPY_STATE.search\" ]; then printf backward-delete-char; else printf '%s' 'execute-silent(tmux select-pane -t \"\$TMUX_PANE\" -L)'; fi)"
+      --bind='ctrl-l:execute-silent(tmux select-pane -t "$TMUX_PANE" -R)'
     )
   fi
 }

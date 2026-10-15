@@ -346,16 +346,20 @@ printf 'ok - marks and moves panes and windows through the stateful tree\n'
 
 rm -f "$state_file"
 
+before_refusal="$("${TMUX_TEST[@]}" list-panes -a -F '#{pane_id}|#{window_id}|#{pane_width}|#{pane_height}')"
+run_in_server "$destination" "'$PROJECT_DIR/scripts/toggle' 'client-b' '$destination' 36 global"
+sleep 0.3
+[[ -z "$(sidebar_for_owner client-b)" ]] || fail 'a second client must not create a competing dock'
+assert_eq "$sidebar" "$(sidebar_for_owner client-a)" 'refusal preserves the current owner'
+assert_eq "$before_refusal" "$("${TMUX_TEST[@]}" list-panes -a -F '#{pane_id}|#{window_id}|#{pane_width}|#{pane_height}')" 'refusal leaves pane geometry unchanged'
+run_in_server "$destination" "'$PROJECT_DIR/scripts/toggle' 'client-a' '$destination' 42 global"
+sleep 0.3
+[[ -z "$(sidebar_for_owner client-a)" ]] || fail 'the owner closes its dock'
 run_in_server "$destination" "'$PROJECT_DIR/scripts/toggle' 'client-b' '$destination' 36 global"
 sleep 0.5
 sidebar_b="$(sidebar_for_owner client-b)"
-[[ -n "$sidebar_b" && "$sidebar_b" != "$sidebar" ]] || fail 'different clients own different sidebar panes'
-
-run_in_server "$destination" "'$PROJECT_DIR/scripts/toggle' 'client-a' '$destination' 42 global"
-sleep 0.3
-[[ -z "$(sidebar_for_owner client-a)" ]] || fail 'toggle closes only the invoking client sidebar'
-assert_eq "$sidebar_b" "$(sidebar_for_owner client-b)" 'closing one client sidebar leaves another client sidebar intact'
-printf 'ok - ownership and toggling are client-scoped\n'
+[[ -n "$sidebar_b" ]] || fail 'a different client can open after the owner closes'
+printf 'ok - one live dock owner preserves geometry and ownership can transfer after close\n'
 
 # Simulate an unexpected sidebar death and verify hook-independent maintenance.
 sidebar_b_cache_key="$(printf '%s' client-b | cksum | awk '{ print $1 }')"

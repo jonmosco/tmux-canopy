@@ -31,6 +31,8 @@ help_records() {
   key 'Ctrl-g' 'Search all sessions, windows and panes, including collapsed branches; Enter switches, Esc cancels'
   key 'Esc' 'Leave search and clear its query'
   key 'Ctrl-r' 'Refresh; retry if data is unavailable'
+  key 'Ctrl-h / Ctrl-l' 'In a dock, focus the left / right pane; Ctrl-h is Backspace while searching'
+  key 'Ctrl-j / Ctrl-k' 'Move the selection down / up'
   note 'The green dot shows the active location. The highlighted row is your selection.'
 
   note 'Text-filter prompts use tmux prompt keys; Ctrl-c cancels.'
@@ -108,6 +110,7 @@ help_records() {
 
   section 'Appearance and behavior'
   note 'Set @tmux-canopy-mode to sidebar (default), popup, or auto (popup on narrow screens, sidebar otherwise).'
+  note 'One dock can own a tmux server. Close it from its owning terminal before opening another; other clients can use popup mode without changing dock geometry.'
   note 'Set @tmux-canopy-position to left (default) or right, then close and reopen the sidebar. Right-side mouse resizing is live; release saves the width.'
   note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
@@ -117,12 +120,14 @@ help_records() {
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. On by default in quiet; set off to keep pane rows.'
   note 'Press Shift-a to show or hide agent mode. @tmux-canopy-agents on is only the default for clients that have not chosen. Integrations stay installed either way.'
   note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight. Session and window selections use their active content pane.'
+  note 'Default selection highlights the row with a dark-gray background. @tmux-canopy-selection-background sets a palette index or RGB background to suit your theme; reopen after changing it.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
 
 legend_records() {
   section 'Location and selection'
   legend_item '›' 'Selected row and highlight. Move with j/k; Enter focuses it. It may differ from the active pane.' cyan
+  note 'Default selection uses a background row highlight, not an underline. An explicit selection background or reverse/solid style changes that emphasis; the green dot still marks the active location.'
   legend_item '▶ / ● green' 'Your current content pane: ▶ at the edge by default, ● by its name in quiet (> with ASCII icons). Folded branches carry ▶ (> with ASCII icons) on their folder, window or session.' green
   legend_item 'bold name' 'Current session or window.'
   legend_item '▼ / ▶' 'Open / folded branch, left of its name (▾ / ▸ in quiet and classic).'

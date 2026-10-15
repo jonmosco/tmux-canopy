@@ -21,16 +21,8 @@ fi
 
 sidebar_pane="$(sidebar_for_client "$client")"
 
-# Adopt sidebars created before client ownership was introduced rather than
-# leaving behind an orphan or opening a duplicate.
-if [[ -z "$sidebar_pane" ]]; then
-  sidebar_pane="$(unowned_sidebar)"
-  if [[ -n "$sidebar_pane" ]]; then
-    tmux set-option -p -t "$sidebar_pane" @tmux_canopy_client "$client"
-  fi
-fi
-
-if [[ -n "$sidebar_pane" ]]; then
+toggle_close_sidebar() {
+  local restore_zoom_pane
   restore_zoom_pane="$(tmux show-option -pqv -t "$sidebar_pane" @tmux_canopy_restore_zoom_pane 2>/dev/null || true)"
   clear_sidebar_cache "$client"
   close_sidebar_pane "$sidebar_pane"
@@ -39,13 +31,9 @@ if [[ -n "$sidebar_pane" ]]; then
     tmux resize-pane -Z -t "$restore_zoom_pane" 2>/dev/null || true
   fi
   exit 0
-fi
+}
 
-# Preflight precedes unzoom/splitting: a missing/incompatible dependency must
-# not disturb application geometry. Closing an existing dock needs no preflight.
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/ui-options.sh"
-sidebar_preflight "$client" "$target_pane" || exit 1
+[[ -z "$sidebar_pane" ]] || toggle_close_sidebar
 
 # One batched display-message call retrieves all geometry options and window
 # attributes instead of 10-12 sequential tmux invocations.
@@ -78,6 +66,43 @@ if [[ "$mode" == 'popup' ]]; then
 elif [[ "$mode" == 'auto' ]]; then
   if [[ "$window_width" =~ ^[1-9][0-9]*$ ]] && ((window_width < popup_threshold)); then
     use_popup=1
+  fi
+fi
+
+# Closing an existing dock needs no preflight. Opening must pass before any
+# application geometry changes, including automatic unzoom.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/ui-options.sh"
+sidebar_preflight "$client" "$target_pane" || exit 1
+
+if ((!use_popup)); then
+  # Claim before adopting, unzooming or changing server-wide runtime width.
+  # Competing shells cannot both pass a read-then-split ownership check.
+  if ! claim_sidebar_dock; then
+    tmux display-message -c "$client" 'tmux-canopy: another terminal owns or is opening the dock; close it there or set @tmux-canopy-mode popup' 2>/dev/null || true
+    exit 0
+  fi
+  trap release_sidebar_dock EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  dock_inventory="$(live_sidebar_docks)" || {
+    sidebar_failure "$client" dock-ownership 'Cannot inspect dock ownership. Retry or set @tmux-canopy-mode popup.'
+    exit 1
+  }
+  legacy_pane=''
+  while IFS='|' read -r dock_pane dock_marker dock_owner; do
+    [[ -n "$dock_pane" ]] || continue
+    if [[ "$dock_marker" != 1 || ( -n "$dock_owner" && "$dock_owner" != "$client" ) ]]; then
+      tmux display-message -c "$client" 'tmux-canopy: another terminal owns or is opening the dock; close it there or set @tmux-canopy-mode popup' 2>/dev/null || true
+      exit 0
+    fi
+    legacy_pane="$dock_pane"
+  done <<< "$dock_inventory"
+  # Preserve legacy adoption only when no other owned dock can be disturbed.
+  if [[ -n "$legacy_pane" ]]; then
+    sidebar_pane="$legacy_pane"
+    tmux set-option -p -t "$sidebar_pane" @tmux_canopy_client "$client"
+    toggle_close_sidebar
   fi
 fi
 
@@ -116,6 +141,8 @@ if ((!use_popup)); then
 fi
 
 if ((use_popup)); then
+  release_sidebar_dock
+  trap - EXIT INT TERM HUP
   exec tmux display-popup -c "$client" -t "$target_pane" \
     -w "$popup_width" -h "$popup_height" \
     -T ' Canopy · q/Esc close · Enter focus ' -E \
@@ -138,21 +165,16 @@ placement=(-b)
 sidebar_pane="$(
   tmux split-window -d -h "${placement[@]}" -f -l "$width" -t "$target_pane" -P -F '#{pane_id}' \
     -e "TMUX_CANOPY_CLIENT=$client" -e "TMUX_CANOPY_WIDTH=$width" \
+    -e "TMUX_CANOPY_TARGET=$target_pane" -e "TMUX_CANOPY_POSITION=$position" \
+    -e "TMUX_CANOPY_RESTORE_ZOOM=$restore_zoom_pane" \
     -e "TMUX_CANOPY_SCOPE=$scope" -e "TMUX_CANOPY_KEY=$toggle_key" \
     -e "TMUX_CANOPY_LAST_KEY=$last_window_key" -e "TMUX_CANOPY_TRANSITION=$transition" \
     -e "TMUX_CANOPY_FZF_BINARY=$SIDEBAR_FZF_BINARY" -e "TMPDIR=${TMPDIR:-/tmp}" \
-    "$BASH" "$SCRIPT_DIR/sidebar" 2>/dev/null
+    "$BASH" "$SCRIPT_DIR/sidebar" "tmux-canopy-dock:${CANOPY_DOCK_CLAIM%%|*}" 2>/dev/null
 )"
 
 if [[ -n "$sidebar_pane" ]]; then
-  # Publish the internal marker only after ownership/target metadata is ready.
-  tmux set-option -p -t "$sidebar_pane" @tmux_canopy_client "$client" \; \
-    set-option -p -t "$sidebar_pane" @tmux_canopy_target "$target_pane" \; \
-    set-option -p -t "$sidebar_pane" @tmux_canopy_position "$position" \; \
-    set-option -p -t "$sidebar_pane" @tmux_canopy 1
-  if [[ -n "$restore_zoom_pane" ]]; then
-    tmux set-option -p -t "$sidebar_pane" @tmux_canopy_restore_zoom_pane "$restore_zoom_pane"
-  fi
+  publish_sidebar_dock "$sidebar_pane" "$client" "$target_pane" "$position" "$restore_zoom_pane"
   cache_sidebar_for_client "$client" "$sidebar_pane"
   tmux select-pane -t "$sidebar_pane" \; \
     if-shell -F -t "$sidebar_pane" "$(sidebar_empty_window_condition)" \

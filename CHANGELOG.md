@@ -4,6 +4,9 @@
 
 ### Changed
 
+- A tmux server now admits one live dock owner at a time. Competing requests leave the owner's layout, focus, zoom and width preference unchanged and suggest popup mode, which remains independently owned. Concurrent opening is serialized and interrupted openers cannot leave a permanent claim.
+- Restored the default subtle selection's full-row dark-gray background highlight instead of underlining. Explicit palette/RGB selection backgrounds and the other selection styles remain available.
+- Ctrl-h and Ctrl-l leave a dock toward the left or right pane when vim-tmux-navigator forwards them to fzf. Ctrl-h remains Backspace during search, and Ctrl-j/k move the selection.
 - Every appearance now names only the open view in its header instead of spending space on a permanent `Tree Agents Proc Buff` tab strip. Tree keeps its active filter, Agents keeps its state summary, Processes and Buffers put their row count on the right, and agent mode off remains explicit.
 - Every view and appearance now has a responsive action footer instead of workspace or agent inventory counts. Tree advertises focus, actions, search, and help; Agents advertises focus, the next waiting agent, reply, and summary; Processes advertises focus, actions, and preview; Buffers advertises paste, actions, delete, and search. Lower-priority hints disappear as the sidebar narrows, while a waiting agent or pending move, link, or delete temporarily takes priority.
 - Previews show a directory under your home directory as `~/…` in the window preview and the agent summary too, as the pane preview already did, leaving room for the rest of the path.
@@ -12,6 +15,9 @@
 
 ### Fixed
 
+- Refresh no longer clears the sidebar before new data arrives. Explicit header updates replace input-header reset redraws and keep empty views and source recovery current without restarting fzf or losing search/selection.
+- A delayed background focus snapshot can no longer overwrite a newer tree refresh, including a rename or appearance change.
+- Delayed native resize callbacks no longer restore an older width or replace the saved preference. No-transition follow hooks leave live geometry alone, and close-time balancing runs only when multiple content panes become one, not on ordinary resize events.
 - The default quiet sidebar could show “Sidebar data unavailable” with Git context off. Rendering discarded directory rows still accessed an absent Git label, triggering a fatal GNU awk error. Quiet no longer formats those unused rows.
 
 ## 0.4.0 - 2026-10-11

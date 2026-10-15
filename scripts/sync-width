@@ -27,19 +27,24 @@ done < <(tmux show-options -gq @tmux-canopy-min-width \; show-options -gq @tmux-
 # after-resize hook carries an intermediate width; the release handler owns
 # the final commit and must not race a worker restoring that earlier width.
 [[ "$drag_native" != 1 ]] || exit 0
+# A queued native hook may arrive after a newer resize. Never restore its old
+# geometry or save its obsolete preference.
+[[ "$current_width" == "$width" ]] || exit 0
 
 : "${min_content:=40}"
 : "${minimum:=24}"
 : "${maximum:=0}"
 requested="$width"
 width="$(clamp_sidebar_width_for_total "$total" "$requested" "$minimum" "$maximum" "$min_content")" || exit 0
-if [[ "$current_width" != "$width" ]]; then
-  tmux resize-pane -t "$pane_id" -x "$width" 2>/dev/null || true
-fi
-
-# $$ separates concurrent workers; date +%N is not portable (macOS prints N).
+# Recheck in tmux's queue: focus/geometry may change after the snapshot.
 nonce="${EPOCHREALTIME:-$SECONDS}-$$-$RANDOM"
-tmux set-option -gq @tmux_canopy_resize_nonce "$nonce" \; set-option -gq @tmux_canopy_runtime_width "$requested"
+condition="#{&&:#{==:#{@tmux_canopy},1},#{&&:#{!=:#{@tmux_canopy_drag_native},1},#{==:#{pane_width},$current_width}}}"
+body="set-option -gq @tmux_canopy_resize_nonce '$nonce' ; set-option -gq @tmux_canopy_runtime_width '$requested'"
+[[ "$current_width" == "$width" ]] || body+=" ; resize-pane -t $(tmux_quote "$pane_id") -x $width"
+body+=' ; display-message -p width-committed'
+committed=''
+IFS= read -r committed < <(tmux if-shell -F -t "$pane_id" "$condition" "$body" 2>/dev/null) || true
+[[ "$committed" == width-committed ]] || exit 0
 
 # Interactive dragging can emit many resize hooks. Only the most recent width
 # is propagated to inactive slot panes.
