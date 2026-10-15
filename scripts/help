@@ -7,17 +7,103 @@ toggle_key="${toggle_key//[[:cntrl:]]/ }"
 last_window_key="${last_window_key//[[:cntrl:]]/ }"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/launch-lib.sh"
-if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
 legend_mode=0
-if [[ "${1:-}" == --legend ]]; then legend_mode=1; shift; fi
+context_token="${TMUX_CANOPY_HELP_TOKEN:-}"
+while (($#)); do
+  case "$1" in
+    --legend) legend_mode=1; shift ;;
+    --context)
+      if (($# >= 2)); then context_token="$2"; shift 2; else shift; fi
+      ;;
+    *) break ;;
+  esac
+done
 legend_args=()
 if ((legend_mode)); then legend_args=(--legend); fi
+help_view="${TMUX_CANOPY_HELP_VIEW:-tree}"
+if [[ -n "${TMUX_CANOPY_STATE:-}" && -r "$TMUX_CANOPY_STATE" ]]; then
+  while IFS=$'\t' read -r kind value _; do
+    [[ "$kind" != VIEW ]] || { help_view="$value"; break; }
+  done < "$TMUX_CANOPY_STATE"
+fi
+case "$help_view" in tree|processes|buffers|agents) ;; *) help_view=tree ;; esac
+if canopy_agents_enabled; then agents_enabled=on; else agents_enabled=off; fi
 
 section() { printf 'S\t%s\n' "$1"; }
 key() { printf 'K\t%s\t%s\n' "$1" "$2"; }
 note() { printf 'N\t%s\n' "$1"; }
 legend_item() { printf 'L\t%s\t%s\t%s\n' "$1" "$2" "${3:-}"; }
+context_help_records() {
+  case "$help_view" in
+    processes)
+      section 'Current process'
+      key 'Enter' 'Focus the pane that owns the selected process'
+      key 'a' 'Open process actions'
+      key 'p / Shift-p' 'Show the preview drawer / open a larger preview'
+      key '/' 'Search visible processes'
+      ;;
+    buffers)
+      section 'Current buffer'
+      key 'Enter' 'Paste the selected buffer into the target pane'
+      key 'a' 'Open buffer actions, including yank to the system clipboard'
+      key 'x, then x' 'Confirm deletion of the selected buffer'
+      key 'p / Shift-p' 'Show the preview drawer / open a larger preview'
+      ;;
+    agents)
+      section 'Current agent'
+      key 'Enter' 'Focus the selected agent pane'
+      key 'n' 'Jump to the next agent needing input'
+      key '>' 'Reply or send a line to the selected pane'
+      key 'i' 'Show the agent summary in the preview drawer'
+      key 'a' 'Open pane actions'
+      ;;
+    *)
+      case "$context_token" in
+        S:*)
+          section 'Current session'
+          key 'Enter' 'Focus its active pane'
+          key 'h / l' 'Collapse or expand the session'
+          key 'a' 'Open session actions'
+          key 't' 'Create a window in the session'
+          ;;
+        W:*)
+          section 'Current window'
+          key 'Enter' 'Focus its active pane'
+          key 'h / l' 'Collapse or expand the window'
+          key 'a' 'Open window actions'
+          key 'z' 'Zoom or unzoom its active pane'
+          key '>' 'Send a line to its active pane'
+          ;;
+        DIR:*)
+          section 'Current directory group'
+          key 'Enter' 'Focus its selected pane'
+          key 'h / l' 'Collapse or expand the directory group'
+          key 'a' 'Open pane actions'
+          key 'p / Shift-p' 'Show the preview drawer / open a larger preview'
+          ;;
+        P:*|Q:*)
+          section 'Current pane'
+          key 'Enter' 'Focus the selected pane'
+          key 'a' 'Open pane actions'
+          key 'z' 'Zoom or unzoom the pane'
+          key '>' 'Send a line to the pane'
+          key 'p / Shift-p' 'Show the preview drawer / open a larger preview'
+          ;;
+        *)
+          section 'Current Tree view'
+          key 'Enter' 'Focus the selected object'
+          key 'h / l' 'Collapse or expand a branch'
+          key 'F / Ctrl-f' 'Filter the tree'
+          key '/' 'Search visible rows'
+          ;;
+      esac
+      ;;
+  esac
+  note 'Full command reference follows.'
+}
+
 help_records() {
+  context_help_records
   section 'Navigation'
   key 'j / Down' 'Move down'
   key 'k / Up' 'Move up'
@@ -287,6 +373,7 @@ if [[ "${1:-}" != --render ]]; then
         tmux display-popup -c "$owner" -t "$TMUX_PANE" -w "$popup_width" -h "$popup_height" \
           -T "$popup_title" -E -e "TMUX_CANOPY_KEY=$toggle_key" \
           -e "TMUX_CANOPY_LAST_KEY=$last_window_key" \
+          -e "TMUX_CANOPY_HELP_VIEW=$help_view" -e "TMUX_CANOPY_HELP_TOKEN=$context_token" \
           "$BASH" "$SCRIPT_DIR/help" "${legend_args[@]}" --render && exit 0
       fi
       break

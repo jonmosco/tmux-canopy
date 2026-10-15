@@ -24,7 +24,7 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
    ```
 
 2. Press **prefix + I** to install.
-3. Press **prefix + T** to open the sidebar (with the default prefix: **Ctrl-b**, then **Shift-t**). Press `?` inside it for every key.
+3. Press **prefix + T** to open the sidebar (with the default prefix: **Ctrl-b**, then **Shift-t**). Press `?` inside it for actions relevant to the current view and selection, followed by the full key reference.
 
 For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/canopy setup` and pick your agents (see [AI agent monitoring](#ai-agent-monitoring)). [Manual installation](#install) needs no plugin manager.
 
@@ -94,7 +94,7 @@ With agent mode on, Canopy finds agents running in any pane of any session and s
 - **What it's waiting for:** an agent that needs input shows the command it wants to run, or its question, on a dim line beneath its pane.
 - **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
 - **Reply without switching (`>`):** type a line into the selected pane from a tmux prompt; your focus stays where it is.
-- **Summary drawer (`i`):** the selected agent's state, its age, and the pending request when the agent reports one.
+- **Summary drawer (`i`):** the selected agent's state, its age, pending request, and recent terminal output. A pane without a detected agent remains useful by falling back to its terminal preview.
 - **Alerts (optional):** a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, skipped while you're looking at that pane. Off by default; see [Alerts](#alerts).
 
 Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in your tmux configuration, then reload and reopen the sidebar. Press `A` in the sidebar to switch it on or off for just your client.
@@ -268,9 +268,12 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `f` | Show / hide the footer |
 | `[` / `]` / `w` | Previous / next / cycle width presets |
 | `Ctrl-r` | Refresh |
-| `Ctrl-h` / `Ctrl-l` | Focus the left / right pane from a dock; `Ctrl-h` edits the query while searching |
+1: | `Ctrl-h` / `Ctrl-l` | Focus the left / right pane from a dock; `Ctrl-h` edits the query while searching |
 | `Ctrl-j` / `Ctrl-k` | Move the selection down / up |
-| `?` | Scrollable help popup (wheel or `j`/`k` to scroll) |
+| `?` | Scrollable help popup, starting with actions for the current view and selection (wheel or `j`/`k` to scroll) |
+2: | `Ctrl-h` / `Ctrl-l` | Focus the pane to the left / right from a dock; Ctrl-h remains Backspace while searching |
+| `Ctrl-j` / `Ctrl-k` | Move selection down / up |
+| `?` | Open scrollable Help, starting with actions for the current view and selection; the wheel, `j`/`k`, or arrows scroll, Space pages, `q`/Esc closes |
 | `g` | Scrollable symbol and color legend (wheel also works) |
 | Mouse | In the tree, click selects, double-click focuses, and the wheel scrolls; in Help/Legend, the wheel scrolls (needs `set -g mouse on`) |
 | `Ctrl-q` | Close the sidebar |

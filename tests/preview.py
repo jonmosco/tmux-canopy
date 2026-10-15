@@ -201,7 +201,8 @@ while True:
                 wait(lambda: 'ROW079' in capture(), 'drawer reshown')
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
-            wait(lambda: 'No supported agent process found' in capture(), 'agent drawer shown')
+            wait(lambda: 'Terminal · no agent detected' in capture(), 'agent drawer terminal fallback shown')
+            assert 'ROW079' in capture()
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
             wait(lambda: 'ROW079' in capture(), 'terminal drawer restored')

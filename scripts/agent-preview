@@ -19,10 +19,10 @@ if [[ ! "$pane" =~ ^%[0-9]+$ ]]; then
 fi
 sep=$'\037'
 clean=$'s/[\001-\037\177]/ /'
-format="#{pane_id}$sep#{pane_pid}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_title}$sep#{${clean}:pane_current_path}$sep#{${clean}:session_name}$sep#{window_index}$sep#{${clean}:window_name}$sep#{@tmux_canopy}$sep#{@tmux_canopy_slot}"
+format="#{pane_id}$sep#{pane_pid}$sep#{${clean}:pane_current_command}$sep#{${clean}:pane_title}$sep#{${clean}:pane_current_path}$sep#{${clean}:session_name}$sep#{window_index}$sep#{${clean}:window_name}$sep#{@tmux_canopy}$sep#{@tmux_canopy_slot}$sep#{cursor_y}"
 metadata="$(tmux display-message -p -t "$pane" "$format" 2>/dev/null)" || metadata=''
 if [[ -z "$metadata" ]]; then printf 'Pane %s is no longer available.\n' "$pane"; exit 0; fi
-IFS="$sep" read -r actual pid command title directory session index window sidebar slot <<< "$metadata"
+IFS="$sep" read -r actual pid command title directory session index window sidebar slot cursor_y <<< "$metadata"
 if [[ "$actual" != "$pane" ]]; then
   printf 'Pane %s is no longer available.\n' "$pane"; exit 0
 fi
@@ -79,19 +79,31 @@ case "$kind" in
   grok) agent='Grok Build' ;;
   hermes) agent='Hermes' ;;
 esac
+rows="${FZF_PREVIEW_LINES:-12}"
+columns="${FZF_PREVIEW_COLUMNS:-42}"
+[[ "$rows" =~ ^[1-9][0-9]{0,4}$ ]] || rows=12
+[[ "$columns" =~ ^[1-9][0-9]{0,4}$ ]] || columns=42
 if [[ -z "$agent" ]]; then
-  printf 'No supported agent process found in pane %s.\n' "$pane"
-  printf 'Select a pane running an agent, or press i for terminal preview.\n'
+  printf 'Terminal · no agent detected\n'
+  if ((rows > 1)); then
+    FZF_PREVIEW_LINES=$((rows - 1)) "${BASH_SOURCE[0]%/*}/pane-preview" "$pane"
+  fi
   exit 0
 fi
-columns="${FZF_PREVIEW_COLUMNS:-42}"
-[[ "$columns" =~ ^[1-9][0-9]{0,3}$ ]] || columns=42
+used=0
 printf '%s · %s:%s %s · %s\n' "$agent" "$session" "$index" "$window" "$pane"
-[[ -z "$title" || "$title" == "$command" ]] || printf 'Title: %s\n' "$title"
+((used+=1))
+if [[ -n "$title" && "$title" != "$command" ]]; then
+  printf 'Title: %s\n' "$title"
+  ((used+=1))
+fi
 # shellcheck disable=SC1091
 source "${BASH_SOURCE[0]%/*}/path-lib.sh"
 canopy_home_path directory
 printf 'Directory: %s\n' "$directory"
+((used+=1))
+reported=0
+infer_request=1
 if [[ "$pid" =~ ^[0-9]+$ ]]; then
   # shellcheck disable=SC1091
   source "$(dirname "$0")/../lib/agent-process.sh"
@@ -115,46 +127,73 @@ if [[ "$pid" =~ ^[0-9]+$ ]]; then
       if [[ "$kind" == opencode ]]; then source_name="$agent plugin (session association unverified)"; else source_name="$agent lifecycle hook"; fi
       printf 'Source: %s · reported %ss ago\n' "$source_name" "$age"
       printf 'Status: %s\n' "$label"
+      ((used+=2))
       if [[ "$report_status" == needs-input ]]; then
-        [[ -z "$report_tool" ]] || printf 'Tool: %s\n' "$report_tool"
-        [[ -z "$report_summary" ]] || printf 'Request: %s\n' "$report_summary"
-        [[ -z "$report_command" ]] || printf 'Command: %s\n' "$report_command"
+        if [[ -n "$report_tool" ]]; then printf 'Tool: %s\n' "$report_tool"; ((used+=1)); fi
+        if [[ -n "$report_summary" ]]; then printf 'Request: %s\n' "$report_summary"; ((used+=1)); fi
+        if [[ -n "$report_command" ]]; then printf 'Command: %s\n' "$report_command"; ((used+=1)); fi
       fi
-      exit 0
+      reported=1
+      infer_request=0
     fi
-    if [[ "$kind" == opencode ]]; then source_name="$agent plugin (session association unverified)"; else source_name="$agent lifecycle hook"; fi
-    printf 'Source: %s · last report %ss ago\n' "$source_name" "$age"
-    exit 0
+    if ((reported == 0)); then
+      if [[ "$kind" == opencode ]]; then source_name="$agent plugin (session association unverified)"; else source_name="$agent lifecycle hook"; fi
+      printf 'Source: %s · last report %ss ago\n' "$source_name" "$age"
+      ((used+=1))
+      reported=1
+      infer_request=0
+    fi
   fi
 fi
-printf 'Source: visible terminal text · snapshot only\n\n'
+if ((reported == 0)); then
+  printf 'Source: visible terminal text · snapshot only\n'
+  ((used+=1))
+fi
 # Capture the current screen only. History can contain prompts already answered.
-# The label is deliberately tentative: terminal text cannot prove request state.
-tmux capture-pane -p -t "$pane" 2>/dev/null | awk -v width="$columns" '
-  function wrap(value,    take,part) {
+# Hook reports provide state; screen wording is only interpreted when no fresh
+# or stale report can establish it. The active cursor row is still available
+# for request inference, but omitted from the terminal tail so the agent input
+# prompt does not displace useful output.
+available=$((rows - used))
+((available > 0)) || exit 0
+cursor_line=0
+[[ "$cursor_y" =~ ^[0-9]+$ ]] && cursor_line=$((cursor_y + 1))
+tmux capture-pane -p -t "$pane" 2>/dev/null | awk \
+  -v limit="$available" -v infer="$infer_request" -v cursor="$cursor_line" '
+  function clipped(value) {
     gsub(/^[ \t]+|[ \t]+$/, "", value)
-    if (value=="") return
-    while (length(value)>width-2) {
-      take=width-2; part=substr(value,1,take)
-      if (part ~ / /) { sub(/ [^ ]*$/, "", part); if (part!="") take=length(part) }
-      print "  " substr(value,1,take)
-      value=substr(value,take+1); sub(/^[ \t]+/, "", value)
-    }
-    print "  " value
+    if (value=="") return ""
+    return value
   }
   { line[++n]=$0 }
   END {
     while (n>0 && line[n] ~ /^[ \t]*$/) n--
-    first=n-11; if (first<1) first=1
     request=""
-    for (i=first;i<=n;i++) {
-      value=tolower(line[i])
-      if (value ~ /(permission needed|needs your (approval|permission)|do you want to (run|allow|approve|proceed|trust)|would you like to (run|allow|approve|proceed)|press (enter|y) to (approve|confirm)|allow (once|always)|yes, allow|trust the files in this folder)/) request=line[i]
+    first=n-11; if (first<1) first=1
+    if (infer) {
+      for (i=first;i<=n;i++) {
+        value=tolower(line[i])
+        if (value ~ /(permission needed|needs your (approval|permission)|do you want to (run|allow|approve|proceed|trust)|would you like to (run|allow|approve|proceed)|press (enter|y) to (approve|confirm)|allow (once|always)|yes, allow|trust the files in this folder)/) request=clipped(line[i])
+      }
+      if (request!="" && limit>=4) {
+        print "Possible input requested (unverified):"
+        print "  " request
+        limit-=2
+      } else if (limit>=3) {
+        print "No clear request visible in the current screen."
+        limit--
+      }
+      if (limit>=3) { print ""; limit-- }
     }
-    if (request!="") { print "Possible input requested (unverified):"; wrap(request) }
-    else print "No clear request visible in the current screen."
-    print ""; print "Recent screen:"
-    first=n-5; if (first<1) first=1
-    for (i=first;i<=n;i++) if (line[i] !~ /^[ \t]*$/) wrap(line[i])
+    if (limit>0) {
+      print "Recent screen:"
+      limit--
+      count=0
+      for (i=n;i>=1 && count<limit;i--) {
+        value=clipped(line[i])
+        if (i!=cursor && value!="") recent[++count]=value
+      }
+      for (i=count;i>=1;i--) print "  " recent[i]
+    }
   }
 '

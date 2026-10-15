@@ -104,7 +104,7 @@ sidebar_ui_options() {
     --bind="/:execute-silent([ -z \"\$TMUX_CANOPY_STATE\" ] || touch \"\$TMUX_CANOPY_STATE.search\")+show-input+enable-search+clear-query+unbind($search_unbind)+transform($footer_cmd)"
     --bind="esc:$esc_cmd"
     # Help owns a separate popup terminal; keep the current sidebar painted.
-    --bind="?:execute-silent($help_cmd $detach)"
+    --bind="?:execute-silent($help_cmd --context {1} $detach)"
     --bind="g:execute-silent($help_cmd --legend $detach)"
     # View changes must work even when the current view has no selectable row.
     --bind="1:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-tree)+reload-sync($source_cmd --stable)"

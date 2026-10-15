@@ -100,9 +100,12 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
-| `Ctrl-h` / `Ctrl-l` | Focus the pane to the left / right from a dock; Ctrl-h remains Backspace while searching |
+1: | `Ctrl-h` / `Ctrl-l` | Focus the left / right pane from a dock; `Ctrl-h` edits the query while searching |
+| `Ctrl-j` / `Ctrl-k` | Move the selection down / up |
+| `?` | Scrollable help popup, starting with actions for the current view and selection (wheel or `j`/`k` to scroll) |
+2: | `Ctrl-h` / `Ctrl-l` | Focus the pane to the left / right from a dock; Ctrl-h remains Backspace while searching |
 | `Ctrl-j` / `Ctrl-k` | Move selection down / up |
-| `?` | Open scrollable Help; the wheel, `j`/`k`, or arrows scroll, Space pages, `q`/Esc closes |
+| `?` | Open scrollable Help, starting with actions for the current view and selection; the wheel, `j`/`k`, or arrows scroll, Space pages, `q`/Esc closes |
 | `g` | Open the scrollable legend of tree symbols, colors, badges, and labels |
 | `Ctrl-q` | Close |
 | `q` / `Esc` | Close popup (in popup mode) |
@@ -679,9 +682,9 @@ The drawer keeps a consistent configured height (35% by default) while browsing.
 
 `Shift-p` opens an 85%-wide, 80%-high native tmux popup for the selected object. It uses `less -R -S` in secure mode: arrows scroll vertically/horizontally and `q` closes it. TUI snapshots include the whole current screen; shell snapshots include up to 300 recent physical rows. Popup sizing uses its own PTY dimensions, not the narrow drawer's inherited dimensions. Buffers and session/window/process metadata can also be inspected there.
 
-The **agent summary** is a read-only view for detected Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent`), GitHub Copilot CLI, Grok Build, Crush, and Hermes Agent processes. Press `i` while selecting a pane to switch the existing drawer from terminal preview to an agent summary; press `i` again to return. The summary automatically follows whichever supported agent is in the selected pane. Press `p` to hide or show the drawer. The choice belongs to the sidebar pane and lasts until it closes. A single-content-pane window also resolves to its pane. `Shift-p` continues to open the enlarged terminal preview.
+The **agent summary** is a read-only view for detected Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent`), GitHub Copilot CLI, Grok Build, Crush, and Hermes Agent processes. Press `i` while selecting a pane to switch the existing drawer from terminal preview to the combined agent summary and recent terminal output; press `i` again to return. The summary automatically follows whichever supported agent is in the selected pane. Press `p` to hide or show the drawer. The choice belongs to the sidebar pane and lasts until it closes. A single-content-pane window also resolves to its pane. `Shift-p` continues to open the enlarged terminal preview.
 
-The summary detects a supported agent command in the pane or its process descendants and shows its title and directory. Without an integration, it checks the visible screen for likely approval wording and labels any match **possible input requested (unverified)**. It does not inspect transcripts, agent configuration, or hidden terminal history. Without a supported agent process, the drawer explains that no agent was found.
+The summary detects a supported agent command in the pane or its process descendants and shows its title, directory, lifecycle state when available, and a bounded tail of the current terminal screen. The active cursor row is omitted from that tail so the agent's input prompt does not displace useful output. Without an integration, Canopy can still use that row while checking the visible screen for likely approval wording and labels any match **possible input requested (unverified)**. It does not inspect transcripts, agent configuration, or hidden terminal history. If the selected pane has no supported agent process, the same drawer falls back to its terminal preview instead of becoming a dead end.
 
 ### Agent lifecycle adapters
 

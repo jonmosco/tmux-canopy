@@ -30,7 +30,7 @@ try:
         install_agent_fixture(claude_binary)
         agent = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'studio', '-x', '120', '-y', '35',
                    '-P', '-F', '#{pane_id}',
-                   f"/bin/bash -c 'printf \"Do you want to run this command?\\n\"; exec {binary} 600'")
+                   f"/bin/bash -c 'printf \"Do you want to run this command?\\nAgent prompt>\"; exec {binary} 600'")
         tm('set-option', '-g', '@tmux-canopy-agents', 'on')
         window = tm('display-message', '-p', '-t', agent, '#{window_id}')
         session = tm('display-message', '-p', '-t', agent, '#{session_id}')
@@ -58,12 +58,12 @@ try:
             return result.stdout
 
         terminal = run('sidebar-preview', 'P:' + agent)
-        assert 'Do you want to run this command?' in terminal
+        assert 'Do you want to run this command?' in terminal and 'Agent prompt>' in terminal
         run('preview-mode')
         assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'agent'
         agent_view = run('sidebar-preview', 'P:' + agent)
-        assert 'Codex ·' in agent_view and 'Possible input requested (unverified)' in agent_view
-        assert 'Do you want to run this command?' in agent_view
+        assert 'Codex ·' in agent_view and 'Possible input requested (unverified)' in agent_view, agent_view
+        assert 'Do you want to run this command?' in agent_view and 'Agent prompt>' not in agent_view
         assert len(agent_view.splitlines()) <= 12
         def hook(event, pane=agent):
             result = sp.run([str(ROOT / 'scripts/codex-hook')],
@@ -80,7 +80,11 @@ try:
                         if line.startswith('P:' + pane + '\t'))
 
         hook({'hook_event_name': 'SessionStart', 'session_id': 'codex-session'})
-        assert 'Status: Ready' in report() and 'Source: Codex lifecycle hook' in report()
+        ready = report()
+        assert 'Status: Ready' in ready and 'Source: Codex lifecycle hook' in ready
+        assert 'Recent screen:' in ready and 'Do you want to run this command?' in ready
+        assert 'Agent prompt>' not in ready
+        assert len(ready.splitlines()) <= 12, ready
         assert 'READY' in tree_row(agent) and '·hook' in tree_row(agent)
         hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'codex-session', 'turn_id': 't1'})
         assert 'Status: Working' in report()
@@ -155,7 +159,10 @@ try:
         assert 'Do you want to proceed?' in claude_view
         assert len(claude_view.splitlines()) <= 12
         assert 'Claude Code ·' in run('sidebar-preview', 'W:' + claude_window + ':' + session)
-        assert 'No supported agent process found' in run('sidebar-preview', 'P:' + other)
+        fallback = run('sidebar-preview', 'P:' + other)
+        assert fallback.startswith('Terminal · no agent detected\n'), fallback
+        assert 'sleep' in fallback and 'No supported agent process found' not in fallback
+        assert len(fallback.splitlines()) <= 12, fallback
         assert 'Session: studio' in run('sidebar-preview', 'S:' + session)
         assert 'no longer available' in run('sidebar-preview', 'P:%999999'), run('sidebar-preview', 'P:%999999')
         assert 'Codex ·' not in run('sidebar-preview', 'P:' + agent,

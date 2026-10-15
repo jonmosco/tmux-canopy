@@ -99,6 +99,7 @@ clear_sidebar_cache() {
 claim_sidebar_dock() {
   local started observed holder live state body condition
   started="$(LC_ALL=C ps -p "$$" -o lstart= 2>/dev/null)" || return 1
+  read -r started <<< "$started"
   [[ -n "$started" ]] || return 1
   CANOPY_DOCK_CLAIM="$$.$RANDOM|$started"
   body="set-option -gq @tmux_canopy_dock_opening $(tmux_quote "$CANOPY_DOCK_CLAIM") ; display-message -p $(tmux_quote "$CANOPY_DOCK_CLAIM")"

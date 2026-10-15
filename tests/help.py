@@ -41,6 +41,23 @@ def main():
     assert 'Return to the last window' not in custom
     print('ok - narrow/wide layouts, complete command text, custom keys and bounded line widths')
 
+    with tempfile.TemporaryDirectory(prefix='canopy-help-context-', ignore_cleanup_errors=True) as directory:
+        state = Path(directory) / 'state'
+        contexts = (
+            ('tree', 'P:%1', 'Current pane', 'Send a line to the pane'),
+            ('processes', 'X:123:%1', 'Current process', 'Open process actions'),
+            ('buffers', 'B:sample', 'Current buffer', 'Paste the selected buffer'),
+            ('agents', 'P:%1', 'Current agent', 'Jump to the next agent needing input'),
+        )
+        for view, token, heading, action in contexts:
+            state.write_text(f'VIEW\t{view}\n')
+            contextual = subprocess.check_output(
+                [str(HELP), '--context', token, '--print', '80'],
+                text=True, env=env | {'TMUX_CANOPY_STATE': str(state)})
+            assert contextual.index(heading) < contextual.index('Navigation'), contextual
+            assert action in contextual, (view, contextual)
+    print('ok - help leads with actions for the current Tree, Processes, Buffers and Agents context')
+
     for width in (12, 24, 42, 60, 80):
         legend = subprocess.check_output([str(HELP), '--legend', '--print', str(width)],
                                          text=True, env=env)
@@ -82,7 +99,7 @@ def main():
 
             try:
                 wait_for(b'q close   1-14')
-                assert b'SIDEBAR HELP' in output and b'[j / Down]' in output
+                assert b'SIDEBAR HELP' in output and b'[Enter]' in output
                 assert b'\x1b[?1000h\x1b[?1006h' in output, 'mouse reporting not enabled'
                 assert (b'\x1b[1;36m' in output) == (theme == 'ansi')
                 send(b'\x1b[<65;12;8M')  # SGR wheel down

@@ -93,7 +93,8 @@ try:
             assert '[process]' in row and '·hook' not in row, (name, row)
             assert 'Source: visible terminal text' in run('agent-preview', pane, ['P:' + pane_id])
         assert not any(line.startswith('P:' + editor_pane + '\t') for line in agent_view.splitlines()), agent_view
-        assert 'No supported agent process' in run('agent-preview', pane, ['P:' + editor_pane])
+        fallback = run('agent-preview', pane, ['P:' + editor_pane])
+        assert fallback.startswith('Terminal · no agent detected\n') and 'nvim' in fallback, fallback
         # Crush is detected by process only (it has no lifecycle adapter yet).
         crush_row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes['crush'] + '\t'))
         assert 'Crush' in crush_row and '❖' in crush_row, crush_row
