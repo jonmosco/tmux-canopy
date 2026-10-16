@@ -299,27 +299,15 @@ To switch branch labels while tmux runs, type `canopy-branch` at the tmux comman
 
 Press `Ctrl-r` in the sidebar after changing a setting by hand or switching branches. Directory groups display `⎇ feature/name` (ASCII: `[git:feature/name]`); compact layouts show the branch beside the pane when space permits. The pane preview shows the full name even if a narrow tree omits it. A detached HEAD appears as `detached@<commit>`. This requires Git; if it is unavailable, no label is shown. Canopy reads Git metadata only on reload, once per distinct repository, and never runs `git status`, watches files, checks out branches, or creates worktrees. A `cd` without another tmux event may also require `Ctrl-r`, unless you enable the opt-in Bash notifier (`@tmux-canopy-directory-refresh 'on'` and `source …/scripts/directory-prompt.sh`).
 
-## Place labels (preview)
-
-Idle windows are all called `zsh`, which says nothing. Set `@tmux-canopy-labels 'places'` and `quiet` names each row by what tells it apart instead: the session heading shows the session's directory and branch, a row elsewhere shows where it is (` docs`, ` notes ⎇ main`), an idle shell shows its folder, and a running program sits dim on the right. Names you gave your windows always win, and tmux's own names and status line are untouched; if you have customised tmux's `automatic-rename-format`, Canopy keeps tmux's window names. See [Place labels](docs/reference.md#place-labels-preview).
-
-```text
-▾ ◈ canopy ──────────── tmux-canopy ⎇ main
-    ✳ 0:editor                         nvim
-    ▣ 1:tmux-canopy
-    ▣ 2: docs
-  ▾ ▣ 3:agents
-        0:claude
-        1: canopy-footer             codex
-```
-
 ## Customizing the look
 
 The default `quiet` appearance follows tmux's session, window, and pane order.
 Sessions are bold headings, single-pane windows use one row, directories and
 Git branches are dim details, and idle shells are subdued. The current view is
 named in a compact header such as `Tree · All`; agent and unread marks remain at
-the right edge.
+the right edge. Preview: `@tmux-canopy-labels 'places'` names quiet rows by
+folder or program instead of idle window names such as `zsh`; see
+[Place labels](docs/reference.md#place-labels-preview).
 
 Every appearance uses a responsive action footer. Tree starts with
 `↵ focus  a actions`, Agents with `↵ focus  n waiting`, Processes with
