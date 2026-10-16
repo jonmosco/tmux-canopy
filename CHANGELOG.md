@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-10-16
+
 ### Added
 
 - `S` names a new session after the git repository of the selected pane (`my.project` becomes `my-project`). If that name is already taken, or the directory is not a repository, the session is still `session-N`.
