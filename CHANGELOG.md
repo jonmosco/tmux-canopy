@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- Opening a sidebar jumps the browse pointer to the live content row again. Sticky browse still keeps the pointer put on later pane-focus changes; only the first focus publish uses Ctrl-o.
 - Preview scroll-position counters no longer cover right-aligned agent names. Docked and popup previews retain their scrollbars without the overlay.
 - Refresh no longer clears the sidebar before new data arrives. Explicit header updates replace input-header reset redraws and keep empty views and source recovery current without restarting fzf or losing search/selection.
 - A delayed background focus snapshot can no longer overwrite a newer tree refresh, including a rename or appearance change.

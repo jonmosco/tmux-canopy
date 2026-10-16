@@ -133,10 +133,18 @@ if [[ "$mode" == worker ]]; then
       continue
     fi
     # Pane focus moves the green ● (target + reload) but not the browse
-    # pointer or inspector: those follow sidebar selection until Ctrl-o or a
-    # deliberate return to the sidebar.
+    # pointer or inspector once a location has been published: those follow
+    # sidebar selection until Ctrl-o or a deliberate return to the sidebar.
+    # The first publish (empty focus_location) still jumps with C-o so a
+    # freshly opened sidebar lands on the live content row.
+    stored="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)"
+    if [[ -z $stored ]]; then
+      jump=C-o
+    else
+      jump=C-r
+    fi
     commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
-    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-r\" ; "
+    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar $jump\" ; "
     commands+="set-option -pu -t $sidebar @tmux_canopy_focus_pending ; set-option -pu -t $sidebar @tmux_canopy_focus_deadline"
     committed="$(commit "#{&&:#{==:#{@tmux_canopy_focus_pending},$token},#{!=:#{$guard},1}}" "$commands ; display-message -p focus-committed")"
     if [[ "$committed" == focus-committed ]]; then
