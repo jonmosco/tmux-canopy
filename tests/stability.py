@@ -346,9 +346,12 @@ def selection(ui):
             wait(lambda: color_at(ui.screen(ansi=True), 'selection-window')[1] == bg,
                  'the parent window did not gain the row highlight')
         except AssertionError:
-            plain = re.sub(r'\x1b\[[0-9;]*m', '', ui.screen(ansi=True))
-            rows = [line for line in plain.splitlines() if 'selection-window' in line or 'sleep' in line]
-            raise AssertionError(f'the parent window did not gain the row highlight; probe={ui.probe()!r}; rows={rows!r}')
+            frame = ui.screen(ansi=True)
+            raw = next((line for line in frame.splitlines() if 'selection-window' in line), '')
+            raise AssertionError(
+                f'the parent window did not gain the row highlight; want bg {bg!r}; '
+                f'got {color_at(frame, "selection-window")[1]!r}; line={raw!r}'
+            )
         ui.send('C-j')
         wait(lambda: ui.probe()[0] == 'P:' + ui.pane, 'selection returned to content pane')
         print(f'ok - {name} selection highlights the row background without underlining and follows the pointer')
