@@ -162,7 +162,7 @@ help_records() {
   key 's' 'Split into stacked panes'
   key 'v' 'Split into panes side by side'
   key 't' 'Create a window in the selected session'
-  key 'Shift-s' 'Create an unnamed session (session-N)'
+  key 'Shift-s' 'Create a session named for the git repository, or session-N'
   key 'Shift-n' 'Create a named session with a prompt'
   note "New objects use the selected pane's working directory."
 
@@ -211,13 +211,13 @@ help_records() {
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. On by default in quiet; set off to keep pane rows.'
   note 'Press Shift-a to show or hide agent mode. @tmux-canopy-agents on is only the default for clients that have not chosen. Integrations stay installed either way.'
   note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight and drives the inspector. Switching panes updates the dot without moving that selection.'
-  note 'Default selection highlights the row with a dark-gray background. @tmux-canopy-selection-background sets a palette index or RGB background to suit your theme; reopen after changing it.'
+  note 'ansi theme inherits pointer and accents from tmux status/border/message styles; fixed keeps the classic palette. Default selection uses dark gray (or an inherited 256-color/hex status background). @tmux-canopy-selection-background overrides; reopen after changing theme or selection.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
 
 legend_records() {
   section 'Location and selection'
-  legend_item '›' 'Selected row and highlight. Move with j/k; Enter focuses it. It may differ from the active pane.' cyan
+  legend_item '▌' 'Selected row. An accent bar sits beside the highlight (> with ASCII icons). Move with j/k; Enter focuses it. It may differ from the active pane.' cyan
   note 'Default selection uses a background row highlight, not an underline. An explicit selection background or reverse/solid style changes that emphasis; the green dot still marks the active location.'
   legend_item '▶ / ● green' 'Your current content pane: ▶ at the edge by default, ● by its name in quiet (> with ASCII icons). Folded branches carry ▶ (> with ASCII icons) on their folder, window or session.' green
   legend_item 'bold name' 'Current session or window.'

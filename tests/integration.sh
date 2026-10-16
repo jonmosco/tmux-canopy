@@ -76,7 +76,7 @@ notice_file="$(mktemp)"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE=/dev/null TMUX_CANOPY_CLIENT='' '$PROJECT_DIR/scripts/tree-source' > '$notice_file'"
 # quiet (the default) draws plain activity dim, on the pane row or, for a
 # single-pane window, on the window row.
-grep -E "^(P:$target|W:$source_window)" "$notice_file" | grep -Fq $'\033[2m●' || fail 'tree renders one dim pane activity badge'
+grep -E "^(P:$target|W:$source_window)" "$notice_file" | grep -Fq $'\033[38;5;245m●' || fail 'tree renders one dim pane activity badge'
 if grep -E '^([SW]):' "$notice_file" | grep -Fq $'\033[1;33m'; then fail 'expanded ancestors must not repeat pane notifications'; fi
 rm -f "$notice_file"
 run_in_server "$target" "'$PROJECT_DIR/scripts/notify' clear-window '$source_window'"
@@ -189,7 +189,22 @@ sleep 0.3
 session_count_after="$("${TMUX_TEST[@]}" list-sessions -F '#{session_id}' | awk 'END { print NR }')"
 assert_eq "$((session_count_before + 1))" "$session_count_after" 'session action creates a session'
 tmux_session_name="$("${TMUX_TEST[@]}" display-message -p -t "$sidebar" '#{session_name}')"
-assert_eq 'session-1' "$tmux_session_name" 'new sessions receive the next automatic name'
+# The content pane's directory is this checkout when it is a git repository,
+# so S names the session after that root instead of session-1.
+expected_session=session-1
+repo_dir="$("${TMUX_TEST[@]}" display-message -p -t "$target_after_window" '#{pane_current_path}')"
+while [[ -n "$repo_dir" && "$repo_dir" != / ]]; do
+  if [[ -e "$repo_dir/.git" ]]; then
+    expected_session=${repo_dir##*/}
+    expected_session=${expected_session//./-}
+    expected_session=${expected_session//:/-}
+    while [[ "$expected_session" == -* ]]; do expected_session=${expected_session#-}; done
+    [[ -n "$expected_session" ]] || expected_session=session-1
+    break
+  fi
+  repo_dir=${repo_dir%/*}
+done
+assert_eq "$expected_session" "$tmux_session_name" 'new sessions use the git repository name, or session-N'
 printf 'ok - creates pane splits, windows, and sessions\n'
 
 # Native window ordering and linked-window occurrences.
@@ -199,7 +214,7 @@ order_b_window="$("${TMUX_TEST[@]}" display-message -p -t "$order_b" '#{window_i
 order_a_index="$("${TMUX_TEST[@]}" display-message -p -t "$order_a" '#{window_index}')"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' window-up 'W:$order_b_window:\$0'"
 assert_eq "$order_a_index" "$("${TMUX_TEST[@]}" display-message -p -t "$order_b" '#{window_index}')" 'window-up swaps native window order'
-destination_session_id="$("${TMUX_TEST[@]}" display-message -p -t session-1 '#{session_id}')"
+destination_session_id="$("${TMUX_TEST[@]}" display-message -p -t "$tmux_session_name" '#{session_id}')"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' link-toggle 'W:$order_b_window:\$0'"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' activate 'S:$destination_session_id'"
 "${TMUX_TEST[@]}" list-windows -t "$destination_session_id" -F '#{window_id}' | grep -Fqx "$order_b_window" || fail 'link action adds the window to the destination session'
@@ -320,7 +335,7 @@ if "${TMUX_TEST[@]}" list-windows -a -F '#{window_id}' | grep -Fqx "$delete_wind
 printf 'ok - confirms destructive pane and window actions\n'
 
 move_source_pane="$("${TMUX_TEST[@]}" new-window -d -t test: -n move-pane-source -P -F '#{pane_id}')"
-move_destination_pane="$("${TMUX_TEST[@]}" new-window -d -t session-1: -n move-pane-target -P -F '#{pane_id}')"
+move_destination_pane="$("${TMUX_TEST[@]}" new-window -d -t "$tmux_session_name:" -n move-pane-target -P -F '#{pane_id}')"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_CANOPY_WIDTH=42 TMUX_CANOPY_SCOPE=global TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' move-toggle 'P:$move_source_pane'"
 # Query through the private server so tree-source sees its TMUX environment.
 marker_file="$(mktemp)"
@@ -336,7 +351,7 @@ assert_eq "$("${TMUX_TEST[@]}" display-message -p -t "$move_destination_pane" '#
 
 move_window_pane="$("${TMUX_TEST[@]}" new-window -d -t test: -n move-window-source -P -F '#{pane_id}')"
 move_window_id="$("${TMUX_TEST[@]}" display-message -p -t "$move_window_pane" '#{window_id}')"
-destination_session_id="$("${TMUX_TEST[@]}" display-message -p -t session-1 '#{session_id}')"
+destination_session_id="$("${TMUX_TEST[@]}" display-message -p -t "$tmux_session_name" '#{session_id}')"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_CANOPY_WIDTH=42 TMUX_CANOPY_SCOPE=global TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' move-toggle 'W:$move_window_id'"
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_CANOPY_WIDTH=42 TMUX_CANOPY_SCOPE=global TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' activate 'S:$destination_session_id'"
 sleep 0.3

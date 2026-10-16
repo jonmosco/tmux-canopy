@@ -92,7 +92,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `s` | Create a horizontal split from the selected node |
 | `v` | Create a vertical split from the selected node |
 | `t` | Create a window in the selected node's session |
-| `S` | Create the next available `session-N` session |
+| `S` | Create a session named for the git repository, or the next `session-N` |
 | `N` | Create a named session with a prompt |
 | `/` | Enter fuzzy-filter mode |
 | `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
@@ -323,7 +323,7 @@ set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
 set -g @tmux-canopy-appearance 'quiet' # default; or 'folders', 'ascii' (classic still works)
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-footer 'on' # off: open sidebars without the action footer; f toggles it
-set -g @tmux-canopy-theme 'ansi'
+set -g @tmux-canopy-theme 'ansi' # inherit tmux styles; or 'fixed', 'mono'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
 set -g @tmux-canopy-selection-style 'subtle'
@@ -594,9 +594,23 @@ never lost to a frame reload; full speed returns when you move to another pane.
 Requires agent awareness. Set the option to `off` and reopen the sidebar to
 disable it.
 
-`ansi` uses the terminal's standard palette for application icons, active panes,
-notifications, and pending operations; `mono` disables source styling. Density
-may be `minimal`, `normal`, `compact`, or `detailed`:
+`ansi` (default) inherits fzf chrome and tree semantic accents from tmux when
+those styles have real colors:
+
+| Role | tmux source (first usable) | Used for |
+|---|---|---|
+| Accent | `pane-active-border-style` → `status-style` → `message-style` fg | pointer, prompt, header accent, working badge |
+| Active | `pane-active-border-style` fg | green `●` / `▶` |
+| Attention | `message-style` → `message-command-style` fg | `!` / needs-input / warnings |
+| Selection bg | `status-style` bg when hex or 256-color (≥16) | subtle `bg+` |
+| Border | `pane-border-style` fg | fzf border, scrollbar, preview label |
+
+`mode-style` is not an accent: its foreground is chosen for text on the mode highlight, and on a dark theme that is often the background color itself. A foreground that does not contrast with the status background is skipped. On a dark status background, secondary text is a light gray instead of a mid gray that disappears; a very dark inherited selection background is lifted so the selected row stays visible. Empty or `default` slots keep today's fixed ANSI values. Application icon colors
+stay on the terminal palette. Colors are sampled when the sidebar opens; close
+and reopen after changing a tmux theme (Ctrl-r does not restyle chrome).
+`fixed` always uses the classic cyan/green/yellow/gray palette. `mono` disables
+source styling. Explicit `@tmux-canopy-selection-background` overrides inherited
+selection. Density may be `minimal`, `normal`, `compact`, or `detailed`:
 
 - **Normal (default):** At 31 columns or fewer, rows show commands and statuses.
   From 32 to 55 columns, directory names appear inline once per adjacent group.
@@ -614,8 +628,9 @@ may be `minimal`, `normal`, `compact`, or `detailed`:
 - **Detailed:** Two lines per pane, retaining the full path, pane index, and
   useful title. Long lines are clipped; the preview provides more room.
 
-The active pane has one green dot. Its session and window names are bold; fzf's
-highlight and cyan pointer identify the selected row. A minimal combined window
+The active pane has one green dot. Its session and window names are bold. The
+selected row keeps the background highlight and a one-cell accent bar (`▌`, or
+`>` with ASCII icons). A minimal combined window
 row carries the dot when it contains the active pane. The default and folders
 appearances show application icons, and folders adds folder icons; ASCII mode
 uses text markers.
@@ -669,12 +684,13 @@ fzf handles final ANSI/Unicode cell clipping. To change density at runtime, set
 
 Selection styles are `subtle`, `solid`, `reverse`, or `pointer`. The default subtle
 style highlights the selected logical entry with a dark-gray background
-(palette index 236), preserving application/notification foreground colors
-without underlining. Set `@tmux-canopy-selection-background` to a 0–255 palette
-index or `#RRGGBB` to suit your theme; unset or invalid values use the default
-dark gray. A lighter background can suit a light terminal theme. Reopen the
-sidebar after changing selection options. `pointer` keeps selection text
-unchanged, `reverse` uses reverse video, and `solid` uses a cyan background.
+(palette index 236), or the tmux status background when `ansi` inherits a
+256-color or hex status `bg`, preserving application/notification foreground
+colors without underlining. Set `@tmux-canopy-selection-background` to a 0–255
+palette index or `#RRGGBB` to override; unset or invalid values use the theme
+default. A lighter background can suit a light terminal theme. Reopen the
+sidebar after changing selection or theme options. `pointer` keeps selection text
+unchanged, `reverse` uses reverse video, and `solid` uses the accent color.
 Monochrome mode overrides these colors and uses fzf's monochrome selection. The header
 names only the open view (`Tree`, `Agents`, `Processes`, or `Buffers`) rather than
 spending space on a permanent tab strip. Tree includes its filter (`· All`,
@@ -849,7 +865,7 @@ This protection covers `prefix + Space` and the sidebar layout menu. Direct nati
 
 ### Icons
 
-Application icons keep a fixed column and stay dim by default so names and structure dominate. Full command-aware color is used for the active content pane and for detected agents: blue editors, Kubernetes tools, and Gemini, yellow Node/Python, Claude, Oh My Pi, and Hermes, red Git/npm/OpenShift, cyan SSH/Codex/Antigravity/system monitors, magenta Pi and Crush, and neutral OpenCode and Cursor Agent. Oh My Pi uses the same π mark as its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg); the orange plug on that mark cannot be drawn in one terminal cell, so the row uses yellow instead of Pi's magenta. In Unicode and Nerd Font themes, shells and unknown commands show their names without a default icon; ASCII retains its plain pane marker. The green active-location dot remains separate from the cyan selection pointer. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
+Application icons keep a fixed column and stay dim by default so names and structure dominate. Full command-aware color is used for the active content pane and for detected agents: blue editors, Kubernetes tools, and Gemini, yellow Node/Python, Claude, Oh My Pi, and Hermes, red Git/npm/OpenShift, cyan SSH/Codex/Antigravity/system monitors, magenta Pi and Crush, and neutral OpenCode and Cursor Agent. Oh My Pi uses the same π mark as its [icon](https://github.com/can1357/oh-my-pi/blob/main/assets/icon.svg); the orange plug on that mark cannot be drawn in one terminal cell, so the row uses yellow instead of Pi's magenta. In Unicode and Nerd Font themes, shells and unknown commands show their names without a default icon; ASCII retains its plain pane marker. The green active-location dot remains separate from the accent bar on the selected row. Tree guides, paths, inactive tabs, and metadata are dimmed; yellow marks notifications and delete/dead-pane warnings. The gutter is blank, so that bar does not repeat down the list, and scrollbars use a thin, dim line. These styles apply to Nerd Font, Unicode, and ASCII glyph themes; `theme=mono` disables source styling and uses fzf’s monochrome interface.
 
 Icon themes:
 
@@ -1009,7 +1025,7 @@ None of these suites alters the developer's active tmux server.
 - Multi-selection, bulk movement, and undo are not implemented.
 - Desktop alerts appear on the machine running tmux; over SSH, only the `tmux` alert mode reaches you. Only `terminal-notifier` alerts on macOS can be clicked through to the pane.
 - Deletion is intentionally irreversible after the second `x`; there is no trash or undo layer.
-- New sessions created with `S` use the first available automatic name (`session-1`, `session-2`, and so on) and are styled dimmed; press `N` to create a session with an immediate name prompt, or rename any session afterward with `r`.
+- New sessions created with `S` take the git repository's directory name when the selected pane is inside a repository (`my.project` becomes `my-project`; `.` and `:` are not allowed in a tmux session name). If that name is already in use, or the directory is not a repository, `S` uses the first available automatic name (`session-1`, `session-2`, and so on), which is styled dimmed. Press `N` to create a session with an immediate name prompt, or rename any session afterward with `r`.
 
 ## License
 

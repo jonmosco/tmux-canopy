@@ -1218,13 +1218,24 @@ END {
     }
     if (agent_view) find_agents()
     if (theme != "mono") {
-        reset="\033[0m"; bold="\033[1m"; dim="\033[2m"
+        reset="\033[0m"; bold="\033[1m"
+        # Palette gray, not SGR faint. A dark status background replaces this
+        # with a near-white so secondary text stays readable.
+        dim="\033[38;5;245m"
+        if (ENVIRON["CANOPY_COLOR_MUTED_ANSI"] != "") dim=ENVIRON["CANOPY_COLOR_MUTED_ANSI"]
         # Neutral text and guides, with distinct application and active-location colors.
         icon_blue="\033[94m"; icon_yellow="\033[93m"; icon_red="\033[91m"
         icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[39m"
         icon_white="\033[97m"
         green="\033[1;32m"
         accent="\033[1;36m"; attention="\033[1;33m"; path_color=dim
+        # ansi (default) may inherit from tmux via the sidebar's frozen env.
+        # fixed always keeps the classic palette even when those vars are set.
+        if (theme != "fixed") {
+            if (ENVIRON["CANOPY_COLOR_ACTIVE_ANSI"] != "") green=ENVIRON["CANOPY_COLOR_ACTIVE_ANSI"]
+            if (ENVIRON["CANOPY_COLOR_ACCENT_ANSI"] != "") accent=ENVIRON["CANOPY_COLOR_ACCENT_ANSI"]
+            if (ENVIRON["CANOPY_COLOR_ATTENTION_ANSI"] != "") attention=ENVIRON["CANOPY_COLOR_ATTENTION_ANSI"]
+        }
         # tmux's own green (its logo, about #1BB91F) for quiet session glyphs.
         tmux_green="\033[38;5;34m"; tmux_green_dim="\033[2;38;5;34m"
     }
@@ -1586,7 +1597,7 @@ function label_line(prefix, name, tail, edge,    plain, signal, program) {
     plain=prefix name tail; gsub(/\033\[[0-9;]*m/,"",plain)
     signal=program edge; gsub(/\033\[[0-9;]*m/,"",signal)
     if (text_width(plain)+text_width(signal)+2 > width-3) {
-        sub(/ \033\[2m(⎇ |@)[^\033]*\033\[0m/, "", name)
+        sub(/ \033\[[0-9;]*m(⎇ |@)[^\033]*\033\[0m/, "", name)
         plain=prefix name tail; gsub(/\033\[[0-9;]*m/,"",plain)
     }
     if (text_width(plain)+text_width(signal)+2 > width-3) program=""

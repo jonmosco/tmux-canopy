@@ -152,21 +152,26 @@ palette for most of its UI, with a separate `mono` mode and configurable
 selection background. The remaining work is to make theme sources explicit and
 consistent across views:
 
-- [ ] **tmux:** derive sidebar colors from the active tmux status, pane border,
-  and message styles where available. Define clear fallbacks when those styles
-  use `default` or omit a color.
+- [x] **tmux:** derive fzf chrome and tree semantic accents (active / attention /
+  accent) from status, pane border, and message styles at sidebar open, with
+  per-slot fallbacks when styles are `default` or missing. Escape hatch:
+  `@tmux-canopy-theme 'fixed'`.
 - [ ] **Canopy:** allow an independent palette for text, selection, accents,
   notices, tree guides, preview, help, and the scrollbar. Provide documented
   defaults and user overrides without changing tmux or terminal settings.
 - [ ] Apply the chosen source consistently across Tree, Processes, Buffers,
   Agents, previews, help, and popups. Keep agent state and unread notifications
-  distinguishable without relying on color alone.
+  distinguishable without relying on color alone. (Tree + fzf chrome +
+  Processes/Buffers header accents land with the tmux inherit work; remaining
+  surfaces still use fixed ANSI where they paint.)
 - [ ] Define precedence for explicit color overrides, theme-source selection,
   and `mono`; update a running sidebar when tmux styling changes without losing
-  selection, query, folds, or preview state.
+  selection, query, folds, or preview state. (Precedence and open-only sampling
+  are done; live restyle without reopen is not.)
 - [ ] Test light/dark terminal palettes, tmux themes with partial/default
   colors, 256-color/truecolor terminals, and monochrome output. Document what
-  terminal colors can be inherited rather than queried reliably.
+  terminal colors can be inherited rather than queried reliably. (Parser and
+  private-tmux inherit/fixed/mono coverage added; expand as themes appear.)
 
 ## Scope
 

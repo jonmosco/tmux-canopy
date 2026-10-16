@@ -71,7 +71,7 @@ def main():
         assert '\x1b[1;32m●\x1b[0m' in quiet['P:%0:$0'] and '▶' not in quiet['P:%0:$0']
         assert '\x1b[1;33m!\x1b[0m' in quiet['P:%0:$0']
         assert 'NEEDS INPUT' not in quiet['P:%0:$0'] and '·hook' not in quiet['P:%0:$0']
-        assert '\x1b[2m●\x1b[0m' in quiet['P:%1:$0']  # plain activity is a dim notice, not agent attention
+        assert '\x1b[38;5;245m●\x1b[0m' in quiet['P:%1:$0']  # plain activity is muted, not agent attention
         assert 'P:%0:$0' in quiet and 'W:@0:$0' in quiet and 'S:$0' in quiet
         assert '◈' in quiet['S:$0'] and '▣' in quiet['W:@0:$0']
         assert '\x1b[1mserver\x1b[0m' in quiet['W:@0:$0'], quiet['W:@0:$0']

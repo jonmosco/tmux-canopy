@@ -133,7 +133,8 @@ fi |
   { line[++n]=$0 }
   END {
     if (theme!="mono") {
-      reset="\033[0m"; bold="\033[1m"; dim="\033[2m"
+      reset="\033[0m"; bold="\033[1m"; dim="\033[38;5;245m"
+      if (ENVIRON["CANOPY_COLOR_MUTED_ANSI"] != "") dim=ENVIRON["CANOPY_COLOR_MUTED_ANSI"]
       attention="\033[1;33m"; working="\033[1;36m"; green="\033[32m"
     }
     state=ENVIRON["CANOPY_PREVIEW_STATE"]

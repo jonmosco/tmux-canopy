@@ -256,7 +256,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `b` | Break selected pane into its own window |
 | `s` / `v` | Create horizontal / vertical split from selected node |
 | `t` | Create new window in selected session |
-| `S` / `N` | Create session / create named session with prompt |
+| `S` / `N` | Create a session named for the git repository (or `session-N`) / create named session with prompt |
 | `r` | Rename selected session or window |
 | `>` | Type a line into the selected pane, such as a reply to an agent |
 | `x`, then `x` | Confirm deletion of a pane, window, session, or paste buffer |
@@ -312,10 +312,17 @@ Every appearance uses a responsive action footer. Tree starts with
 `↵ focus  a actions`, and Buffers with `↵ paste  a actions`. More hints appear
 when space permits; `f` hides the footer.
 
-The default selection highlights the row with a dark-gray background while
-preserving application and notification colors. Set
-`@tmux-canopy-selection-background` to a palette index or RGB background to suit
-your theme; `reverse`, `solid`, and `pointer` selection styles are also available.
+The selected row keeps its background highlight and adds a one-cell accent bar
+(`▌`, or `>` with ASCII icons). The gutter stays blank.
+
+The default `ansi` theme inherits pointer, selection, border, and tree accent
+colors from your tmux status, pane-border, and message styles when those use
+real colors (close and reopen the sidebar after changing a tmux theme). Set
+`@tmux-canopy-theme 'fixed'` for the classic hard-coded palette, or `mono` for
+no color. The default selection uses a dark-gray background, or your status
+background when it is a 256-color or hex value. Set
+`@tmux-canopy-selection-background` to a palette index or RGB background to
+override; `reverse`, `solid`, and `pointer` selection styles are also available.
 
 Use `@tmux-canopy-appearance 'folders'` for directory groups, boxed titles, and
 tree guides, or `ascii` for `quiet` without Unicode glyphs. Density settings

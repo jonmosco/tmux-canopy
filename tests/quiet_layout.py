@@ -143,12 +143,12 @@ def main():
         assert not any('\n' in tree[key] for key in tree if key.startswith('S:')), tree
         assert '\x1b[1;36mwork' in first and '\x1b[1m\x1b[38;5;34m' in first, first
         assert '\x1b[1mreference' in second and '\x1b[2;38;5;34m' in second and '\x1b[1;36m' not in second, second
-        assert '\x1b[1m\x1b[2msession-3' in automatic, automatic
+        assert '\x1b[1m\x1b[38;5;245msession-3' in automatic, automatic
         assert rule * 4 in ANSI.sub('', first) and rule * 4 in ANSI.sub('', second), (first, second)
         # A heading's rule stops before its detail.
         assert re.search(rf'reference {re.escape(rule)}+ docs$', ANSI.sub('', second).rstrip()), second
         # Plain output is a dim notice; a bell keeps the amber.
-        assert '\x1b[2m' + ('*' if icons == 'ascii' else '●') + '\x1b[0m' in tree['P:%1:$0'], tree['P:%1:$0']
+        assert '\x1b[38;5;245m' + ('*' if icons == 'ascii' else '●') + '\x1b[0m' in tree['P:%1:$0'], tree['P:%1:$0']
         assert '\x1b[1;33m' in tree['P:%2:$0'], tree['P:%2:$0']
         # tmux order: no folder rows, windows in index order, and a window whose
         # panes are in different directories appears once.
@@ -170,8 +170,8 @@ def main():
         assert not tail['P:%0:$0'].endswith('api'), tail['P:%0:$0']  # its window already says
         # An idle shell recedes; one with output to report, or a running
         # program, does not.
-        assert '\x1b[2mzsh' in tree['P:%6:$0'], tree['P:%6:$0']
-        assert '\x1b[2mzsh' not in tree['P:%1:$0'] and '\x1b[2mclaude' not in tree['P:%7:$0']
+        assert '\x1b[38;5;245mzsh' in tree['P:%6:$0'], tree['P:%6:$0']
+        assert '\x1b[38;5;245mzsh' not in tree['P:%1:$0'] and '\x1b[38;5;245mclaude' not in tree['P:%7:$0']
     split = render('unicode', compact='off')
     assert 'P:%3:$0' in split and ' · ' not in ANSI.sub('', split['W:@1:$0']), 'compact-single-panes off keeps pane rows'
     for density in ('compact', 'minimal'):

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Shared by the preflight parser and the real UI. Paths are expanded by a
 # known POSIX shell from environment data, never embedded in fzf bind syntax.
+# shellcheck disable=SC1091
+source "${BASH_SOURCE[0]%/*}/theme-lib.sh"
 # shellcheck disable=SC2016 # These variables expand in fzf's action shell.
 sidebar_ui_options() {
-  local pane="${1:-${TMUX_PANE:-}}" preview_mode preview_height selection_style pane_height preview_window fzf_colors theme selection_background
+  local pane="${1:-${TMUX_PANE:-}}" preview_mode preview_height selection_style pane_height preview_window fzf_colors theme selection_background icon_theme
   local inspector_mode agents_enabled agents_format preview_label=' Terminal preview '
   local source_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-source"'
   local action_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-action"'
@@ -16,6 +18,7 @@ sidebar_ui_options() {
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
   local animate_cmd='"$TMUX_CANOPY_ROOT/scripts/animate-frame"'
   local mode_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-mode"'
+  local accent border muted
   # fzf pauses its screen when a command keeps it waiting over a second, and
   # resuming leaves mouse tracking off and the tty echoing what Canopy sends
   # the sidebar (^T, ^R). Popups, menus and prompts wait on the user, so they
@@ -25,9 +28,9 @@ sidebar_ui_options() {
   local pane_flag=()
   [[ -n "$pane" ]] && pane_flag=(-t "$pane")
   agents_format="$(canopy_agents_format "${TMUX_CANOPY_CLIENT:-}")"
-  IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance inspector_mode agents_enabled < <(
+  IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance inspector_mode agents_enabled icon_theme < <(
     tmux display-message -p "${pane_flag[@]}" \
-      "#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}|#{@tmux_canopy_preview_mode}|$agents_format" 2>/dev/null || true
+      "#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}|#{@tmux_canopy_preview_mode}|$agents_format|#{@tmux_canopy_icon_theme}" 2>/dev/null || true
   )
   if [[ "$agents_enabled" == on ]] && canopy_preview_is_inspector "$inspector_mode"; then
     preview_label=' Agent inspector '
@@ -47,16 +50,20 @@ sidebar_ui_options() {
   if [[ "$preview_mode" == off || ( "$preview_mode" == auto && "$pane_height" =~ ^[0-9]+$ && "$pane_height" -lt 28 ) ]]; then
     preview_window+=',hidden'
   fi
-  if [[ "$selection_background" =~ ^([0-9]|[1-9][0-9]{1,2})$ ]] && ((selection_background <= 255)); then
-    :
-  elif [[ ! "$selection_background" =~ ^#[[:xdigit:]]{6}$ ]]; then
-    selection_background=236
-  fi
+  canopy_theme_resolve
+  theme=${CANOPY_THEME:-ansi}
+  accent=${CANOPY_COLOR_ACCENT_FZF:-6}
+  border=${CANOPY_COLOR_BORDER_FZF:--1}
+  # A pane-border color is a line, often too dark to read as text. Labels and
+  # the scrollbar stay a mid gray; an explicit border color still draws the line.
+  [[ "$border" != -1 ]] || border=${CANOPY_COLOR_MUTED_FZF:-245}
+  muted=${CANOPY_COLOR_MUTED_FZF:-245}
+  selection_background=${CANOPY_COLOR_SELECTION_BG:-236}
   # Preserve source foreground colors, including application icons and notices.
-  fzf_colors='fg:-1,bg:-1,bg+:-1,gutter:-1,header:-1,info:-1,query:-1,disabled:-1,preview-fg:-1,preview-bg:-1,border:-1:dim,label:-1:dim,scrollbar:-1:dim,preview-scrollbar:-1:dim,spinner:6,prompt:6,pointer:6:bold,marker:6,hl:6:bold,hl+:6:bold'
+  fzf_colors="fg:-1,bg:-1,bg+:-1,gutter:-1,header:-1,info:-1,query:-1,disabled:-1,preview-fg:-1,preview-bg:-1,border:${border},label:${muted},scrollbar:${muted},preview-scrollbar:${muted},spinner:${accent},prompt:${accent},pointer:${accent}:bold,marker:${accent},hl:${accent}:bold,hl+:${accent}:bold"
   case "$selection_style" in
-    solid) fzf_colors+=',bg+:6,fg+:0,hl+:0:bold' ;;
-    reverse) fzf_colors+=',fg+:-1:reverse,hl+:6:bold:reverse' ;;
+    solid) fzf_colors+=",bg+:${accent},fg+:0,hl+:0:bold" ;;
+    reverse) fzf_colors+=",fg+:-1:reverse,hl+:${accent}:bold:reverse" ;;
     pointer) fzf_colors+=',fg+:-1:regular' ;;
     *)
       fzf_colors+=",bg+:$selection_background,fg+:-1:regular"
@@ -64,8 +71,13 @@ sidebar_ui_options() {
   esac
   [[ "$theme" != mono ]] || fzf_colors='bw'
   : "${appearance:=classic}"
-  # Current-line arrow is drawn at the row edge. Leave the left pointer blank.
-  pointer=' '; prompt='search › '; marker='●'; scrollbar='│'
+  # One accent cell on the current row. The gutter stays a space so the bar
+  # does not repeat down the list. ASCII icons keep a plain marker.
+  pointer='▌'
+  if [[ "$icon_theme" == ascii ]]; then
+    pointer='>'
+  fi
+  prompt='search › '; marker='●'; scrollbar='│'
   local activate_suffix='' jump_agent_bind="n:execute-silent($jump_agent_cmd)"
   local search_unbind='F,f,g,h,H,A,i,j,k,l,L,m,c,r,x,u,U,w,a,p,P,1,2,3,4,[,],s,v,t,S,N,n,z,b,>,?'
   # The footer sidebar-source stored for this load, or a search hint while

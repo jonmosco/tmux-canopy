@@ -182,8 +182,23 @@ create_window() {
   [[ -n "$new_pane" ]] && show_target "$new_pane"
 }
 
+# tmux session names cannot contain '.' or ':'. A repository named my.project
+# becomes my-project. Empty or already-used names fall back to session-N.
+session_repo_name() {
+  local directory=$1 base
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/git-lib.sh"
+  canopy_git_root "$directory" || return 1
+  base=${CANOPY_GIT_ROOT##*/}
+  base=${base//./-}
+  base=${base//:/-}
+  while [[ "$base" == -* ]]; do base=${base#-}; done
+  [[ -n "$base" && "$base" != *[$'\001'-$'\037'$'\177']* ]] || return 1
+  printf '%s\n' "$base"
+}
+
 create_session() {
-  local token="$1" target_pane cwd number name new_pane existing
+  local token="$1" target_pane cwd number name new_pane existing repo_name taken
   target_pane="$(pane_for_token "$token")"
   [[ -n "$target_pane" ]] || return 0
   cwd="$(tmux display-message -p -t "$target_pane" '#{pane_current_path}' 2>/dev/null || true)"
@@ -191,11 +206,21 @@ create_session() {
   # One list-sessions call plus an in-memory scan, instead of one
   # has-session subprocess per already-numbered session.
   existing="$(tmux list-sessions -F '#{session_name}' 2>/dev/null)"
-  number="$(awk '
-    /^session-[0-9]+$/ { sub(/^session-/, "", $0); used[$0 + 0]=1 }
-    END { for (i = 1; ; i++) if (!(i in used)) { print i; break } }
-  ' <<< "$existing")"
-  name="session-$number"
+  name=''
+  if repo_name="$(session_repo_name "$cwd")"; then
+    taken=0
+    while IFS= read -r taken_name; do
+      [[ "$taken_name" == "$repo_name" ]] && taken=1
+    done <<< "$existing"
+    [[ "$taken" == 1 ]] || name=$repo_name
+  fi
+  if [[ -z "$name" ]]; then
+    number="$(awk '
+      /^session-[0-9]+$/ { sub(/^session-/, "", $0); used[$0 + 0]=1 }
+      END { for (i = 1; ; i++) if (!(i in used)) { print i; break } }
+    ' <<< "$existing")"
+    name="session-$number"
+  fi
   new_pane="$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -c "$cwd")"
   [[ -n "$new_pane" ]] && show_target "$new_pane"
 }

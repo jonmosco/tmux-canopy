@@ -55,8 +55,8 @@ def main():
 
             def ui_options():
                 result = sp.run(['bash', '-c',
-                                 'source "$1"; sidebar_ui_options "$2"; printf "%s\\n" "${SIDEBAR_FZF_ARGS[@]}"',
-                                 'bash', str(ROOT / 'scripts/ui-options.sh'), pane],
+                                 'source "$1"; source "$2"; sidebar_ui_options "$3"; printf "%s\\n" "${SIDEBAR_FZF_ARGS[@]}"',
+                                 'bash', str(ROOT / 'scripts/lib.sh'), str(ROOT / 'scripts/ui-options.sh'), pane],
                                 env=source_env, capture_output=True, text=True, timeout=15)
                 assert result.returncode == 0, result.stderr
                 return result.stdout

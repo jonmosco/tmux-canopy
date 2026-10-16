@@ -68,7 +68,7 @@ def main():
         assert text(rows, 'W:@0:$0').endswith('0:editor nvim'), text(rows, 'W:@0:$0')
         # An idle shell shows where it is, dimmed, not "zsh".
         assert text(rows, 'W:@1:$0').endswith('1:tmux-canopy'), text(rows, 'W:@1:$0')
-        assert '\x1b[2mtmux-canopy' in rows['W:@1:$0'], rows['W:@1:$0']
+        assert '\x1b[38;5;245mtmux-canopy' in rows['W:@1:$0'], rows['W:@1:$0']
         assert 'zsh' not in text(rows, 'W:@1:$0')
         # A subfolder of the session's directory: a folder, no repeated branch.
         assert text(rows, 'W:@2:$0').endswith('2: docs'), text(rows, 'W:@2:$0')

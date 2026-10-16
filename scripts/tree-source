@@ -200,6 +200,13 @@ else
     [[ -z "$processes" ]] || snapshot+=$'\n'"$processes"
   fi
 fi
+# Inherit sidebar-frozen colors when present; otherwise sample for CLI/tests.
+if [[ "${CANOPY_THEME_FROZEN:-0}" != 1 || -z "${CANOPY_COLOR_ACTIVE_ANSI:-}" ]]; then
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/theme-lib.sh"
+  canopy_theme_resolve
+  canopy_theme_export
+fi
 # Byte-order string comparison for text_width's wide-character ranges, with
 # the user's character set kept (LC_ALL would override both, so clear it).
 ctype="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"

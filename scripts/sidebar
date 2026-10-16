@@ -61,6 +61,10 @@ if ! grep -q '^FOOTER' "$STATE_FILE" 2>/dev/null; then
   [[ "$(tmux show-option -gqv @tmux-canopy-footer 2>/dev/null)" != off ]] || printf 'FOOTER\toff\n' >> "$STATE_FILE"
 fi
 stty status undef discard undef 2>/dev/null || true
+# Sample tmux styles once for this fzf lifetime; Ctrl-r keeps the same palette.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/theme-lib.sh"
+canopy_theme_freeze
 sidebar_ui_options "${TMUX_PANE:-}"
 "$SCRIPT_DIR/sidebar-source" --stable | env -u FZF_DEFAULT_OPTS -u FZF_DEFAULT_OPTS_FILE -u FZF_DEFAULT_COMMAND "${TMUX_CANOPY_FZF_BINARY:-fzf}" "${SIDEBAR_FZF_ARGS[@]}"
 statuses=("${PIPESTATUS[@]}")

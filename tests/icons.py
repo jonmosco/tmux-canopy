@@ -62,9 +62,11 @@ def main():
                     glyph = glyph if icons == 'nerdfont' else '>' if icons == 'ascii' else UNICODE_ICONS.get(command, ' ')
                     if theme == 'ansi':
                         # %0 is the active pane: full app color. Agents keep
-                        # app color when idle; other tools are dim.
-                        paint = color if index == 0 or command in agents else 2
-                        assert f'\x1b[{paint}m{glyph}\x1b[0m' in row[1], (command, row)
+                        # app color when idle; other tools use a readable gray.
+                        if index == 0 or command in agents:
+                            assert f'\x1b[{color}m{glyph}\x1b[0m' in row[1], (command, row)
+                        else:
+                            assert f'\x1b[38;5;245m{glyph}\x1b[0m' in row[1], (command, row)
                     else:
                         assert glyph in row[1] and '\x1b' not in row[1], row
                 if theme == 'ansi':

@@ -4,10 +4,14 @@
 
 ### Added
 
+- `S` names a new session after the git repository of the selected pane (`my.project` becomes `my-project`). If that name is already taken, or the directory is not a repository, the session is still `session-N`.
 - Opt-in directory-change refresh for Bash: set `@tmux-canopy-directory-refresh 'on'` and source `scripts/directory-prompt.sh` from an interactive shell. After `cd` returns to the prompt, open sidebars reload metadata with Ctrl-r semantics (selection and focus markers stay put). Off by default; no polling. See [directory-refresh.md](docs/directory-refresh.md).
 
 ### Changed
 
+- The selected row shows a one-cell accent bar (`▌`, or `>` with ASCII icons) in the theme accent color. The gutter stays blank, so the bar does not repeat on every row.
+- Secondary text (directories, idle names, footer hints, inspector details, preview label) uses a light gray on a dark status background instead of terminal faint or a mid gray. Sidebar accents follow the pane border, not `mode-style`, whose foreground is the color of text on the mode highlight and disappears on a dark terminal. A very dark inherited selection background is lifted so the selected row stays visible.
+- `@tmux-canopy-theme 'ansi'` (default) inherits sidebar pointer, border, selection, and tree accent colors from tmux status, pane-border, and message styles when those styles set real colors. Close and reopen the sidebar after changing a tmux theme. `@tmux-canopy-theme 'fixed'` keeps the classic hard-coded palette; `mono` is unchanged. Explicit `@tmux-canopy-selection-background` still wins. Stock named status backgrounds such as `bg=green` are not used for selection (hex / 256-color only).
 - Switching content panes updates the green active-location marker without moving the sidebar browse pointer or rewriting the Agent inspector. The drawer follows the selected sidebar row until you pick another row; leaving the sidebar for a content pane, returning to the sidebar, or pressing `Ctrl-o` still jumps the pointer to the live pane.
 - Agent inspector detection shares `canopy_resolve_pane_agent` / label helpers in `lib/agent-process.sh` instead of an inline `ps|awk` copy; preview mode checks use one `canopy_preview_is_inspector` helper for the legacy `codex` alias.
 - Application icons in the tree stay dim by default; full app color is reserved for the active content pane and for detected agents.

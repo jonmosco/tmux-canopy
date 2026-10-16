@@ -122,7 +122,7 @@ def main():
             for token, text, _ in rows:
                 assert text.count('\n') == (1 if token.startswith('P:') else 0)
                 if token.startswith('P:'):
-                    assert '\x1b[2m…/' in text.split('\n')[1]
+                    assert '\x1b[38;5;245m…/' in text.split('\n')[1]
             assert all(len(row.split('\t')) == 3 for row in source().splitlines())
             assert '\0' not in source()
             for view in ('processes', 'buffers'):
@@ -163,7 +163,8 @@ def main():
             observed = probe()
             assert observed[0] == 'P:' + first, (observed, screen())
             frame = screen()
-            assert not any(line.startswith('▌') for line in frame), 'gutter must not form a block bar'
+            bars = [line for line in frame if line.startswith('▌')]
+            assert 1 <= len(bars) <= 2, (bars, 'pointer bar on the selected row only; gutter must not form a block bar')
             a = next(i for i, line in enumerate(frame) if '…/commercial/hcm-gitops' in line)
             b = next(i for i, line in enumerate(frame) if '…/fedramp/hcm-gitops' in line)
             assert b == a + 2 and 'sleep' in frame[a-1] and 'sleep' in frame[b-1]

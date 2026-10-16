@@ -68,7 +68,7 @@ def main():
         done_pane = agent_pane('%13', '@0', '5', 'pi', '114', 'turn-ended')
         verified_13 = ['V', '%13']
         collapsed_done = render(collapsed='W:@0:$0\n', extra_rows=[done_pane, verified_13])
-        assert '\x1b[2m✓\x1b[0m' in collapsed_done['W:@0:$0']
+        assert '\x1b[38;5;245m✓\x1b[0m' in collapsed_done['W:@0:$0']
         collapsed_done_and_work = render(collapsed='W:@0:$0\n', extra_rows=[done_pane, verified_13, work_pane, verified_11])
         assert '\x1b[1;36m▷\x1b[0m' in collapsed_done_and_work['W:@0:$0']
         assert '✓' not in collapsed_done_and_work['W:@0:$0']

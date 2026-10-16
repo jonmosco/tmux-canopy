@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/buffer-lib.sh"
 
 theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 if [[ "$theme" == 'mono' ]]; then reset='' name_color='' dim=''
-else reset=$'\033[0m'; name_color=$'\033[1m'; dim=$'\033[2m'; fi
+else reset=$'\033[0m'; name_color=$'\033[1m'; dim=${CANOPY_COLOR_MUTED_ANSI:-$'\033[38;5;245m'}; fi
 
 # tmux rejects control bytes in buffer names; reserve US for snapshot fields.
 # Scrub samples before they enter the newline/tab-framed source records.

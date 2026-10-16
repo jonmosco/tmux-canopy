@@ -3,7 +3,7 @@ set -u
 
 theme="$(tmux show-option -gqv @tmux-canopy-theme 2>/dev/null || true)"
 if [[ "$theme" == 'mono' ]]; then reset='' heading='' process_color='' dim=''
-else reset=$'\033[0m'; heading=$'\033[1m'; process_color=''; dim=$'\033[2m'; fi
+else reset=$'\033[0m'; heading=$'\033[1m'; process_color=''; dim=${CANOPY_COLOR_MUTED_ANSI:-$'\033[38;5;245m'}; fi
 
 # etime is available on both BSD and procps; etimes is Linux-specific.
 snapshot="$(ps -eo pid=,ppid=,user=,stat=,etime=,comm=,args= 2>/dev/null)" || exit 1
