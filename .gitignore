@@ -8,3 +8,4 @@ node_modules/
 /docs/assets/*.cast
 /docs/assets/canopy-demo-captures.json
 .superpowers/
+/docs/research/
