@@ -30,17 +30,17 @@ For agent status beyond process detection, run `~/.tmux/plugins/tmux-canopy/cano
 
 ## Features
 
-- Sessions → windows → panes in tmux's own order, each window once, with numbered windows and panes, application icons, and an active-location marker. Directories and Git branches show as details; idle shells are dimmed so what is running stands out.
+- Sessions → windows → panes in tmux's own order, each window once, with numbered windows and panes, application icons (dim by default; full color for your active pane and for agents), and an active-location marker. The browse highlight stays put when you switch content panes; `Ctrl-o` jumps it back. Directories and Git branches show as details; idle shells are dimmed so what is running stands out.
 - Left or right placement; **left by default**.
 - Floating **popup modal** mode or adaptive **auto** switching on smaller displays (`@tmux-canopy-mode`).
 - Optional directory-grouped layout (`folders`), minimal and compact views, previews, and scrollable popup help.
-- Optional Git branch labels for panes and directory groups, without polling or changing repository state.
+- Optional Git branch labels for panes and directory groups, without polling or changing repository state. Opt-in Bash prompt notifier refreshes the tree after `cd` (`@tmux-canopy-directory-refresh`).
 - Global quick switching, including panes inside collapsed branches.
 - Tree filters for the current session, unread notifications, window names, and pane titles.
 - Create, rename, move, link, and delete tmux objects with native menus and direct keys.
 - Zoom badges (`[Z]`), native pane/window zoom toggle, and automatic sidebar width balance when closing panes.
 - Process trees attributed to panes, plus tmux buffer browsing with a system-clipboard yank action.
-- AI agent monitoring: Track active agents across sessions with animated status badges, a dedicated Agents view (`4`), summary drawer (`i`), subagent trees, and a one-key jump (`n`) to panes waiting for user input or approval.
+- AI agent monitoring: Track active agents across sessions with animated status badges, a dedicated Agents view (`4`), Agent inspector drawer (`i`), subagent trees, and a one-key jump (`n`) to panes waiting for user input or approval.
 - Optional alerts: a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, or when a pane rings the bell or goes quiet, skipped while you're watching that pane. On macOS, clicking one jumps to the agent's pane. No daemon; off by default.
 - Activity and bell notifications; optional silence monitoring.
 - Live mouse resizing and keyboard width presets; stale resize callbacks cannot restore an earlier width.
@@ -94,7 +94,8 @@ With agent mode on, Canopy finds agents running in any pane of any session and s
 - **What it's waiting for:** an agent that needs input shows the command it wants to run, or its question, on a dim line beneath its pane.
 - **Jump to blockers (`n`):** the next pane waiting for an approval, question, or input, across all sessions.
 - **Reply without switching (`>`):** type a line into the selected pane from a tmux prompt; your focus stays where it is.
-- **Summary drawer (`i`):** the selected agent's state, its age, pending request, and recent terminal output. A pane without a detected agent remains useful by falling back to its terminal preview.
+- **Agent inspector (`i`):** the native sharp frame names the current mode: **Terminal preview** or **Agent inspector**. Press `i` to select terminal preview or the structured inspector; `p` only hides or shows the drawer. Both modes share the same drawer geometry (default height **25%**). The inspector is a fixed field card: state and agent, one dim trust line, directory, optional git repo/branch when `@tmux-canopy-git-context` is `branch`, and place (`session:window`, with a green `●` when that pane is your active content target). A verified request and command appear only beneath that card when present. The drawer follows the selected sidebar row; switching content panes updates `●` without rewriting the inspector until you browse elsewhere or press `Ctrl-o`. It does not show a Recent screen excerpt or the agent TUI status bar. Short drawers keep state and a present request ahead of trust and place; lines clip rather than wrap.
+  Process-only agents are **Detected** with snapshot-only trust; non-agent panes show **No agent** / **Terminal**, their command, and place, without screen-based request inference. Stale reports omit old requests; agent screen hints remain explicitly unverified. Close and reopen an existing sidebar after upgrading to activate the new frame and bindings.
 - **Alerts (optional):** a desktop notification or tmux message when an agent needs input, finishes, or is interrupted, skipped while you're looking at that pane. Off by default; see [Alerts](#alerts).
 
 Turn it on with `set -g @tmux-canopy-agents 'on'` **before** the Canopy line in your tmux configuration, then reload and reopen the sidebar. Press `A` in the sidebar to switch it on or off for just your client.
@@ -187,8 +188,10 @@ set -g @tmux-canopy-appearance 'quiet'    # quiet, folders, or ascii
 set -g @tmux-canopy-density 'normal'      # normal, minimal, compact, detailed
 set -g @tmux-canopy-labels 'tmux'         # tmux or places (preview)
 set -g @tmux-canopy-git-context 'off'     # off or branch
+set -g @tmux-canopy-directory-refresh 'off'  # on + source scripts/directory-prompt.sh
 set -g @tmux-canopy-footer 'on'
 set -g @tmux-canopy-preview 'off'
+set -g @tmux-canopy-preview-height '25%'
 ```
 
 Reload your tmux configuration after changing settings. Close and reopen Canopy
@@ -223,9 +226,9 @@ Tree · All                         ◆1 ▷1   ① ②
 | ③ | **Session heading**, followed by a dim rule that separates it from the session above. The session you are in has a tmux-green glyph and a cyan name. | `h` / `l` fold and unfold, `H` / `L` all |
 | ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
 | ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them: the session, a window, or a pane. | `canopy-branch`, `canopy-directory` at `prefix :` |
-| ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; it can differ. | `Ctrl-o` jump back to your pane |
+| ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; pane focus alone does not move it. | `Ctrl-o` jump back to your pane |
 | ⑦ | **Pane:** application icon, pane index, and the command running in it. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
-| ⑧ | **Agent state** at the right edge: `!` needs input, `▷` working, `✓` turn ended. An agent that needs input shows what it asks for on a dim line beneath. | `n` next agent that needs input, `i` agent summary, `>` send it a reply |
+| ⑧ | **Agent state** at the right edge: `!` needs input, `▷` working, `✓` turn ended. An agent that needs input shows what it asks for on a dim line beneath. | `n` next agent that needs input, `i` Agent inspector, `>` send it a reply |
 | ⑨ | **Subagents** of the pane above, with their own state. They disappear when they finish. | |
 | ⑩ | **An idle shell**, dimmed so running programs stand out. | |
 | ⑪ | **A window with one pane**, on one row. The command follows `·` when the window has another name. | |
@@ -249,7 +252,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 | `1` / `2` / `3` / `4` | Tree / Processes / Buffers / Agents |
 | `A` | Toggle agent mode on or off for this client |
 | `n` | Jump to the next agent needing input (across all sessions) |
-| `i` | Switch drawer between terminal preview and agent summary |
+| `i` | Switch drawer between terminal preview and Agent inspector |
 | `a` | Actions for the selected object |
 | `z` | Toggle zoom on the selected pane or window |
 | `b` | Break selected pane into its own window |
@@ -282,7 +285,7 @@ Press `g` in the sidebar for every symbol and color, and `?` for every key.
 Use your usual tmux pane navigation to return to the sidebar after focusing an application, such as `prefix + Left` or `prefix + Right`. In popup mode, pressing `Enter` focuses the target and automatically closes the popup.
 When you leave the sidebar for a content pane, its selection pointer follows the active pane automatically.
 
-With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to an agent summary.
+With agent monitoring enabled, `4` opens Agents, `n` jumps to the next pane reporting needs-input, and `i` switches the drawer to the Agent inspector.
 
 ## Git branch context
 
@@ -294,7 +297,7 @@ set -g @tmux-canopy-git-context 'branch'
 
 To switch branch labels while tmux runs, type `canopy-branch` at the tmux command prompt (`prefix :`), or run `tmux canopy-branch` in a shell. It toggles the labels and refreshes every open sidebar. In the `quiet` appearance, the directory details beside them toggle the same way with `canopy-directory`, or with `set -g @tmux-canopy-directory 'off'`. These commands toggle because tmux cannot pass an argument through a command alias; for an explicit state, use `canopy details branch on` (or `off`, and `directory` for the directory) or the settings above.
 
-Press `Ctrl-r` in the sidebar after changing a setting by hand or switching branches. Directory groups display `⎇ feature/name` (ASCII: `[git:feature/name]`); compact layouts show the branch beside the pane when space permits. The pane preview shows the full name even if a narrow tree omits it. A detached HEAD appears as `detached@<commit>`. This requires Git; if it is unavailable, no label is shown. Canopy reads Git metadata only on reload, once per distinct repository, and never runs `git status`, watches files, checks out branches, or creates worktrees. A `cd` without another tmux event may also require `Ctrl-r`.
+Press `Ctrl-r` in the sidebar after changing a setting by hand or switching branches. Directory groups display `⎇ feature/name` (ASCII: `[git:feature/name]`); compact layouts show the branch beside the pane when space permits. The pane preview shows the full name even if a narrow tree omits it. A detached HEAD appears as `detached@<commit>`. This requires Git; if it is unavailable, no label is shown. Canopy reads Git metadata only on reload, once per distinct repository, and never runs `git status`, watches files, checks out branches, or creates worktrees. A `cd` without another tmux event may also require `Ctrl-r`, unless you enable the opt-in Bash notifier (`@tmux-canopy-directory-refresh 'on'` and `source …/scripts/directory-prompt.sh`).
 
 ## Place labels (preview)
 
@@ -330,8 +333,9 @@ your theme; `reverse`, `solid`, and `pointer` selection styles are also availabl
 
 Use `@tmux-canopy-appearance 'folders'` for directory groups, boxed titles, and
 tree guides, or `ascii` for `quiet` without Unicode glyphs. Density settings
-provide leaner or more detailed rows. Application icons can be changed or hidden
-per app—for example, `@tmux-canopy-icon-codex 'none'`. See
+provide leaner or more detailed rows. Application icons stay dim unless the pane
+is your active content target or a detected agent; hide or replace one with
+`@tmux-canopy-icon-codex 'none'` (and the same pattern for other apps). See
 [Appearance](docs/reference.md#appearance) and [Icons](docs/reference.md#icons).
 
 See the [configuration and command reference](docs/reference.md) for every control, appearance setting, notification option, and the architecture.
@@ -353,8 +357,8 @@ Canopy wraps `prefix + n`, `p`, `0`–`9`, and `Tab` for smooth window navigatio
 ## Current limitations
 
 - Only one client can own a dock on a tmux server. A competing dock request is refused without changing layouts; close it from the owning terminal first, or use `@tmux-canopy-mode 'popup'` in other clients.
-- A directory-only change may need `Ctrl-r`; there is no shell prompt integration or polling loop.
-- Activity means terminal output, not an AI agent’s task status. Without an [optional lifecycle adapter](docs/reference.md#agent-lifecycle-adapters), the agent drawer reads the selected pane’s current terminal screen and labels possible requests as unverified. Continuous logs can be noisy.
+- A directory-only change may need `Ctrl-r`, or the opt-in Bash prompt notifier (`@tmux-canopy-directory-refresh`); there is no polling loop.
+- Activity means terminal output, not an AI agent’s task status. Without an [optional lifecycle adapter](docs/reference.md#agent-lifecycle-adapters), the inspector may read a supported process-only agent’s visible screen for possible request hints, explicitly labeled unverified and never promoted to lifecycle state. It does not display an arbitrary terminal excerpt; use `i` for Terminal preview.
 - Desktop alerts appear on the machine running tmux, so over SSH only the `tmux` alert mode reaches you. Only `terminal-notifier` alerts on macOS can be clicked through to the pane.
 - Closing the sidebar returns its space but may not restore every previous pane proportion.
 - Confirmed deletion has no undo.

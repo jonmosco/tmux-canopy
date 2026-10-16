@@ -52,12 +52,19 @@ def main():
                 session_row = re.sub(r'\x1b\[[0-9;]*m', '', rows['S:$0'][1])
                 assert session_row.startswith('▾ test'), session_row
                 assert '─' not in rows['S:$0'][1], rows['S:$0']
+                agents = {
+                    'pi', 'omp', 'claude', 'codex', 'opencode', 'agent', 'gemini', 'agy',
+                    'claude.exe', 'codex.exe', 'agy.exe',
+                }
                 for index, (command, color, glyph) in enumerate(CASES):
                     row = rows[f'P:%{index}']
                     assert len(row) == 3 and row[2] == f'P:%{index}:$0'
                     glyph = glyph if icons == 'nerdfont' else '>' if icons == 'ascii' else UNICODE_ICONS.get(command, ' ')
                     if theme == 'ansi':
-                        assert f'\x1b[{color}m{glyph}\x1b[0m' in row[1], row
+                        # %0 is the active pane: full app color. Agents keep
+                        # app color when idle; other tools are dim.
+                        paint = color if index == 0 or command in agents else 2
+                        assert f'\x1b[{paint}m{glyph}\x1b[0m' in row[1], (command, row)
                     else:
                         assert glyph in row[1] and '\x1b' not in row[1], row
                 if theme == 'ansi':
@@ -134,7 +141,7 @@ def main():
         assert '[Z]' in rows_zoom['W:@0:$0'][1], rows_zoom['W:@0:$0']
         assert '[Z]' in rows_zoom['P:%0'][1], rows_zoom['P:%0']
         assert '[Z]' not in rows_zoom['P:%1'][1], rows_zoom['P:%1']
-    print('ok - command-aware icon colors, active green marker, all glyph themes and monochrome output')
+    print('ok - muted app icons, active/agent color, green marker, all glyph themes and monochrome output')
     print('ok - lazygit appearance header, structural glyphs, and rounded branches')
 
 

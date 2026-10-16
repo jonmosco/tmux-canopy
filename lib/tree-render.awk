@@ -922,7 +922,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
                 if (idle_shell(p, s)) name_disp=dim win_names[windex] reset
                 pm=(wm != " " ? wm : pt == del ? "✕" : pt == move ? "⇢" : p == current_p && s == current_s ? "●" : dead[p] == 1 ? "×" : " ")
                 prefix=dim dir_stem (wlast ? branch_end : branch_mid) reset " " (pm == "●" ? green (icons == "ascii" ? ">" : "●") reset : pm == " " ? " " : mark(pm)) " "
-                prefix=prefix (icon != "" && icon != " " ? appcolor(cmd) icon reset : dim window_icon reset) " " dim wi[s SUBSEP w] ":" reset
+                prefix=prefix (icon != "" && icon != " " ? icon_style(cmd, p, s) icon reset : dim window_icon reset) " " dim wi[s SUBSEP w] ":" reset
                 cmd_disp=(cmd == "" || cmd == win_names[windex] ? "" : dim " · " cmd reset)
                 if (place_labels()) {
                     line=(w == current_w && s == current_s ? bold : "") label_row(p, s, win_names[windex], !wauto[w] || tmux_names) reset
@@ -956,7 +956,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
                     # A left-hand location dot leaves the right edge for agent
                     # attention and terminal notices; fzf still owns selection.
                     prefix=dim win_stem reset pane_indent (pm == "●" ? green (icons == "ascii" ? ">" : "●") reset : pm == " " ? " " : mark(pm)) " "
-                    if (icon != "" && icon != " ") prefix=prefix appcolor(cmd) icon reset
+                    if (icon != "" && icon != " ") prefix=prefix icon_style(cmd, p, s) icon reset
                     prefix=prefix sprintf("%*s", 2 - text_width(icon == " " ? "" : icon), "") " "
                     if (place_labels())
                         line=label_line(prefix dim pi[p] ":" reset, label_pane(p, w, s), (pane_zoomed[p] ? " " dim "[Z]" reset : "") subagent_count(p), quiet_pane_edge(p))
@@ -965,7 +965,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
                             quiet_edge(prefix pi[p] ":" cmd_disp, shared_place(w) == "" && path[p] != quiet_place[s] ? p : "", quiet_pane_edge(p), width-3), width-3)
                     edge=""
                 } else {
-                    line=lazy_prefix(win_stem, pane_last ? branch_end : branch_mid, pm, appcolor(cmd), icon) " " dim pi[p] ":" reset cmd_disp (pane_zoomed[p] ? " " dim "[Z]" reset : "") hook_glyph(p) subagent_count(p)
+                    line=lazy_prefix(win_stem, pane_last ? branch_end : branch_mid, pm, icon_style(cmd, p, s), icon) " " dim pi[p] ":" reset cmd_disp (pane_zoomed[p] ? " " dim "[Z]" reset : "") hook_glyph(p) subagent_count(p)
                     edge=pane_edge(unread_glyph(pa[p],pb[p],pz[p]), pm == "●")
                 }
                 # Subagents hang beneath the pane, their branches aligned with
@@ -1000,7 +1000,7 @@ function pills_session(s, st,    wpos,w,key,wt,ppos,p,pt,shown,name,icon,mark,li
             cmd_disp=(unnamed_cmd[p] ? dim name reset : name)
             icon=appicon(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p])
             mark=(p == current_p && s == current_s ? green "●" reset : dead[p]==1 ? dim "×" reset : " ")
-            line=mark " " appcolor(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p]) icon reset " " cmd_disp (pane_zoomed[p] ? " " dim "[Z]" reset : "") subagent_count(p)
+            line=mark " " icon_style(agent_view && agent_kind[p] != "" ? agent_kind[p] : command[p], p, s) icon reset " " cmd_disp (pane_zoomed[p] ? " " dim "[Z]" reset : "") subagent_count(p)
             note=pill_word(p)
             if (note == "" && (pa[p] || pb[p] || pz[p])) note="●"
             row(pt, edge_count(git_line(line,p,width-6), note, width-2) subagent_lines(p, sprintf("%*s", 2+text_width(icon), "")), pt ":" s)
@@ -1101,6 +1101,14 @@ function useful_title(p, value) {
 # active-location indicator; application colors do not imply activity/state.
 # Icons and colors depend only on the command and settings fixed before
 # rendering, and are asked for several times per pane.
+# App marks stay in their column but are dim by default; full app color is
+# reserved for the active content pane and for detected agents.
+function icon_style(value, p, s) {
+    if (theme == "mono") return ""
+    if ((p != "" && p == current_p && s == current_s) || (p != "" && agent_kind[p] != "") || canonical_agent(value) != "")
+        return appcolor(value)
+    return dim
+}
 function appcolor(value) {
     if (!(value in appcolor_memo)) appcolor_memo[value]=appcolor_lookup(value)
     return appcolor_memo[value]
@@ -1369,7 +1377,7 @@ END {
                 row(wt,"Window   " context (w_zoomed[w] ? " [Z]" : ""),wt)
                 for (ppos=1;ppos<=np[w];ppos++) {
                     p=panes[w,ppos]; pt="P:" p
-                    row(pt,git_line("Pane     " context "." pi[p] "  " appcolor(command[p]) appicon(command[p]) reset " " command[p] (pane_zoomed[p] ? " [Z]" : "") " " useful_title(p) "  " path[p] (dead[p] == 1 ? " [exited]" : ""),p,0),pt ":" s)
+                    row(pt,git_line("Pane     " context "." pi[p] "  " icon_style(command[p], p, s) appicon(command[p]) reset " " command[p] (pane_zoomed[p] ? " [Z]" : "") " " useful_title(p) "  " path[p] (dead[p] == 1 ? " [exited]" : ""),p,0),pt ":" s)
                 }
             }
         }
@@ -1440,7 +1448,7 @@ END {
                 compact_duration=(appearance == "pills" ? pill_word(p) : appearance == "lazygit" ? quiet_mark(compact_label) : compact_label != "" && compact_label != "stale" ? agent_duration_text(p) : "")
                 w_name=(unnamed_w[key] ? dim wn[key] reset : wn[key])
                 cmd_disp=(unnamed_cmd[p] ? dim command[p] reset : command[p])
-                row(wt,edge_colored(git_line(dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style (appearance == "pills" || appearance == "lazygit" ? w_name : wi[key] ":" w_name) reset "  " appcolor(command[p]) appicon(command[p]) reset " " cmd_disp agent_badge(p) status_mark(compact_duration) dim meta compact_path reset,p,width-7),pane_edge(unread_glyph(pa[p]||vwa[w], pb[p]||vwb[w], pz[p]||vwz[w]), p == current_p && s == current_s),width-3),wt)
+                row(wt,edge_colored(git_line(dim branch reset " " (wm != " " ? mark(wm) " " : "") window_glyph window_style (appearance == "pills" || appearance == "lazygit" ? w_name : wi[key] ":" w_name) reset "  " icon_style(command[p], p, s) appicon(command[p]) reset " " cmd_disp agent_badge(p) status_mark(compact_duration) dim meta compact_path reset,p,width-7),pane_edge(unread_glyph(pa[p]||vwa[w], pb[p]||vwb[w], pz[p]||vwz[w]), p == current_p && s == current_s),width-3),wt)
                 continue
             }
             grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
@@ -1469,8 +1477,8 @@ END {
                 icon=appicon(agent_view ? agent_kind[p] : command[p])
                 zoom_badge=(pane_zoomed[p] ? " " dim "[Z]" reset : "")
                 if (appearance == "lazygit")
-                    prefix=lazy_prefix(stem, visible_ppos == shown_p[w] ? branch_end : branch_mid, pm, appcolor(agent_view ? agent_kind[p] : command[p]), icon)
-                else prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " (pm == "●" ? " " : mark(pm)) " " appcolor(agent_view ? agent_kind[p] : command[p]) icon reset
+                    prefix=lazy_prefix(stem, visible_ppos == shown_p[w] ? branch_end : branch_mid, pm, icon_style(agent_view ? agent_kind[p] : command[p], p, s), icon)
+                else prefix=dim stem (visible_ppos == shown_p[w] ? branch_end : branch_mid) reset " " (pm == "●" ? " " : mark(pm)) " " icon_style(agent_view ? agent_kind[p] : command[p], p, s) icon reset
                 show_path=(density == "detailed" || density == "compact" || (density == "normal" && width>=32))
                 pane_path=(show_path && !grouped && !(density == "normal" && group_member[p]) ? pathlabel(p,w,width-12-text_width(icon)) : "")
                 if (nul && density != "compact") {

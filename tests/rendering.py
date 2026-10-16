@@ -417,10 +417,9 @@ def main():
             time.sleep(.2)
             print('ok - Enter on a linked pane focuses its displayed session occurrence')
             tm('kill-pane', '-t', pane_b)
-            time.sleep(.4)
             remaining = {row[2] for row in rows()[1:]}
-            chosen = selection()[1]
-            assert chosen in remaining and chosen != pane_identity, (chosen, selection(), tm('capture-pane', '-p', '-t', sidebar))
+            remaining.discard(pane_identity)
+            wait_for(lambda: selection()[1] in remaining, 'deleted selection replaced by a live row')
             print('ok - deleting the tracked object falls back to a live row without freezing fzf')
         finally:
             sp.run([tmux, '-L', socket, 'kill-server'], env=env, stdout=sp.DEVNULL, stderr=sp.DEVNULL)

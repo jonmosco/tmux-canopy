@@ -26,6 +26,21 @@ New features were on hold until the existing ones were dependable:
   is in help, the README, and the reference, every setting the code reads is
   documented, and the legend describes the current footers.
 
+## Sidebar UX (done, unreleased)
+
+- [x] Agent inspector as a fixed field card (state, trust, directory, optional
+  git, place with green `●`), shared Terminal/Agent drawer at 25% height, `i`
+  selects mode and `p` only toggles visibility.
+- [x] Sticky browse pointer: content-pane focus updates `●` without moving the
+  sidebar selection or rewriting the inspector; `Ctrl-o` / return-to-sidebar
+  still jumps to the live pane.
+- [x] Dim application icons by default; full color for the active content pane
+  and for detected agents.
+- [x] Opt-in Bash directory-change refresh (`@tmux-canopy-directory-refresh` and
+  `scripts/directory-prompt.sh`); no polling. Ctrl-r remains the explicit refresh.
+- [x] vim-tmux-navigator: Ctrl-h / Ctrl-l leave a dock toward the adjacent pane
+  without changing the navigator's root bindings; Ctrl-h stays Backspace in search.
+
 ## Agent status reliability
 
 - [ ] Extend lifecycle regression coverage beyond Codex to verify that agent
@@ -54,11 +69,11 @@ New features were on hold until the existing ones were dependable:
 
 ## Agent request panel and responses (backlog)
 
-The agent summary and the line beneath a waiting pane already show the request
-description when a lifecycle adapter reports one (for example Claude Code and Codex approvals,
-including Codex's proposed command). The remaining work is to make
-supported requests easier to inspect and, where safe, respond to them from the
-sidebar.
+The Agent inspector and the dim line beneath a waiting pane already show the
+request when a lifecycle adapter reports one (for example Claude Code and Codex
+approvals, including Codex's proposed command). Inspecting a request from the
+sidebar is done; the remaining work is structured choices and, where safe,
+responding without leaving the tree.
 
 - [ ] Show structured response choices when an integration supplies them, and
   make long requests scrollable at narrow sidebar widths.

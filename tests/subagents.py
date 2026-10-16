@@ -152,7 +152,8 @@ try:
         assert lines[1].strip(' │') == 'make', lines
         assert all(re.search(r'(<1m|[0-9]+[mh])$', line) for line in lines[2:]), lines
         tm('set-option', '-gu', '@tmux_canopy_appearance')
-        assert 'Request: general-purpose: Approval requested' in preview()
+        requested = plain(preview())
+        assert 'general-purpose' in requested and 'make' in requested
         assert f'P:{pane}\t' in needs_input()
         # Neither the main thread nor another subagent may clear it.
         event(session | {'hook_event_name': 'PostToolUse', 'tool_name': 'Bash'})

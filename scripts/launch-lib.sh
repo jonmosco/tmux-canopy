@@ -92,6 +92,10 @@ canopy_agents_enabled() {
   [[ -n "$client" ]] || client="$(canopy_agents_client)"
   [[ "$(tmux display-message -p "$(canopy_agents_format "$client")" 2>/dev/null || true)" == on ]]
 }
+# Drawer mode: legacy "codex" is the same as "agent".
+canopy_preview_is_inspector() {
+  [[ "$1" == agent || "$1" == codex ]]
+}
 
 # run-shell performs one tmux format expansion before executing its shell.
 tmux_shell() {

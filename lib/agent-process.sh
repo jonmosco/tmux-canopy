@@ -202,3 +202,91 @@ canopy_agent_name_matches() {
     *) return 1 ;;
   esac
 }
+# Map a process basename to Canopy's agent kind (CANOPY_REPLY).
+canopy_agent_kind_from_name() {
+  local name=${1##*/}
+  name=${name%.exe}
+  CANOPY_REPLY=''
+  case "$name" in
+    codex) CANOPY_REPLY=codex ;;
+    claude|claude-code) CANOPY_REPLY=claude ;;
+    opencode|gemini|pi|omp|agy|crush|copilot|grok) CANOPY_REPLY=$name ;;
+    hermes|hermes-agent) CANOPY_REPLY=hermes ;;
+    antigravity) CANOPY_REPLY=agy ;;
+    agent) CANOPY_REPLY=cursor-agent ;;
+    *) return 1 ;;
+  esac
+  printf '%s' "$CANOPY_REPLY"
+}
+# Display label for a kind (CANOPY_REPLY).
+canopy_agent_label() {
+  CANOPY_REPLY=''
+  case "$1" in
+    codex) CANOPY_REPLY='Codex' ;;
+    claude) CANOPY_REPLY='Claude Code' ;;
+    opencode) CANOPY_REPLY='OpenCode' ;;
+    gemini) CANOPY_REPLY='Gemini CLI' ;;
+    pi) CANOPY_REPLY='Pi' ;;
+    omp) CANOPY_REPLY='Oh My Pi' ;;
+    agy) CANOPY_REPLY='Antigravity' ;;
+    cursor-agent) CANOPY_REPLY='cursor-agent' ;;
+    crush) CANOPY_REPLY='Crush' ;;
+    copilot) CANOPY_REPLY='Copilot CLI' ;;
+    grok) CANOPY_REPLY='Grok Build' ;;
+    hermes) CANOPY_REPLY='Hermes' ;;
+    *) CANOPY_REPLY=$1 ;;
+  esac
+  printf '%s' "$CANOPY_REPLY"
+}
+# Shells, runtimes, and wrappers an agent may sit under and still belong to the pane.
+canopy_agent_carrier() {
+  local name=${1#-}
+  name=${name##*/}
+  name=${name%.exe}
+  canopy_agent_kind_from_name "$name" >/dev/null && return 0
+  case "$name" in
+    sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare) return 0 ;;
+    python|Python|python[0-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# Resolve the agent kind for a pane: foreground command, hosted runtime, or
+# closest matching descendant under only carrier processes (CANOPY_REPLY).
+canopy_resolve_pane_agent() {
+  local root=$1 base=${2##*/} pid current depth best=129 found='' kind name
+  base=${base%.exe}
+  CANOPY_REPLY=''
+  if canopy_agent_kind_from_name "$base" >/dev/null; then
+    return 0
+  fi
+  if [[ "$base" =~ ^(node|nodejs|python[0-9.]*|Python)$ ]]; then
+    canopy_pane_agent "$root" >/dev/null && return 0
+  fi
+  [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
+  canopy_load_ps_snapshot || return 1
+  for pid in "${!CANOPY_COMM[@]}"; do
+    kind=${CANOPY_KIND[$pid]:-}
+    if [[ -z $kind ]]; then
+      canopy_agent_kind_from_name "${CANOPY_COMM[$pid]}" >/dev/null || continue
+      kind=$CANOPY_REPLY
+    fi
+    current=$pid
+    for ((depth=0; depth<128; depth++)); do
+      if [[ $current != "$pid" ]]; then
+        name=${CANOPY_KIND[$current]:-${CANOPY_COMM[$current]:-}}
+        canopy_agent_carrier "$name" || break
+      fi
+      if [[ $current == "$root" ]]; then
+        if ((depth < best)); then
+          best=$depth
+          found=$kind
+        fi
+        break
+      fi
+      current=${CANOPY_PPID[$current]:-}
+      [[ $current =~ ^[1-9][0-9]*$ ]] || break
+    done
+  done
+  CANOPY_REPLY=$found
+  [[ -n $found ]] && printf '%s' "$found"
+}

@@ -4,6 +4,7 @@
 # shellcheck disable=SC2016 # These variables expand in fzf's action shell.
 sidebar_ui_options() {
   local pane="${1:-${TMUX_PANE:-}}" preview_mode preview_height selection_style pane_height preview_window fzf_colors theme selection_background
+  local inspector_mode agents_enabled agents_format preview_label=' Terminal preview '
   local source_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-source"'
   local action_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-action"'
   local preview_cmd='"$TMUX_CANOPY_ROOT/scripts/sidebar-preview"'
@@ -23,20 +24,24 @@ sidebar_ui_options() {
   local refresh='tmux send-keys -t "$TMUX_PANE" C-r'
   local pane_flag=()
   [[ -n "$pane" ]] && pane_flag=(-t "$pane")
-  IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance < <(
+  agents_format="$(canopy_agents_format "${TMUX_CANOPY_CLIENT:-}")"
+  IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance inspector_mode agents_enabled < <(
     tmux display-message -p "${pane_flag[@]}" \
-      '#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}' 2>/dev/null || true
+      "#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}|#{@tmux_canopy_preview_mode}|$agents_format" 2>/dev/null || true
   )
+  if [[ "$agents_enabled" == on ]] && canopy_preview_is_inspector "$inspector_mode"; then
+    preview_label=' Agent inspector '
+  fi
   : "${preview_mode:=off}"
-  : "${preview_height:=35%}"
+  : "${preview_height:=25%}"
   : "${selection_style:=subtle}"
   [[ "$pane_height" =~ ^[1-9][0-9]*$ ]] || pane_height=30
-  preview_window="down,${preview_height},nowrap,border-top,+0"
+  preview_window="down,${preview_height},nowrap,noinfo,border-sharp,+0"
   if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
     popup_cols=80
     read -r _rows popup_cols < <(stty size </dev/tty 2>/dev/null || echo "24 80")
     if [[ "$popup_cols" =~ ^[1-9][0-9]*$ ]] && ((popup_cols >= 100)); then
-      preview_window="right,45%,nowrap,border-left,+0"
+      preview_window="right,45%,nowrap,noinfo,border-sharp,+0"
     fi
   fi
   if [[ "$preview_mode" == off || ( "$preview_mode" == auto && "$pane_height" =~ ^[0-9]+$ && "$pane_height" -lt 28 ) ]]; then
@@ -86,7 +91,7 @@ sidebar_ui_options() {
     --gutter=' ' --scrollbar="$scrollbar"
     --footer-border=line --no-input --info=hidden --no-separator --prompt="$prompt" --pointer="$pointer" --marker="$marker" --header=' '
     --preview="$preview_cmd {1}" --preview-window="$preview_window"
-    --preview-label=' Preview ' --preview-label-pos=2
+    --preview-label="$preview_label" --preview-label-pos=2
     --bind='j:down,k:up'
     # The mouse wheel scrolls the view and leaves the selection where it is;
     # by default each wheel event would move the selection one row. A
@@ -111,10 +116,10 @@ sidebar_ui_options() {
     --bind="2:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-processes)+reload-sync($source_cmd --stable)"
     --bind="3:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-buffers)+reload-sync($source_cmd --stable)"
     --bind="4:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd view-agents)+reload-sync($source_cmd --stable)"
-    --bind="A:execute-silent($action_cmd toggle-agents)+reload-sync($source_cmd --stable)"
+    --bind="A:execute-silent($action_cmd toggle-agents)+transform($mode_cmd --label)+reload-sync($source_cmd --stable)+refresh-preview"
     --bind="f:execute-silent($action_cmd toggle-footer)+reload-sync($source_cmd --stable)"
     --bind="$jump_agent_bind"
-    --bind="i:execute-silent($mode_cmd)+refresh-preview+show-preview"
+    --bind="i:transform($mode_cmd --fzf)"
     --bind="a:execute-silent($action_cmd actions {1} $detach)"
     --bind='p:toggle-preview'
     --bind="P:execute-silent($popup_cmd {1} $detach)"
@@ -143,7 +148,7 @@ sidebar_ui_options() {
     --bind="N:execute-silent(($action_cmd create-session-prompt {1}; $refresh) $detach)"
     --bind="z:execute-silent($action_cmd zoom {1})+reload-sync($source_cmd --stable)"
     --bind="b:execute-silent($action_cmd break-window {1})+reload-sync($source_cmd --stable)"
-    --bind="ctrl-r:reload-sync($source_cmd --stable)"
+    --bind="ctrl-r:reload-sync($source_cmd --stable)+refresh-preview"
     --bind='ctrl-j:down,ctrl-k:up'
     --bind="ctrl-t:reload-sync($animate_cmd)"
     --bind='ctrl-q:abort'

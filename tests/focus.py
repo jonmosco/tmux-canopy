@@ -156,36 +156,42 @@ def main():
             tm('bind-key', '-n', 'F8', 'select-window', '-t', wa)
             tm('bind-key', '-n', 'F9', 'select-pane', '-t', sidebar)
             # Browse to a distant row, then leave the sidebar for the pane
-            # already active beneath it. The arrow must follow that pane even
-            # though the active-location value itself has not changed.
+            # already active beneath it. Leaving the sidebar still jumps the
+            # pointer to that pane even though the active-location value has
+            # not changed.
             os.write(master, b'\x1b[15~')
             wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'same-pane departure selects active row')
             assert pointer_line(sidebar) != row_before
             time.sleep(.3)
+            # Browse away again, then switch content panes without entering the
+            # sidebar: ● and target move, the browse pointer stays put.
+            tm('send-keys', '-t', sidebar, 'M-a')
+            wait(lambda: probe(sidebar).startswith('P:' + last + '|'), 'browse away before pane switch')
+            browsed = probe(sidebar)
             rendered = renders.stat().st_size
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'native pane focus marker')
-            wait(lambda: probe(sidebar).startswith('P:' + peer + '|'), 'native pane focus selects active row')
+            wait(lambda: display(sidebar, '#{@tmux_canopy_target}') == peer, 'native pane focus updates target')
             time.sleep(.3)
-            # The pointer jump and the list refresh share one render.
+            assert probe(sidebar) == browsed, 'pane focus must not move the browse pointer'
             assert renders.stat().st_size - rendered == 1, renders.stat().st_size - rendered
-            assert display(sidebar, '#{@tmux_canopy_target}') == peer
             assert set(active_rows()) == {'S:' + session, f'W:{wa}:{session}', 'P:' + peer}
-            print('ok - native pane focus updates hierarchy and selects active row')
+            print('ok - native pane focus updates ● without moving the browse pointer')
 
-            # Real SGR mouse click selects the other content pane.
+            # Real SGR mouse click focuses the other content pane; pointer stays.
             x, y = map(int, display(pane_a, '#{pane_left}|#{pane_top}').split('|'))
             os.write(master, f'\x1b[<0;{x+2};{y+2}M\x1b[<0;{x+2};{y+2}m'.encode())
             wait(lambda: location(sidebar) == f'{session}|{wa}|{pane_a}', 'mouse pane focus marker')
-            wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'mouse pane focus selects active row')
-            # Entering the sidebar remembers content and causes no extra reload.
+            wait(lambda: display(sidebar, '#{@tmux_canopy_target}') == pane_a, 'mouse pane focus updates target')
+            assert probe(sidebar) == browsed, 'mouse pane focus must not move the browse pointer'
+            # Entering the sidebar jumps to the live content row.
             time.sleep(.2)
             count = len(deliveries.read_text().splitlines())
             os.write(master, b'\x1b[20~')
             wait(lambda: probe(sidebar).startswith('P:' + pane_a + '|'), 'return selects current pane')
             assert location(sidebar) == f'{session}|{wa}|{pane_a}'
             assert len(deliveries.read_text().splitlines()) == count
-            print('ok - mouse focus and returning to sidebar selects the current content pane')
+            print('ok - mouse focus keeps browse selection; returning to sidebar selects the content pane')
 
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'prepare pane burst')
@@ -214,11 +220,12 @@ def main():
             time.sleep(.15)
             filtered = probe(sidebar)
             assert filtered.split('|')[2] == 'focus-collapse', filtered
+            filtered_before = probe(sidebar)
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'filtered focus refresh')
-            wait(lambda: probe(sidebar).startswith('P:' + peer + '|'), 'filtered focus selects active pane')
-            assert probe(sidebar).split('|')[-1] == ''
-            print('ok - leaving a filtered sidebar clears search and selects the active pane')
+            wait(lambda: display(sidebar, '#{@tmux_canopy_target}') == peer, 'filtered focus updates target')
+            assert probe(sidebar) == filtered_before, 'pane focus must keep a filtered browse selection'
+            print('ok - pane focus keeps a filtered browse selection while updating ●')
             wait(enter_search, 'search mode before collapsing active window')
             tm('send-keys', '-t', sidebar, '-l', 'focus-collapse')
             time.sleep(.15)

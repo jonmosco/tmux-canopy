@@ -54,7 +54,7 @@ context_help_records() {
       key 'Enter' 'Focus the selected agent pane'
       key 'n' 'Jump to the next agent needing input'
       key '>' 'Reply or send a line to the selected pane'
-      key 'i' 'Show the agent summary in the preview drawer'
+      key 'i' 'Inspect state, directory, git and place; switch to Terminal preview for output'
       key 'a' 'Open pane actions'
       ;;
     *)
@@ -119,7 +119,7 @@ help_records() {
   key 'Ctrl-r' 'Refresh; retry if data is unavailable'
   key 'Ctrl-h / Ctrl-l' 'In a dock, focus the left / right pane; Ctrl-h is Backspace while searching'
   key 'Ctrl-j / Ctrl-k' 'Move the selection down / up'
-  note 'The green dot shows the active location. The highlighted row is your selection.'
+  note 'The green dot shows the active location. The highlighted row is your selection; pane focus alone does not move it (Ctrl-o or returning to the sidebar does).'
 
   note 'Text-filter prompts use tmux prompt keys; Ctrl-c cancels.'
   note 'Tree filters combine with search and preserve folds. +W/+T in the header means a window-name/pane-title rule; F shows the values. Clear all filters restores everything. Ctrl-g always searches all targets.'
@@ -134,8 +134,10 @@ help_records() {
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
   [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'
   key 'p' 'Show or hide the preview drawer'
-  [[ "$agents_enabled" != on ]] || key 'i' 'Switch the drawer between terminal and agent summaries; show it if hidden'
+  [[ "$agents_enabled" != on ]] || key 'i' 'Switch Terminal preview / Agent inspector; the drawer border names the mode'
   key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'
+  note 'p changes only drawer visibility, not its mode. Close and reopen the sidebar after upgrading to activate new bindings.'
+  note 'Both modes share a native sharp frame and fixed geometry, with a scrollbar but no scroll-position counter covering the heading.'
   note 'The top line names only the open view and its filter or summary; use 1-4 to switch views.'
 
   section 'Manage'
@@ -149,6 +151,9 @@ help_records() {
   if [[ "$agents_enabled" == on ]]; then
     note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'
     note 'Optional agent hooks or plugins report lifecycle events. Without them, screen-based request hints remain unverified.'
+    note 'The inspector is a fixed field card: state and agent, one trust line, directory, optional git repo/branch, and place (green ● when that pane is your active content target). A request and command appear only when present. Use i for the terminal snapshot.'
+    note 'Short drawers keep state, then a present request/command, ahead of trust and place; lines clip, never wrap. No blank filler rows. Default drawer height is 25% (@tmux-canopy-preview-height).'
+    note 'Process-only agents show Detected with snapshot-only trust; other panes show No agent / Terminal with their command and place, without request inference. Agent screen hints stay unverified; the inspector does not approve requests.'
     note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale hook state clears after 15 minutes.'
   fi
   note 'The actions menu also has reorder, link, unlink, layout, zoom, swap, synchronization and dead-pane respawn.'
@@ -201,11 +206,11 @@ help_records() {
   note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'The default appearance, quiet, lists sessions, windows and panes in tmux order with directories as details. Set @tmux-canopy-appearance folders to group panes by directory instead, or ascii for quiet without glyphs. Reload the plugin and reopen the sidebar after changing it.'
-  note 'Optional: set @tmux-canopy-git-context branch for read-only Git branch labels. Narrow rows omit them; pane previews show the full branch. Ctrl-r updates branch or directory changes.'
+  note 'Optional: set @tmux-canopy-git-context branch for read-only Git branch labels. Narrow rows omit them; pane previews show the full branch. Ctrl-r updates branch or directory changes; or enable @tmux-canopy-directory-refresh and source scripts/directory-prompt.sh for Bash cd.'
   note 'Toggle branch labels or quiet directory details anywhere with prefix-: canopy-branch or canopy-directory.'
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. On by default in quiet; set off to keep pane rows.'
   note 'Press Shift-a to show or hide agent mode. @tmux-canopy-agents on is only the default for clients that have not chosen. Integrations stay installed either way.'
-  note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight. Session and window selections use their active content pane.'
+  note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight and drives the inspector. Switching panes updates the dot without moving that selection.'
   note 'Default selection highlights the row with a dark-gray background. @tmux-canopy-selection-background sets a palette index or RGB background to suit your theme; reopen after changing it.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
@@ -229,7 +234,7 @@ legend_records() {
   legend_item '[1/2w]' 'With a filter, one of two windows matches in a session.' dim
 
   section 'Pane labels'
-  legend_item '❋ codex' 'Recognized apps have icons; shells and unknown commands show names only. Icon color does not show state.' cyan
+  legend_item '❋ codex' 'Recognized apps have icons; shells and unknown commands show names only. Icons are dim unless the pane is active or an agent.' cyan
   note 'Set @tmux-canopy-icon-codex (or another app name) to replace its glyph; none hides it. Press Ctrl-r to refresh.'
   legend_item 'dim title' 'Pane title, shortened to fit the available width.' dim
   legend_item 'dim path' 'Working directory, inline or below the command depending on width. Adjacent panes sharing it can show it once.' dim
@@ -251,7 +256,7 @@ legend_records() {
     note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
     legend_item '◆ Claude Code waiting  n go' 'A waiting agent temporarily replaces the normal action footer; pending move, link, and delete operations do the same.' amber
     legend_item '! / ▷ / ✓' 'Agent state on a pane: needs input, working (pulses while animation is on), ready or turn ended.' amber
-    legend_item '  make test · Run…' 'What an agent waiting on you asks for: the command, then its description. i shows it in full; > replies.' dim
+    legend_item '  make test · Run…' 'What an agent waiting on you asks for: the command, then its description. i separates request and command; > replies.' dim
     legend_item '├─ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
     note 'Quiet moves these marks to the right edge, separate from amber unread notices; a waiting subagent takes priority. Classic spells states out instead, as the labels below show.'
     legend_item '[process]' 'An agent process was found in this pane; no lifecycle state is available.' dim

@@ -5,6 +5,7 @@ from support import install_fzf_probe
 import os
 from pathlib import Path
 import pty
+import re
 import shlex
 import shutil
 import struct
@@ -57,6 +58,19 @@ def main():
         def capture():
             return tm('capture-pane', '-p', '-t', sidebar)
 
+        def preview_border():
+            lines = capture().splitlines()
+            for index, line in enumerate(lines):
+                match = re.fullmatch(r'\s*┌─* (.+?) ─+┐\s*', line)
+                if match:
+                    bottom = next((row for row in range(index + 1, len(lines))
+                                   if re.fullmatch(r'\s*└─+┘\s*', lines[row])), None)
+                    if bottom is not None:
+                        assert all(re.fullmatch(r'\s*│.*│\s*', row)
+                                   for row in lines[index + 1:bottom]), lines[index:bottom + 1]
+                        return index, match.group(1), bottom
+            return None
+
         def probe():
             selected.unlink(missing_ok=True)
             tm('send-keys', '-t', sidebar, 'M-z')
@@ -105,8 +119,16 @@ while True:
                 tm('set-option', '-g', '@tmux-canopy-' + option, value)
             script_env = env | {'TMUX': display(pane, '#{socket_path},#{pid},0'), 'TMUX_PANE': pane,
                                 'TMUX_CANOPY_STATE': str(state), 'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '40'}
+            overflow = temp / 'overflow.sh'
+            overflow.write_text('#!/bin/sh\n'
+                                'printf "%*s\\n" "$((FZF_PREVIEW_COLUMNS - 1))" agent-heading-right-edge\n'
+                                'i=0\nwhile [ "$i" -lt 80 ]; do\n'
+                                '  printf "output row %s\\n" "$i"\n  i=$((i + 1))\ndone\n')
+            overflow.chmod(0o755)
             bindings = ['alt-t:pos(3)', 'alt-w:pos(2)',
-                        f"alt-z:execute-silent(printf '%s|%s\\n' {{1}} {{q}} > {selected})"]
+                        f"alt-z:execute-silent(printf '%s|%s\\n' {{1}} {{q}} > {selected})",
+                        f"alt-v:change-preview({shlex.quote(str(overflow))})+refresh-preview",
+                        f"alt-r:change-preview({shlex.quote(str(ROOT / 'scripts/sidebar-preview'))} {{1}})+refresh-preview"]
             install_fzf_probe(temp, bindings, script_env)
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 44, 160, 0, 0))
@@ -183,31 +205,61 @@ while True:
             tm('send-keys', '-t', sidebar, 'M-t')
             before = probe()
             assert before.startswith('P:' + pane + '|')
-            assert ' Preview ' not in capture()
+            assert preview_border() is None
             tm('send-keys', '-t', sidebar, 'p')
             wait(lambda: 'ROW079' in capture(), 'drawer shown')
             assert 'RIGHTEND' not in capture(), capture()
             assert '界🙂' in capture()
-            border = next(i for i, line in enumerate(capture().splitlines()) if ' Preview ' in line)
+            terminal_border = preview_border()
+            assert terminal_border is not None and 'DONE' in capture()
             tm('send-keys', '-t', sidebar, 'M-w')
             wait(lambda: 'Window: preview' in capture(), 'window preview')
-            assert border == next(i for i, line in enumerate(capture().splitlines()) if ' Preview ' in line)
+            assert preview_border() == terminal_border
             tm('send-keys', '-t', sidebar, 'M-t')
             wait(lambda: 'ROW079' in capture(), 'pane preview restored')
             for _ in range(2):
                 tm('send-keys', '-t', sidebar, 'p')
-                wait(lambda: ' Preview ' not in capture(), 'drawer hidden')
+                wait(lambda: preview_border() is None, 'drawer hidden')
                 tm('send-keys', '-t', sidebar, 'p')
                 wait(lambda: 'ROW079' in capture(), 'drawer reshown')
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
-            wait(lambda: 'Terminal · no agent detected' in capture(), 'agent drawer terminal fallback shown')
-            assert 'ROW079' in capture()
+            wait(lambda: preview_border() is not None and preview_border()[1] != terminal_border[1]
+                 and 'ROW079' not in capture() and 'DONE' not in capture(), 'structured inspector shown')
+            inspector_border = preview_border()
+            assert inspector_border is not None and inspector_border[::2] == terminal_border[::2]
+            assert inspector_border[1] != terminal_border[1], 'inspector has the same visible mode label as terminal preview'
+            assert 'ROW079' not in capture() and 'DONE' not in capture()
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
-            wait(lambda: 'ROW079' in capture(), 'terminal drawer restored')
+            wait(lambda: 'ROW079' in capture() and 'DONE' in capture() and preview_border() == terminal_border,
+                 'terminal drawer and mode label restored')
+            assert probe() == before
+            tm('send-keys', '-t', sidebar, 'i')
+            wait(lambda: preview_border() == inspector_border and 'ROW079' not in capture() and 'DONE' not in capture(),
+                 'inspector label and content restored')
+            tm('send-keys', '-t', sidebar, 'A')
+            wait(lambda: preview_border() == terminal_border and 'ROW079' in capture() and 'DONE' in capture(),
+                 'agent mode off uses terminal preview and its label')
+            tm('send-keys', '-t', sidebar, 'A')
+            wait(lambda: preview_border() == inspector_border and 'ROW079' not in capture() and 'DONE' not in capture(),
+                 'agent mode on restores inspector choice and its label')
+            tm('send-keys', '-t', sidebar, 'i')
+            wait(lambda: preview_border() == terminal_border and 'ROW079' in capture() and 'DONE' in capture(),
+                 'terminal mode restored before remaining preview checks')
             assert probe() == before
             print('ok - real fzf clips wide rows, keeps drawer height steady, and toggles with p and i')
+
+            tm('send-keys', '-t', sidebar, 'M-v')
+            wait(lambda: 'output row 0' in capture(), 'overflowing preview shown')
+            overflow_screen = capture()
+            assert 'agent-heading-right-edge' in overflow_screen, overflow_screen
+            assert any(re.search(r'│\s*│\s*$', line) for line in overflow_screen.splitlines()), \
+                'overflowing preview lost its scrollbar'
+            tm('send-keys', '-t', sidebar, 'M-r')
+            wait(lambda: 'ROW079' in capture() and 'output row 0' not in capture(), 'normal preview restored')
+            assert probe() == before
+            print('ok - an overflowing preview keeps its right-aligned heading unobscured and its scrollbar visible')
 
             tm('send-keys', '-t', pane, '-l', 't')
             wait(lambda: display(pane, '#{alternate_on}') == '1', 'alternate screen')

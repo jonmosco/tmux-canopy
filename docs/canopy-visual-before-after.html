@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canopy — visual before &amp; after</title>
+<style>
+:root {
+  color-scheme: dark;
+  --page: #10141b; --paper: #181e27; --terminal: #20252f;
+  --ink: #e6ebf2; --muted: #a1adbd; --quiet: #8793a5;
+  --border: #3a4555; --selection: #343b48; --accent: #83d9eb;
+  --green: #99d3a4; --amber: #f0c878; --columns: 42;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --page: #edf0f3; --paper: #fafbfc; --terminal: #ffffff;
+  --ink: #23303d; --muted: #526071; --quiet: #626f7e;
+  --border: #c3ccd5; --selection: #e0e6ec; --accent: #08677c;
+  --green: #28733d; --amber: #875812;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 16px/1.55 system-ui, sans-serif; }
+main { max-width: 1420px; padding: 52px 30px 70px; margin: auto; }
+h1 { font-size: clamp(34px, 5vw, 62px); line-height: 1.06; letter-spacing: -.045em; margin: 14px 0 18px; font-weight: 650; }
+h2 { font-size: clamp(23px, 3vw, 30px); letter-spacing: -.025em; line-height: 1.2; margin: 0 0 9px; }
+h3 { margin: 0; font-size: 16px; }
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 4px; }
+a:hover { text-decoration-thickness: 2px; }
+button, select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.eyebrow, .number { font: 600 12px/1.5 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.lede { max-width: 75ch; color: var(--muted); font-size: 18px; }
+.notice { padding: 15px 18px; border-left: 3px solid var(--accent); background: var(--paper); color: var(--muted); margin: 26px 0 18px; max-width: 100ch; font-size: 14px; }
+.notice strong { color: var(--ink); }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; padding: 16px 0; }
+.toolbar label { color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+nav { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 8px 0 24px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.study { margin-top: 48px; }
+.section-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 430px); gap: 20px; align-items: end; margin-bottom: 20px; }
+.number { display: block; margin-bottom: 8px; }
+.explanation { color: var(--muted); font-size: 14px; max-width: 65ch; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.example { min-width: 0; background: var(--paper); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.example-head { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.example-head .tag { font: 600 11px/1.4 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); display: block; margin-bottom: 5px; }
+.after .tag { color: var(--accent); }
+.stage { padding: 24px 16px; display: flex; justify-content: center; align-items: flex-start; min-width: 0; }
+.terminal { width: min(100%, calc(var(--columns) * 1ch + 24px)); background: var(--terminal); color: var(--ink); border: 1px solid var(--border); font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow: hidden; min-width: 0; }
+.terminal-head, .terminal-footer { display: flex; gap: 1ch; align-items: baseline; padding: 6px 10px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.terminal-head { border-bottom: 1px solid var(--border); }
+.terminal-footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.terminal-footer span { flex-shrink: 0; }
+.terminal-footer .optional { flex-shrink: 1; overflow: hidden; }
+.rows { min-height: 316px; padding: 8px 0 16px; }
+.row { display: flex; align-items: baseline; gap: .6ch; white-space: nowrap; padding: 0 10px; min-width: 0; }
+.row .name, .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .context { margin-left: auto; color: var(--quiet); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row .state { margin-left: auto; flex: none; }
+.row .context + .state { margin-left: 0; }
+.session { font-weight: 700; margin-top: 8px; }
+.indent { padding-left: 4ch; }
+.deep { padding-left: 7ch; }
+.selected { background: var(--selection); }
+.active { color: var(--green); flex: none; }
+.muted { color: var(--muted); }
+.quiet { color: var(--quiet); }
+.accent { color: var(--accent); }
+.amber { color: var(--amber); }
+.strong { font-weight: 700; }
+.push { margin-left: auto; }
+.rule { height: 1px; margin: 11px 10px; background: var(--border); }
+.legend { display: flex; flex-wrap: wrap; gap: 5px 18px; color: var(--muted); font-size: 12px; margin-top: 12px; }
+.caption { border-top: 1px solid var(--border); padding: 13px 20px; color: var(--muted); font-size: 13px; }
+.raw { padding: 12px 10px; margin: 0; white-space: pre; overflow: hidden; font: inherit; min-height: 330px; }
+.inspector { min-height: 330px; padding: 12px 10px; }
+.inspector-title { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.request { margin-bottom: 13px; overflow-wrap: anywhere; }
+.command { border-left: 2px solid var(--amber); padding-left: 10px; margin: 0 0 14px; white-space: pre; overflow-x: auto; font: inherit; }
+.provenance { color: var(--quiet); font-size: 12px; margin: 12px 0; overflow-wrap: anywhere; }
+.screen-label { color: var(--quiet); font-size: 12px; margin: 14px 0 4px; }
+.screen-output { margin: 0; font: inherit; color: var(--muted); white-space: pre; overflow-x: auto; }
+.popup { width: 100%; font-size: 12px; }
+.popup-columns { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); min-height: 330px; }
+.popup-list { border-right: 1px solid var(--border); padding: 10px 0; }
+.popup .row { padding-left: 8px; padding-right: 8px; }
+.popup .raw, .popup .inspector { min-height: 0; }
+.narrow { --columns: 30; }
+.narrow .rows { min-height: 260px; }
+.narrow .name { flex: 1; }
+.narrow .row .state { margin-left: 0; }
+.takeaway { margin-top: 16px; font-size: 14px; color: var(--muted); }
+.takeaway strong { color: var(--ink); }
+footer { margin-top: 52px; border-top: 1px solid var(--border); padding-top: 22px; color: var(--muted); font-size: 13px; }
+footer p + p { margin-top: 10px; }
+@media (max-width: 1000px) {
+  .pair { grid-template-columns: 1fr; }
+  .section-intro { grid-template-columns: 1fr; gap: 8px; }
+  .popup { max-width: 760px; }
+}
+@media (max-width: 540px) {
+  main { padding: 28px 14px 44px; }
+  .study { margin-top: 34px; }
+  .stage { padding: 16px 8px; }
+  .example-head, .caption { padding: 13px 14px; }
+  .popup-columns { grid-template-columns: 1fr; }
+  .popup-list { border-right: 0; border-bottom: 1px solid var(--border); }
+  .popup .raw, .popup .inspector { min-height: 300px; }
+  .toolbar { align-items: stretch; }
+  .toolbar label { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print {
+  .toolbar, nav { display: none; }
+  main { padding: 0; }
+  .example { break-inside: avoid; }
+  .study { break-before: auto; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Canopy / visual before &amp; after</div>
+    <h1>Same workspace.<br>Clearer attention.</h1>
+    <p class="lede">Four matched comparisons exploring ideas from OpenSessions, Superterm, and tmux-claude-sessions—without replacing Canopy’s tree or adding another dashboard.</p>
+    <div class="notice"><strong>Design comparison, not screenshots.</strong> “Before” panels are schematics using fictional data, not a complete record of the previous terminal output. Study 02 shows the intended card composition; a corrected terminal adaptation is now being implemented, including a native frame, consistent process-only and non-agent cards, and a four-row recent-screen cap. This CSS illustration does not establish that an earlier implementation matched the mockup, nor promise identical font, background, colors, or dimensions in tmux. Studies 01, 03, and 04 remain proposals: tree emphasis, popup request wrapping, and narrow-sidebar policy are not implemented.</div>
+    <div class="toolbar" aria-label="Preview controls">
+      <button id="theme" type="button" aria-pressed="false">Light theme</button>
+      <label for="width">Dock preview width <select id="width"><option value="30">30 columns</option><option value="42" selected>42 columns</option><option value="56">56 columns</option></select></label>
+      <span class="explanation">Popup examples use the available width. Study 04 stays at 30 columns.</span>
+    </div>
+    <nav aria-label="Comparisons"><a href="#tree">01 Tree emphasis</a><a href="#inspector">02 Agent inspector</a><a href="#popup">03 Popup readability</a><a href="#narrow">04 Narrow sidebar</a></nav>
+  </header>
+
+  <section class="study" id="tree" aria-labelledby="tree-title">
+    <div class="section-intro">
+      <div><span class="number">01 / Tree emphasis</span><h2 id="tree-title">Keep the tree. Let the blocker stand out.</h2></div>
+      <p class="explanation">Borrow the restrained navigation rail, not cards around every item. Brighten the waiting request and give state a predictable right edge. The active pane and browsing selection remain separate.</p>
+    </div>
+    <div class="pair">
+      <article class="example before"><div class="example-head"><span class="tag">Before · pre-change schematic</span><h3>Context and attention share the row</h3></div>
+        <div class="stage"><div class="terminal">
+          <div class="terminal-head"><span class="accent strong">Tree</span><span class="quiet">· All</span><span class="push amber">◆1</span><span class="accent">▷2</span></div>
+          <div class="rows">
+            <div class="row session"><span class="active">▾ ▣</span><span>acme-api</span><span class="context">auth / main</span></div>
+            <div class="row indent"><span class="quiet">0:server</span><span class="context">acme-api</span></div>
+            <div class="row indent"><span class="active">●</span><span class="name muted">2:claude</span><span class="context">auth / main</span><span class="state amber">!</span></div>
+            <div class="row deep quiet"><span class="clip">npm test -- auth · Run auth tests</span></div>
+            <div class="row indent selected"><span class="name muted">3:codex</span><span class="context">auth / main</span><span class="state accent">▷</span></div>
+            <div class="row session"><span class="active">▾ ▣</span><span>acme-web</span><span class="context">feature/ui</span></div>
+            <div class="row indent"><span class="name muted">0:opencode</span><span class="context">acme-web</span><span class="state accent">▷</span></div>
+          </div>
+          <div class="terminal-footer"><span>↵ focus</span><span>a actions</span><span class="optional">/ search · ? help</span></div>
+        </div></div><p class="caption">Quiet rows, inline context, a dim request line, and symbol-only state.</p>
+      </article>
+      <article class="example after"><div class="example-head"><span class="tag">After · visual proposal</span><h3>Stable state edge; stronger request contrast</h3></div>
+        <div class="stage"><div class="terminal">
+          <div class="terminal-head"><span class="accent strong">Tree</span><span class="quiet">· All</span><span class="push amber">◆1</span><span class="accent">▷2</span></div>
+          <div class="rows">
+            <div class="row session"><span class="active">▾ ▣</span><span>acme-api</span><span class="context">auth / main</span></div>
+            <div class="row indent"><span class="quiet">0:server</span><span class="context">acme-api</span></div>
+            <div class="row indent"><span class="active">●</span><span class="name strong">2:claude</span><span class="state amber strong">!</span></div>
+            <div class="row deep amber"><span class="clip">npm test -- auth · Run auth tests</span></div>
+            <div class="row indent selected"><span class="name">3:codex</span><span class="state accent">▷</span></div>
+            <div class="row session"><span class="active">▾ ▣</span><span>acme-web</span><span class="context">feature/ui</span></div>
+            <div class="row indent"><span class="name">0:opencode</span><span class="state accent">▷</span></div>
+          </div>
+          <div class="terminal-footer"><span>↵ focus</span><span>a actions</span><span class="optional">/ search · ? help</span></div>
+        </div></div><p class="caption">Shared context stays on the parent; a blocker gets contrast without recoloring the whole branch.</p>
+      </article>
+    </div>
+    <div class="legend"><span><span class="active">●</span> Active terminal location: Claude</span><span>Background highlight: browsing Codex</span><span><span class="amber">!</span> Needs input, not unread output</span></div>
+    <p class="takeaway"><strong>Scope:</strong> presentation only. Parent context is reused only when all relevant children genuinely share it; differing pane directories or branches must remain visible.</p>
+  </section>
+
+  <section class="study" id="inspector" aria-labelledby="inspector-title">
+    <div class="section-intro">
+      <div><span class="number">02 / Agent inspector</span><h2 id="inspector-title">Read the request before the metadata.</h2></div>
+      <p class="explanation">OpenSessions separates task details from navigation. The corrected terminal adaptation gives state the left edge and the dim agent name the right edge when they fit, within a native fzf frame. A one-column inset and spaced sections appear when room permits. Request and command use normal foreground text; an amber command bar and compact dim provenance, title, location, and directory complete the structured inspector. Terminal output belongs in Terminal preview, selected with i.</p>
+    </div>
+    <div class="pair">
+      <article class="example before"><div class="example-head"><span class="tag">Before · pre-change schematic</span><h3>A linear metadata summary</h3></div>
+        <div class="stage"><div class="terminal"><pre class="raw">Claude Code · acme-api:2 claude · %7
+Title: Fix authentication tests
+Directory: ~/work/acme-api
+Source: Claude Code lifecycle hook · reported 42s ago
+Status: Approval requested (hook report)
+Tool: Bash
+Request: Run the authentication tests
+Command: npm test -- auth
+Recent screen:
+  Found 2 failing authentication tests.
+  Prepared the targeted test command.</pre></div></div><p class="caption">The pre-change summary placed source and location before the request. This is a schematic baseline, not a screenshot.</p>
+      </article>
+      <article class="example after"><div class="example-head"><span class="tag">After · implemented terminal adaptation</span><h3>A request-first inspector</h3></div>
+        <div class="stage"><div class="terminal"><div class="inspector">
+          <div class="inspector-title"><strong class="amber">! Needs input</strong><span class="muted">Claude Code</span></div>
+          <p class="request">Run the authentication tests</p>
+          <pre class="command">npm test -- auth</pre>
+          <div class="provenance">Bash · lifecycle hook · reported 42s ago<br>Fix authentication tests<br>acme-api:2 claude · %7<br>~/work/acme-api</div>
+        </div></div></div><p class="caption">Design reference with fictional lifecycle data. <a href="assets/inspector-runtime-captures.html">View actual attached terminal captures</a> for runtime evidence. This browser illustration is not a screenshot of the terminal: CSS spacing, font metrics, backgrounds, and colors remain illustrative. A command is text to inspect, not an approval button.</p>
+      </article>
+    </div>
+    <p class="takeaway"><strong>Terminal adaptation scope:</strong> a native sharp-framed inspector, not a browser card, wrapping transcript, or approval control. Drawers of at least 16 available content rows space the sections; shorter drawers compact them. One-to-three-row drawers prioritize state and identity, then a verified request, then its command, within the fzf content budget. Long lines clip. The inspector ends after provenance, title, location, and directory: no Recent screen, screen divider, or captured agent TUI footer/status bar. Process-only agents retain a Detected card with lifecycle state unavailable and may still show explicitly unverified possible-request hints inferred from the visible screen. Ordinary panes retain a No agent / Terminal card with their actual command and location, without request inference. Fresh ordinary reports indicate no pending request reported; stale, unknown, or incomplete needs-input reports explain unavailable request details rather than inventing them. Stale reports omit old requests and do not infer new ones. Report age is not time spent waiting. Optional integrations supply lifecycle data when agents report it, not a layout change or manufactured request. Use <code>i</code> for Terminal preview and its terminal output; both modes retain the same frame and geometry, mode labels, and scrollbar without a scroll-position overlay. Close and reopen an existing sidebar after upgrading. Increasing <code>@tmux-canopy-preview-height</code> adds spacing; its default remains <code>35%</code>. ASCII mode uses plain bars; monochrome mode omits color styling.</p>
+  </section>
+
+  <section class="study" id="popup" aria-labelledby="popup-title">
+    <div class="section-intro">
+      <div><span class="number">03 / Popup readability</span><h2 id="popup-title">Wrap the explanation. Preserve the terminal.</h2></div>
+      <p class="explanation">Borrow the conversation picker’s list-and-preview composition. Canopy already has this wide-popup layout; the proposal below explores wrapping requests and retaining terminal context. It is not the current inspector contract: today request lines clip, and terminal output appears only in Terminal preview via i.</p>
+    </div>
+    <div class="pair">
+      <article class="example before"><div class="example-head"><span class="tag">Before · pre-change schematic</span><h3>Long request lines disappear at the edge</h3></div>
+        <div class="stage"><div class="terminal popup">
+          <div class="terminal-head"><span class="accent strong">Agents</span><span class="push amber">◆1</span><span class="accent">▷1</span></div>
+          <div class="popup-columns"><div class="popup-list">
+            <div class="row session">▾ acme-api</div><div class="row selected"><span class="name"> 2:claude</span><span class="state amber">!</span></div><div class="row"><span class="name"> 3:codex</span><span class="state accent">▷</span></div>
+          </div><pre class="raw">Claude Code · acme-api:2 claude · %7
+Title: Fix authentication tests
+Directory: ~/work/acme-api
+Source: Claude Code lifecycle hook · reported 42s ago
+Status: Approval requested (hook report)
+Tool: Bash
+Request: Run the authentication suite against the local test database before applying the migration; production credentials must not be used.
+Command: npm test -- auth
+Recent screen:
+  suite       passed  failed
+  auth           18       2</pre></div>
+          <div class="terminal-footer"><span>↵ focus</span><span>&gt; reply</span><span class="optional">n waiting · i summary</span></div>
+        </div></div><p class="caption">The request is a single clipped line, just like the terminal snapshot.</p>
+      </article>
+      <article class="example after"><div class="example-head"><span class="tag">After · visual proposal</span><h3>Structured prose and raw output get different treatment</h3></div>
+        <div class="stage"><div class="terminal popup">
+          <div class="terminal-head"><span class="accent strong">Agents</span><span class="push amber">◆1</span><span class="accent">▷1</span></div>
+          <div class="popup-columns"><div class="popup-list">
+            <div class="row session">▾ acme-api</div><div class="row selected"><span class="name"> 2:claude</span><span class="state amber">!</span></div><div class="row"><span class="name"> 3:codex</span><span class="state accent">▷</span></div>
+          </div><div class="inspector">
+            <div class="inspector-title"><strong class="amber">! Needs input</strong></div>
+            <p class="request">Run the authentication suite against the local test database before applying the migration; production credentials must not be used.</p>
+            <pre class="command">npm test -- auth</pre>
+            <div class="provenance">Claude Code · Bash · hook report 42s ago<br>Fix authentication tests<br>acme-api:2 claude · %7<br>~/work/acme-api</div>
+            <p class="screen-label">Recent screen · alignment preserved</p><pre class="screen-output">suite       passed  failed
+auth           18       2</pre>
+          </div></div>
+          <div class="terminal-footer"><span>↵ focus</span><span>&gt; reply</span><span class="optional">n waiting · i summary</span></div>
+        </div></div><p class="caption">Request prose wraps. Commands and captured output stay monospace and unwrapped; overflow can be scrolled here.</p>
+      </article>
+    </div>
+    <p class="takeaway"><strong>Scope:</strong> proposed request formatting inside the existing popup summary—not a transcript reader. On small browser screens the webpage stacks the preview beneath the list for inspection.</p>
+  </section>
+
+  <section class="study" id="narrow" aria-labelledby="narrow-title">
+    <div class="section-intro">
+      <div><span class="number">04 / Narrow sidebar · 30 columns</span><h2 id="narrow-title">Spend scarce columns on identity and state.</h2></div>
+      <p class="explanation">At narrow widths, prefer a deliberate reduction in detail to accidental clipping. The suggestion targets Agents view; ordinary Tree rows can keep their smaller symbols.</p>
+    </div>
+    <div class="pair">
+      <article class="example before"><div class="example-head"><span class="tag">Before · pre-change schematic</span><h3>Names, context, and state compete</h3></div>
+        <div class="stage"><div class="terminal narrow">
+          <div class="terminal-head"><span class="accent strong">Agents</span><span class="push amber">◆1</span><span class="accent">▷1</span></div>
+          <div class="rows">
+            <div class="row session">▾ acme-api</div>
+            <div class="row indent selected"><span class="name">2:claude-authentication</span><span class="context">auth/main</span><span class="state amber">!</span></div>
+            <div class="row deep quiet"><span class="clip">npm test -- auth · Run auth tests</span></div>
+            <div class="row indent"><span class="name">3:codex-migration</span><span class="context">auth/main</span><span class="state accent">▷</span></div>
+          </div><div class="terminal-footer"><span>↵ focus</span><span>n waiting</span><span class="optional">&gt; reply</span></div>
+        </div></div><p class="caption">This is a layout sketch, not a claim that all current narrow rows clip in exactly this way.</p>
+      </article>
+      <article class="example after"><div class="example-head"><span class="tag">After · visual proposal</span><h3>Context moves out before identity does</h3></div>
+        <div class="stage"><div class="terminal narrow">
+          <div class="terminal-head"><span class="accent strong">Agents</span><span class="push amber">◆1</span><span class="accent">▷1</span></div>
+          <div class="rows">
+            <div class="row session">▾ acme-api</div>
+            <div class="row indent selected"><span class="name">2:claude-authentication</span><span class="state amber">! input</span></div>
+            <div class="row deep amber"><span class="clip">npm test -- auth · Run auth tests</span></div>
+            <div class="row indent"><span class="name">3:codex-migration</span><span class="state accent">▷ work</span></div>
+            <div class="rule"></div>
+            <div class="row quiet"><span class="clip">Selected · auth/main</span></div>
+          </div><div class="terminal-footer"><span>↵ focus</span><span>n waiting</span><span class="optional">&gt; reply</span></div>
+        </div></div><p class="caption">The selected context stays inspectable. Short state words supplement symbols; names still ellipsize when necessary.</p>
+      </article>
+    </div>
+    <p class="takeaway"><strong>Scope:</strong> a candidate width policy, not a promise to fit every label. Below this width, shorten state words before hiding the symbol; full names and context remain available in the inspector.</p>
+  </section>
+
+  <footer>
+    <p><strong>Status:</strong> Study 02’s corrected terminal adaptation is implemented and exercised in attached clients. <a href="assets/inspector-runtime-captures.html">Actual captures show reported, process-only, and non-agent states.</a> The browser illustration remains a design reference, not proof of pixel-identical terminal rendering. Tree emphasis, popup request wrapping, and the narrow-width treatment remain design proposals.</p>
+    <p>Visual references: <a href="https://github.com/Ataraxy-Labs/opensessions">OpenSessions</a> (navigation/detail separation), <a href="https://superterm.dev/">Superterm</a> (restrained status rail), and <a href="https://github.com/aomerk/tmux-claude-sessions">tmux-claude-sessions</a> (list-and-preview composition). tmex composes layouts; it does not supply a comparable persistent sidebar.</p>
+    <p>Implementation and context: <a href="../scripts/agent-preview">agent-preview</a>, <a href="reference.md#preview">preview reference</a>, and <a href="assets/canopy-demo.png">the existing demo still</a>. The “Before” panels retain the pre-change schematic baseline. This page is self-contained and works directly from a local file. No fonts, scripts, analytics, or styles are loaded from the network.</p>
+  </footer>
+</main>
+<script>
+const theme = document.getElementById('theme');
+theme.addEventListener('click', () => {
+  const light = document.documentElement.dataset.theme !== 'light';
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  theme.textContent = light ? 'Dark theme' : 'Light theme';
+  theme.setAttribute('aria-pressed', String(light));
+});
+document.getElementById('width').addEventListener('change', event => {
+  document.documentElement.style.setProperty('--columns', event.target.value);
+});
+</script>
+</body>
+</html>

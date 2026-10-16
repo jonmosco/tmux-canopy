@@ -132,8 +132,11 @@ if [[ "$mode" == worker ]]; then
       previous="$location"
       continue
     fi
+    # Pane focus moves the green ● (target + reload) but not the browse
+    # pointer or inspector: those follow sidebar selection until Ctrl-o or a
+    # deliberate return to the sidebar.
     commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
-    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-o\" ; "
+    commands+="if-shell -F -t $sidebar '#{!=:#{@tmux_canopy_focus_location},$location}' \"set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-r\" ; "
     commands+="set-option -pu -t $sidebar @tmux_canopy_focus_pending ; set-option -pu -t $sidebar @tmux_canopy_focus_deadline"
     committed="$(commit "#{&&:#{==:#{@tmux_canopy_focus_pending},$token},#{!=:#{$guard},1}}" "$commands ; display-message -p focus-committed")"
     if [[ "$committed" == focus-committed ]]; then

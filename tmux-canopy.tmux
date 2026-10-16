@@ -26,7 +26,7 @@ plugin_job() {
 # in two tmux calls (see canopy_load_state); unset settings read as empty.
 settings=(key width scope smooth-navigation last-window-key transition notifications notification-target
   silence-seconds icon-theme appearance animate resize-mode width-presets mode popup-threshold popup-width popup-height
-  alerts alert-events alert-sound alert-detail)
+  alerts alert-events alert-sound alert-detail directory-refresh)
 canopy_load_state "${settings[@]/#/@tmux-canopy-}" \
   window:window-status-activity-style window:window-status-bell-style \
   session:activity-action session:bell-action session:silence-action \
@@ -42,6 +42,7 @@ setting sidebar_mode mode; setting popup_threshold popup-threshold
 setting popup_width popup-width; setting popup_height popup-height
 setting alerts alerts; setting alert_events alert-events
 setting alert_sound alert-sound; setting alert_detail alert-detail
+setting directory_refresh directory-refresh
 
 # Free-form settings take a default when unset.
 : "${sidebar_key:=T}"
@@ -66,7 +67,8 @@ number() { [[ "${!1}" =~ ^[1-9][0-9]*$ ]] || printf -v "$1" '%s' "$2"; }
 size() { [[ "${!1}" =~ ^[1-9][0-9]*%?$ ]] || printf -v "$1" '%s' "$2"; }
 
 declare sidebar_mode popup_threshold popup_width popup_height sidebar_width sidebar_scope \
-  sidebar_transition silence_seconds notification_target resize_mode animate alerts alert_detail icon_theme
+  sidebar_transition silence_seconds notification_target resize_mode animate alerts alert_detail icon_theme \
+  directory_refresh
 choose sidebar_mode sidebar popup auto
 number popup_threshold 100
 size popup_width 85%
@@ -80,6 +82,7 @@ choose resize_mode live staged preset
 choose animate on off
 choose alerts off desktop tmux both
 choose alert_detail brief full
+choose directory_refresh off on
 # tmux cannot inspect the font selected by each attached terminal client, and
 # a Nerd Font installed on the server is not evidence that its glyphs render,
 # so auto means unicode.
@@ -127,6 +130,8 @@ canopy_queue set-option -gq @tmux_canopy_alert_events "$alert_events"
 canopy_queue set-option -gq @tmux_canopy_agent_alerts "$agent_alerts"
 canopy_queue set-option -gq @tmux_canopy_alert_sound "$alert_sound"
 canopy_queue set-option -gq @tmux_canopy_alert_detail "$alert_detail"
+# Normalize the user-facing opt-in; the helper reads this exact name.
+canopy_queue set-option -gq @tmux-canopy-directory-refresh "$directory_refresh"
 
 
 # ---------------------------------------------------------------------------

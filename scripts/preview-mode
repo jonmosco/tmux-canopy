@@ -4,10 +4,22 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/launch-lib.sh"
-canopy_agents_enabled || exit 0
 sidebar="${TMUX_PANE:-}"
 [[ "$sidebar" =~ ^%[0-9]+$ ]] || exit 0
-[[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || exit 0
-mode="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_preview_mode 2>/dev/null || true)"
-if [[ "$mode" == agent || "$mode" == codex ]]; then mode=terminal; else mode=agent; fi
-tmux set-option -pq -t "$sidebar" @tmux_canopy_preview_mode "$mode" 2>/dev/null || true
+client="$(canopy_agents_client)"
+agents_format="$(canopy_agents_format "$client")"
+settings="$(tmux display-message -p -t "$sidebar" "#{@tmux_canopy}|#{@tmux_canopy_preview_mode}|$agents_format" 2>/dev/null)" || exit 0
+IFS='|' read -r is_sidebar mode agents <<< "$settings"
+[[ "$is_sidebar" == 1 ]] || exit 0
+if [[ "${1:-}" != --label ]]; then
+  [[ "$agents" == on ]] || exit 0
+  if canopy_preview_is_inspector "$mode"; then mode=terminal; else mode=agent; fi
+  tmux set-option -pq -t "$sidebar" @tmux_canopy_preview_mode "$mode" 2>/dev/null || exit 0
+fi
+if [[ "${1:-}" == --fzf || "${1:-}" == --label ]]; then
+  label='Terminal preview'
+  if [[ "$agents" == on ]] && canopy_preview_is_inspector "$mode"; then label='Agent inspector'; fi
+  printf 'change-preview-label( %s )' "$label"
+  [[ "${1:-}" != --fzf ]] || printf '+refresh-preview+show-preview'
+  printf '\n'
+fi

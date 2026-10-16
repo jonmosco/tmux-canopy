@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Opt-in directory-change refresh for Bash: set `@tmux-canopy-directory-refresh 'on'` and source `scripts/directory-prompt.sh` from an interactive shell. After `cd` returns to the prompt, open sidebars reload metadata with Ctrl-r semantics (selection and focus markers stay put). Off by default; no polling. See [directory-refresh.md](docs/directory-refresh.md).
+
 ### Changed
 
+- Switching content panes updates the green active-location marker without moving the sidebar browse pointer or rewriting the Agent inspector. The drawer follows the selected sidebar row until you pick another row; leaving the sidebar for a content pane, returning to the sidebar, or pressing `Ctrl-o` still jumps the pointer to the live pane.
+- Agent inspector detection shares `canopy_resolve_pane_agent` / label helpers in `lib/agent-process.sh` instead of an inline `ps|awk` copy; preview mode checks use one `canopy_preview_is_inspector` helper for the legacy `codex` alias.
+- Application icons in the tree stay dim by default; full app color is reserved for the active content pane and for detected agents.
 - A tmux server now admits one live dock owner at a time. Competing requests leave the owner's layout, focus, zoom and width preference unchanged and suggest popup mode, which remains independently owned. Concurrent opening is serialized and interrupted openers cannot leave a permanent claim.
 - Restored the default subtle selection's full-row dark-gray background highlight instead of underlining. Explicit palette/RGB selection backgrounds and the other selection styles remain available.
 - Ctrl-h and Ctrl-l leave a dock toward the left or right pane when vim-tmux-navigator forwards them to fzf. Ctrl-h remains Backspace during search, and Ctrl-j/k move the selection.
@@ -11,12 +18,14 @@
 - Every view and appearance now has a responsive action footer instead of workspace or agent inventory counts. Tree advertises focus, actions, search, and help; Agents advertises focus, the next waiting agent, reply, and summary; Processes advertises focus, actions, and preview; Buffers advertises paste, actions, delete, and search. Lower-priority hints disappear as the sidebar narrows, while a waiting agent or pending move, link, or delete temporarily takes priority.
 - Help now starts with the actions relevant to the selected session, window, pane, directory group, process, buffer, or agent before the full command reference. The sidebar passes the live selection into the help popup, so `?` answers what can be done at the current row first.
 - Previews show a directory under your home directory as `~/…` in the window preview and the agent summary too, as the pane preview already did, leaving room for the rest of the path.
-- Agent summaries now retain a bounded tail of the agent's current terminal screen beneath lifecycle state and approval details, while omitting the active input-prompt row from that tail. Selecting a pane without a supported agent while in summary mode falls back to its terminal preview instead of showing a dead-end message.
+- The Agent inspector is a fixed field card: state and agent, one dim trust line (`lifecycle hook · 12s` / `snapshot only`), directory, optional git `reponame ⎇ branch` when `@tmux-canopy-git-context` is `branch`, and place (`session:window`, green `●` when that pane is the client’s active content target). A request and amber command bar appear only when present, beneath the card. No title dump, multi-part provenance, blank filler rows, Recent screen excerpt, or agent TUI footer. Short drawers keep state then a present request/command ahead of trust and place. Process-only and non-agent panes stay structured; screen hints remain explicitly unverified.
+- Both preview modes share a native sharp frame; the border names `Terminal preview` or `Agent inspector`. Default `@tmux-canopy-preview-height` is `25%` (was `35%`). `i` selects mode and opens the drawer; `p` only changes visibility. Disabling agent awareness temporarily uses the terminal label and preview. Close and reopen an existing sidebar after upgrading to load the new frame and bindings.
 - Each plugin load removes everything at Canopy's own tmux hook indexes (9000-9099) and command-alias indexes (9100-9199) before adding what the current settings need, instead of a fixed list of hooks. A hook an older version left at those indexes is cleared too; your own hooks and aliases at other indexes are untouched. Settings with fixed values or a number now share one check each, with the default written once.
 - The README demo now starts at a blank terminal and builds a tmux workspace before opening Canopy. Its high-resolution 16:9 recording uses larger text, a cleaner tmux status line, and a visible session/window/pane workflow. Fictional repositories, branches, nested project directories, a development server, and test files make the resulting panes look like active work. The sidebar tour toggles agent monitoring, opens the built-in help, and then demonstrates cross-session agent awareness.
 
 ### Fixed
 
+- Preview scroll-position counters no longer cover right-aligned agent names. Docked and popup previews retain their scrollbars without the overlay.
 - Refresh no longer clears the sidebar before new data arrives. Explicit header updates replace input-header reset redraws and keep empty views and source recovery current without restarting fzf or losing search/selection.
 - A delayed background focus snapshot can no longer overwrite a newer tree refresh, including a rename or appearance change.
 - Delayed native resize callbacks no longer restore an older width or replace the saved preference. No-transition follow hooks leave live geometry alone, and close-time balancing runs only when multiple content panes become one, not on ordinary resize events.

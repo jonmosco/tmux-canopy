@@ -43,7 +43,7 @@ try:
         # owns that agent: the pane is the editor, not an agent pane.
         install_agent_fixture(temp / 'nvim')
         editor = temp / 'editor.sh'
-        editor.write_text(f'#!/bin/bash\n{temp / "opencode"} 600 &\nexec {temp / "nvim"} 600\n')
+        editor.write_text(f'#!/bin/bash\nprintf "Do you want to run this command?\\nEditor cursor>"\n{temp / "opencode"} 600 &\nexec {temp / "nvim"} 600\n')
         editor.chmod(0o755)
         # Its own directory: OpenCode events are matched to panes by directory.
         (temp / 'editor-project').mkdir()
@@ -71,7 +71,11 @@ try:
             result = sp.run([str(ROOT / 'scripts' / name), *(payload or [])], env=script_env,
                             text=True, capture_output=True, timeout=10)
             assert result.returncode == 0, (name, result.stderr)
-            return result.stdout
+            return re.sub(r'\x1b\[[0-9;]*m', '', result.stdout)
+
+        def tree_row(pane_id):
+            return next(line for line in run('tree-source', pane, ['--agents']).splitlines()
+                        if line.startswith('P:' + pane_id + '\t'))
 
         def event(kind, pane_id, payload, name=None):
             script_env = env | {'TMUX': tmux_env, 'TMUX_PANE': pane_id}
@@ -91,10 +95,21 @@ try:
         for name, pane_id in panes.items():
             row = next(line for line in agent_view.splitlines() if line.startswith('P:' + pane_id + '\t'))
             assert '[process]' in row and '·hook' not in row, (name, row)
-            assert 'Source: visible terminal text' in run('agent-preview', pane, ['P:' + pane_id])
+            preview = run('agent-preview', pane, ['P:' + pane_id])
+            assert 'Detected' in preview.splitlines()[0], (name, preview)
+            assert 'Needs input' not in preview and 'Working' not in preview, (name, preview)
+            assert 'lifecycle hook' not in preview, (name, preview)
+            assert not re.search(r'^\s*[│|] ', preview, re.MULTILINE), (name, preview)
         assert not any(line.startswith('P:' + editor_pane + '\t') for line in agent_view.splitlines()), agent_view
-        fallback = run('agent-preview', pane, ['P:' + editor_pane])
-        assert fallback.startswith('Terminal · no agent detected\n') and 'nvim' in fallback, fallback
+        terminal_card = run('agent-preview', pane, ['P:' + editor_pane])
+        assert 'Terminal' in terminal_card.splitlines()[0] and 'nvim' in terminal_card, terminal_card
+        assert str(temp / 'editor-project') in terminal_card, terminal_card
+        editor_place = tm('display-message', '-p', '-t', editor_pane,
+                          '#{session_name}:#{window_index} #{window_name}')
+        assert editor_place in terminal_card, terminal_card
+        assert 'Possible input requested' not in terminal_card and 'Editor cursor>' not in terminal_card, terminal_card
+        assert 'lifecycle hook' not in terminal_card, terminal_card
+        assert not re.search(r'^\s*[│|] ', terminal_card, re.MULTILINE), terminal_card
         # Crush is detected by process only (it has no lifecycle adapter yet).
         crush_row = next(line for line in agent_view.splitlines() if line.startswith('P:' + panes['crush'] + '\t'))
         assert 'Crush' in crush_row and '❖' in crush_row, crush_row
@@ -114,35 +129,41 @@ try:
         event('claude', panes['claude'], {'hook_event_name': 'UserPromptSubmit', 'session_id': 'c1'})
         event('claude', panes['claude'], {'hook_event_name': 'PermissionRequest', 'session_id': 'c1',
                                          'tool_name': 'Bash', 'tool_input': {'command': 'date'}})
-        assert 'Status: Approval requested (hook report)' in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
+        assert 'NEEDS INPUT' in tree_row(panes['claude'])
+        assert 'date' in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
         event('claude', panes['claude'], {'hook_event_name': 'PostToolUse', 'session_id': 'c1',
                                          'tool_name': 'Other'})
-        assert 'Approval requested' in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
+        assert 'NEEDS INPUT' in tree_row(panes['claude'])
+        assert 'date' in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
         event('claude', panes['claude'], {'hook_event_name': 'PostToolUse', 'session_id': 'c1',
                                          'tool_name': 'Bash'})
-        assert 'Status: Working' in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
+        assert 'WORKING' in tree_row(panes['claude'])
+        assert 'date' not in run('agent-preview', panes['claude'], ['P:' + panes['claude']])
 
         event('claude', panes['claude.exe'], {'hook_event_name': 'SessionStart', 'session_id': 'n1'})
         event('claude', panes['claude.exe'], {'hook_event_name': 'PermissionRequest', 'session_id': 'n1',
                                              'tool_name': 'Bash', 'tool_input': {'command': 'date'}})
-        assert 'Status: Approval requested (hook report)' in run('agent-preview', panes['claude.exe'], ['P:' + panes['claude.exe']])
+        assert 'NEEDS INPUT' in tree_row(panes['claude.exe'])
+        assert 'date' in run('agent-preview', panes['claude.exe'], ['P:' + panes['claude.exe']])
 
         event('gemini', panes['gemini'], {'hook_event_name': 'SessionStart', 'session_id': 'g1'})
         event('gemini', panes['gemini'], {'hook_event_name': 'Notification', 'session_id': 'g1',
                                          'notification_type': 'ToolPermission', 'message': 'Allow shell command?'})
         event('gemini', panes['gemini'], {'hook_event_name': 'BeforeAgent', 'session_id': 'other'})
-        assert 'Status: Approval requested' in run('agent-preview', panes['gemini'], ['P:' + panes['gemini']])
+        assert 'NEEDS INPUT' in tree_row(panes['gemini'])
+        assert 'Allow shell command?' in run('agent-preview', panes['gemini'], ['P:' + panes['gemini']])
 
         event('copilot', panes['copilot'], {'sessionId': 'k1'}, 'sessionStart')
         event('copilot', panes['copilot'], {'sessionId': 'k1', 'notification_type': 'permission_prompt',
                                             'message': 'Allow shell command?'}, 'notification')
-        assert 'Status: Approval requested' in run('agent-preview', panes['copilot'], ['P:' + panes['copilot']])
+        assert 'NEEDS INPUT' in tree_row(panes['copilot'])
+        assert 'Allow shell command?' in run('agent-preview', panes['copilot'], ['P:' + panes['copilot']])
         event('grok', panes['grok'], {'hook_event_name': 'SessionStart', 'sessionId': 'x1'})
         event('grok', panes['grok'], {'hook_event_name': 'UserPromptSubmit', 'sessionId': 'x1', 'promptId': 'p1'})
-        assert 'Status: Working' in run('agent-preview', panes['grok'], ['P:' + panes['grok']])
+        assert 'WORKING' in tree_row(panes['grok'])
         # Grok also runs Claude's hooks; a Claude report from a Grok pane is ignored.
         event('claude', panes['grok'], {'hook_event_name': 'Stop', 'session_id': 'x1'})
-        assert 'Status: Working' in run('agent-preview', panes['grok'], ['P:' + panes['grok']])
+        assert 'WORKING' in tree_row(panes['grok'])
 
         agy_work = temp / 'agy-work'
         agy_subagents_dir = agy_work / '.system_generated' / 'subagents'
@@ -155,12 +176,13 @@ try:
         agy = {'conversationId': 'a1', 'workspacePaths': [str(agy_work)],
                'transcriptPath': str(agy_work / '.system_generated' / 'logs' / 'transcript.jsonl'), 'modelName': 'gemini'}
         event('agy', panes['agy'], agy | {'hook_event_name': 'PermissionRequest'}, 'PermissionRequest')
-        assert 'Source: visible terminal text' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        agy_preview = run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'Needs input' not in agy_preview and 'NEEDS INPUT' not in tree_row(panes['agy']), agy_preview
         event('agy', panes['agy'], agy | {'invocationNum': 0, 'initialNumSteps': 0}, 'PreInvocation')
-        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'WORKING' in tree_row(panes['agy'])
         event('agy', panes['agy'], agy | {'toolCall': {'name': 'run_command', 'args': {'CommandLine': 'date'}},
                                           'stepIdx': 1, 'error': ''}, 'PostToolUse')
-        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'WORKING' in tree_row(panes['agy'])
         event('agy', panes['agy'], agy | {
             'stepIdx': 2,
             'toolCall': {
@@ -177,10 +199,10 @@ try:
         assert 'sub-uuid-1,Codebase Researcher,working' in subagents, subagents
         assert 'Database Debugger,working' in subagents, subagents
         event('agy', panes['agy'], agy | {'invocationNum': 0, 'initialNumSteps': 1}, 'PostInvocation')
-        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'WORKING' in tree_row(panes['agy'])
         event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
                                           'error': '', 'fullyIdle': False}, 'Stop')
-        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'WORKING' in tree_row(panes['agy'])
         subagents = tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
         assert 'sub-uuid-1,Codebase Researcher,working' in subagents
         event('agy', panes['agy'], agy | {
@@ -195,11 +217,11 @@ try:
         assert 'Database Debugger,working' in subagents
         event('agy', panes['agy'], agy | {'executionNum': 1, 'terminationReason': 'model_stop',
                                           'error': '', 'fullyIdle': True}, 'Stop')
-        assert 'Status: Turn ended' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'TURN ENDED' in tree_row(panes['agy'])
         subagents = tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}')
         assert 'Database Debugger,done' in subagents
         event('agy', panes['agy'], agy | {'invocationNum': 1, 'initialNumSteps': 4}, 'PreInvocation')
-        assert 'Status: Working' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'WORKING' in tree_row(panes['agy'])
         assert tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}') == ''
         event('agy', panes['agy'], agy | {
             'stepIdx': 5,
@@ -219,7 +241,7 @@ try:
         assert tm('display-message', '-p', '-t', panes['agy'], '#{@tmux_canopy_agent_subagents}') == ''
         event('agy', panes['agy'], agy | {'executionNum': 2, 'terminationReason': 'error',
                                           'error': 'request failed', 'fullyIdle': True}, 'Stop')
-        assert 'Status: Interrupted' in run('agent-preview', panes['agy'], ['P:' + panes['agy']])
+        assert 'INTERRUPTED' in tree_row(panes['agy'])
 
         event('pi', panes['pi'], {'type': 'session_start', 'session_id': 'p1'})
         event('pi', panes['pi'], {'type': 'agent_start', 'session_id': 'p1'})
@@ -232,11 +254,11 @@ try:
         event('opencode', panes['opencode'], {'type': 'session.status', 'properties': {'sessionID': 'oc1',
                                                'status': {'type': 'busy'}}})
         event('opencode', panes['opencode'], {'type': 'permission.asked', 'properties': {'sessionID': 'other'}})
-        assert 'Status: Working' in run('agent-preview', panes['opencode'], ['P:' + panes['opencode']])
+        assert 'WORKING' in tree_row(panes['opencode'])
 
         event('cursor-agent', panes['agent'], {'hook_event_name': 'sessionStart', 'conversation_id': 'ca1'})
         event('cursor-agent', panes['agent'], {'hook_event_name': 'beforeSubmitPrompt', 'conversation_id': 'ca1'})
-        assert 'Status: Working' in run('agent-preview', panes['agent'], ['P:' + panes['agent']])
+        assert 'WORKING' in tree_row(panes['agent'])
 
         agent_view = run('tree-source', pane, ['--agents'])
         assert 'WORKING' in agent_view and 'NEEDS INPUT' in agent_view and '·hook' in agent_view

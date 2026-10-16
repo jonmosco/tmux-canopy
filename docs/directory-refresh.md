@@ -1,7 +1,8 @@
 # Directory refresh investigation
 
-Status: investigated, not implemented. No prompt changes, timer, polling loop,
-control-mode client, or additional persistent helper has been installed.
+Status: implemented (opt-in). Enable `@tmux-canopy-directory-refresh` and source
+`scripts/directory-prompt.sh` from Bash. No timer, polling loop, or control-mode
+client is installed. Ctrl-r remains the explicit refresh.
 
 ## Findings on tmux 3.7c
 
@@ -87,9 +88,19 @@ also describes local pane process state, not necessarily a remote SSH shell's
 working directory. Those are separate requirements and should not be hidden
 behind a claim of universal real-time directory tracking.
 
-## Recommendation
+## Implementation
 
-Keep Ctrl-r as the current explicit refresh. Review an opt-in, cwd-change-only
-prompt notifier next, with a dedicated metadata-refresh path and the tests above.
-Do not alter the existing prompt or introduce polling as part of diagnostics and
-launcher hardening.
+1. Set `set -g @tmux-canopy-directory-refresh 'on'` (default `off`).
+2. Source the prompt hook once per interactive Bash shell:
+
+   ```bash
+   source /path/to/tmux-canopy/scripts/directory-prompt.sh
+   ```
+
+The hook compares `$PWD` with builtins only. On a change it runs
+`scripts/directory-refresh` asynchronously with the pane id. That helper
+validates the pane, ignores sidebar/slot panes, coalesces bursts with an
+expiring claim, and delivers `Ctrl-r` through `refresh_sidebars` without
+changing focus location, target, selection, or layout. Invalid option values
+are treated as off. Nested shells each keep their own previous-directory
+marker; repeated sourcing is idempotent for string and array `PROMPT_COMMAND`.

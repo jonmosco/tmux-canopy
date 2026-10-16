@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Metadata-only refresh after a content pane's working directory changes.
+# Invoked by scripts/directory-prompt.sh with a pane id. Never interpolates
+# paths, titles, or shell text into tmux commands. Coalesces bursts; does not
+# touch focus location, target, selection, or layout.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib.sh"
+
+if ! printf -v now '%(%s)T' -1 2>/dev/null || [[ -z $now ]]; then
+  now="$(date +%s)"
+fi
+
+if [[ ${1:-} != worker ]]; then
+  pane="${1:-${TMUX_PANE:-}}"
+  [[ $pane =~ ^%[0-9]+$ ]] || exit 0
+  # One batch: option, pane identity, and internal flags. Non-on is off.
+  info="$(tmux display-message -p -t "$pane" \
+    "#{@tmux-canopy-directory-refresh}|#{pane_id}|#{pane_dead}|#{@tmux_canopy}|#{@tmux_canopy_slot}" 2>/dev/null)" || exit 0
+  IFS='|' read -r enabled live dead sidebar slot <<< "$info"
+  [[ $enabled == on && $live == "$pane" && $dead != 1 && $sidebar != 1 && $slot != 1 ]] || exit 0
+
+  token="$now.$$.$RANDOM"
+  job="run-shell -b $(tmux_quote "$(tmux_shell "$SCRIPT_DIR/directory-refresh" worker "$token")")"
+  claim="set-option -gq @tmux_canopy_dir_refresh_pending $token ; set-option -gq @tmux_canopy_dir_refresh_deadline $((now + 2)) ; $job"
+  tmux if-shell -F "#{||:#{!:#{@tmux_canopy_dir_refresh_pending}},#{<:#{@tmux_canopy_dir_refresh_deadline},$now}}" \
+    "$claim" 2>/dev/null || true
+  exit 0
+fi
+
+token="${2:-}"
+[[ $token =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 0
+match="#{==:#{@tmux_canopy_dir_refresh_pending},$token}"
+release="set-option -gu @tmux_canopy_dir_refresh_pending ; set-option -gu @tmux_canopy_dir_refresh_deadline"
+# shellcheck disable=SC2317,SC2329 # Invoked by the EXIT trap below.
+release_claim() { tmux if-shell -F "$match" "$release" 2>/dev/null || true; }
+trap release_claim EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+sleep 0.12
+# Release before listing so a concurrent change starts a new worker.
+release_claim
+trap - EXIT
+# Reuse the shared delivery path: Ctrl-r only, skip owners under transition.
+refresh_sidebars

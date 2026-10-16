@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canopy inspector — actual attached captures</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#10141b;color:#e6ebf2;font:16px/1.55 system-ui,sans-serif}main{max-width:1500px;padding:40px 24px 60px;margin:auto}h1{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:12px 0}h2{font-size:19px;margin:0 0 6px}p{color:#a1adbd;max-width:88ch}a{color:#83d9eb;text-underline-offset:4px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,470px),1fr));gap:22px;margin-top:30px}article{min-width:0;padding:18px;background:#181e27;border:1px solid #3a4555;border-radius:8px}article p{font-size:14px;min-height:44px;margin:0 0 16px}.capture{overflow:auto;background:#20252f;border:1px solid #3a4555}pre{margin:0;padding:10px;white-space:pre;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;width:max-content;min-width:100%}.note{padding:14px 18px;border-left:3px solid #83d9eb;background:#181e27;font-size:14px}.eyebrow{color:#83d9eb;font:600 12px/1.5 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.1em}
+</style></head><body><main><div class="eyebrow">Actual runtime output · not another mockup</div><h1>Three states. One inspector.</h1><p>These text and ANSI captures came from real Canopy sidebars in attached clients on private tmux servers. Agent executables and lifecycle events were synthetic fixtures. No live user sessions were accessed.</p><p class="note">Native frame, spacing, text, row limits, and blank space are preserved from the capture. ANSI colors are mapped to this page’s palette; browser font metrics are not a pixel-perfect photograph of your terminal. The frame is drawn by fzf, not by CSS inside the captured output.</p><p><a href="../canopy-visual-before-after.html#inspector">Back to the original before/after design study</a></p><p>The inspector contains structured details only. Terminal excerpts and the agent TUI’s status bar are excluded; press <code>i</code> in Canopy to select Terminal preview when you want terminal content.</p><section class="grid"><article><h2>Reported approval</h2><p>State, pending request, command, and metadata only.</p><div class="capture"><pre><span style="opacity:.65">┌ Agent inspector ─────────────────────────────────────┐
+│ </span> <span style="font-weight:700;color:#f0c878">! Needs input</span>                          <span style="opacity:.65">Claude Code</span> <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> Run the authentication tests                       <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> <span style="font-weight:700;color:#f0c878">│ </span>npm test -- auth                                 <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">Bash · lifecycle hook · reported 1s ago</span>            <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">Fix authentication tests</span>                           <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">acme-api:0 bash · %0</span>                               <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">/tmp/canopy-structured-inspector-9jsx6716/acme-api</span> <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+└──────────────────────────────────────────────────────┘</span></pre></div></article><article><h2>Process detected, no report</h2><p>Honest unavailable-state metadata, without a terminal excerpt.</p><div class="capture"><pre><span style="opacity:.65">┌ Agent inspector ─────────────────────────────────────┐
+│ </span> <span style="opacity:.65">Detected</span>                                  <span style="opacity:.65">Oh My Pi</span> <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">Lifecycle state unavailable.</span>                       <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">visible terminal text · snapshot only</span>              <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">Fix authentication tests</span>                           <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">acme-api:0 bash · %0</span>                               <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">/tmp/canopy-structured-inspector-q17s_50_/acme-api</span> <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+└──────────────────────────────────────────────────────┘</span></pre></div></article><article><h2>Ordinary terminal pane</h2><p>Structured pane metadata; no captured prompt, transcript, or TUI footer.</p><div class="capture"><pre><span style="opacity:.65">┌ Agent inspector ─────────────────────────────────────┐
+│ </span> <span style="font-weight:700">No agent</span>                                  <span style="opacity:.65">Terminal</span> <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">No supported agent in this pane.</span>                   <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">nvim · terminal snapshot</span>                           <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">Fix authentication tests</span>                           <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">acme-api:0 bash · %0</span>                               <span style="opacity:.65"> │
+│ </span> <span style="opacity:.65">/tmp/canopy-structured-inspector-ngo4bvv8/acme-api</span> <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+│ </span>                                                    <span style="opacity:.65"> │
+└──────────────────────────────────────────────────────┘</span></pre></div></article></section></main></body></html>
