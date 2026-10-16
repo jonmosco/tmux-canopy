@@ -12,8 +12,6 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 [![Canopy demo: build a tmux workspace, open the sidebar, toggle agent monitoring, view help, browse the tree, and jump to a waiting agent](docs/assets/canopy-demo.gif?v=10)](docs/assets/canopy-demo.gif?v=10)
 
-**Build a tmux workspace, then see it from above.** This 47-second demo starts at a blank shell, builds windows and panes across two fictional projects, runs a development server, opens Canopy, toggles agent monitoring, shows the built-in help, and jumps to an agent waiting in another session. Scripted fixtures and agent events keep the recording reproducible and private. [Watch the focused feature tour](docs/assets/canopy-walkthrough.gif?v=10) for search, previews, Agents view, alerts, and floating popup mode. [View a still image](docs/assets/canopy-demo.png?v=10).
-
 ## Quick start
 
 1. Install [tmux](https://github.com/tmux/tmux), [fzf](https://github.com/junegunn/fzf), and Bash 4.4+ (see [Requirements](#requirements-and-support)). With [TPM](https://github.com/tmux-plugins/tpm), add this before its `run '~/.tmux/plugins/tpm/tpm'` line:
