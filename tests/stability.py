@@ -341,7 +341,14 @@ def selection(ui):
         ui.send('C-k')
         wait(lambda: ui.probe()[0] != 'P:' + ui.pane, 'selection moved to parent')
         wait(lambda: color_at(ui.screen(ansi=True), 'sleep')[1] != bg, 'old row highlight cleared')
-        assert color_at(ui.screen(ansi=True), 'selection-window')[1] == bg, 'the parent window did not gain the row highlight'
+        # The old row can lose its background a frame before the parent gains it.
+        try:
+            wait(lambda: color_at(ui.screen(ansi=True), 'selection-window')[1] == bg,
+                 'the parent window did not gain the row highlight')
+        except AssertionError:
+            plain = re.sub(r'\x1b\[[0-9;]*m', '', ui.screen(ansi=True))
+            rows = [line for line in plain.splitlines() if 'selection-window' in line or 'sleep' in line]
+            raise AssertionError(f'the parent window did not gain the row highlight; probe={ui.probe()!r}; rows={rows!r}')
         ui.send('C-j')
         wait(lambda: ui.probe()[0] == 'P:' + ui.pane, 'selection returned to content pane')
         print(f'ok - {name} selection highlights the row background without underlining and follows the pointer')
