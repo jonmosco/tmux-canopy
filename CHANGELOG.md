@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- When `@tmux-canopy-git-context` is `branch`, the Agent inspector (`i`) appends an on-demand dirty-worktree summary (`reponame ⎇ branch · N changed (+A −D)`, or `[git:branch] | N changed (+A -D)` with ASCII icons) using `git --no-optional-locks`, shortening or omitting the suffix when narrow.
+
+### Changed
+
+- `n` (`jump-agent`) visits panes needing input or interrupted first, then falls back to settled agent panes with an unread notification when nothing currently needs input.
+- Sending text to a pane with `>` refreshes the sidebar and preview drawer immediately after the input is delivered.
+
 ## 0.5.0 - 2026-10-16
 
 ### Added

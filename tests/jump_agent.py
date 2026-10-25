@@ -127,5 +127,23 @@ try:
         set_location(idle)
         assert jump() == order[0]
         print('ok - jumping from a pane not in the list lands on the first match')
+
+        # Unread completed agents are a fallback only when nothing needs input:
+        # while 'other' is still interrupted, an unread finished pane waits its
+        # turn; once 'other' resumes working, the unread finished agent is next,
+        # while working or non-agent panes with activity flags are skipped.
+        tm('set-option', '-g', '@tmux_canopy_notifications', 'activity,bell')
+        hook({'hook_event_name': 'Stop', 'session_id': 's1', 'turn_id': 't1'}, first)
+        hook({'hook_event_name': 'PostToolUse', 'session_id': 's3', 'turn_id': 't1',
+              'tool_name': 'Bash', 'tool_input': {'command': 'two'}}, wrapped)
+        tm('set-option', '-p', '-t', first, '@tmux_canopy_notice_pane_activity', '1')
+        tm('set-option', '-p', '-t', wrapped, '@tmux_canopy_notice_pane_activity', '1')
+        tm('set-option', '-p', '-t', idle, '@tmux_canopy_notice_pane_activity', '1')
+        assert [row[0] for row in needs_input()] == ['P:' + other]
+        hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 's2', 'turn_id': 't2'}, other)
+        assert [row[0] for row in needs_input()] == ['P:' + first]
+        set_location(idle)
+        assert jump() == first
+        print('ok - unread completed agents are visited after needs-input, skipping working and non-agent panes')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

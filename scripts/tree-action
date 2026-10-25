@@ -288,7 +288,11 @@ send_to_pane() {
   [[ -n "$response" ]] || return 0
   # The pane may have exited while the prompt was open.
   [[ "$(tmux display-message -p -t "$target" '#{pane_dead}' 2>/dev/null)" == 0 ]] || return 0
-  tmux send-keys -t "$target" -l -- "$response" \; send-keys -t "$target" Enter 2>/dev/null || true
+  if [[ -n "$sidebar_pane" ]]; then
+    tmux send-keys -t "$target" -l -- "$response" \; send-keys -t "$target" Enter \; send-keys -t "$sidebar_pane" C-r 2>/dev/null || true
+  else
+    tmux send-keys -t "$target" -l -- "$response" \; send-keys -t "$target" Enter 2>/dev/null || true
+  fi
 }
 
 session_for_token() {

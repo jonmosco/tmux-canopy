@@ -54,9 +54,11 @@ try:
         tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')
         # A pane that records each line typed into it.
         received = temp / 'received'
+        refreshes = temp / 'refreshes'
         reader = tm('new-window', '-d', '-t', 'work:', '-n', 'reader', '-P', '-F', '#{pane_id}',
                     f"bash -c 'stty -echo; while IFS= read -r line; do printf \"%s\\n\" \"$line\" >> {received}; done'")
-        sidebar = tm('split-window', '-d', '-h', '-b', '-l', '42', '-t', agent, '-P', '-F', '#{pane_id}', 'sleep 600')
+        sidebar = tm('split-window', '-d', '-h', '-b', '-l', '42', '-t', agent, '-P', '-F', '#{pane_id}',
+                     f"python3 -c 'import os, sys, tty; tty.setraw(0); [open(sys.argv[1], \"a\").write(\"1\\n\") for b in iter(lambda: os.read(0, 1), b\"\") if b == b\"\\x12\"]' {refreshes}")
         tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
         socket_path = tm('display-message', '-p', '#{socket_path}')
         base = env | {'TMUX': f'{socket_path},0,0', 'TMUX_CANOPY_STATE': str(state)}
@@ -147,10 +149,17 @@ try:
         def got():
             return received.read_text().splitlines() if received.exists() else []
 
+        def refresh_count():
+            return len(refreshes.read_text().splitlines()) if refreshes.exists() else 0
+
         reader_label = 'Send to work:' + tm('display-message', '-p', '-t', reader, '#{window_index}.#{pane_index}') + ':'
+        wait(lambda: not tm('show-option', '-gqv', '@tmux_canopy_agent_refresh_pending'), 'agent-refresh settled')
+        time.sleep(0.05)
+        before = refresh_count()
         text = 'it\'s "$HOME" `id` #{pane_id} ; kill-server \\ ünïcode, 50%'
         send('P:' + reader, text.encode() + b'\r', reader_label)
         wait(lambda: got() == [text], f'literal text arrives: {got()}')
+        wait(lambda: refresh_count() == before + 1, f'sidebar receives C-r refresh after send: before={before} now={refresh_count()}')
         assert tm('display-message', '-p', '-c', client_name, '#{pane_id}') == sidebar, 'focus stays in the sidebar'
         print('ok - > sends literal text and Enter to a pane without leaving the sidebar')
 
@@ -158,6 +167,7 @@ try:
         send('W:' + window, b'to the window\r', reader_label)
         send('Q:' + reader, b'from agents\r', reader_label)
         wait(lambda: got()[1:] == ['to the window', 'from agents'], f'window and agents rows: {got()}')
+        wait(lambda: refresh_count() == before + 3, 'sidebar refreshes after window and agents sends')
         # tmux picks vi prompt keys when $EDITOR mentions vi; there Escape
         # only leaves insert mode.
         tm('set-option', '-g', 'status-keys', 'emacs')
@@ -171,6 +181,7 @@ try:
         send('P:' + reader, b'\r', reader_label)
         time.sleep(0.3)
         assert len(got()) == 3, got()
+        assert refresh_count() == before + 3, 'cancelled or empty prompts do not refresh the sidebar'
         assert '@tmux_canopy_send_' not in tm('show-options', '-g'), 'a cancelled prompt leaves no state'
         print('ok - window and Agents rows send to their content pane, never the sidebar; Escape and an empty line send nothing')
 

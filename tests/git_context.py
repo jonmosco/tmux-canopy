@@ -155,6 +155,29 @@ def main():
             tm('resize-window', '-t', 'app:0', '-x', '120', '-y', '35')
             print('ok - narrow trees preserve space; pane preview retains the full branch')
 
+            clean_inspector = run('agent-preview', f'P:{a}', FZF_PREVIEW_LINES='10', FZF_PREVIEW_COLUMNS='80')
+            assert 'app space ⎇ feature/alpha' in clean_inspector and 'changed' not in clean_inspector, clean_inspector
+            tracked = first / 'tracked.txt'
+            tracked.write_text('one\ntwo\n')
+            sp.run([GIT, '-C', str(first), 'add', 'tracked.txt'], env=env, check=True)
+            sp.run([GIT, '-C', str(first), 'commit', '-q', '-m', 'add tracked'], env=env, check=True)
+            tracked.write_text('one\nthree\nfour\n')
+            (first / 'untracked.txt').write_text('new\n')
+            dirty_inspector = run('agent-preview', f'P:{a}', FZF_PREVIEW_LINES='10', FZF_PREVIEW_COLUMNS='80')
+            assert 'app space ⎇ feature/alpha · 2 changed (+2 −1)' in dirty_inspector, dirty_inspector
+            assert not (first / '.git' / 'index.lock').exists()
+            tm('set-option', '-g', '@tmux_canopy_icon_theme', 'ascii')
+            ascii_inspector = run('agent-preview', f'P:{a}', FZF_PREVIEW_LINES='10', FZF_PREVIEW_COLUMNS='80')
+            assert 'app space [git:feature/alpha] | 2 changed (+2 -1)' in ascii_inspector, ascii_inspector
+            tm('set-option', '-g', '@tmux_canopy_icon_theme', 'unicode')
+            medium_inspector = run('agent-preview', f'P:{a}', FZF_PREVIEW_LINES='10', FZF_PREVIEW_COLUMNS='40')
+            assert 'app space ⎇ feature/alpha · 2 changed' in medium_inspector and '(+2' not in medium_inspector, medium_inspector
+            tight_inspector = run('agent-preview', f'P:{a}', FZF_PREVIEW_LINES='10', FZF_PREVIEW_COLUMNS='28')
+            assert 'app space ⎇ feature/alpha' in tight_inspector and 'changed' not in tight_inspector, tight_inspector
+            tracked.write_text('one\ntwo\n')
+            (first / 'untracked.txt').unlink()
+            print('ok - agent inspector shows on-demand dirty summary and budgets width')
+
             commit = sp.check_output([GIT, '-C', str(first), 'rev-parse', '--short', 'HEAD'], env=env, text=True).strip()
             sp.run([GIT, '-C', str(first), 'checkout', '-q', '--detach'], env=env, check=True)
             assert f'detached@{commit}' in '\n'.join(rows().values())

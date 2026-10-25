@@ -90,6 +90,10 @@ if [[ "$git_mode" == branch ]] && command -v git >/dev/null 2>&1; then
     else
       git_line="$repo ⎇ $CANOPY_GIT_BRANCH"
     fi
+    git_budget=$((columns - (columns >= 24 ? 2 : 0) - ${#git_line}))
+    if ((git_budget > 0)) && canopy_git_dirty "$CANOPY_GIT_ROOT" "$icons" "$git_budget"; then
+      git_line+="$CANOPY_GIT_DIRTY"
+    fi
   fi
 fi
 # shellcheck disable=SC1091

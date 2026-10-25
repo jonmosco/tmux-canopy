@@ -1277,9 +1277,18 @@ END {
                 for (ppos=1;ppos<=np[w];ppos++) {
                     p=panes[w,ppos]
                     label=agent_label(p)
-                    if (label=="approval" || label=="interrupted" || (load_subagents(p) && sub_need[p])) printf "P:%s\t%s\n",p,s
+                    load_subagents(p)
+                    if (label=="approval" || label=="interrupted" || sub_need[p])
+                        need_rows[++n_need]="P:" p "\t" s
+                    else if (agent_kind[p] != "" && label != "working" && !sub_work[p] && notices != "none" && (pa[p] || pb[p] || pz[p]))
+                        unread_rows[++n_unread]="P:" p "\t" s
                 }
             }
+        }
+        if (n_need) {
+            for (i=1;i<=n_need;i++) print need_rows[i]
+        } else {
+            for (i=1;i<=n_unread;i++) print unread_rows[i]
         }
         exit
     }
