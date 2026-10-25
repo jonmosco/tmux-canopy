@@ -130,8 +130,10 @@ def main():
         try:
             work = Path(directory) / 'work'
             (work / 'docs').mkdir(parents=True)
-            tm('-f', '/dev/null', 'new-session', '-d', '-s', 'w', '-x', '120', '-y', '30', '-c', str(work), 'sleep 600')
-            tm('new-window', '-d', '-t', 'w:', '-c', str(work / 'docs'), 'sleep 600')
+            link = Path(directory) / 'link-[v1]'
+            link.symlink_to(work)
+            tm('-f', '/dev/null', 'new-session', '-d', '-s', 'w', '-x', '120', '-y', '30', '-c', str(link), 'sleep 600')
+            tm('new-window', '-d', '-t', 'w:', '-c', str((work / 'docs').resolve()), 'sleep 600')
             sidebar = tm('split-window', '-d', '-h', '-l', '42', '-t', 'w:0', '-P', '-F', '#{pane_id}', 'sleep 600')
             tm('set-option', '-p', '-t', sidebar, '@tmux_canopy', '1')
             tm('set-option', '-g', '@tmux_canopy_appearance', 'quiet')

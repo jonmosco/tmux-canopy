@@ -6,6 +6,7 @@ source "$SCRIPT_DIR/buffer-lib.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/launch-lib.sh"
 token="${1:-}"
+[[ "$token" == DIR:* ]] && token="P:${token#DIR:}"
 rows="${FZF_PREVIEW_LINES:-12}"
 [[ "$rows" =~ ^[1-9][0-9]{0,4}$ ]] || rows=12
 export FZF_PREVIEW_LINES="$rows"

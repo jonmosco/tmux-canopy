@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Process identity and ancestry helpers. Linux uses /proc without spawning ps.
 canopy_ps_loaded=0
-declare -gA CANOPY_PPID CANOPY_LSTART CANOPY_COMM CANOPY_KIND
-# PIDs with a CANOPY_KIND entry, so pane lookups skip the rest of the table.
-declare -ga CANOPY_KIND_PIDS=()
+declare -gA CANOPY_PPID CANOPY_LSTART CANOPY_COMM CANOPY_KIND CANOPY_AGENT_KIND
+# PIDs with a CANOPY_KIND or CANOPY_AGENT_KIND entry, so pane lookups skip the rest of the table.
+declare -ga CANOPY_KIND_PIDS=() CANOPY_AGENT_PIDS=()
 # Helpers also leave their result here so callers can avoid a $(...) subshell,
 # which would discard the snapshot cache along with the fork.
 CANOPY_REPLY=''
@@ -25,6 +25,10 @@ canopy_load_ps_snapshot() {
     CANOPY_LSTART[$pid]="$w1 $w2 $w3 $w4 $w5"
     argv0=${argv0##*/}
     CANOPY_COMM[$pid]=${argv0%.exe}
+    if canopy_agent_kind_from_name "${CANOPY_COMM[$pid]}" >/dev/null; then
+      CANOPY_AGENT_KIND[$pid]=$CANOPY_REPLY
+      CANOPY_AGENT_PIDS+=("$pid")
+    fi
     case "${CANOPY_COMM[$pid]}" in
       node|nodejs|pi|omp|hermes|hermes-agent|python|Python|python[0-9]|python[0-9].*) ;;
       *) continue ;;
@@ -33,6 +37,10 @@ canopy_load_ps_snapshot() {
     canopy_hosted_agent "${CANOPY_COMM[$pid]}" "${rest_args[@]}" >/dev/null || continue
     CANOPY_KIND[$pid]=$CANOPY_REPLY
     CANOPY_KIND_PIDS+=("$pid")
+    if [[ -z "${CANOPY_AGENT_KIND[$pid]:-}" ]]; then
+      CANOPY_AGENT_KIND[$pid]=$CANOPY_REPLY
+      CANOPY_AGENT_PIDS+=("$pid")
+    fi
   done <<< "$raw"
   return "$canopy_ps_status"
 }
@@ -264,12 +272,9 @@ canopy_resolve_pane_agent() {
   fi
   [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
   canopy_load_ps_snapshot || return 1
-  for pid in "${!CANOPY_COMM[@]}"; do
-    kind=${CANOPY_KIND[$pid]:-}
-    if [[ -z $kind ]]; then
-      canopy_agent_kind_from_name "${CANOPY_COMM[$pid]}" >/dev/null || continue
-      kind=$CANOPY_REPLY
-    fi
+  for pid in "${CANOPY_AGENT_PIDS[@]}"; do
+    kind=${CANOPY_AGENT_KIND[$pid]:-}
+    [[ -n $kind ]] || continue
     current=$pid
     for ((depth=0; depth<128; depth++)); do
       if [[ $current != "$pid" ]]; then

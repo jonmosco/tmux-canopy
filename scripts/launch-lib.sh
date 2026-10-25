@@ -150,7 +150,7 @@ sidebar_preflight() {
     sidebar_failure "$owner" bash-version 'Bash 4.4 or newer is required (NUL-delimited record handling).'
     return 1
   fi
-  for dependency in tmux bash awk mktemp fzf grep cksum date rm env sort; do
+  for dependency in tmux bash awk mktemp fzf grep date rm env; do
     if ! command -v "$dependency" >/dev/null 2>&1; then
       sidebar_failure "$owner" dependency "Required executable is missing: $dependency. See scripts/doctor."
       return 1
@@ -160,13 +160,14 @@ sidebar_preflight() {
   SIDEBAR_FZF_BINARY="$TMUX_CANOPY_FZF_BINARY"
   for helper in sidebar sidebar-source tree-source sidebar-action tree-action sidebar-preview tree-preview \
     view-header doctor help tree-filter quick-switch preview-popup pane-preview agent-preview codex-preview agent-refresh agent-expiry agent-animate animate-frame preview-mode info process-source buffer-source navigate follow \
-    refresh-sidebar cleanup reap-empty resize sync-width responsive-width mouse-resize notify content-layout restore-window-layout balance-window; do
+    refresh-sidebar cleanup reap-empty resize sync-width responsive-width mouse-resize notify content-layout restore-window-layout balance-window \
+    details directory-refresh jump-current jump-agent; do
     if [[ ! -f "$SCRIPT_DIR/$helper" || ! -r "$SCRIPT_DIR/$helper" || ! -x "$SCRIPT_DIR/$helper" ]]; then
       sidebar_failure "$owner" install "Required helper is missing or not executable: $helper. Restore the plugin installation."
       return 1
     fi
   done
-  for helper in buffer-lib.sh config-lib.sh git-lib.sh lib.sh navigation.sh notification-lib.sh launch-lib.sh ui-options.sh ../lib/tree-render.awk ../lib/animate.py ../lib/agent-process.sh ../lib/agent-process.py ../lib/content-layout.awk ../lib/scale-layout.awk; do
+  for helper in buffer-lib.sh config-lib.sh directory-prompt.sh git-lib.sh lib.sh navigation.sh notification-lib.sh path-lib.sh theme-lib.sh launch-lib.sh ui-options.sh ../lib/tree-render.awk ../lib/animate.py ../lib/agent-process.sh ../lib/agent-process.py ../lib/content-layout.awk ../lib/scale-layout.awk; do
     if [[ ! -f "$SCRIPT_DIR/$helper" || ! -r "$SCRIPT_DIR/$helper" ]]; then
       sidebar_failure "$owner" install "Required library is missing or unreadable: $helper. Restore the plugin installation."
       return 1
@@ -175,13 +176,13 @@ sidebar_preflight() {
   commands="$(tmux list-commands 2>/dev/null)" || {
     sidebar_failure "$owner" server 'Cannot query the tmux server. See scripts/doctor.'; return 1;
   }
-  if ! grep -q '^run-shell .*\[-[^]]*C' <<< "$commands" ||
-     ! grep -q '^split-window .*\[-[^]]*f' <<< "$commands" ||
-     ! grep -q '^split-window .*\[-e ' <<< "$commands" ||
-     ! grep -q '^display-popup .*\[-e ' <<< "$commands" ||
-     ! grep -q '^display-menu ' <<< "$commands" ||
-     ! grep -q '^command-prompt .*\[-[^]]*l' <<< "$commands" ||
-     [[ "$(tmux display-message -p -t "$target" '#{e|>=:211,65}' 2>/dev/null)" != 1 ]]; then
+  if [[ ! "$commands" =~ (^|$'\n')run-shell\ .*\[-[^\]]*C ||
+        ! "$commands" =~ (^|$'\n')split-window\ .*\[-[^\]]*f ||
+        ! "$commands" =~ (^|$'\n')split-window\ .*\[-e\  ||
+        ! "$commands" =~ (^|$'\n')display-popup\ .*\[-e\  ||
+        ! "$commands" =~ (^|$'\n')display-menu\  ||
+        ! "$commands" =~ (^|$'\n')command-prompt\ .*\[-[^\]]*l ||
+        "$(tmux display-message -p -t "$target" '#{e|>=:211,65}' 2>/dev/null)" != 1 ]]; then
     sidebar_failure "$owner" tmux-capabilities 'tmux lacks required commands/formats (tested with 3.7c). See scripts/doctor.'
     return 1
   fi

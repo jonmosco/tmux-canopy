@@ -20,7 +20,7 @@ if [[ "${1:-}" == --render ]]; then
 fi
 
 token="${1:-}"
-case "$token" in S:*|W:*|P:*|Q:*|X:*|B:*) ;; *) exit 0 ;; esac
+case "$token" in S:*|W:*|P:*|DIR:*|Q:*|X:*|B:*|B2:*) ;; *) exit 0 ;; esac
 client="${TMUX_CANOPY_CLIENT:-}"
 [[ -n "$client" && -n "${TMUX_PANE:-}" ]] || exit 0
 # Pass tokens as environment data, never interpolate buffer names into shell

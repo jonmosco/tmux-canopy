@@ -121,18 +121,17 @@ if [[ "$labels" == places ]]; then
   # was typed. Resolve it the same way (builtin cd, no process) so a symlinked
   # project still contains its panes.
   origin=$PWD
-  while IFS= read -r line; do
-    case "$line" in
-      S$sep*) ;;
-      W$sep*|P$sep*) break ;;
-      *) continue ;;
-    esac
-    IFS="$sep" read -ra fields <<< "$line"
-    if [[ -z "${fields[4]:-}" ]] || ! builtin cd -P -- "${fields[4]}" 2>/dev/null; then continue; fi
-    [[ "$PWD" != "${fields[4]}" ]] || continue
-    resolved="${line%"$sep"*}${sep}${PWD}"
-    snapshot=${snapshot/"$line"/"$resolved"}
+  resolved_snapshot=''
+  while IFS= read -r line || [[ -n $line ]]; do
+    if [[ $line == S$sep* ]]; then
+      IFS="$sep" read -ra fields <<< "$line"
+      if [[ -n "${fields[4]:-}" ]] && builtin cd -P -- "${fields[4]}" 2>/dev/null && [[ "$PWD" != "${fields[4]}" ]]; then
+        line="${line%"$sep"*}${sep}${PWD}"
+      fi
+    fi
+    resolved_snapshot+="$line"$'\n'
   done <<< "$snapshot"
+  snapshot=${resolved_snapshot%$'\n'}
   builtin cd -- "$origin" 2>/dev/null || true
 fi
 # Git is strictly opt-in. Find roots with shell builtins and ask git once per

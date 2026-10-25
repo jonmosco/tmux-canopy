@@ -19,8 +19,8 @@ if [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]]; then
 else
   sidebar="${TMUX_PANE:-}"
   [[ "$sidebar" =~ ^%[0-9]+$ ]] || { printf 'bell\n'; exit 0; }
-  [[ "$(tmux show-option -pqv -t "$sidebar" @tmux_canopy 2>/dev/null || true)" == 1 ]] || { printf 'bell\n'; exit 0; }
-  location="$(tmux show-option -pqv -t "$sidebar" @tmux_canopy_focus_location 2>/dev/null || true)"
+  IFS='|' read -r is_sidebar location < <(tmux display-message -p -t "$sidebar" '#{@tmux_canopy}|#{@tmux_canopy_focus_location}' 2>/dev/null || true)
+  [[ "$is_sidebar" == 1 ]] || { printf 'bell\n'; exit 0; }
 fi
 IFS='|' read -r session window pane <<< "$location"
 if [[ ! "$session" =~ ^\$[0-9]+$ || ! "$window" =~ ^@[0-9]+$ || ! "$pane" =~ ^%[0-9]+$ ]]; then

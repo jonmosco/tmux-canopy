@@ -277,16 +277,20 @@ while True:
             wait(lambda: not any(command == 'less' for _, command in descendants()), 'popup closed')
             time.sleep(.15)
             assert probe() == before
-            # A hostile buffer name must remain data, including in the popup.
+            # A hostile buffer name must remain data, including in the popup,
+            # for both legacy B: tokens and current B2: hex-encoded tokens.
             sentinel = temp / 'must-not-exist'
             name = "odd'$(touch " + str(sentinel) + ")"
             tm('set-buffer', '-b', name, 'safe buffer content')
-            popup = sp.Popen([str(ROOT / 'scripts/preview-popup'), 'B:' + name], env=script_env,
-                             stdout=sp.DEVNULL, stderr=sp.PIPE)
-            wait(lambda: any(command == 'less' for _, command in descendants()), 'buffer popup')
-            os.write(master, b'q')
-            popup.communicate(timeout=10)
-            assert popup.returncode == 0 and not sentinel.exists()
+            b2_token = 'B2:' + name.encode().hex()
+            for buf_token in ('B:' + name, b2_token, 'DIR:' + pane):
+                popup = sp.Popen([str(ROOT / 'scripts/preview-popup'), buf_token], env=script_env,
+                                 stdout=sp.DEVNULL, stderr=sp.PIPE)
+                wait(lambda: any(command == 'less' for _, command in descendants()), f'popup for {buf_token}')
+                os.write(master, b'q')
+                popup.communicate(timeout=10)
+                assert popup.returncode == 0 and not sentinel.exists()
+            assert run('sidebar-preview', 'DIR:' + pane) == run('sidebar-preview', 'P:' + pane)
             assert display(pane, '#{pane_width}|#{pane_height}') == geometry
             assert signals.read_text() == signal_count
             assert {pid for pid, command in descendants() if command == 'fzf'} == fzf_pids

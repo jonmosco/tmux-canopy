@@ -76,10 +76,21 @@ clear_animate() {
   tmux set-option -pu -t "$sidebar" @tmux_canopy_animate_token 2>/dev/null || true
 }
 schedule_animate() {
-  local sidebar="${TMUX_PANE:-}" token cache cache_tmp settings animate theme
+  local LC_ALL=C
+  local sidebar="${TMUX_PANE:-}" token cache cache_tmp settings animate theme record working=0
   [[ "$TMUX_CANOPY_NUL" == 1 && -n "$state_file" && "$sidebar" =~ ^%[0-9]+$ ]] || return 0
   cache="${state_file}.animate"
-  if ! command -v python3 >/dev/null 2>&1; then
+  # Match the live working badge the renderer emits (bold-cyan accent, word or
+  # mark, reset), not plain text such as a ~/wrk directory or a stale report's
+  # dim mark; lib/animate.py uses the same pattern.
+  local badge=$'\e\\[1;36m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'
+  for record in "${records[@]}"; do
+    if [[ "$record" == *$'\e[1;36m'* && "$record" =~ $badge ]]; then
+      working=1
+      break
+    fi
+  done
+  if ((!working)) || ! command -v python3 >/dev/null 2>&1; then
     clear_animate "$cache" "$sidebar"
     return 0
   fi
@@ -89,28 +100,20 @@ schedule_animate() {
     clear_animate "$cache" "$sidebar"
     return 0
   fi
-  # Match the live working badge the renderer emits (bold-cyan accent, word or
-  # mark, reset), not plain text such as a ~/wrk directory or a stale report's
-  # dim mark; lib/animate.py uses the same pattern.
-  local badge=$'\e\\[1;36m(WORKING|wrk|\xe2\x96\xb7[0-9]*)\e\\[0m'
-  if ((${#records[@]})) && printf '%s\0' "${records[@]}" | LC_ALL=C grep -aEq "$badge"; then
-    cache_tmp="$(mktemp "${cache}.XXXXXX")" || return 0
-    chmod 600 "$cache_tmp" 2>/dev/null || { rm -f -- "$cache_tmp"; return 0; }
-    if ! printf '%s\0' "${records[@]}" > "$cache_tmp"; then
-      rm -f -- "$cache_tmp"
-      return 0
-    fi
-    # Retire the previous animator first, then drop its frames: they were
-    # precomputed for the old cache and must not be served for this one.
-    token="$$.$RANDOM"
-    tmux set-option -p -t "$sidebar" @tmux_canopy_animate_token "$token" 2>/dev/null || true
-    rm -f -- "${cache}.prefix"
-    mv -f -- "$cache_tmp" "$cache"
-    # shellcheck disable=SC2091 # tmux_shell builds a quoted argv for run-shell.
-    tmux run-shell -b "$(tmux_shell "$SCRIPT_DIR/agent-animate" "$sidebar" "$token" "$state_file")" 2>/dev/null || true
-  else
-    clear_animate "$cache" "$sidebar"
+  cache_tmp="$(mktemp "${cache}.XXXXXX")" || return 0
+  chmod 600 "$cache_tmp" 2>/dev/null || { rm -f -- "$cache_tmp"; return 0; }
+  if ! printf '%s\0' "${records[@]}" > "$cache_tmp"; then
+    rm -f -- "$cache_tmp"
+    return 0
   fi
+  # Retire the previous animator first, then drop its frames: they were
+  # precomputed for the old cache and must not be served for this one.
+  token="$$.$RANDOM"
+  tmux set-option -p -t "$sidebar" @tmux_canopy_animate_token "$token" 2>/dev/null || true
+  rm -f -- "${cache}.prefix"
+  mv -f -- "$cache_tmp" "$cache"
+  # shellcheck disable=SC2091 # tmux_shell builds a quoted argv for run-shell.
+  tmux run-shell -b "$(tmux_shell "$SCRIPT_DIR/agent-animate" "$sidebar" "$token" "$state_file")" 2>/dev/null || true
 }
 
 # Sticky chrome is kept out of the live UI's selectable records. Standalone

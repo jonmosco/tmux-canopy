@@ -60,7 +60,7 @@ def main():
             'false\n'
             '_canopy_directory_prompt; status=$?\n'
             '_canopy_directory_prompt\n'
-            'printf "status=%s calls=%s\\n" "$status" "$(wc -l < ' + shlex.quote(str(calls)) + ')"\n'
+            'printf "status=%s calls=%d\\n" "$status" "$(wc -l < ' + shlex.quote(str(calls)) + ')"\n'
         )
         out = run_prompt(script)
         assert out.returncode == 0, out.stderr
@@ -110,8 +110,9 @@ def main():
     # --- helper against a private tmux server --------------------------
     try:
         with tempfile.TemporaryDirectory(prefix='canopy-dir-refresh-') as folder:
-            work_a = Path(folder) / 'a'
-            work_b = Path(folder) / 'b'
+            root = Path(folder).resolve()
+            work_a = root / 'a'
+            work_b = root / 'b'
             work_a.mkdir()
             work_b.mkdir()
             pane = tm('-f', '/dev/null', 'new-session', '-d', '-x', '120', '-y', '40',

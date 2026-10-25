@@ -215,15 +215,17 @@ function lazy_prefix(stem, branch, pm, color, icon,    prefix) {
 # two. Each character is taken with match(), whose length is in bytes on macOS
 # awk and in characters on gawk, so substr() agrees with it on both. The ranges
 # compare as bytes because tree-source runs this with LC_COLLATE=C.
-function text_width(value,    c,cells) {
+function text_width(value,    c,cells,raw) {
     if (value !~ /[^ -~]/) return length(value)
+    if (value in width_memo) return width_memo[value]
+    raw=value
     while (match(value, /^./)) {
         c=substr(value, 1, RLENGTH); value=substr(value, RLENGTH+1)
         cells+=((c >= "\342\272\200" && c < "\355\236\260") || (c >= "\357\274\200" && c < "\357\275\241") ||
                 (c >= "\357\277\240" && c < "\357\277\247") || (c >= "\360\237\200\200" && c < "\360\237\274\200") ||
                 (c >= "\360\240\200\200" && c < "\361\200\200\200")) ? 2 : 1
     }
-    return cells
+    return (width_memo[raw]=cells)
 }
 function edge_count(value,count,budget, plain,padding) {
     if (count == "") return value
@@ -348,10 +350,9 @@ function overview_add(glyph,count,color, space) {
     overview_plain=overview_plain space glyph count
     overview_color=overview_color space color glyph count reset
 }
-# Count every agent pane on the server, whatever the tree's filters and folds.
-# A caller requesting only the summary leaves rendering to the action footer;
-# legacy callers may still emit the count as a footer.
-function agent_footer(summary_only, si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,seen,hint) {
+# Count every agent pane on the server, whatever the tree's filters and folds,
+# for the quiet header and action footer summaries.
+function agent_footer(    si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,seen) {
     for (si=1;si<=ns;si++) {
         s=sessions[si]
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -372,29 +373,7 @@ function agent_footer(summary_only, si,s,wpos,w,ppos,p,label,need,work,settled,u
             }
         }
     }
-    if (appearance == "quiet" || summary_only) {
-        quiet_total=total; quiet_need=need; quiet_work=work; quiet_settled=settled; quiet_unknown=unknown
-        return
-    }
-    if (!total) return
-    # The footer has room the header lacks: "◆ 1  ▷ 2" reads more easily than
-    # "◆1 ▷2". Fall back to the header's compact form when it would not fit.
-    footer_plain=""; footer_color=""
-    footer_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
-    footer_add(agent_work_badge,work,accent)
-    footer_add(agent_done_badge,settled,dim)
-    footer_add(icons == "ascii" ? "o" : "○",unknown,dim)
-    if (text_width("Agents  " footer_plain) > width-4) {
-        overview_plain=""; overview_color=""
-        overview_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
-        overview_add(agent_work_badge,work,accent)
-        overview_add(agent_done_badge,settled,dim)
-        overview_add(icons == "ascii" ? "o" : "○",unknown,dim)
-        footer_plain=overview_plain; footer_color=overview_color
-    }
-    # The jump hint appears only when it fits beside the counts.
-    hint=(need && text_width("Agents  " footer_plain "   n jumps to input") <= width-4 ? dim "   n jumps to input" reset : "")
-    row("F:", dim "Agents" reset "  " footer_color hint, "F:")
+    quiet_total=total; quiet_need=need; quiet_work=work; quiet_settled=settled; quiet_unknown=unknown
 }
 # A quiet header presents the current view and its filter, then a count of
 # agents in each state if it fits, or the most urgent state with the total.
@@ -481,7 +460,7 @@ function current_view_header(    title,scope,joiner,summary,summary_color,plain,
 # waiting for input take priority; otherwise stable shortcuts build muscle
 # memory. Important actions come first, so narrow sidebars truncate safely.
 function action_footer(    n,i,part,status,short,text,plain,budget,enter_key,gap) {
-    if (agents_enabled && (appearance != "quiet" || agent_view)) agent_footer(1)
+    if (agents_enabled && (appearance != "quiet" || agent_view)) agent_footer()
     enter_key=(icons == "ascii" ? "Enter" : "↵")
     if (mode == "MOVE" || mode == "LINK") {
         status=accent (mode == "MOVE" ? "Moving" : "Linking") reset
@@ -515,48 +494,6 @@ function action_footer(    n,i,part,status,short,text,plain,budget,enter_key,gap
         plain=plain (plain == "" ? "" : gap) part[i] " " part[i+1]
     }
     row("F:",text,"F:")
-}
-function footer_add(glyph,count,color, space) {
-    if (!count) return
-    space=(footer_plain == "" ? "" : "  ")
-    footer_plain=footer_plain space glyph " " count
-    footer_color=footer_color space color glyph reset " " count
-}
-# Without agent mode, the Tree view's footer summarizes the workspace instead:
-# sessions, windows, and content panes, each counted once (linked windows,
-# sidebars, and reserve panes excluded). A tree filter shows visible/total.
-function workspace_footer( si,s,wpos,w,ppos,p,sessions_n,windows_n,panes_n,sessions_v,windows_v,panes_v,seen_w,seen_p,full,short,text) {
-    for (si=1;si<=ns;si++) {
-        s=sessions[si]
-        sessions_n++
-        if (visible_s[s]) sessions_v++
-        for (wpos=1;wpos<=nw[s];wpos++) {
-            w=windows[s,wpos]
-            if (!np[w]) continue
-            if (!(w in seen_w)) { seen_w[w]=0; windows_n++ }
-            if (visible_w[s SUBSEP w] && !seen_w[w]) { seen_w[w]=1; windows_v++ }
-            for (ppos=1;ppos<=np[w];ppos++) {
-                p=panes[w,ppos]
-                if (p in seen_p) continue
-                seen_p[p]=1; panes_n++
-                if (visible_p[p]) panes_v++
-            }
-        }
-    }
-    if (!sessions_n) return
-    full=footer_count(session_icon, sessions_v, sessions_n, "session") "  " \
-        footer_count(window_icon, windows_v, windows_n, "window") "  " \
-        footer_count(pane_icon, panes_v, panes_n, "pane")
-    short=footer_count(session_icon, sessions_v, sessions_n, "") "  " \
-        footer_count(window_icon, windows_v, windows_n, "") "  " \
-        footer_count(pane_icon, panes_v, panes_n, "")
-    text=(text_width(full) <= width-4 ? full : short)
-    row("F:", dim text reset, "F:")
-}
-# "◈ 3 sessions", or "◈ 1/3 sessions" while a tree filter hides some.
-function footer_count(icon, shown, total, noun,    count) {
-    count=(filtered && shown != total ? shown "/" total : total)
-    return icon " " count (noun == "" ? "" : " " noun (total == 1 ? "" : "s"))
 }
 function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,count) {
     overview_plain=""; overview_color=""
@@ -796,14 +733,15 @@ function quiet_home_place(s,    wpos,w,ppos,p) {
 }
 # The directory every visible pane of a window shares, or "" when they differ.
 function shared_place(w,    ppos,p,place) {
+    if (w in shared_place_memo) return shared_place_memo[w]
     place=""
     for (ppos=1; ppos<=np[w]; ppos++) {
         p=panes[w,ppos]
         if (!visible_p[p]) continue
         if (place == "") place=path[p]
-        else if (path[p] != place) return ""
+        else if (path[p] != place) return (shared_place_memo[w]="")
     }
-    return place
+    return (shared_place_memo[w]=place)
 }
 # The right-hand edge: pane p's directory and branch, then the row's marks.
 # On a narrow row the detail gives way in steps (a shortened branch, then the
@@ -1349,15 +1287,11 @@ END {
     if (header && !switcher) {
         mode=(move != "" ? "MOVE" : link != "" ? "LINK" : del != "" ? "DELETE" : "")
         mode_color=(del != "" && move == "" && link == "" ? attention : accent)
-        mode_gap=(mode == "" ? 0 : 1)
         # Reserve fzf's pointer gutter and keep operation warnings visible.
         available=width-2
         filter_label=(filter == "session" ? "Session" : filter == "unread" ? "Unread" : "All")
-        filter_sep=(icons == "ascii" ? " | " : appearance == "lazygit" || appearance == "places" ? " ─ " : " · ")
         if (window_filter != "") filter_label=filter_label "+W"
         if (title_filter != "") filter_label=filter_label "+T"
-        reserved=text_width(filter_sep filter_label)+(mode != "" ? length(mode)+1 : 0)
-        box_pad=(appearance == "lazygit" || appearance == "places" ? 3 : 0)
         if (appearance == "quiet") {
             quiet_header()
         } else {

@@ -41,7 +41,7 @@ case "$token" in
       "#{?pane_active,●,·} #{pane_id}  #{${clean}:pane_current_command}#{?#{&&:#{window_zoomed_flag},#{pane_active}}, [Z],}$pane_notices"$'\037'"#{${clean}:pane_current_path}" 2>/dev/null)
     ;;
 
-  P:*)
-    exec "$SCRIPT_DIR/pane-preview" "${token#P:}"
+  P:*|DIR:*)
+    exec "$SCRIPT_DIR/pane-preview" "${token#*:}"
     ;;
 esac

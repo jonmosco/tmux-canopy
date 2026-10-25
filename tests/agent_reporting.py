@@ -447,6 +447,22 @@ output = call_main_with_failing_report(
 check(output == '{"permission":"allow"}\n',
       f"main() emits exactly one line when report() raises: {output!r}")
 
+# main() must accept 'contract' (used by scripts/agent-report) and pass the
+# payload's agent kind to pane_from_ancestry when TMUX_PANE is unset.
+state = harness("hermes")
+ancestry_calls = []
+orig_ancestry, orig_argv, orig_stdin, orig_pane = core.pane_from_ancestry, sys.argv, sys.stdin, core.PANE
+try:
+    core.PANE = ""
+    core.pane_from_ancestry = lambda kind, sid: (ancestry_calls.append((kind, sid)) or "%4")
+    sys.argv = ["agent-hook.py", "contract"]
+    sys.stdin = FakeStdin(json.dumps({"agent": "hermes", "session_id": "h-1", "state": "working"}).encode())
+    hook.main()
+finally:
+    core.pane_from_ancestry, sys.argv, sys.stdin, core.PANE = orig_ancestry, orig_argv, orig_stdin, orig_pane
+check(ancestry_calls == [("hermes", "h-1")] and state.get("status") == "working" and state.get("source") == "hermes-hook",
+      f"main() dispatches contract events and resolves pane ancestry by payload agent: {ancestry_calls} / {state}")
+
 print("ok - Gemini, Pi/OMP, OpenCode lifecycle edges and common report contract")
 
 # Agent alerts: only transitions a user waits for start the delivery script,

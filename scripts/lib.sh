@@ -26,27 +26,33 @@ sidebar_popup_option() {
 }
 
 set_popup_active() {
-  tmux set-option -gq "$(sidebar_popup_option "${1:-}")" 1
+  canopy_client_key "${1:-}"
+  tmux set-option -gq "@tmux_canopy_popup_$CANOPY_KEY" 1
 }
 
 clear_popup_active() {
-  tmux set-option -gu "$(sidebar_popup_option "${1:-}")" 2>/dev/null || true
+  canopy_client_key "${1:-}"
+  tmux set-option -gu "@tmux_canopy_popup_$CANOPY_KEY" 2>/dev/null || true
 }
 
 popup_active() {
-  [[ "$(tmux show-option -gqv "$(sidebar_popup_option "${1:-}")" 2>/dev/null || true)" == '1' ]]
+  canopy_client_key "${1:-}"
+  [[ "$(tmux show-option -gqv "@tmux_canopy_popup_$CANOPY_KEY" 2>/dev/null || true)" == '1' ]]
 }
 
 begin_sidebar_transition() {
-  tmux set-option -gq "$(sidebar_transition_option "${1:-}")" 1
+  canopy_client_key "${1:-}"
+  tmux set-option -gq "@tmux_canopy_transition_$CANOPY_KEY" 1
 }
 
 end_sidebar_transition() {
-  tmux set-option -gu "$(sidebar_transition_option "${1:-}")" 2>/dev/null || true
+  canopy_client_key "${1:-}"
+  tmux set-option -gu "@tmux_canopy_transition_$CANOPY_KEY" 2>/dev/null || true
 }
 
 sidebar_transition_active() {
-  [[ "$(tmux show-option -gqv "$(sidebar_transition_option "${1:-}")" 2>/dev/null || true)" == '1' ]]
+  canopy_client_key "${1:-}"
+  [[ "$(tmux show-option -gqv "@tmux_canopy_transition_$CANOPY_KEY" 2>/dev/null || true)" == '1' ]]
 }
 
 client_pane() {
@@ -64,7 +70,8 @@ sidebar_rows() {
 
 sidebar_for_client() {
   local client="${1:-}" cache_option cached pane
-  cache_option="$(sidebar_cache_option "$client")"
+  canopy_client_key "$client"
+  cache_option="@tmux_canopy_client_$CANOPY_KEY"
   cached="$(tmux show-option -gqv "$cache_option" 2>/dev/null || true)"
 
   if [[ "$cached" =~ ^%[0-9]+$ ]] \
@@ -80,17 +87,19 @@ sidebar_for_client() {
   if [[ -n "$pane" ]]; then
     tmux set-option -gq "$cache_option" "$pane"
     printf '%s\n' "$pane"
-  else
+  elif [[ -n "$cached" ]]; then
     tmux set-option -gu "$cache_option" 2>/dev/null || true
   fi
 }
 
 cache_sidebar_for_client() {
-  tmux set-option -gq "$(sidebar_cache_option "${1:-}")" "${2:-}"
+  canopy_client_key "${1:-}"
+  tmux set-option -gq "@tmux_canopy_client_$CANOPY_KEY" "${2:-}"
 }
 
 clear_sidebar_cache() {
-  tmux set-option -gu "$(sidebar_cache_option "${1:-}")" 2>/dev/null || true
+  canopy_client_key "${1:-}"
+  tmux set-option -gu "@tmux_canopy_client_$CANOPY_KEY" 2>/dev/null || true
 }
 
 # Only opening/closing docks uses this claim; popup lifetimes and refreshes do
@@ -338,6 +347,6 @@ refresh_sidebars() {
       continue
     fi
     tmux send-keys -t "$pane" C-r 2>/dev/null || true
-  done < <(tmux list-panes -a -F $'#{pane_id}\t#{@tmux_canopy_client}\t#{@tmux_canopy}' 2>/dev/null |
-    awk -F '\t' '$3 == "1" { print $1 "\t" $2 }')
+  done < <(tmux list-panes -a -f '#{==:#{@tmux_canopy},1}' \
+    -F $'#{pane_id}\t#{@tmux_canopy_client}' 2>/dev/null)
 }

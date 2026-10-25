@@ -275,10 +275,12 @@ def report(kind, event, event_name=None):
     is_contract = kind == 'contract'
     if kind == 'contract':
         agent_kind = event.get('agent')
+        if agent_kind == 'antigravity':
+            agent_kind = 'agy'
         state = event.get('state')
         allowed = {'ready', 'working', 'needs-input', 'turn-ended', 'session-ended', 'interrupted'}
         if agent_kind not in ('claude', 'codex', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent',
-                              'copilot', 'grok') or state not in allowed:
+                              'copilot', 'grok', 'hermes') or state not in allowed:
             return
         request = event.get('request') if isinstance(event.get('request'), dict) else {}
         if state == 'needs-input' and not any(request.get(k) for k in ('id', 'summary', 'tool')):
@@ -527,7 +529,7 @@ def main():
         return
     if kind == 'cursor-agent' and event.get('hook_event_name') == 'subagentStart':
         cursor_response = '{"permission":"allow"}'
-    if oversized or kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent', 'copilot', 'grok'):
+    if oversized or kind not in ('claude', 'opencode', 'gemini', 'pi', 'omp', 'agy', 'cursor-agent', 'copilot', 'grok', 'contract'):
         emit()
         return
     if not re.fullmatch(r'%[0-9]+', core.PANE):
@@ -539,7 +541,10 @@ def main():
             # No pane in the environment, as in a Claude Code background
             # session: find it from the process tree, or the pane attached to
             # the session.
-            core.PANE = core.pane_from_ancestry(kind, core.field(event.get('session_id'), 128))
+            target_kind = event.get('agent') if kind == 'contract' else kind
+            if target_kind == 'antigravity':
+                target_kind = 'agy'
+            core.PANE = core.pane_from_ancestry(target_kind or '', core.field(event.get('session_id'), 128))
         if not core.PANE:
             emit()
             return

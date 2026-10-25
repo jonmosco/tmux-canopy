@@ -130,6 +130,7 @@ else
     claude) label='Claude Code' ;; codex) label=Codex ;; opencode) label=OpenCode ;;
     gemini) label='Gemini CLI' ;; cursor-agent) label='Cursor Agent' ;; agy) label=Antigravity ;;
     pi) label=Pi ;; omp) label='Oh My Pi' ;; copilot) label='Copilot CLI' ;; grok) label='Grok Build' ;;
+    hermes) label='Hermes Agent' ;;
     *) exit 0 ;;
   esac
   case "$event" in
