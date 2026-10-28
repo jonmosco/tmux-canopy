@@ -92,4 +92,8 @@ def next_entries(current, agent, event, state, now):
         # Completed children remain visible until the parent advances, then a
         # fresh parent event clears the previous turn's finished child rows.
         entries = [entry for entry in entries if entry[2] != 'done']
+        if state in ('turn-ended', 'interrupted'):
+            for entry in entries:
+                if entry[2] in ('working', 'unknown'):
+                    entry[2], entry[4] = 'done', ''
     return format_subagents(entries)

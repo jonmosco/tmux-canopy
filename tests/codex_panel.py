@@ -226,12 +226,14 @@ try:
               'turn_id': 't1', 'tool_name': 'shell_command',
               'tool_input': {'command': 'npm install example'}})
         assert 'npm install example' not in report() and 'Install fixture dependency 7b2' not in report()
+        assert 'Working · shell_command' in report().splitlines()[0], report()
         assert 'WORKING' in tree_row(agent) and '·hook' in tree_row(agent)
         hook(request)
         hook({'hook_event_name': 'PostToolUse', 'session_id': 'codex-session',
               'turn_id': 't1', 'tool_name': 'shell_command',
               'tool_input': {'command': 'npm install example'}})
         assert 'npm install example' not in report() and 'Install fixture dependency 7b2' not in report()
+        assert 'Working · shell_command' not in report().splitlines()[0], report()
         assert 'WORKING' in tree_row(agent) and '·hook' in tree_row(agent)
         hook({'hook_event_name': 'Stop', 'session_id': 'codex-session', 'turn_id': 't1'})
         assert 'TURN ENDED' in tree_row(agent) and '·hook' in tree_row(agent)
@@ -308,12 +310,16 @@ try:
         assert 'Agent list' in run('preview-mode', '--label')
         tm('set-option', '-g', '@tmux_canopy_notifications', 'activity,bell')
         tm('set-option', '-pq', '-t', claude, '@tmux_canopy_notice_pane_activity', '1')
+        hook({'hook_event_name': 'PreToolUse', 'session_id': 'new-session',
+              'turn_id': 't2', 'tool_name': 'shell_command', 'tool_input': {}})
         agent_list = run('sidebar-preview', 'S:' + empty_session,
                          extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'})
         list_lines = agent_list.splitlines()
         assert len(list_lines) == 2, agent_list
-        assert '▷ studio:0.1  Codex · Working' in list_lines[0], list_lines
+        assert '▷ studio:0.1  Codex · Working · shell_command' in list_lines[0], list_lines
         assert '○ studio:2.0  Claude Code · Detected' in list_lines[1] and list_lines[1].endswith('●'), list_lines
+        hook({'hook_event_name': 'PostToolUse', 'session_id': 'new-session',
+              'turn_id': 't2', 'tool_name': 'shell_command', 'tool_input': {}})
         tm('set-option', '-pu', '-t', claude, '@tmux_canopy_notice_pane_activity')
         run('preview-mode')
         assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'terminal'

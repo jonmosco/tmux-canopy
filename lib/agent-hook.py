@@ -269,6 +269,20 @@ def with_opencode_subagent_fields(event):
     return out
 
 
+def event_tool(kind, event, name='', is_contract=False):
+    if is_contract:
+        return core.field(event.get('tool') or event.get('tool_name'), 80)
+    if kind == 'opencode':
+        if name != 'session.next.tool.called':
+            return ''
+        props = opencode_payload(event)
+        return core.field(props.get('tool') or props.get('name') or event.get('tool_name'), 80)
+    if kind == 'agy':
+        call = event.get('toolCall')
+        return core.field(call.get('name'), 80) if isinstance(call, dict) else ''
+    return core.field(event.get('tool_name') or event.get('toolName'), 80)
+
+
 def report(kind, event, event_name=None):
     if kind in ('agy', 'antigravity'):
         kind = 'agy'
@@ -414,13 +428,6 @@ def report(kind, event, event_name=None):
                 if targets:
                     entries = [entry for entry in parse_subagents(values['subagents']) if entry[0] not in targets]
                     values['subagents'] = format_subagents(entries)
-    elif kind == 'agy' and not agent and name == 'Stop' and state in ('turn-ended', 'interrupted'):
-        if event.get('fullyIdle') is not False:
-            entries = parse_subagents(values['subagents'])
-            for item in entries:
-                if item[2] == 'working':
-                    item[2], item[4] = 'done', ''
-            values['subagents'] = format_subagents(entries)
     # Only a request's own agent (or the main thread) can clear it.
     if state == 'subagent-stop' and current['status'] == 'needs-input' and \
             current['request_agent'] == agent:
@@ -435,8 +442,12 @@ def report(kind, event, event_name=None):
                 return
         state = 'working'
     elif (agent and state != 'needs-input') or state in ('clear-request', 'subagent-start', 'subagent-stop'):
+        if state == 'clear-request' and not agent and current['status'] == 'working':
+            tool = event_tool(kind, event, name, is_contract)
+            if tool:
+                values['tool'] = tool
         # Subagent progress leaves the main thread's status and its age alone.
-        if values['subagents'] == current['subagents']:
+        if values['subagents'] == current['subagents'] and values['tool'] == current['tool']:
             return
         values['updated'] = current['updated'] or now
         if core.write(values):
@@ -487,7 +498,8 @@ def report(kind, event, event_name=None):
         values['request'] = request_id or hashlib.sha256(json.dumps([session, name, tool, detail],
                                                                      sort_keys=True, default=str).encode()).hexdigest()[:24]
     else:
-        values.update(tool='', summary='', command='', request='')
+        tool = event_tool(kind, event, name, is_contract) if (state == 'working' and not agent) else ''
+        values.update(tool=tool, summary='', command='', request='')
     if core.write(values):
         core.schedule_expiry(process_pid, process_birth, current_timer)
         core.alert(alerts, current, values, kind, event.get('last_assistant_message'))

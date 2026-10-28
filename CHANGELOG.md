@@ -9,6 +9,8 @@
 
 ### Changed
 
+- When a parent agent turn ends (`Stop` / `turn-ended`) or is interrupted without running background tasks, any leftover `working` or `unknown` subagent entries whose `SubagentStop` event was missed are marked `done` so they do not remain stuck in the tree, while subagents waiting on input stay actionable.
+- The Agent inspector and Agent list drawers (`i`) now display the active or most recent tool name (`Working · <tool>`) when an agent is working and has reported a tool event.
 - `n` (`jump-agent`) visits panes needing input or interrupted first, then falls back to settled agent panes with an unread notification when nothing currently needs input.
 - Sending text to a pane with `>` refreshes the sidebar and preview drawer immediately after the input is delivered.
 

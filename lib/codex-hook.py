@@ -121,6 +121,8 @@ def report(event):
                  "needs-input" if kind == "PermissionRequest" else
                  "clear-request" if kind in ("PreToolUse", "PostToolUse") else
                  "working" if kind == "UserPromptSubmit" else
+                 "turn-ended" if kind == "Stop" else
+                 "interrupted" if kind == "Interrupt" else
                  "session-ended" if kind == "SessionEnd" else "")
     values["subagents"] = next_entries(current["subagents"], agent, event, sub_state, now)
     if kind in ("SubagentStart", "SubagentStop"):
@@ -143,7 +145,9 @@ def report(event):
         return
     if kind in ("PreToolUse", "PostToolUse"):
         if current["status"] != "needs-input" or current["request"] != fingerprint(event) or current["request_agent"] != agent:
-            if values["subagents"] != current["subagents"]:
+            if current["status"] == "working" and not agent:
+                values["tool"] = field(event.get("tool_name"), 80) if kind == "PreToolUse" else ""
+            if values["subagents"] != current["subagents"] or values["tool"] != current["tool"]:
                 values.update(source="codex-hook", session=session, pane_pid=pid,
                               process_pid=process_pid, process_birth=process_birth,
                               updated=current["updated"] or now)
@@ -175,7 +179,8 @@ def report(event):
         values["command"] = field(inputs.get("command"), 500)
         values["request"] = fingerprint(event)
     else:
-        values.update(tool="", summary="", command="", request="")
+        tool = field(event.get("tool_name"), 80) if (kind == "PreToolUse" and not agent) else ""
+        values.update(tool=tool, summary="", command="", request="")
     if write(values):
         schedule_expiry(process_pid, process_birth, current_timer)
         alert(alerts, current, values, "codex", event.get("last_assistant_message"))

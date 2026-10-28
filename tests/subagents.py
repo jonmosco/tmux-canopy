@@ -200,13 +200,21 @@ try:
         print('ok - child completion clears outstanding requests and removes its row')
 
         # A background child disappears as soon as it stops, even if the
-        # parent's next prompt has not yet arrived.
+        # parent's next prompt has not yet arrived. If a SubagentStop was
+        # missed, a parent Stop without running background tasks marks any
+        # leftover working child done so it does not stay stuck in the tree.
         event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a3', 'agent_type': 'Research'})
         event(session | {'hook_event_name': 'SubagentStop', 'agent_id': 'a3', 'agent_type': 'Research'})
         assert option('subagents') == ''
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'a3m', 'agent_type': 'MissedStop'})
+        assert any('MissedStop' in line for line in pane_row().split('\n')[1:])
+        event(session | {'hook_event_name': 'Stop'})
+        assert 'a3m,MissedStop,done,' in option('subagents')
+        assert not any('MissedStop' in line for line in pane_row().split('\n')[1:])
         event(session | {'hook_event_name': 'UserPromptSubmit'})
+        assert option('subagents') == ''
         lines = pane_row().split('\n')
-        assert not any('Research' in line or 'Explore' in line for line in lines[1:]), lines
+        assert not any('Research' in line or 'Explore' in line or 'MissedStop' in line for line in lines[1:]), lines
         print('ok - completed background children stay absent on the next prompt')
 
         # Legacy DONE entries are hidden and pruned on the next hook event.

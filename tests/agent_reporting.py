@@ -207,7 +207,7 @@ for kind in ("pi", "omp"):
     send(kind, {"type": "agent_start", "session_id": kind + "-1"})
     check(state["status"] == "working", f"{kind} turn start")
     send(kind, {"type": "tool_execution_start", "session_id": kind + "-1", "tool_name": "bash"})
-    check(state["status"] == "working", f"{kind} tool execution keeps the turn fresh")
+    check(state["status"] == "working" and state["tool"] == "bash", f"{kind} tool execution keeps the turn fresh and records tool: {state}")
     send(kind, {"type": "ui_prompt_start", "session_id": kind + "-1", "tool_name": "confirm",
                 "message": "Allow command?"})
     check(state["status"] == "needs-input" and state["summary"] == "Allow command?", f"{kind} UI prompt")
