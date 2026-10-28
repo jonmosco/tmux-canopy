@@ -4,6 +4,7 @@
 
 ### Added
 
+- `i` now cycles the drawer through a third **Agent list** mode (`terminal` → `agent` → `agents`) that lists every detected agent across all sessions with its state glyph, `session:window.pane` location, agent name, brief status or request, and a right-edge notification badge when the pane has unread activity, bell, or silence.
 - When `@tmux-canopy-git-context` is `branch`, the Agent inspector (`i`) appends an on-demand dirty-worktree summary (`reponame ⎇ branch · N changed (+A −D)`, or `[git:branch] | N changed (+A -D)` with ASCII icons) using `git --no-optional-locks`, shortening or omitting the suffix when narrow.
 
 ### Changed

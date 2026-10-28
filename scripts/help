@@ -54,7 +54,7 @@ context_help_records() {
       key 'Enter' 'Focus the selected agent pane'
       key 'n' 'Jump to the next agent needing input'
       key '>' 'Reply or send a line to the selected pane'
-      key 'i' 'Inspect state, directory, git and place; switch to Terminal preview for output'
+      key 'i' 'Cycle drawer: Terminal preview, Agent inspector, or Agent list'
       key 'a' 'Open pane actions'
       ;;
     *)
@@ -134,10 +134,10 @@ help_records() {
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
   [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'
   key 'p' 'Show or hide the preview drawer'
-  [[ "$agents_enabled" != on ]] || key 'i' 'Switch Terminal preview / Agent inspector; the drawer border names the mode'
+  [[ "$agents_enabled" != on ]] || key 'i' 'Cycle Terminal preview / Agent inspector / Agent list; the drawer border names the mode'
   key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'
   note 'p changes only drawer visibility, not its mode. Close and reopen the sidebar after upgrading to activate new bindings.'
-  note 'Both modes share a native sharp frame and fixed geometry, with a scrollbar but no scroll-position counter covering the heading.'
+  note 'All drawer modes share a native sharp frame and fixed geometry, with a scrollbar but no scroll-position counter covering the heading.'
   note 'The top line names only the open view and its filter or summary; use 1-4 to switch views.'
 
   section 'Manage'

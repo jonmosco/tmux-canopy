@@ -1280,7 +1280,7 @@ END {
                     load_subagents(p)
                     if (label=="approval" || label=="interrupted" || sub_need[p])
                         need_rows[++n_need]="P:" p "\t" s
-                    else if (agent_kind[p] != "" && label != "working" && !sub_work[p] && notices != "none" && (pa[p] || pb[p] || pz[p]))
+                    else if (agent_kind[p] != "" && (label=="ready" || label=="turn ended" || label=="session ended") && !sub_work[p] && notices != "none" && (pa[p] || pb[p] || pz[p]))
                         unread_rows[++n_unread]="P:" p "\t" s
                 }
             }

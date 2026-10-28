@@ -304,6 +304,19 @@ try:
         tm('set-option', '-pq', '-t', sidebar, '@tmux_canopy_preview_mode', 'codex')
         assert 'Claude Code' in run('sidebar-preview', 'P:' + claude)
         run('preview-mode')
+        assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'agents'
+        assert 'Agent list' in run('preview-mode', '--label')
+        tm('set-option', '-g', '@tmux_canopy_notifications', 'activity,bell')
+        tm('set-option', '-pq', '-t', claude, '@tmux_canopy_notice_pane_activity', '1')
+        agent_list = run('sidebar-preview', 'S:' + empty_session,
+                         extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'})
+        list_lines = agent_list.splitlines()
+        assert len(list_lines) == 2, agent_list
+        assert '▷ studio:0.1  Codex · Working' in list_lines[0], list_lines
+        assert '○ studio:2.0  Claude Code · Detected' in list_lines[1] and list_lines[1].endswith('●'), list_lines
+        tm('set-option', '-pu', '-t', claude, '@tmux_canopy_notice_pane_activity')
+        run('preview-mode')
+        assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'terminal'
         assert run('sidebar-preview', 'P:' + agent) == terminal
         run('sidebar-action', 'view-agents')
         assert state.read_text() == 'VIEW\tagents\n'

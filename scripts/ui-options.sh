@@ -25,6 +25,7 @@ sidebar_ui_options() {
   # run detached; a prompt that changes the tree refreshes it when it closes.
   local detach='</dev/null >/dev/null 2>&1 &'
   local refresh='tmux send-keys -t "$TMUX_PANE" C-r'
+  [[ "${TMUX_CANOPY_POPUP:-0}" == 1 ]] && refresh=':'
   local pane_flag=()
   [[ -n "$pane" ]] && pane_flag=(-t "$pane")
   agents_format="$(canopy_agents_format "${TMUX_CANOPY_CLIENT:-}")"
@@ -32,8 +33,12 @@ sidebar_ui_options() {
     tmux display-message -p "${pane_flag[@]}" \
       "#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}|#{@tmux_canopy_preview_mode}|$agents_format|#{@tmux_canopy_icon_theme}" 2>/dev/null || true
   )
-  if [[ "$agents_enabled" == on ]] && canopy_preview_is_inspector "$inspector_mode"; then
-    preview_label=' Agent inspector '
+  if [[ "$agents_enabled" == on ]]; then
+    if canopy_preview_is_inspector "$inspector_mode"; then
+      preview_label=' Agent inspector '
+    elif canopy_preview_is_agent_list "$inspector_mode"; then
+      preview_label=' Agent list '
+    fi
   fi
   : "${preview_mode:=off}"
   : "${preview_height:=25%}"

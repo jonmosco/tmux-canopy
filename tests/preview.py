@@ -232,6 +232,12 @@ while True:
             assert 'ROW079' not in capture() and 'DONE' not in capture()
             assert probe() == before
             tm('send-keys', '-t', sidebar, 'i')
+            wait(lambda: preview_border() is not None and preview_border()[1] not in (terminal_border[1], inspector_border[1])
+                 and 'ROW079' not in capture() and 'DONE' not in capture(), 'agent list drawer shown')
+            list_border = preview_border()
+            assert list_border is not None and list_border[::2] == terminal_border[::2]
+            assert 'Agent list' in list_border[1], list_border
+            tm('send-keys', '-t', sidebar, 'i')
             wait(lambda: 'ROW079' in capture() and 'DONE' in capture() and preview_border() == terminal_border,
                  'terminal drawer and mode label restored')
             assert probe() == before
@@ -244,6 +250,9 @@ while True:
             tm('send-keys', '-t', sidebar, 'A')
             wait(lambda: preview_border() == inspector_border and 'ROW079' not in capture() and 'DONE' not in capture(),
                  'agent mode on restores inspector choice and its label')
+            tm('send-keys', '-t', sidebar, 'i')
+            wait(lambda: preview_border() == list_border and 'ROW079' not in capture() and 'DONE' not in capture(),
+                 'agent list mode reached on second i')
             tm('send-keys', '-t', sidebar, 'i')
             wait(lambda: preview_border() == terminal_border and 'ROW079' in capture() and 'DONE' in capture(),
                  'terminal mode restored before remaining preview checks')

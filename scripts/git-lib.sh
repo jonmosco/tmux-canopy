@@ -35,7 +35,7 @@ canopy_git_dirty() {
   local count=0 added=0 deleted=0 sep=' · ' minus='−' short full
   CANOPY_GIT_DIRTY=''
   [[ "$icons" == ascii ]] && { sep=' | '; minus='-'; }
-  status_out="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE; git --no-optional-locks -C "$root" status --porcelain -uall 2>/dev/null)" || return 1
+  status_out="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE; git --no-optional-locks -C "$root" status --porcelain 2>/dev/null)" || return 1
   [[ -n "$status_out" ]] || return 1
   while IFS= read -r line; do
     [[ -n "$line" ]] && ((count++))
@@ -57,5 +57,7 @@ canopy_git_dirty() {
     CANOPY_GIT_DIRTY="$full"
   elif ((${#short} <= budget)); then
     CANOPY_GIT_DIRTY="$short"
+  else
+    return 1
   fi
 }

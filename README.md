@@ -137,7 +137,7 @@ Press `g` in the sidebar for the full symbol and color legend, and `?` for the i
 | `4` | Open the dedicated Agents view |
 | `n` | Jump to the next agent needing input (or unread completed agent) across all sessions |
 | `>` | Send a line of text to the selected pane without leaving your current pane |
-| `i` | Switch the bottom drawer between **Terminal preview** and **Agent inspector** |
+| `i` | Cycle the bottom drawer between **Terminal preview**, **Agent inspector**, and **Agent list** |
 
 ### Sidebar & help
 
@@ -157,7 +157,7 @@ Turn agent monitoring on globally with `set -g @tmux-canopy-agents 'on'` in `.tm
 
 - **Status & subagents in the tree:** Working agents show an animated `▷`, waiting agents show `!` with the pending command or question on a dim line underneath, and folded windows/sessions roll counts up as `◆` and `▷`. Running subagents appear indented beneath their parent pane.
 - **Jump (`n`) and inline reply (`>`):** Press `n` to jump to the next agent waiting for input (or the next unread finished agent if none are waiting) across all sessions. Press `>` to send a prompt or confirmation to the selected pane without switching focus; the preview refreshes immediately.
-- **Agent inspector (`i`):** Press `i` to switch the bottom drawer (default height **25%**, toggled with `p`) between **Terminal preview** and **Agent inspector**. The inspector renders a structured card showing agent state, verification trust, working directory, optional Git repo/branch with an on-demand worktree dirty summary (`N changed (+A −D)`), location (`session:window` with a green `●` for your active pane), and any active permission request or question. See [Preview and Agent inspector](docs/reference.md#preview) for details.
+- **Agent inspector & Agent list (`i`):** Press `i` to cycle the bottom drawer (default height **25%**, toggled with `p`) between **Terminal preview**, **Agent inspector** (a structured card for the selected pane showing state, verification trust, working directory, optional Git repo/branch with an on-demand `N changed (+A −D)` dirty summary, location, and active request/command), and **Agent list** (a compact list of every agent across all sessions showing its state glyph, `session:window.pane`, agent name, brief status/request, and a right-edge notification badge when there is unread activity). See [Preview and Agent inspector](docs/reference.md#preview) for details.
 
 | Agent | Found by process | Lifecycle adapter | Needs input | Subagents |
 |---|---|---|---|---|

@@ -13,12 +13,24 @@ IFS='|' read -r is_sidebar mode agents <<< "$settings"
 [[ "$is_sidebar" == 1 ]] || exit 0
 if [[ "${1:-}" != --label ]]; then
   [[ "$agents" == on ]] || exit 0
-  if canopy_preview_is_inspector "$mode"; then mode=terminal; else mode=agent; fi
+  if canopy_preview_is_inspector "$mode"; then
+    mode=agents
+  elif canopy_preview_is_agent_list "$mode"; then
+    mode=terminal
+  else
+    mode=agent
+  fi
   tmux set-option -pq -t "$sidebar" @tmux_canopy_preview_mode "$mode" 2>/dev/null || exit 0
 fi
 if [[ "${1:-}" == --fzf || "${1:-}" == --label ]]; then
   label='Terminal preview'
-  if [[ "$agents" == on ]] && canopy_preview_is_inspector "$mode"; then label='Agent inspector'; fi
+  if [[ "$agents" == on ]]; then
+    if canopy_preview_is_inspector "$mode"; then
+      label='Agent inspector'
+    elif canopy_preview_is_agent_list "$mode"; then
+      label='Agent list'
+    fi
+  fi
   printf 'change-preview-label( %s )' "$label"
   [[ "${1:-}" != --fzf ]] || printf '+refresh-preview+show-preview'
   printf '\n'
