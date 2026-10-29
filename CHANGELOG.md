@@ -4,11 +4,13 @@
 
 ### Added
 
-- `i` now cycles the drawer through a third **Agent list** mode (`terminal` → `agent` → `agents`) that lists every detected agent across all sessions with its state glyph, `session:window.pane` location, agent name, brief status or request, and a right-edge notification badge when the pane has unread activity, bell, or silence.
+- `i` now cycles the drawer through a third **Agent list** mode (`terminal` → `agent` → `agents`) with a live summary header (`N agents · ...`), attention-priority sorting (`needs-input`/`interrupted`, `working`, unread notifications, then idle), per-pane state glyph, `session:window.pane` location, agent name, brief status/question/error reason, right-edge notification badge, and an overflow footer (`… +N more`) when truncated.
+- Question prompts (`AskUserQuestion`, OpenCode `question.asked` / `question.v2.asked`, Copilot `elicitation_dialog`) and interrupted turn error messages (`StopFailure`, `session.error`, `session.next.step.failed`, `errorOccurred`, `Interrupt`) are now distinguished and surfaced in the Agent inspector and Agent list drawers (`! Needs input · question` / `Question: <prompt>` and `Interrupted: <error>`).
 - When `@tmux-canopy-git-context` is `branch`, the Agent inspector (`i`) appends an on-demand dirty-worktree summary (`reponame ⎇ branch · N changed (+A −D)`, or `[git:branch] | N changed (+A -D)` with ASCII icons) using `git --no-optional-locks`, shortening or omitting the suffix when narrow.
 
 ### Changed
 
+- Nested or child agent invocations (such as `claude -p`, `codex exec`, or another agent CLI run inside an interactive agent's shell tool, or an agent started under an editor like `nvim`) no longer hijack or overwrite the parent pane's agent identity and session state.
 - When a parent agent turn ends (`Stop` / `turn-ended`) or is interrupted without running background tasks, any leftover `working` or `unknown` subagent entries whose `SubagentStop` event was missed are marked `done` so they do not remain stuck in the tree, while subagents waiting on input stay actionable.
 - The Agent inspector and Agent list drawers (`i`) now display the active or most recent tool name (`Working · <tool>`) when an agent is working and has reported a tool event.
 - `n` (`jump-agent`) visits panes needing input or interrupted first, then falls back to settled agent panes with an unread notification when nothing currently needs input.

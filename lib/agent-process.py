@@ -65,19 +65,20 @@ def main():
                 continue
             current = pid
             carried = True
+            kind = KINDS[name]
             for depth in range(128):
                 # The pane's root and everything between it and the agent must
                 # be carriers (see agent_kinds.CARRIERS); hook reports are
-                # verified either way.
-                if current != pid and not is_carrier(cached_name(current)):
+                # verified the same way.
+                if current != pid and not is_carrier(cached_name(current), kind):
                     carried = False
                 if current in owners:
                     pane = owners[current]
                     if carried and (pane not in best or depth < best[pane][0]):
-                        best[pane] = (depth, KINDS[name])
+                        best[pane] = (depth, kind)
                     for report_pane, report_root, report_kind, report_pid, report_birth in reports:
-                        if report_pane == pane and report_root == current and \
-                                report_kind == KINDS[name] and report_pid == entry.name and report_birth == birth[1]:
+                        if carried and report_pane == pane and report_root == current and \
+                                report_kind == kind and report_pid == entry.name and report_birth == birth[1]:
                             verified.add(pane)
                     break
                 # Ancestor chains are frequently shared across candidates

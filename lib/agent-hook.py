@@ -265,7 +265,8 @@ def with_opencode_subagent_fields(event):
         out['agent_type'] = label or title
     props = opencode_payload(event)
     if not out.get('tool_name') and isinstance(props, dict):
-        out['tool_name'] = props.get('permission') or props.get('action') or props.get('tool') or ''
+        out['tool_name'] = (props.get('permission') or props.get('action') or props.get('tool') or
+                            ('question' if event.get('type') in ('question.asked', 'question.v2.asked') else ''))
     return out
 
 
@@ -281,6 +282,43 @@ def event_tool(kind, event, name='', is_contract=False):
         call = event.get('toolCall')
         return core.field(call.get('name'), 80) if isinstance(call, dict) else ''
     return core.field(event.get('tool_name') or event.get('toolName'), 80)
+
+
+QUESTION_TOOLS = frozenset(('AskUserQuestion', 'ask_user_question', 'ask_question',
+                            'ask_user', 'request_user_input', 'question', 'elicitation'))
+
+
+def extract_question(detail, event=None):
+    questions = detail.get('questions') if isinstance(detail, dict) else None
+    if not isinstance(questions, list) and isinstance(event, dict):
+        questions = event.get('questions')
+    if isinstance(questions, list) and questions and isinstance(questions[0], dict):
+        return questions[0].get('question') or questions[0].get('header') or ''
+    if isinstance(detail, dict) and isinstance(detail.get('question'), str):
+        return detail.get('question')
+    if isinstance(event, dict) and isinstance(event.get('question'), str):
+        return event.get('question')
+    return ''
+
+
+def event_error(kind, event):
+    err = opencode_payload(event).get('error') if kind == 'opencode' else event.get('error')
+    if isinstance(err, dict):
+        data = err.get('data') if isinstance(err.get('data'), dict) else {}
+        text = err.get('message') or data.get('message') or err.get('error') or ''
+    elif isinstance(err, str):
+        text = err
+    else:
+        text = ''
+    if not text:
+        if kind == 'agy' and event.get('terminationReason') == 'max_steps_exceeded':
+            text = 'max steps exceeded'
+        elif isinstance(event.get('message'), str):
+            text = event.get('message')
+        elif isinstance(event.get('reason'), str) and event.get('reason') not in (
+                'user_interrupt', 'user_exit', 'cancelled', 'canceled', 'aborted', 'end_turn', 'shutdown'):
+            text = event.get('reason')
+    return core.field(text, 300)
 
 
 def report(kind, event, event_name=None):
@@ -301,7 +339,8 @@ def report(kind, event, event_name=None):
             return
         event = {'session_id': event.get('session_id'), 'state': state,
                  'tool_name': request.get('tool'), 'tool_input': {'description': request.get('summary', ''),
-                 'command': request.get('command', '')}, 'request': request, '_contract': True}
+                 'command': request.get('command', '')}, 'error': event.get('error') or request.get('summary', ''),
+                 'request': request, '_contract': True}
         kind = agent_kind
         result = (state, 'ContractReport')
     else:
@@ -472,20 +511,29 @@ def report(kind, event, event_name=None):
             tool = core.field(props.get('permission') or props.get('action') or props.get('tool'), 80)
             metadata = props.get('metadata') if isinstance(props.get('metadata'), dict) else {}
             detail = metadata
-            questions = props.get('questions')
-            if isinstance(questions, list) and questions and isinstance(questions[0], dict):
-                asked = questions[0].get('question') or questions[0].get('header') or ''
-                if asked and not detail.get('description'):
-                    detail = dict(detail, description=asked)
+            asked = extract_question(props, event)
+            if asked and not detail.get('description'):
+                detail = dict(detail, description=asked)
+            if not tool and (asked or name in ('question.asked', 'question.v2.asked')):
+                tool = 'question'
             if not event.get('message') and not detail.get('description') and tool:
-                values['summary'] = core.field(f"{tool} permission requested", 300)
+                values['summary'] = core.field(
+                    'Question requested' if tool in QUESTION_TOOLS else f"{tool} permission requested", 300)
             patterns = props.get('resources') if isinstance(props.get('resources'), list) else props.get('patterns')
             if not detail.get('command') and isinstance(patterns, list):
                 detail = dict(detail, command=', '.join(core.field(item, 120) for item in patterns if isinstance(item, str)))
+        else:
+            asked = extract_question(detail, event)
+            if asked and not detail.get('description'):
+                detail = dict(detail, description=asked)
+            if not tool and (asked or event.get('notification_type') == 'elicitation_dialog'):
+                tool = 'question'
         values['tool'] = tool
+        is_question = tool in QUESTION_TOOLS
         values['summary'] = (core.field(event.get('message'), 300) or
                              core.field(detail.get('description'), 300) or
-                             (core.field(f"{tool} permission requested", 300) if kind == 'opencode' and tool else
+                             (core.field(f"{tool} permission requested", 300) if kind == 'opencode' and tool and not is_question else
+                              'Question requested' if is_question else
                               'Approval requested' if tool else 'Input requested'))
         if agent:
             values['summary'] = core.field(f"{list_field(event.get('agent_type'), 40) or 'Subagent'}: {values['summary']}", 300)
@@ -499,7 +547,8 @@ def report(kind, event, event_name=None):
                                                                      sort_keys=True, default=str).encode()).hexdigest()[:24]
     else:
         tool = event_tool(kind, event, name, is_contract) if (state == 'working' and not agent) else ''
-        values.update(tool=tool, summary='', command='', request='')
+        summary = event_error(kind, event) if (state == 'interrupted' and not agent) else ''
+        values.update(tool=tool, summary=summary, command='', request='')
     if core.write(values):
         core.schedule_expiry(process_pid, process_birth, current_timer)
         core.alert(alerts, current, values, kind, event.get('last_assistant_message'))

@@ -56,7 +56,7 @@ if ((list_mode)); then
          canopy_process_identity "$pid" "$report_process" "$report_birth" "$kind"; then
         age=$((now - 10#$report_updated))
         if ((age >= 0 && age <= 900)); then
-          sub_need=0 sub_work=0
+          sub_need=0 sub_work=0 sub_question=0
           if [[ -n "$report_subagents" ]]; then
             IFS=';' read -ra sub_items <<< "$report_subagents"
             for sub_item in "${sub_items[@]}"; do
@@ -64,26 +64,49 @@ if ((list_mode)); then
               if [[ "$sub_updated" =~ ^[0-9]+$ && "$sub_state" != 'done' ]]; then
                 sub_age=$((now - 10#$sub_updated))
                 if ((sub_age >= 0 && sub_age <= 900)); then
-                  [[ "$sub_state" == needs-input ]] && sub_need=1
+                  if [[ "$sub_state" == needs-input ]]; then
+                    sub_need=1
+                    case "$_stool" in
+                      AskUserQuestion|ask_user_question|ask_question|ask_user|request_user_input|question|elicitation)
+                        sub_question=1 ;;
+                    esac
+                  fi
                   [[ "$sub_state" == working ]] && sub_work=1
                 fi
               fi
             done
           fi
+          is_question=0
+          case "$report_tool" in
+            AskUserQuestion|ask_user_question|ask_question|ask_user|request_user_input|question|elicitation)
+              is_question=1 ;;
+          esac
           case "$report_status" in
             needs-input)
               state_code='needs-input'
-              if [[ -n "$report_command" ]]; then brief="Needs input: $report_command"
+              if ((is_question)); then
+                if [[ -n "$report_summary" ]]; then brief="Question: $report_summary"
+                else brief='Question'; fi
+              elif [[ -n "$report_command" ]]; then brief="Needs input: $report_command"
               elif [[ -n "$report_summary" ]]; then brief="Needs input: $report_summary"
               else brief='Needs input'; fi
               ;;
             interrupted)
-              state_code='interrupted'; brief='Interrupted' ;;
+              state_code='interrupted'
+              if [[ -n "$report_summary" ]]; then brief="Interrupted: $report_summary"
+              else brief='Interrupted'; fi
+              ;;
             working)
-              if ((sub_need)); then state_code='needs-input'; brief='Needs input (subagent)'
+              if ((sub_need)); then
+                state_code='needs-input'
+                if ((sub_question)); then brief='Question (subagent)'
+                else brief='Needs input (subagent)'; fi
               else state_code='working'; brief='Working'; tool_label="$report_tool"; fi ;;
             ready|turn-ended|session-ended)
-              if ((sub_need)); then state_code='needs-input'; brief='Needs input (subagent)'
+              if ((sub_need)); then
+                state_code='needs-input'
+                if ((sub_question)); then brief='Question (subagent)'
+                else brief='Needs input (subagent)'; fi
               elif ((sub_work)); then state_code='working'; brief='Working'
               elif [[ "$report_status" == ready ]]; then state_code='ready'; brief='Ready'
               elif [[ "$report_status" == turn-ended ]]; then state_code='turn-ended'; brief='Turn ended'
@@ -110,7 +133,20 @@ if ((list_mode)); then
     BEGIN { theme="ansi"; icons="unicode" }
     $1 == "CFG" { theme=$2; icons=$3; next }
     $1 == "ROW" {
-      loc[++n]=$2; agent[n]=$3; state[n]=$4; brief[n]=$5; notice[n]=$6; active[n]=$7; tool[n]=$8
+      n++
+      loc[n]=$2; agent[n]=$3; state[n]=$4; brief[n]=$5; notice[n]=$6; active[n]=$7; tool[n]=$8
+      st=$4; nt=$6
+      if (st=="needs-input") c_need++
+      else if (st=="interrupted") c_err++
+      else if (st=="working") c_work++
+      else c_idle++
+      if (st=="needs-input" || st=="interrupted") r = (nt != "" ? 1 : 2)
+      else if (st=="working") r = (nt != "" ? 3 : 4)
+      else if (nt != "") r = (st=="ready" || st=="turn-ended" || st=="session-ended" ? 5 : 6)
+      else if (st=="ready" || st=="turn-ended" || st=="session-ended") r = 7
+      else r = 8
+      rank[n] = r
+      order[n] = n
     }
     END {
       if (theme!="mono") {
@@ -128,7 +164,47 @@ if ((list_mode)); then
       sep=(icons=="ascii" ? " | " : " · ")
       sep_len=(icons=="ascii" ? 3 : 3)
       more=(icons=="ascii" ? "~" : "…")
-      for (i=1; i<=n && i<=limit; i++) {
+      for (i=2; i<=n; i++) {
+        key=order[i]
+        j=i-1
+        while (j>=1 && rank[order[j]] > rank[key]) {
+          order[j+1]=order[j]
+          j--
+        }
+        order[j+1]=key
+      }
+      row_budget=limit
+      if (limit>=2) {
+        hdr = n (n == 1 ? " agent" : " agents")
+        hdr_cols = length(hdr)
+        if (c_need > 0) {
+          seg = c_need " needs input"
+          if (hdr_cols + sep_len + length(seg) <= content_width) { hdr = hdr sep seg; hdr_cols += sep_len + length(seg) }
+        }
+        if (c_err > 0) {
+          seg = c_err " interrupted"
+          if (hdr_cols + sep_len + length(seg) <= content_width) { hdr = hdr sep seg; hdr_cols += sep_len + length(seg) }
+        }
+        if (c_work > 0) {
+          seg = c_work " working"
+          if (hdr_cols + sep_len + length(seg) <= content_width) { hdr = hdr sep seg; hdr_cols += sep_len + length(seg) }
+        }
+        if (c_idle > 0) {
+          seg = c_idle " idle"
+          if (hdr_cols + sep_len + length(seg) <= content_width) { hdr = hdr sep seg; hdr_cols += sep_len + length(seg) }
+        }
+        if (hdr_cols > content_width) hdr = substr(hdr, 1, content_width)
+        print inset dim hdr reset
+        row_budget = limit - 1
+      }
+      overflow = 0
+      show_n = (n < row_budget ? n : row_budget)
+      if (row_budget >= 2 && n > row_budget) {
+        show_n = row_budget - 1
+        overflow = n - show_n
+      }
+      for (idx=1; idx<=show_n; idx++) {
+        i=order[idx]
         st=state[i]
         if (st=="needs-input" || st=="interrupted") { glyph="!"; gstyle=attention }
         else if (st=="working") { glyph=(icons=="ascii" ? "+" : "▷"); gstyle=working }
@@ -184,6 +260,9 @@ if ((list_mode)); then
           line_out=line_out sprintf("%*s", pad+1, "") attention nglyph reset
         }
         print line_out
+      }
+      if (overflow > 0) {
+        print inset dim more " +" overflow " more" reset
       }
     }
   '
@@ -252,7 +331,13 @@ if [[ -n "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
       case "$report_status" in
         ready) state='Ready' ;;
         working) state='Working'; tool_label=$report_tool ;;
-        needs-input) state='Needs input' ;;
+        needs-input)
+          state='Needs input'
+          case "$report_tool" in
+            AskUserQuestion|ask_user_question|ask_question|ask_user|request_user_input|question|elicitation)
+              tool_label='question' ;;
+          esac
+          ;;
         turn-ended) state='Turn ended' ;;
         interrupted) state='Interrupted' ;;
         session-ended) state='Session ended' ;;
@@ -261,6 +346,8 @@ if [[ -n "$kind" && "$pid" =~ ^[0-9]+$ ]]; then
       if [[ "$report_status" == needs-input ]]; then
         request=$report_summary
         request_command=$report_command
+      elif [[ "$report_status" == interrupted ]]; then
+        request=$report_summary
       fi
     else
       state='Stale report'
@@ -339,7 +426,7 @@ fi |
     heading=(state=="Needs input" || state=="Interrupted" ? "! " : "") state
     heading_len=length(heading)
     agent=ENVIRON["CANOPY_PREVIEW_AGENT"]
-    if (state=="Working" && tool!="" && heading_len + 3 + length(tool) + 2 + length(agent) <= content_width) {
+    if ((state=="Working" || state=="Needs input") && tool!="" && heading_len + 3 + length(tool) + 2 + length(agent) <= content_width) {
       heading=heading sep tool
       heading_len+=3+length(tool)
     }

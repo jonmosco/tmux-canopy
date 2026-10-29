@@ -305,21 +305,55 @@ try:
         assert expanded == terminal
         tm('set-option', '-pq', '-t', sidebar, '@tmux_canopy_preview_mode', 'codex')
         assert 'Claude Code' in run('sidebar-preview', 'P:' + claude)
+        # Question requests show '! Needs input · question' in inspector and 'Question: ...' in list.
+        hook({'hook_event_name': 'PermissionRequest', 'session_id': 'new-session',
+              'turn_id': 't2', 'tool_name': 'AskUserQuestion',
+              'tool_input': {'questions': [{'question': 'Which database?'}]}})
+        question_card = report(12, columns=70)
+        assert '! Needs input · question' in question_card.splitlines()[0], question_card
+        assert 'Which database?' in question_card, question_card
+        # Interrupted with an error message surfaces the error in the inspector and list.
+        hook({'hook_event_name': 'Interrupt', 'session_id': 'new-session',
+              'turn_id': 't2', 'error': 'connection reset'})
+        err_card = report(12, columns=70)
+        assert '! Interrupted' in err_card.splitlines()[0] and 'connection reset' in err_card, err_card
         run('preview-mode')
         assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'agents'
         assert 'Agent list' in run('preview-mode', '--label')
+        err_list = run('sidebar-preview', 'S:' + empty_session,
+                       extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'}).splitlines()
+        assert '2 agents · 1 interrupted · 1 idle' in err_list[0], err_list
+        assert '! studio:0.1  Codex · Interrupted: connection reset' in err_list[1], err_list
+        hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'new-session', 'turn_id': 't3'})
+        hook({'hook_event_name': 'PermissionRequest', 'session_id': 'new-session',
+              'turn_id': 't3', 'tool_name': 'AskUserQuestion',
+              'tool_input': {'questions': [{'question': 'Which database?'}]}})
+        q_list = run('sidebar-preview', 'S:' + empty_session,
+                     extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'}).splitlines()
+        assert '2 agents · 1 needs input · 1 idle' in q_list[0], q_list
+        assert '! studio:0.1  Codex · Question: Which database?' in q_list[1], q_list
         tm('set-option', '-g', '@tmux_canopy_notifications', 'activity,bell')
         tm('set-option', '-pq', '-t', claude, '@tmux_canopy_notice_pane_activity', '1')
         hook({'hook_event_name': 'PreToolUse', 'session_id': 'new-session',
-              'turn_id': 't2', 'tool_name': 'shell_command', 'tool_input': {}})
+              'turn_id': 't3', 'tool_name': 'AskUserQuestion',
+              'tool_input': {'questions': [{'question': 'Which database?'}]}})
+        hook({'hook_event_name': 'PreToolUse', 'session_id': 'new-session',
+              'turn_id': 't3', 'tool_name': 'shell_command', 'tool_input': {}})
         agent_list = run('sidebar-preview', 'S:' + empty_session,
                          extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'})
         list_lines = agent_list.splitlines()
-        assert len(list_lines) == 2, agent_list
-        assert '▷ studio:0.1  Codex · Working · shell_command' in list_lines[0], list_lines
-        assert '○ studio:2.0  Claude Code · Detected' in list_lines[1] and list_lines[1].endswith('●'), list_lines
-        hook({'hook_event_name': 'PostToolUse', 'session_id': 'new-session',
-              'turn_id': 't2', 'tool_name': 'shell_command', 'tool_input': {}})
+        assert len(list_lines) == 3, agent_list
+        assert '2 agents · 1 working · 1 idle' in list_lines[0], list_lines
+        assert '▷ studio:0.1  Codex · Working · shell_command' in list_lines[1], list_lines
+        assert '○ studio:2.0  Claude Code · Detected' in list_lines[2] and list_lines[2].endswith('●'), list_lines
+        # Priority order: when Codex is idle and Claude has activity, Claude sorts ahead of Codex.
+        hook({'hook_event_name': 'Stop', 'session_id': 'new-session', 'turn_id': 't3'})
+        priority_lines = run('sidebar-preview', 'S:' + empty_session,
+                             extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'}).splitlines()
+        assert '2 agents · 2 idle' in priority_lines[0], priority_lines
+        assert '○ studio:2.0  Claude Code · Detected' in priority_lines[1] and priority_lines[1].endswith('●'), priority_lines
+        assert '✓ studio:0.1  Codex · Turn ended' in priority_lines[2], priority_lines
+        hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'new-session', 'turn_id': 't4'})
         tm('set-option', '-pu', '-t', claude, '@tmux_canopy_notice_pane_activity')
         run('preview-mode')
         assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'terminal'
@@ -375,6 +409,12 @@ try:
         assert tm('show-option', '-pqv', '-t', restart,
                   '@tmux_canopy_agent_process_pid') == child()[0]
         script_env['TMUX_PANE'] = old_pane
+        overflow_lines = run('agent-preview', '--list',
+                             extra={'FZF_PREVIEW_LINES': '3', 'FZF_PREVIEW_COLUMNS': '70'}).splitlines()
+        assert len(overflow_lines) == 3, overflow_lines
+        assert '3 agents · 1 working · 2 idle' in overflow_lines[0], overflow_lines
+        assert '▷ studio:0.1  Codex · Working' in overflow_lines[1], overflow_lines
+        assert overflow_lines[2].strip() == '… +2 more', overflow_lines
         tm('kill-pane', '-t', restart)
         tm('kill-pane', '-t', claude)
         source = run('sidebar-source', '--stable')

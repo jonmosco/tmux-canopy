@@ -25,13 +25,35 @@ CARRIERS = frozenset((
     'deno', 'npx', 'npm', 'pnpm', 'yarn', 'tsx', 'ts-node', 'uv', 'uvx', 'pipx', 'poetry', 'ruby',
     'bundle', 'cargo', 'make', 'just',
     'bwrap', 'firejail', 'sandbox-exec', 'nono', 'fence', 'landrun', 'nsjail', 'minijail0', 'unshare',
+    'codex-app-server',
 ))
 
 
-def is_carrier(name):
+def is_carrier(name, kind=None):
     name = name.lstrip('-')
-    return (name in CARRIERS or name in KINDS or
-            (name.startswith('python') and name[6:].replace('.', '').isdigit()) or name == 'python')
+    if name in CARRIERS or is_python(name):
+        return True
+    return KINDS.get(name) == kind if kind else name in KINDS
+
+
+def is_headless_args(kind, args):
+    """Whether argv[1:] runs a non-interactive one-shot command for kind."""
+    rest = [arg.decode('utf-8', 'replace') if isinstance(arg, bytes) else arg
+            for arg in (args or ())[1:] if arg]
+    if kind in ('claude', 'gemini', 'cursor-agent', 'copilot', 'grok', 'pi', 'omp'):
+        if '-p' in rest or '--print' in rest:
+            return True
+        if kind in ('pi', 'omp') and '--mode' in rest:
+            return True
+    elif kind == 'codex':
+        for arg in rest:
+            if not arg.startswith('-'):
+                return arg in ('exec', 'e')
+    elif kind == 'opencode':
+        for arg in rest:
+            if not arg.startswith('-'):
+                return arg == 'run'
+    return False
 
 
 NAMES = {
@@ -78,6 +100,8 @@ def name_from_args(args):
     if not names:
         return ''
     base = os.path.basename(names[0]).removesuffix('.exe')
+    if base == 'codex' and 'app-server' in names[1:3]:
+        return 'codex-app-server'
     if is_python(base):
         return 'hermes' if hermes_args(names[1:]) else base
     if base not in ('node', 'nodejs'):
@@ -96,6 +120,15 @@ def name_from_args(args):
     return base
 
 
+def process_args(pid, proc_root='/proc'):
+    """Return the decoded argv list for pid from /proc."""
+    try:
+        raw = open(f'{proc_root}/{pid}/cmdline', 'rb').read().split(b'\0')
+        return [part.decode('utf-8', 'replace') for part in raw if part]
+    except OSError:
+        return []
+
+
 def process_name(pid, proc_root='/proc'):
     """Return the executable basename used for agent kind matching.
 
@@ -103,15 +136,10 @@ def process_name(pid, proc_root='/proc'):
     ``comm`` is often ``MainThread``) and Pi, whose executable is ``node``.
     Fall back to ``comm``.
     """
-    base = f'{proc_root}/{pid}'
-    try:
-        argv = open(f'{base}/cmdline', 'rb').read().split(b'\0')
-    except OSError:
-        argv = []
-    name = name_from_args(argv)
+    name = name_from_args(process_args(pid, proc_root))
     if name:
         return name
     try:
-        return open(f'{base}/comm', encoding='utf-8').read().strip().removesuffix('.exe')
+        return open(f'{proc_root}/{pid}/comm', encoding='utf-8').read().strip().removesuffix('.exe')
     except OSError:
         return ''

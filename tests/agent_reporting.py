@@ -139,9 +139,26 @@ check(state["status"] == "working", "a recoverable Copilot error keeps working")
 hook.report("copilot", {"sessionId": "k1", "stopReason": "end_turn"}, "agentStop")
 check(state["status"] == "turn-ended", "Copilot agentStop ends the turn")
 hook.report("copilot", {"sessionId": "k1", "error": "fatal", "recoverable": False}, "errorOccurred")
-check(state["status"] == "interrupted", "an unrecoverable Copilot error interrupts")
+check(state["status"] == "interrupted" and state["summary"] == "fatal", f"an unrecoverable Copilot error interrupts with reason: {state}")
+hook.report("copilot", {"sessionId": "k1", "notification_type": "elicitation_dialog",
+                        "message": "Which environment?"}, "notification")
+check(state["status"] == "needs-input" and state["tool"] == "question" and state["summary"] == "Which environment?",
+      f"Copilot elicitation dialog is classified as question: {state}")
 hook.report("copilot", {"sessionId": "k1", "reason": "user_exit"}, "sessionEnd")
 check(state["status"] == "session-ended", "Copilot sessionEnd")
+
+# Claude AskUserQuestion extracts the question prompt and StopFailure records error reason.
+state = harness("claude")
+send("claude", {"hook_event_name": "SessionStart", "session_id": "q1"})
+send("claude", {"hook_event_name": "PermissionRequest", "session_id": "q1", "tool_name": "AskUserQuestion",
+                "tool_input": {"questions": [{"question": "Use SQLite or Postgres?", "header": "DB"}]}})
+check(state["status"] == "needs-input" and state["tool"] == "AskUserQuestion" and
+      state["summary"] == "Use SQLite or Postgres?", f"Claude AskUserQuestion extracts question text: {state}")
+send("claude", {"hook_event_name": "PostToolUse", "session_id": "q1", "tool_name": "AskUserQuestion"})
+check(state["status"] == "working" and not state["request"], f"Claude AskUserQuestion clears on PostToolUse: {state}")
+send("claude", {"hook_event_name": "StopFailure", "session_id": "q1", "error": "rate limit exceeded"})
+check(state["status"] == "interrupted" and state["summary"] == "rate limit exceeded",
+      f"Claude StopFailure preserves error message: {state}")
 
 # Grok Build: Claude-style event names, camelCase fields, promptId per turn.
 state = harness("grok")
@@ -311,11 +328,11 @@ check(state["status"] == "working" and not state["request"], "OpenCode V2 reply 
 send("opencode", {"type": "question.v2.asked", "properties": {
     "sessionID": "v2", "id": "que_1", "questions": [{"question": "Which file?", "header": "file"}]}})
 check(state["status"] == "needs-input" and state["request"] == "que_1" and
-      state["summary"] == "Which file?", "OpenCode V2 question is needs-input")
+      state["tool"] == "question" and state["summary"] == "Which file?", "OpenCode V2 question is needs-input with question tool")
 send("opencode", {"type": "question.v2.rejected", "properties": {"sessionID": "v2", "requestID": "que_1"}})
 check(state["status"] == "working" and not state["request"], "OpenCode V2 question rejection clears the request")
 send("opencode", {"type": "session.next.step.failed", "data": {"sessionID": "v2", "error": {"message": "nope"}}})
-check(state["status"] == "interrupted", "OpenCode V2 step failure is interrupted")
+check(state["status"] == "interrupted" and state["summary"] == "nope", "OpenCode V2 step failure is interrupted with error summary")
 send("opencode", {"type": "session.status", "data": {"sessionID": "v2", "status": {"type": "idle"}}})
 check(state["status"] == "turn-ended", "OpenCode V2 idle status ends the turn")
 

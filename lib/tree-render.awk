@@ -69,10 +69,10 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
 # Shells, launchers, runtimes, and sandbox wrappers an agent may run under and
 # still belong to its pane. Any other process in between (an editor such as nvim, or lazygit)
 # owns the agent itself, so the pane is not reported as that agent.
-function agent_carrier(name) {
+function agent_carrier(name, kind) {
     sub(/^-/,"",name)
-    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare)$/ ||
-        canonical_agent(name) != ""
+    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare|codex-app-server)$/ ||
+        (kind == "" ? canonical_agent(name) != "" : canonical_agent(name) == kind)
 }
 function find_agents( pid,current,depth,p,root) {
     for (p in pane_pid) {
@@ -84,7 +84,7 @@ function find_agents( pid,current,depth,p,root) {
         for (depth=0;depth<128 && current>0;depth++) {
             # The agent itself, the pane's root, and everything between must
             # be carriers; a foreground app on the way disqualifies it.
-            if (current != pid && (current in process_name) && !agent_carrier(process_name[current])) break
+            if (current != pid && (current in process_name) && !agent_carrier(process_name[current], agent_process[pid])) break
             if (current in owner) {
                 p=owner[current]
                 if (!(p in best_agent) || depth<best_agent[p]) {

@@ -171,16 +171,27 @@ def report(event):
         inputs = event.get("tool_input")
         if not isinstance(inputs, dict):
             inputs = {}
-        values["tool"] = field(event.get("tool_name"), 80)
-        values["summary"] = field(inputs.get("description"), 300) or \
-            ("Approval requested for " + values["tool"])
+        questions = inputs.get("questions")
+        asked = (questions[0].get("question") or questions[0].get("header") or ""
+                 if isinstance(questions, list) and questions and isinstance(questions[0], dict)
+                 else inputs.get("question") if isinstance(inputs.get("question"), str) else "")
+        values["tool"] = field(event.get("tool_name"), 80) or ("question" if asked else "")
+        is_question = values["tool"] in ("AskUserQuestion", "ask_user_question", "ask_question",
+                                         "ask_user", "request_user_input", "question")
+        values["summary"] = (field(inputs.get("description") or asked, 300) or
+                             ("Question requested" if is_question else "Approval requested for " + values["tool"]))
         if agent:
             values["summary"] = field(f"{list_field(event.get('agent_type'), 40) or 'Subagent'}: {values['summary']}", 300)
         values["command"] = field(inputs.get("command"), 500)
         values["request"] = fingerprint(event)
     else:
         tool = field(event.get("tool_name"), 80) if (kind == "PreToolUse" and not agent) else ""
-        values.update(tool=tool, summary="", command="", request="")
+        err = event.get("error") if kind == "Interrupt" else None
+        err_text = ((err.get("message") or err.get("error") or "" if isinstance(err, dict)
+                     else err if isinstance(err, str) else "") or
+                    (event.get("message") if kind == "Interrupt" and isinstance(event.get("message"), str) else ""))
+        summary = field(err_text, 300) if (kind == "Interrupt" and not agent) else ""
+        values.update(tool=tool, summary=summary, command="", request="")
     if write(values):
         schedule_expiry(process_pid, process_birth, current_timer)
         alert(alerts, current, values, "codex", event.get("last_assistant_message"))

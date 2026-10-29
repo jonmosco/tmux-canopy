@@ -100,7 +100,7 @@ canopy_hosted_agent() {
 }
 # Closest pi/omp descendant of a pane root, if Node is only hosting that CLI.
 canopy_pane_agent() {
-  local root=$1 pid current depth=0 best=129 found='' kind
+  local root=$1 pid current depth=0 best=129 found='' kind name
   CANOPY_REPLY=''
   [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
   canopy_load_ps_snapshot || return 1
@@ -110,6 +110,10 @@ canopy_pane_agent() {
     current=$pid
     depth=0
     while ((depth < 128)); do
+      if [[ $current != "$pid" ]]; then
+        name=${CANOPY_KIND[$current]:-${CANOPY_COMM[$current]:-}}
+        canopy_agent_carrier "$name" "$kind" || { depth=128; break; }
+      fi
       [[ $current == "$root" ]] && break
       current=${CANOPY_PPID[$current]:-}
       [[ $current =~ ^[1-9][0-9]*$ ]] || { depth=128; break; }
@@ -178,6 +182,10 @@ canopy_process_identity() {
     canopy_proc_stat "$pid" || return 1
     [[ $CANOPY_BIRTH == "$birth" ]] || return 1
     while ((depth++ < 128)); do
+      if [[ $current != "$pid" ]]; then
+        name="$(canopy_process_name "$current")" || return 1
+        canopy_agent_carrier "$name" "$kind" || return 1
+      fi
       [[ $current == "$root" ]] && return 0
       canopy_proc_stat "$current" || return 1
       current=$CANOPY_PARENT
@@ -197,6 +205,10 @@ canopy_process_identity() {
   [[ "${CANOPY_LSTART[$pid]:-}" == "${birth_fields[*]}" ]] || return 1
   current=$pid
   while ((depth++ < 128)); do
+    if [[ $current != "$pid" ]]; then
+      name=${CANOPY_KIND[$current]:-${CANOPY_COMM[$current]:-}}
+      canopy_agent_carrier "$name" "$kind" || return 1
+    fi
     [[ $current == "$root" ]] && return 0
     current=${CANOPY_PPID[$current]:-}
     [[ $current =~ ^[1-9][0-9]*$ ]] || return 1
@@ -248,12 +260,18 @@ canopy_agent_label() {
 }
 # Shells, runtimes, and wrappers an agent may sit under and still belong to the pane.
 canopy_agent_carrier() {
-  local name=${1#-}
+  local name=${1#-} kind=${2:-}
   name=${name##*/}
   name=${name%.exe}
-  canopy_agent_kind_from_name "$name" >/dev/null && return 0
+  if [[ -n $kind ]]; then
+    canopy_agent_name_matches "$name" "$kind" && return 0
+  else
+    case "$name" in
+      codex|claude|claude-code|opencode|gemini|pi|omp|agy|antigravity|agent|crush|copilot|grok|hermes|hermes-agent) return 0 ;;
+    esac
+  fi
   case "$name" in
-    sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare) return 0 ;;
+    sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare|codex-app-server) return 0 ;;
     python|Python|python[0-9]*) return 0 ;;
     *) return 1 ;;
   esac
@@ -279,7 +297,7 @@ canopy_resolve_pane_agent() {
     for ((depth=0; depth<128; depth++)); do
       if [[ $current != "$pid" ]]; then
         name=${CANOPY_KIND[$current]:-${CANOPY_COMM[$current]:-}}
-        canopy_agent_carrier "$name" || break
+        canopy_agent_carrier "$name" "$kind" || break
       fi
       if [[ $current == "$root" ]]; then
         if ((depth < best)); then
