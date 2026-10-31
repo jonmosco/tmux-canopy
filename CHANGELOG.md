@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0 - 2026-10-31
+
 ### Added
 
 - `i` now cycles the drawer through a third **Agent list** mode (`terminal` → `agent` → `agents`) with a live summary header (`N agents · ...`), attention-priority sorting (`needs-input`/`interrupted`, `working`, unread notifications, then idle), per-pane state glyph, `session:window.pane` location, agent name, brief status/question/error reason, right-edge notification badge, and an overflow footer (`… +N more`) when truncated.
@@ -11,13 +13,18 @@
 
 ### Changed
 
-- Nested or child agent invocations (such as `claude -p`, `codex exec`, or another agent CLI run inside an interactive agent's shell tool, or an agent started under an editor like `nvim`) no longer hijack or overwrite the parent pane's agent identity and session state.
-- When a parent agent turn ends (`Stop` / `turn-ended`) or is interrupted without running background tasks, any leftover `working` or `unknown` subagent entries whose `SubagentStop` event was missed are marked `done` so they do not remain stuck in the tree, while subagents waiting on input stay actionable.
 - The Agent inspector and Agent list drawers (`i`) now display the active or most recent tool name (`Working · <tool>`) when an agent is working and has reported a tool event.
 - `n` (`jump-agent`) visits panes needing input or interrupted first, then falls back to settled agent panes with an unread notification when nothing currently needs input.
 - Sending text to a pane with `>` refreshes the sidebar and preview drawer immediately after the input is delivered.
+- Lower refresh and preview overhead: skip animation scheduling when no working badge is present, memoize width and shared-path rendering in `lib/tree-render.awk`, index candidate agent PIDs during `ps` snapshot loads, and batch tmux queries across preview and action scripts.
+- Simplified and restructured `README.md`, with a new hero demo alongside Neovim showing three live agents and subagents across sessions, `i` Agent inspector question/diff review, `>` inline replies without leaving the editor, and `n` cross-session attention jumps, plus the full navigation/popup walkthrough linked below it.
+
+### Fixed
+
+- Nested or child agent invocations (such as `claude -p`, `codex exec`, or another agent CLI run inside an interactive agent's shell tool, or an agent started under an editor like `nvim`) no longer hijack or overwrite the parent pane's agent identity and session state.
+- When a parent agent turn ends (`Stop` / `turn-ended`) or is interrupted without running background tasks, any leftover `working` or `unknown` subagent entries whose `SubagentStop` event was missed are marked `done` so they do not remain stuck in the tree, while subagents waiting on input stay actionable.
 - Opening or cycling the drawer with `i` while hidden now un-hides the preview window before updating its border label so `fzf` renders `Agent inspector` / `Agent list` on the first press.
-- The README hero demo now opens directly alongside Neovim with three live agents and subagents across sessions, demonstrating `i` Agent inspector question/diff review, `>` inline replies without leaving the editor, and `n` cross-session attention jumps, with the full navigation/popup walkthrough linked below it.
+- Preview popups and panes now handle encoded buffer (`B2:`) and directory (`DIR:`) tokens consistently, contract reporting covers `hermes` in `lib/agent-hook.py` and alert checks, and session start-path matching avoids unintended glob expansion.
 
 ## 0.5.0 - 2026-10-16
 
