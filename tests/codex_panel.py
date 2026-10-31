@@ -320,6 +320,10 @@ try:
         run('preview-mode')
         assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'agents'
         assert 'Agent list' in run('preview-mode', '--label')
+        fzf_cycle = run('preview-mode', '--fzf').strip()
+        assert fzf_cycle.startswith('show-preview+change-preview-label('), fzf_cycle
+        run('preview-mode'); run('preview-mode')
+        assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'agents'
         err_list = run('sidebar-preview', 'S:' + empty_session,
                        extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'}).splitlines()
         assert '2 agents · 1 interrupted · 1 idle' in err_list[0], err_list

@@ -13,6 +13,19 @@ import tempfile
 from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent
+
+
+def _install_root():
+    override = os.environ.get("TMUX_CANOPY_INSTALL_ROOT", "").strip()
+    if override:
+        candidate = Path(override).expanduser()
+        if candidate.is_absolute() and (candidate / "scripts" / "agent-hook").is_file():
+            return candidate
+    return ROOT
+
+
+# Stable non-dereferenced root for hook config paths (e.g. Nix/Home Manager symlinks).
+INSTALL_ROOT = _install_root()
 PLACEHOLDER = "/absolute/path/to/tmux-canopy"
 KINDS = ("codex", "claude", "gemini", "agy", "pi", "omp", "opencode", "cursor-agent", "copilot", "grok")
 EXECUTABLES = {"codex": "codex", "claude": "claude", "gemini": "gemini", "agy": "agy", "pi": "pi", "omp": "omp",
@@ -82,7 +95,7 @@ def rewrite_owned_commands(data, rewrite):
 
 def owned_template(kind):
     data = json.loads((ROOT / "docs" / TEMPLATES[kind]).read_text())
-    command = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
+    command = shlex.quote(str(INSTALL_ROOT / "scripts" / "agent-hook"))
     return rewrite_owned_commands(data, lambda text: text.replace(PLACEHOLDER + "/scripts/agent-hook", command))
 
 
@@ -102,7 +115,7 @@ def owned_state(kind):
     commands = hook_commands(data)
     if not commands or not all(is_ours(command, kind) for command in commands):
         return "modified (review manually)"
-    script = shlex.quote(str(ROOT / "scripts" / "agent-hook"))
+    script = shlex.quote(str(INSTALL_ROOT / "scripts" / "agent-hook"))
     moved = rewrite_owned_commands(data, lambda text: " ".join([script] + shlex.split(text)[1:]))
     return "outdated path" if moved == template(kind) else "modified (review manually)"
 
@@ -112,8 +125,8 @@ def template(kind):
         return owned_template(kind)
     content = (ROOT / "docs" / TEMPLATES[kind]).read_text()
     if kind in ("codex", "claude", "gemini", "agy", "cursor-agent"):
-        return json.loads(content.replace(PLACEHOLDER, shlex.quote(str(ROOT))))
-    content = content.replace("'" + PLACEHOLDER + "/scripts/agent-hook'", json.dumps(str(ROOT / "scripts" / "agent-hook")))
+        return json.loads(content.replace(PLACEHOLDER, shlex.quote(str(INSTALL_ROOT))))
+    content = content.replace("'" + PLACEHOLDER + "/scripts/agent-hook'", json.dumps(str(INSTALL_ROOT / "scripts" / "agent-hook")))
     if kind == "omp":
         content = content.replace("const kind = 'pi';", "const kind = 'omp';")
     return content
@@ -279,7 +292,7 @@ def agy_state():
     if actual is not None:
         commands = agy_commands(data)
         if commands and all(is_ours(command, "agy") for command in commands):
-            current_root = str(ROOT)
+            current_root = str(INSTALL_ROOT)
             if not all(current_root in command for command in commands):
                 return "outdated path"
             return "partial"

@@ -2,14 +2,15 @@
 
 The recorder is [`record.py`](record.py), not a mockup. It builds fictional projects and agent events on a private tmux server and records an attached client; it never records your real sessions. Keys are checked against `scripts/ui-options.sh` (`j/k`, `h/l`, `/`, `p`, `4`, `n`) and the plugin toggle (`prefix + T` in `tmux-canopy.tmux`). Keep the scenes tied to those bindings when they change.
 
-## README preview (~19 seconds)
+## README preview (~18 seconds)
 
 | Beat | On screen | Evidence to review |
 |---|---|---|
-| Open | Quiet Tree, three projects, balanced content panes | The first published frame already shows the sidebar, not a bare terminal or a loading state. |
-| Context | Two subagents appear under the API agent | `Explore` and `Plan` are beneath their actual parent pane; the footer stays readable at README width. |
-| Attention | Web agent requests `npm run e2e` | The request and `!` appear on the web pane; tmux's transient alert is not mistaken for persistent sidebar state. |
-| Action | `n` jumps to the waiting agent | The active session changes to `acme-web`; the last frame remains on the product, not a detach screen. |
+| Open | Neovim open on `src/auth/login.ts` in `acme-api`; `prefix T` docks Canopy beside it with 3 agents (`Claude Code`, `OpenCode`, `Codex`) working across sessions | Frame 1 shows a real editor workspace, not a blank shell; Canopy docks cleanly on the left without cramping Neovim. |
+| Subagents | `Explore` and `Plan` subagents appear under `acme-api`'s Claude window | Subagent rows indent beneath `1:api · claude`; green `●` stays pinned to `0:editor · nvim`. |
+| Question & Inspector | `acme-web`'s OpenCode asks `Use Redis or memory cache?` (`!`); `j` + `i` opens the Agent inspector | Inspector shows `! Needs input · question`, verified trust, `⎇ feat/cache` dirty stats, and the question text without clipping. |
+| Inline reply (`>`) | `>` sends `Use Redis so workers share sessions` to `acme-web:0.0` | Right pane never leaves Neovim; `acme-web` flips from `!` back to `▷` (`Working · edit`). |
+| Attention jump (`n`) | `billing`'s Codex requests `pytest tests/webhooks.py` (`!`); `n` jumps across sessions to `billing` | Active session switches to `billing` showing the approval prompt; final frame holds on the live UI, never a detach screen. |
 
 ## Longer walkthrough
 

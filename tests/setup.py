@@ -183,6 +183,20 @@ with tempfile.TemporaryDirectory(prefix="canopy-setup-", ignore_cleanup_errors=T
     assert json.loads(cursor.read_text()) == cursor_restored
     print("ok - dry-run, interactive setup cancellation, all-agent setup and removal")
 
+    stable_link = home / "stable link" / "tmux-canopy"
+    stable_link.parent.mkdir(parents=True)
+    stable_link.symlink_to(ROOT)
+    stable_env = env | {"TMUX_CANOPY_INSTALL_ROOT": str(stable_link)}
+    run(cli, "integration", "install", "claude", "copilot", "agy", "opencode", env=stable_env)
+    assert str(stable_link) in claude_target.read_text() and str(ROOT) not in claude_target.read_text()
+    assert str(stable_link) in (home / ".copilot" / "hooks" / "canopy.json").read_text()
+    assert str(stable_link) in agy_hooks.read_text()
+    assert str(stable_link) in (Path(env["XDG_CONFIG_HOME"]) / "opencode" / "plugins" / "canopy-agent-state.js").read_text()
+    stable_status = run(cli, "integration", "status", "claude", "copilot", "agy", "opencode", env=stable_env).stdout
+    assert all(f"{kind:12} installed" in stable_status for kind in ("claude", "copilot", "agy", "opencode")), stable_status
+    run(cli, "integration", "uninstall", "claude", "copilot", "agy", "opencode", env=stable_env)
+    print("ok - TMUX_CANOPY_INSTALL_ROOT preserves stable symlink paths across Nix store updates")
+
     codex.write_text("{invalid")
     result = run(cli, "integration", "install", "codex", env=env, ok=False)
     assert result.returncode != 0 and codex.read_text() == "{invalid"

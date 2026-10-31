@@ -31,7 +31,10 @@ if [[ "${1:-}" == --fzf || "${1:-}" == --label ]]; then
       label='Agent list'
     fi
   fi
-  printf 'change-preview-label( %s )' "$label"
-  [[ "${1:-}" != --fzf ]] || printf '+refresh-preview+show-preview'
-  printf '\n'
+  if [[ "${1:-}" == --fzf ]]; then
+    # fzf ignores change-preview-label while the preview window is hidden.
+    printf 'show-preview+change-preview-label( %s )+refresh-preview\n' "$label"
+  else
+    printf 'change-preview-label( %s )\n' "$label"
+  fi
 fi

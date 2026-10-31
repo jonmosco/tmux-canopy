@@ -7,6 +7,7 @@
 - `i` now cycles the drawer through a third **Agent list** mode (`terminal` → `agent` → `agents`) with a live summary header (`N agents · ...`), attention-priority sorting (`needs-input`/`interrupted`, `working`, unread notifications, then idle), per-pane state glyph, `session:window.pane` location, agent name, brief status/question/error reason, right-edge notification badge, and an overflow footer (`… +N more`) when truncated.
 - Question prompts (`AskUserQuestion`, OpenCode `question.asked` / `question.v2.asked`, Copilot `elicitation_dialog`) and interrupted turn error messages (`StopFailure`, `session.error`, `session.next.step.failed`, `errorOccurred`, `Interrupt`) are now distinguished and surfaced in the Agent inspector and Agent list drawers (`! Needs input · question` / `Question: <prompt>` and `Interrupted: <error>`).
 - When `@tmux-canopy-git-context` is `branch`, the Agent inspector (`i`) appends an on-demand dirty-worktree summary (`reponame ⎇ branch · N changed (+A −D)`, or `[git:branch] | N changed (+A -D)` with ASCII icons) using `git --no-optional-locks`, shortening or omitting the suffix when narrow.
+- `TMUX_CANOPY_INSTALL_ROOT` support in `canopy` so package managers using a stable symlink path do not write ephemeral store paths into agent hook configurations.
 
 ### Changed
 
@@ -15,6 +16,8 @@
 - The Agent inspector and Agent list drawers (`i`) now display the active or most recent tool name (`Working · <tool>`) when an agent is working and has reported a tool event.
 - `n` (`jump-agent`) visits panes needing input or interrupted first, then falls back to settled agent panes with an unread notification when nothing currently needs input.
 - Sending text to a pane with `>` refreshes the sidebar and preview drawer immediately after the input is delivered.
+- Opening or cycling the drawer with `i` while hidden now un-hides the preview window before updating its border label so `fzf` renders `Agent inspector` / `Agent list` on the first press.
+- The README hero demo now opens directly alongside Neovim with three live agents and subagents across sessions, demonstrating `i` Agent inspector question/diff review, `>` inline replies without leaving the editor, and `n` cross-session attention jumps, with the full navigation/popup walkthrough linked below it.
 
 ## 0.5.0 - 2026-10-16
 

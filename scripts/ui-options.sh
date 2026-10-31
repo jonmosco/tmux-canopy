@@ -138,7 +138,7 @@ sidebar_ui_options() {
     --bind="$jump_agent_bind"
     --bind="i:transform($mode_cmd --fzf)"
     --bind="a:execute-silent($action_cmd actions {1} $detach)"
-    --bind='p:toggle-preview'
+    --bind="p:toggle-preview+transform($mode_cmd --label)"
     --bind="P:execute-silent($popup_cmd {1} $detach)"
     --bind="enter:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})$activate_suffix"
     --bind="double-click:execute-silent(rm -f \"\$TMUX_CANOPY_STATE.search\"; $action_cmd activate {1} {3})$activate_suffix"
