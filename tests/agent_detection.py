@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Cursor Agent detection must use argv0 when /proc comm is a Node thread name."""
 import importlib.util
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -9,7 +8,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib"))
-from agent_kinds import process_name  # noqa: E402
+from agent_kinds import is_headless_args, process_name  # noqa: E402
 
 
 def load(name, path):
@@ -67,6 +66,48 @@ def test_process_name_prefers_argv0():
         check(process_name(50, proc_root=str(proc)) == "python3", "an argument named hermes is not Hermes")
         check(process_name(46, proc_root=str(proc)) == "pi",
               "node hosting pi-coding-agent is pi")
+        fake_proc(proc, 51, comm="2.1.201",
+                  cmdline=b"/home/u/.local/share/claude/versions/2.1.201\0")
+        check(process_name(51, proc_root=str(proc)) == "claude",
+              "standalone Claude version binary resolves to claude")
+        fake_proc(proc, 52, comm="2_1_201", cmdline=b"")
+        check(process_name(52, proc_root=str(proc)) == "claude",
+              "underscore-separated Claude version comm resolves to claude")
+        fake_proc(proc, 53, comm="127.0.0.1", cmdline=b"127.0.0.1\0")
+        check(process_name(53, proc_root=str(proc)) == "127.0.0.1",
+              "four-part IPv4 address is not mistaken for a Claude version")
+        fake_proc(proc, 54, comm="node",
+                  cmdline=b"/opt/homebrew/opt/node/bin/node\0/opt/homebrew/bin/gemini\0")
+        check(process_name(54, proc_root=str(proc)) == "gemini",
+              "Homebrew Node-hosted gemini resolves to gemini")
+        fake_proc(proc, 55, comm="node",
+                  cmdline=b"node\0/opt/homebrew/Cellar/gemini-cli/0.46.0/libexec/lib/node_modules/@google/gemini-cli/bundle/gemini.js\0")
+        check(process_name(55, proc_root=str(proc)) == "gemini",
+              "@google/gemini-cli bundle resolves to gemini")
+        fake_proc(proc, 56, comm="node",
+                  cmdline=b"node\0--use-system-ca\0/home/u/.local/share/cursor-agent/versions/1/index.js\0")
+        check(process_name(56, proc_root=str(proc)) == "cursor-agent",
+              "Node-hosted cursor-agent bundle resolves to cursor-agent")
+        fake_proc(proc, 57, comm="bun",
+                  cmdline=b"/usr/local/bin/bun\0/opt/node_modules/@anthropic-ai/claude-code/cli.js\0")
+        check(process_name(57, proc_root=str(proc)) == "claude",
+              "Bun-hosted @anthropic-ai/claude-code resolves to claude")
+        fake_proc(proc, 58, comm="node",
+                  cmdline=b"node\0/opt/bin/codex\0app-server\0--listen\0unix://\0")
+        check(process_name(58, proc_root=str(proc)) == "codex-app-server",
+              "Node-hosted codex app-server resolves to codex-app-server")
+        fake_proc(proc, 59, comm="node", cmdline=b"node\0server.js\0gemini\0")
+        check(process_name(59, proc_root=str(proc)) == "node",
+              "an argument named gemini to another Node script stays node")
+        fake_proc(proc, 60, comm="node", cmdline=b"node\0-e\0console.log('gemini')\0")
+        check(process_name(60, proc_root=str(proc)) == "node",
+              "node -e inline script stays node")
+        check(is_headless_args("codex", ["node", "--use-system-ca", "/opt/bin/codex", "exec", "review"]),
+              "Node-hosted codex exec is recognized as headless")
+        check(not is_headless_args("codex", ["node", "/opt/bin/codex"]),
+              "interactive Node-hosted codex is not headless")
+        check(is_headless_args("gemini", ["node", "/opt/bin/gemini", "-p", "summarize"]),
+              "Node-hosted gemini -p is recognized as headless")
 
 
 def test_nested_agent_isolation():
@@ -341,6 +382,40 @@ canopy_resolve_pane_agent 20 nvim >/dev/null || echo editor-pane-rejected
             "resolved=claude", "editor-pane-rejected",
         ], probe.stderr or probe.stdout)
         print("ok - process identity matches ps start times with padded single-digit days")
+    # Version-named standalone Claude resolves without spawning ps; Node-hosted
+    # Gemini and MainThread/node Cursor Agent share one ps snapshot.
+    probe = subprocess.run(["bash", "-c", f"""
+set -u
+source {script}
+counter=$(mktemp)
+ps() {{ printf x >> "$counter"; printf '%s\\n' \\
+  '10 1 Mon Sep 28 18:47:49 2026 -zsh' '11 10 Mon Sep 28 18:54:08 2026 /opt/homebrew/opt/node/bin/node /opt/homebrew/bin/gemini' \\
+  '20 1 Mon Sep 28 18:47:49 2026 -zsh' '21 20 Mon Sep 28 18:54:08 2026 /Users/me/.local/bin/agent --use-system-ca /Users/me/.local/share/cursor-agent/index.js' \\
+  '30 1 Mon Sep 28 18:47:49 2026 -zsh' '31 30 Mon Sep 28 18:54:08 2026 /Users/me/.local/share/claude/versions/2_1_201' \\
+  '40 1 Mon Sep 28 18:47:49 2026 -zsh' '41 40 Mon Sep 28 18:54:08 2026 node server.js gemini'; }}
+out=''
+canopy_resolve_pane_agent 30 2_1_201 >/dev/null
+fast_calls=$(<"$counter")
+out+="fast=$CANOPY_REPLY:${{#fast_calls}} "
+for pair in 10:node 20:MainThread 30:zsh 40:node; do
+  canopy_resolve_pane_agent "${{pair%%:*}}" "${{pair#*:}}" >/dev/null
+  out+="${{pair%%:*}}=$CANOPY_REPLY "
+done
+if [[ ! -d /proc/self ]]; then
+  canopy_process_identity 10 11 'Mon Sep 28 18:54:08 2026' gemini && out+='gemini-ok '
+  canopy_process_identity 20 21 'Mon Sep 28 18:54:08 2026' cursor-agent && out+='cursor-ok '
+  canopy_process_identity 30 31 'Mon Sep 28 18:54:08 2026' claude && out+='claude-ok '
+  canopy_process_identity 40 41 'Mon Sep 28 18:54:08 2026' gemini || out+='arg-rejected '
+else
+  out+='gemini-ok cursor-ok claude-ok arg-rejected '
+fi
+calls=$(<"$counter"); rm -f "$counter"
+printf '%scalls=%s' "$out" "${{#calls}}"
+"""], capture_output=True, text=True, timeout=10)
+    check(probe.returncode == 0 and probe.stdout ==
+          "fast=claude:0 10=gemini 20=cursor-agent 30=claude 40= gemini-ok cursor-ok claude-ok arg-rejected calls=1",
+          probe.stderr or probe.stdout)
+    print("ok - version-named Claude and Node-hosted agents resolve and verify cleanly")
     test_live_cursor_agent_identity()
     print("ok - process_identity finds live cursor-agent panes")
     test_live_agent_process_scan()

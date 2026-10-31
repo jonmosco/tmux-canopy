@@ -7,6 +7,11 @@ declare -ga CANOPY_KIND_PIDS=() CANOPY_AGENT_PIDS=()
 # Helpers also leave their result here so callers can avoid a $(...) subshell,
 # which would discard the snapshot cache along with the fork.
 CANOPY_REPLY=''
+# Standalone Claude Code builds report their version (dots or underscores,
+# e.g. 2.1.201 or 2_1_201) as kernel comm / pane_current_command.
+canopy_is_claude_version() {
+  [[ ${1:-} =~ ^([0-9]+\.[0-9]+\.[0-9]+|[0-9]+_[0-9]+_[0-9]+)([-+][0-9A-Za-z._-]+)?$ ]]
+}
 # Non-Linux (no /proc) fallback: read the whole process table in one ps call
 # and cache it for the lifetime of this process, instead of spawning ps per
 # ancestor per pane. Safe to call repeatedly; only the first call forks ps.
@@ -30,7 +35,7 @@ canopy_load_ps_snapshot() {
       CANOPY_AGENT_PIDS+=("$pid")
     fi
     case "${CANOPY_COMM[$pid]}" in
-      node|nodejs|pi|omp|hermes|hermes-agent|python|Python|python[0-9]|python[0-9].*) ;;
+      node|nodejs|bun|pi|omp|hermes|hermes-agent|python|Python|python[0-9]|python[0-9].*) ;;
       *) continue ;;
     esac
     read -ra rest_args <<< "$rest"
@@ -67,10 +72,10 @@ canopy_hermes_args() {
   done
   return 1
 }
-# Pi and Oh My Pi exec through Node. A node/nodejs argv0 is those agents only
-# when a later argument is their launcher; every other Node process stays node.
+# Node/Bun-hosted CLIs (Pi, Oh My Pi, Gemini CLI, npm Claude/Codex/Copilot,
+# etc.) identify from their first script operand; any other Node process stays node.
 canopy_hosted_agent() {
-  local host=${1:-} token base
+  local host=${1:-} token base norm skip_next=0
   CANOPY_REPLY=''
   shift || true
   host=${host##*/}
@@ -78,23 +83,58 @@ canopy_hosted_agent() {
   case "$host" in
     pi|omp) CANOPY_REPLY=$host; printf '%s' "$host"; return 0 ;;
     hermes|hermes-agent) CANOPY_REPLY=hermes; printf 'hermes'; return 0 ;;
-    node|nodejs) ;;
+    node|nodejs|bun) ;;
     python|Python|python[0-9]|python[0-9].*)
       canopy_hermes_args "$@" || return 1
       CANOPY_REPLY=hermes; printf 'hermes'; return 0 ;;
     *) return 1 ;;
   esac
-  for token in "$@"; do
-    [[ $token == -* ]] && continue
+  while (($#)); do
+    token=$1
+    shift
+    if ((skip_next)); then
+      skip_next=0
+      continue
+    fi
+    case "$token" in
+      -r|--require|--import|--loader|--experimental-loader|-C|--conditions)
+        skip_next=1; continue ;;
+      -e|--eval|-p|--print|--eval=*|--print=*)
+        return 1 ;;
+      -*)
+        continue ;;
+    esac
     base=${token##*/}
     base=${base%.exe}
     case "$base" in
-      pi|omp) CANOPY_REPLY=$base; printf '%s' "$base"; return 0 ;;
+      pi|omp|codex|gemini|opencode|copilot|grok|cursor-agent|crush)
+        CANOPY_REPLY=$base ;;
+      claude|claude-code)
+        CANOPY_REPLY=claude ;;
+      agy|antigravity)
+        CANOPY_REPLY=agy ;;
+      *)
+        norm="/${token#/}"
+        norm=${norm//\\//}
+        case "$norm" in
+          */pi-coding-agent/*) CANOPY_REPLY=pi ;;
+          */oh-my-pi/*) CANOPY_REPLY=omp ;;
+          */@anthropic-ai/claude-code/*) CANOPY_REPLY=claude ;;
+          */@google/gemini-cli/*|*/gemini-cli/*) CANOPY_REPLY=gemini ;;
+          */@openai/codex/*) CANOPY_REPLY=codex ;;
+          */cursor-agent/*) CANOPY_REPLY=cursor-agent ;;
+          */@github/copilot/*) CANOPY_REPLY=copilot ;;
+          */opencode-ai/*|*/node_modules/opencode/*) CANOPY_REPLY=opencode ;;
+          *) return 1 ;;
+        esac
+        ;;
     esac
-    case "$token" in
-      *pi-coding-agent*) CANOPY_REPLY=pi; printf 'pi'; return 0 ;;
-      *oh-my-pi*) CANOPY_REPLY=omp; printf 'omp'; return 0 ;;
-    esac
+    if [[ $CANOPY_REPLY == codex && ( ${1:-} == app-server || ${2:-} == app-server ) ]]; then
+      CANOPY_REPLY=''
+      return 1
+    fi
+    printf '%s' "$CANOPY_REPLY"
+    return 0
   done
   return 1
 }
@@ -164,6 +204,7 @@ canopy_process_name() {
       argv0=${args[0]##*/}
       name=${argv0%.exe}
       if [[ -n $name ]]; then
+        canopy_is_claude_version "$name" && name=claude
         printf '%s\n' "$name"
         return 0
       fi
@@ -171,7 +212,9 @@ canopy_process_name() {
   fi
   [[ -r /proc/$pid/comm ]] || return 1
   IFS= read -r name < "/proc/$pid/comm" 2>/dev/null || return 1
-  printf '%s\n' "${name%.exe}"
+  name=${name%.exe}
+  canopy_is_claude_version "$name" && name=claude
+  printf '%s\n' "$name"
 }
 canopy_process_identity() {
   local root=$1 pid=$2 birth=$3 kind=${4:-codex} current=$2 depth=0 name
@@ -218,7 +261,8 @@ canopy_process_identity() {
 canopy_agent_name_matches() {
   local target=${1%.exe}
   case "$2:$target" in
-    codex:codex|claude:claude|claude:claude-code|opencode:opencode|gemini:gemini|pi:pi|omp:omp|agy:agy|agy:antigravity|cursor-agent:agent|copilot:copilot|grok:grok|hermes:hermes|hermes:hermes-agent) return 0 ;;
+    codex:codex|claude:claude|claude:claude-code|opencode:opencode|gemini:gemini|pi:pi|omp:omp|agy:agy|agy:antigravity|cursor-agent:agent|cursor-agent:cursor-agent|copilot:copilot|grok:grok|hermes:hermes|hermes:hermes-agent) return 0 ;;
+    claude:*) canopy_is_claude_version "$target" && return 0; return 1 ;;
     *) return 1 ;;
   esac
 }
@@ -233,8 +277,14 @@ canopy_agent_kind_from_name() {
     opencode|gemini|pi|omp|agy|crush|copilot|grok) CANOPY_REPLY=$name ;;
     hermes|hermes-agent) CANOPY_REPLY=hermes ;;
     antigravity) CANOPY_REPLY=agy ;;
-    agent) CANOPY_REPLY=cursor-agent ;;
-    *) return 1 ;;
+    agent|cursor-agent) CANOPY_REPLY=cursor-agent ;;
+    *)
+      if canopy_is_claude_version "$name"; then
+        CANOPY_REPLY=claude
+      else
+        return 1
+      fi
+      ;;
   esac
   printf '%s' "$CANOPY_REPLY"
 }
@@ -267,8 +317,9 @@ canopy_agent_carrier() {
     canopy_agent_name_matches "$name" "$kind" && return 0
   else
     case "$name" in
-      codex|claude|claude-code|opencode|gemini|pi|omp|agy|antigravity|agent|crush|copilot|grok|hermes|hermes-agent) return 0 ;;
+      codex|claude|claude-code|opencode|gemini|pi|omp|agy|antigravity|agent|cursor-agent|crush|copilot|grok|hermes|hermes-agent) return 0 ;;
     esac
+    canopy_is_claude_version "$name" && return 0
   fi
   case "$name" in
     sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare|codex-app-server) return 0 ;;
@@ -285,7 +336,7 @@ canopy_resolve_pane_agent() {
   if canopy_agent_kind_from_name "$base" >/dev/null; then
     return 0
   fi
-  if [[ "$base" =~ ^(node|nodejs|python[0-9.]*|Python)$ ]]; then
+  if [[ "$base" =~ ^(node|nodejs|bun|python[0-9.]*|Python)$ ]]; then
     canopy_pane_agent "$root" >/dev/null && return 0
   fi
   [[ $root =~ ^[1-9][0-9]*$ ]] || return 1

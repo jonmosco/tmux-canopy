@@ -47,7 +47,7 @@ def main():
             ('tree', 'P:%1', 'Current pane', 'Send a line to the pane'),
             ('processes', 'X:123:%1', 'Current process', 'Open process actions'),
             ('buffers', 'B:sample', 'Current buffer', 'Paste the selected buffer'),
-            ('agents', 'P:%1', 'Current agent', 'Jump to the next agent needing input'),
+            ('agents', 'P:%1', 'Current agent', 'Jump to the longest-waiting agent needing input'),
         )
         for view, token, heading, action in contexts:
             state.write_text(f'VIEW\t{view}\n')

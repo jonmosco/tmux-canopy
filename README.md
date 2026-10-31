@@ -86,13 +86,13 @@ Tree · All                         ◆1 ▷1   ① ②
 | | What it shows | Keys |
 |---|---|---|
 | ① | **View and filter.** Open view (`Tree`, `Agents`, `Processes`, `Buffers`) and filter (`All`, `Session`, or `Unread`; `+W` / `+T` when window-name or pane-title filters are active). | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
-| ② | **Agent summary.** Counts by state: `◆` needs input, `▷` working, `✓` ended, `○` process-only (or `◆1/3` when narrow). Processes and Buffers views show row counts here. | `n` jump to the agent waiting |
+| ② | **Agent summary.** Counts by state: `◆` needs input, `✕` interrupted, `▷` working, `✓` ended, `○` process-only (or `◆1/3` when narrow). Processes and Buffers views show row counts here. | `n` jump to the agent waiting |
 | ③ | **Session heading**, followed by a dim rule. Your current session has a tmux-green glyph and cyan name. | `h` / `l` fold and unfold, `H` / `L` all |
 | ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
 | ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them (session, window, or pane). | `canopy-branch`, `canopy-directory` at `prefix :` |
 | ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; switching content panes does not move your browse cursor. | `Ctrl-o` jump back to your pane |
 | ⑦ | **Pane:** application icon, pane index, and running command. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
-| ⑧ | **Agent state** at the right edge: `!` needs input, `▷` working, `✓` turn ended. A waiting agent shows its question or command on a dim line beneath. | `n` next waiting agent, `i` Agent inspector, `>` send reply |
+| ⑧ | **Agent state** at the right edge: `!` needs input, `✕` interrupted (red, `x` in ASCII), `▷` working, `✓` turn ended. A waiting agent shows its question or command on a dim line beneath. | `n` next waiting agent, `i` Agent inspector, `>` send reply |
 | ⑨ | **Subagents** of the pane above, each with its own state while running. | |
 | ⑩ | **An idle shell**, dimmed so running programs stand out. | |
 | ⑪ | **A single-pane window**, shown on one row. | |
@@ -141,7 +141,7 @@ Press `g` in the sidebar for the full symbol and color legend, and `?` for the i
 |---|---|
 | `A` | Toggle agent mode on or off for this client |
 | `4` | Open the dedicated Agents view |
-| `n` | Jump to the next agent needing input (or unread completed agent) across all sessions |
+| `n` | Jump to the longest-waiting agent needing input (or oldest unread completed agent) across all sessions |
 | `>` | Send a line of text to the selected pane without leaving your current pane |
 | `i` | Cycle the bottom drawer between **Terminal preview**, **Agent inspector**, and **Agent list** |
 
@@ -162,7 +162,7 @@ Press `g` in the sidebar for the full symbol and color legend, and `?` for the i
 Turn agent monitoring on globally with `set -g @tmux-canopy-agents 'on'` in `.tmux.conf`, or toggle it per client with `A` in the sidebar.
 
 - **Status & subagents in the tree:** Working agents show an animated `▷`, waiting agents show `!` with the pending command or question on a dim line underneath, and folded windows/sessions roll counts up as `◆` and `▷`. Running subagents appear indented beneath their parent pane.
-- **Jump (`n`) and inline reply (`>`):** Press `n` to jump to the next agent waiting for input (or the next unread finished agent if none are waiting) across all sessions. Press `>` to send a prompt or confirmation to the selected pane without switching focus; the preview refreshes immediately.
+- **Jump (`n`) and inline reply (`>`):** Press `n` to jump to the agent that has been waiting for you longest (or the oldest unread finished agent if none are waiting) across all sessions; repeated presses move to the next-longest. Press `>` to send a prompt or confirmation to the selected pane without switching focus; the preview refreshes immediately.
 - **Agent inspector & Agent list (`i`):** Press `i` to cycle the bottom drawer (default height **25%**, toggled with `p`) between **Terminal preview**, **Agent inspector** (a structured card for the selected pane showing state, verification trust, working directory, optional Git repo/branch with an on-demand `N changed (+A −D)` dirty summary, location, and active request/command), and **Agent list** (a compact list of every agent across all sessions showing its state glyph, `session:window.pane`, agent name, brief status/request, and a right-edge notification badge when there is unread activity). See [Preview and Agent inspector](docs/reference.md#preview) for details.
 
 | Agent | Found by process | Lifecycle adapter | Needs input | Subagents |

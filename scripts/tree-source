@@ -85,21 +85,23 @@ while (($#)); do
   esac
   shift
 done
-# tmux reports Pi's executable (node). Show pi/omp when that process is the agent.
-# Only a pane row's command field counts; a window or title named node does not.
+# tmux's pane_current_command reads kernel comm rather than argv0: Node/Bun/Python
+# hosts report their runtime (or V8's MainThread), and standalone Claude Code
+# binaries report their version (2.1.201 or 2_1_201). Only a pane row's command
+# field counts; a window or title named node does not.
 field="[^${sep}]*${sep}"
-node_row="(^|"$'\n'")P${sep}${field}${field}${field}(node|nodejs|python[0-9.]*|Python)${sep}"
+semver="([0-9]+\\.[0-9]+\\.[0-9]+|[0-9]+_[0-9]+_[0-9]+)([-+][0-9A-Za-z._-]+)?"
+host_cmd="(node|nodejs|bun|MainThread|python[0-9.]*|Python|${semver})"
+node_row="(^|"$'\n'")P${sep}${field}${field}${field}${host_cmd}${sep}"
 if [[ "$snapshot" =~ $node_row ]]; then
   # shellcheck disable=SC1091
   source "$SCRIPT_DIR/../lib/agent-process.sh"
-  # Load once in this shell; every pane lookup below reuses the cached table.
-  canopy_load_ps_snapshot
   relabeled=''
   while IFS= read -r line || [[ -n $line ]]; do
     if [[ $line == P$sep* ]]; then
       IFS="$sep" read -ra fields <<< "$line"
-      if [[ ${fields[4]:-} =~ ^(node|nodejs|python[0-9.]*|Python)$ ]]; then
-        canopy_pane_agent "${fields[16]:-}" >/dev/null
+      if [[ ${fields[4]:-} =~ ^${host_cmd}$ ]]; then
+        canopy_resolve_pane_agent "${fields[16]:-}" "${fields[4]:-}" >/dev/null
         kind=$CANOPY_REPLY
         if [[ -n $kind ]]; then
           fields[4]=$kind
@@ -175,8 +177,10 @@ if [[ "$agent_view" == 1 && -d /proc/self ]] && command -v python3 >/dev/null 2>
   [[ -z "$agent_records" ]] || snapshot+=$'\n'"$agent_records"
 else
   if [[ "$agents_enabled" == on && "$snapshot" == *"-hook${sep}"* ]]; then
-    # shellcheck disable=SC1091
-    source "$SCRIPT_DIR/../lib/agent-process.sh"
+    if ! declare -F canopy_process_identity >/dev/null 2>&1; then
+      # shellcheck disable=SC1091
+      source "$SCRIPT_DIR/../lib/agent-process.sh"
+    fi
     while IFS= read -r line; do
       [[ $line == P$sep* && $line == *"-hook${sep}"* ]] || continue
       IFS="$sep" read -ra fields <<< "$line"

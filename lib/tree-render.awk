@@ -39,7 +39,7 @@ $1 == "W" {
 }
 $1 == "P" {
     p=$2; if (seen_p[p]++) next
-    pw[p]=$3; pi[p]=$4; command[p]=$5; title[p]=$6; path[p]=$7; dead[p]=$8
+    pw[p]=$3; pi[p]=$4; command[p]=$5; raw_command[p]=$5; title[p]=$6; path[p]=$7; dead[p]=$8
     sidebar[p]=$9; slot[p]=$10; pa[p]=$11+0; pb[p]=$12+0; pz[p]=$13+0; target[p]=$14; target_session[p]=$15
     pane_pid[p]=$17; report_source[p]=$18; report_session[p]=$19; report_pid[p]=$20; report_status[p]=$21; report_updated[p]=$22
     subagent_list[p]=$25; pane_zoomed[p]=($26+0 == 1); request_summary[p]=$27; request_command[p]=$28
@@ -62,8 +62,8 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
     process_name[pid]=name
     if (name=="codex" || name=="opencode" || name=="gemini" || name=="pi" || name=="omp" || name=="agy" || name=="crush" || name=="copilot" || name=="grok" || name=="hermes") agent_process[pid]=name
     else if (name=="antigravity") agent_process[pid]="agy"
-    else if (name=="claude" || name=="claude-code") agent_process[pid]="claude"
-    else if (name=="agent") agent_process[pid]="cursor-agent"
+    else if (name=="claude" || name=="claude-code" || is_claude_version(name)) agent_process[pid]="claude"
+    else if (name=="agent" || name=="cursor-agent") agent_process[pid]="cursor-agent"
     next
 }
 # Shells, launchers, runtimes, and sandbox wrappers an agent may run under and
@@ -71,7 +71,7 @@ agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
 # owns the agent itself, so the pane is not reported as that agent.
 function agent_carrier(name, kind) {
     sub(/^-/,"",name)
-    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare|codex-app-server)$/ ||
+    return name ~ /^(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh|login|su|sudo|doas|env|nice|nohup|time|timeout|script|stdbuf|caffeinate|direnv|mise|asdf|nix|nix-shell|devbox|node|nodejs|bun|deno|npx|npm|pnpm|yarn|tsx|ts-node|Python|python[0-9.]*|uv|uvx|pipx|poetry|ruby|bundle|cargo|make|just|bwrap|firejail|sandbox-exec|nono|fence|landrun|nsjail|minijail0|unshare|codex-app-server)$/ ||
         (kind == "" ? canonical_agent(name) != "" : canonical_agent(name) == kind)
 }
 function find_agents( pid,current,depth,p,root) {
@@ -123,13 +123,14 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first,label,window_ne
                     if (pa[p] || pb[p] || pz[p]) shown_unread[w]++
                     vwa[w]+=pa[p]; vwb[w]+=pb[p]; vwz[w]+=pz[p]
                     # Agent lifecycle state is aggregated separately from unread
-                    # terminal notifications, grouped into the same three tiers
-                    # the per-pane badge already colors: needs-input (including
-                    # interrupted), working, and finished. "unknown" is not
+                    # terminal notifications, grouped into the tiers the per-pane
+                    # badge already colors: needs-input, interrupted (its own
+                    # mark and color), working, and finished. "unknown" is not
                     # actionable and is left out of the rollup entirely.
                     label=agent_label(p)
                     load_subagents(p)
-                    if (label=="approval" || label=="interrupted" || sub_need[p]) { w_need[w]++; w_agent_shown[w]++ }
+                    if (label=="approval" || sub_need[p]) { w_need[w]++; w_agent_shown[w]++ }
+                    else if (label=="interrupted") { w_err[w]++; w_agent_shown[w]++ }
                     else if (label=="working" || sub_work[p]) { w_work[w]++; w_agent_shown[w]++ }
                     else if (label=="ready" || label=="turn ended" || label=="session ended") { w_done[w]++; w_agent_shown[w]++ }
                 }
@@ -159,7 +160,7 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first,label,window_ne
             if (agent_view) shown_agents_s[s]+=shown_p[w]
             if (first_w[s] == "") first_w[s]=w
             vsa[s]+=vwa[w]; vsb[s]+=vwb[w]; vsz[s]+=vwz[w]
-            s_need[s]+=w_need[w]; s_work[s]+=w_work[w]; s_done[s]+=w_done[w]
+            s_need[s]+=w_need[w]; s_err[s]+=w_err[w]; s_work[s]+=w_work[w]; s_done[s]+=w_done[w]
             if (alert) shown_unread_w[s]++
         }
         visible_s[s]=(!filtered || shown_w[s]>0)
@@ -235,7 +236,8 @@ function edge_count(value,count,budget, plain,padding) {
     if (padding<2) return value
     style=dim
     if (count == "working" || count == "▷" || count == "+") style=accent
-    else if (count == "waiting" || count == "interrupted" || count == "!" || count == "●") style=attention
+    else if (count == "interrupted" || count == agent_err_badge) style=error
+    else if (count == "waiting" || count == "!" || count == "●") style=attention
     return value sprintf("%*s",padding,"") style count reset
 }
 function unread_glyph(a, b, z) {
@@ -260,7 +262,7 @@ function quiet_pane_edge(p,    label,glyph,style,notice_mark,signal) {
     else if (sub_work[p] && label != "approval" && label != "interrupted") label="working"
     if (label != "" && label != "stale") {
         glyph=quiet_mark(label)
-        style=(glyph == "!" ? attention : glyph == "▷" || glyph == "+" ? accent : dim)
+        style=(glyph == "!" ? attention : glyph == agent_err_badge ? error : glyph == "▷" || glyph == "+" ? accent : dim)
         if (glyph != "") signal=style glyph reset
     } else if (agent_view && agent_kind[p] != "") signal=dim (icons == "ascii" ? "o" : "○") reset
     notice_mark=unread_glyph(pa[p],pb[p],pz[p])
@@ -304,7 +306,7 @@ function quiet_pane_line(prefix,name,tail,edge,budget,    plain,signal,detail,ro
 }
 function status_mark(status,    style) {
     if (status == "") return ""
-    style=(status == "!" || status == "waiting" || status == "interrupted" ? attention : status == "working" || status == "▷" || status == "+" ? accent : dim)
+    style=(status == "interrupted" || status == agent_err_badge ? error : status == "!" || status == "waiting" ? attention : status == "working" || status == "▷" || status == "+" ? accent : dim)
     return " " style status reset
 }
 function pane_edge(unread, here,    arrow) {
@@ -334,9 +336,14 @@ function notice(a,b,z,count, glyph) {
 # separate from unread terminal notifications and never affects their
 # clear-on-focus behavior. Needs-input outranks working outranks finished,
 # matching the three color tiers the per-pane badge already uses.
-function agent_summary(need,work,done, glyph,color,count) {
-    if (need>0) { glyph=agent_need_badge; color=attention; count=need }
-    else if (work>0) { glyph=agent_work_badge; color=accent; count=work }
+function agent_summary(need,err,work,done, glyph,color,count,out) {
+    # Both tiers want you, so both show when both exist: waiting first, then failed.
+    if (need>0 || err>0) {
+        if (need>0) out=" " attention agent_need_badge (need>1 ? need : "") reset
+        if (err>0) out=out " " error agent_err_badge (err>1 ? err : "") reset
+        return out
+    }
+    if (work>0) { glyph=agent_work_badge; color=accent; count=work }
     else if (done>0) { glyph=agent_done_badge; color=dim; count=done }
     else return ""
     return " " color glyph (count>1 ? count : "") reset
@@ -352,7 +359,7 @@ function overview_add(glyph,count,color, space) {
 }
 # Count every agent pane on the server, whatever the tree's filters and folds,
 # for the quiet header and action footer summaries.
-function agent_footer(    si,s,wpos,w,ppos,p,label,need,work,settled,unknown,total,seen) {
+function agent_footer(    si,s,wpos,w,ppos,p,label,need,err,work,settled,unknown,total,seen) {
     for (si=1;si<=ns;si++) {
         s=sessions[si]
         for (wpos=1;wpos<=nw[s];wpos++) {
@@ -363,9 +370,13 @@ function agent_footer(    si,s,wpos,w,ppos,p,label,need,work,settled,unknown,tot
                 seen[p]=1; total++
                 label=agent_label(p)
                 load_subagents(p)
-                if (label == "approval" || label == "interrupted" || sub_need[p]) {
+                if (label == "approval" || sub_need[p]) {
                     if (!need) quiet_need_kind=canonical_agent(command[p])
                     need++
+                }
+                else if (label == "interrupted") {
+                    if (!err) quiet_err_kind=canonical_agent(command[p])
+                    err++
                 }
                 else if (label == "working" || sub_work[p]) work++
                 else if (label == "ready" || label == "turn ended" || label == "session ended") settled++
@@ -373,7 +384,7 @@ function agent_footer(    si,s,wpos,w,ppos,p,label,need,work,settled,unknown,tot
             }
         }
     }
-    quiet_total=total; quiet_need=need; quiet_work=work; quiet_settled=settled; quiet_unknown=unknown
+    quiet_total=total; quiet_need=need; quiet_err=err; quiet_work=work; quiet_settled=settled; quiet_unknown=unknown
 }
 # A quiet header presents the current view and its filter, then a count of
 # agents in each state if it fits, or the most urgent state with the total.
@@ -392,12 +403,14 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
         agent_footer()
         if (quiet_total) {
             overview_plain=""; overview_color=""
-            overview_add(icons == "ascii" ? "!" : agent_need_badge,quiet_need,attention)
+            overview_add(agent_need_badge,quiet_need,attention)
+            overview_add(agent_err_badge,quiet_err,error)
             overview_add(agent_work_badge,quiet_work,accent)
             overview_add(agent_done_badge,quiet_settled,dim)
             overview_add(icons == "ascii" ? "o" : "○",quiet_unknown,dim)
             full_plain=overview_plain; full_color=overview_color
-            if (quiet_need) { summary=(icons == "ascii" ? "!" : "◆") quiet_need "/" quiet_total; style=attention }
+            if (quiet_need) { summary=agent_need_badge quiet_need "/" quiet_total; style=attention }
+            else if (quiet_err) { summary=agent_err_badge quiet_err "/" quiet_total; style=error }
             else if (quiet_work) { summary=agent_work_badge quiet_work "/" quiet_total; style=accent }
             else if (quiet_settled) { summary=agent_done_badge quiet_settled "/" quiet_total; style=dim }
             else summary=(icons == "ascii" ? "o" : "○") quiet_total
@@ -469,11 +482,18 @@ function action_footer(    n,i,part,status,short,text,plain,budget,enter_key,gap
         status=attention "x again within 5 s to delete" reset
         n=0
     } else if (quiet_need == 1) {
-        status=attention (icons == "ascii" ? "!" : agent_need_badge) " " (quiet_need_kind == "" ? "An agent" : agent_name(quiet_need_kind)) " waiting" reset
-        short=attention (icons == "ascii" ? "!" : agent_need_badge) " 1 waiting" reset
+        status=attention agent_need_badge " " (quiet_need_kind == "" ? "An agent" : agent_name(quiet_need_kind)) " waiting" reset (quiet_err ? "  " error agent_err_badge quiet_err reset : "")
+        short=attention agent_need_badge " 1 waiting" reset (quiet_err ? "  " error agent_err_badge quiet_err reset : "")
         n=split("n|go|>|reply", part, "|")
     } else if (quiet_need > 1) {
-        status=attention (icons == "ascii" ? "!" : agent_need_badge) " " quiet_need " waiting" reset
+        status=attention agent_need_badge " " quiet_need " waiting" reset (quiet_err ? "  " error agent_err_badge quiet_err reset : "")
+        n=split("n|next|>|reply", part, "|")
+    } else if (quiet_err == 1) {
+        status=error agent_err_badge " " (quiet_err_kind == "" ? "An agent" : agent_name(quiet_err_kind)) " interrupted" reset
+        short=error agent_err_badge " 1 interrupted" reset
+        n=split("n|go|>|reply", part, "|")
+    } else if (quiet_err > 1) {
+        status=error agent_err_badge " " quiet_err " interrupted" reset
         n=split("n|next|>|reply", part, "|")
     } else if (agent_view) {
         n=split(enter_key "|focus|n|waiting|>|reply|i|summary", part, "|")
@@ -495,14 +515,15 @@ function action_footer(    n,i,part,status,short,text,plain,budget,enter_key,gap
     }
     row("F:",text,"F:")
 }
-function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,count) {
+function agent_overview( p,label,need,err,work,settled,unknown,total,glyph,color,count) {
     overview_plain=""; overview_color=""
     for (p in agent_kind) {
         if (!visible_p[p]) continue
         total++
         label=agent_label(p)
         load_subagents(p)
-        if (label == "approval" || label == "interrupted" || sub_need[p]) need++
+        if (label == "approval" || sub_need[p]) need++
+        else if (label == "interrupted") err++
         else if (label == "working" || sub_work[p]) work++
         else if (label == "ready" || label == "turn ended" || label == "session ended") settled++
         else unknown++
@@ -512,11 +533,13 @@ function agent_overview( p,label,need,work,settled,unknown,total,glyph,color,cou
         overview_short_plain="0"; overview_short_color=dim overview_short_plain reset
         return
     }
-    overview_add(icons == "ascii" ? "!" : agent_need_badge,need,attention)
+    overview_add(agent_need_badge,need,attention)
+    overview_add(agent_err_badge,err,error)
     overview_add(agent_work_badge,work,accent)
     overview_add(agent_done_badge,settled,dim)
     overview_add(icons == "ascii" ? "o" : "○",unknown,dim)
-    if (need) { glyph=(icons == "ascii" ? "!" : agent_need_badge); color=attention; count=need }
+    if (need) { glyph=agent_need_badge; color=attention; count=need }
+    else if (err) { glyph=agent_err_badge; color=error; count=err }
     else if (work) { glyph=agent_work_badge; color=accent; count=work }
     else if (settled) { glyph=agent_done_badge; color=dim; count=settled }
     else { glyph=(icons == "ascii" ? "o" : "○"); color=dim; count=unknown }
@@ -556,10 +579,13 @@ function agent_label(p, age,status,kind) {
     if (status=="session-ended") return agent_labels[p]="session ended"
     return agent_labels[p]="unknown"
 }
+function is_claude_version(value) {
+    return value ~ /^([0-9]+\.[0-9]+\.[0-9]+|[0-9]+_[0-9]+_[0-9]+)([-+][0-9A-Za-z._-]+)?$/
+}
 function canonical_agent(value) {
     sub(/^.*\//,"",value)
     sub(/\.exe$/,"",value)
-    if (value == "claude-code") return "claude"
+    if (value == "claude-code" || is_claude_version(value)) return "claude"
     if (value == "agent") return "cursor-agent"
     if (value == "antigravity") return "agy"
     if (value == "codex" || value == "claude" || value == "opencode" || value == "gemini" || value == "pi" || value == "omp" || value == "agy" || value == "cursor-agent" || value == "crush" || value == "copilot" || value == "grok" || value == "hermes") return value
@@ -627,6 +653,25 @@ function load_subagents(p, n,i,items,parts,age,state) {
     }
     return sub_count[p]
 }
+# How long this pane has waited on you: its own report's age when it is the one
+# asking, or its longest-waiting subagent's. Subagent progress leaves the
+# parent report's age alone, so that age says nothing when only a subagent asks.
+function wait_age(p, label,    age,i) {
+    age=-1
+    if (label=="approval" || label=="interrupted") age=now-report_updated[p]
+    for (i=1;i<=sub_count[p];i++)
+        if (sub_state[p,i]=="needs-input" && sub_age[p,i]>age) age=sub_age[p,i]
+    return age
+}
+# Longest wait first. Equal ages keep their tree order: the shift is strict, so
+# this insertion sort is stable (the lists hold a handful of panes).
+function sort_longest_first(rows, ages, n,    i,j,row,age) {
+    for (i=2;i<=n;i++) {
+        row=rows[i]; age=ages[i]
+        for (j=i-1;j>=1 && ages[j]<age;j--) { rows[j+1]=rows[j]; ages[j+1]=ages[j] }
+        rows[j+1]=row; ages[j+1]=age
+    }
+}
 function subagent_word(state, narrow) {
     if (state == "working") return narrow ? "wrk" : "WORKING"
     if (state == "needs-input") return narrow ? "req" : "NEEDS INPUT"
@@ -674,7 +719,8 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed,glyp
 # suffix since ·plugin? still meaningfully flags an unconfirmed association.
 function quiet_mark(label) {
     if (label == "working") return icons == "ascii" ? "+" : "▷"
-    if (label == "approval" || label == "interrupted") return "!"
+    if (label == "approval") return "!"
+    if (label == "interrupted") return agent_err_badge
     if (label == "ready" || label == "turn ended" || label == "session ended") return icons == "ascii" ? "d" : "✓"
     return ""
 }
@@ -694,7 +740,7 @@ function hook_glyph(p,    label,status,glyph,style) {
     } else style=""
     glyph=quiet_mark(label)
     if (glyph == "") return ""
-    if (style == "") style=(glyph == "!" ? attention : glyph == "▷" || glyph == "+" ? accent : dim)
+    if (style == "") style=(glyph == "!" ? attention : glyph == agent_err_badge ? error : glyph == "▷" || glyph == "+" ? accent : dim)
     return " " style glyph reset
 }
 function pill_word(p, label) {
@@ -877,7 +923,7 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
             if (place_labels()) name_disp=label_window(w, s, win_names[windex], !wauto[w] || tmux_names)
             line=dim dir_stem (wlast ? branch_end : branch_mid) reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " ? mark(wm) " " : "") dim window_icon " " wi[s SUBSEP w] ":" reset (w == current_w && s == current_s ? bold : "") name_disp reset (w_zoomed[w] ? " [Z]" : "")
             if (collapsed[wt]) {
-                line=line notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) agent_summary(w_need[w],w_work[w],w_done[w]) dim " [" shown_p[w] "p]" reset
+                line=line notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) agent_summary(w_need[w],w_err[w],w_work[w],w_done[w]) dim " [" shown_p[w] "p]" reset
                 if (w == current_w && s == current_s && visible_p[current_p] && place == current_place)
                     line=edge_colored(line,green (icons == "ascii" ? ">" : "▶") reset,width-3)
             } else if (appearance == "quiet" && !place_labels() && shared_place(w) != "" && shared_place(w) != quiet_place[s])
@@ -950,7 +996,7 @@ function agent_badge(p, label,style,origin,word) {
     label=agent_label(p)
     if (label=="stale") return agent_view ? " " dim "[process]" reset : ""
     if (label=="") return agent_view && agent_kind[p] != "" ? " " dim "[process]" reset : ""
-    style=(label=="working" ? accent : label=="approval" || label=="interrupted" ? attention : dim)
+    style=(label=="working" ? accent : label=="interrupted" ? error : label=="approval" ? attention : dim)
     word=agent_status_word(label,width<36)
     origin=(report_source[p] == "opencode-hook" ? "plugin?" : "hook")
     return " " (style==dim ? "" : bold) style word reset dim " ·" origin reset
@@ -1166,7 +1212,7 @@ END {
         icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[39m"
         icon_white="\033[97m"
         green="\033[1;32m"
-        accent="\033[1;36m"; attention="\033[1;33m"; path_color=dim
+        accent="\033[1;36m"; attention="\033[1;33m"; error="\033[1;31m"; path_color=dim
         # ansi (default) may inherit from tmux via the sidebar's frozen env.
         # fixed always keeps the classic palette even when those vars are set.
         if (theme != "fixed") {
@@ -1186,6 +1232,7 @@ END {
     agent_need_badge=(icons == "ascii" ? "!" : "◆")
     agent_work_badge=(icons == "ascii" ? "+" : "▷")
     agent_done_badge=(icons == "ascii" ? "d" : "✓")
+    agent_err_badge=(icons == "ascii" ? "x" : "✕")
     if (custom_s != "") session_icon=custom_s
     if (custom_w != "") window_icon=custom_w
     if (custom_p != "") pane_icon=custom_p
@@ -1246,10 +1293,36 @@ END {
             w=windows[s,wpos]; key=s SUBSEP w
             for (ppos=1; ppos<=np[w]; ppos++) {
                 p=panes[w,ppos]
+                if (!(p in normalized_p)) {
+                    normalized_p[p]=1
+                    if (is_claude_version(command[p])) command[p]="claude"
+                    else if (agents_enabled && dead[p] != 1 && canonical_agent(command[p]) == "") {
+                        vkind=""
+                        if (agent_kind[p] != "") vkind=canonical_agent(agent_kind[p])
+                        else if (!agent_view && verified[p] && report_pid[p] != "" && report_pid[p] == pane_pid[p] &&
+                                 report_session[p] != "" && report_updated[p] ~ /^[0-9]+$/ &&
+                                 length(report_updated[p]) <= 12 && report_source[p] ~ /-hook$/) {
+                            vkind=canonical_agent(substr(report_source[p], 1, length(report_source[p])-5))
+                        }
+                        if (vkind != "" && (agent_carrier(command[p], vkind) || command[p] == "MainThread")) {
+                            command[p]=vkind
+                        }
+                    }
+                }
                 if (command[p] ~ /^['"[:space:]]*$/) {
                     ut=useful_title(p)
                     if (ut !~ /^['"[:space:]]*$/) command[p]=ut
                     else { command[p]="unnamed"; unnamed_cmd[p]=1 }
+                }
+            }
+            if (wauto[w] && !tmux_names) {
+                if (is_claude_version(wn[key])) {
+                    for (ppos=1; ppos<=np[w]; ppos++)
+                        if (canonical_agent(command[panes[w,ppos]]) == "claude") { wn[key]="claude"; break }
+                } else if (np[w] == 1 && canonical_agent(command[panes[w,1]]) != "" &&
+                           ((command[panes[w,1]] != raw_command[panes[w,1]] && wn[key] == raw_command[panes[w,1]]) ||
+                            wn[key] ~ /^(node|nodejs|bun|MainThread|python[0-9.]*|Python)$/)) {
+                    wn[key]=command[panes[w,1]]
                 }
             }
             if (wn[key] ~ /^['"[:space:]]*$/) {
@@ -1268,7 +1341,8 @@ END {
     # Unfiltered, like the switcher: a pane needing input must never be
     # hidden by an active Tree filter. Caller forces agent_view so detection
     # includes agents running under a wrapper shell, not just the foreground
-    # command. One entry per linked-session occurrence, natural tree order.
+    # command. One entry per linked-session occurrence, the longest-waiting
+    # first (tree order among equals).
     if (ENVIRON["TMUX_CANOPY_NEEDS_INPUT"] != "") {
         for (si=1;si<=ns;si++) {
             s=sessions[si]
@@ -1278,13 +1352,18 @@ END {
                     p=panes[w,ppos]
                     label=agent_label(p)
                     load_subagents(p)
-                    if (label=="approval" || label=="interrupted" || sub_need[p])
+                    if (label=="approval" || label=="interrupted" || sub_need[p]) {
                         need_rows[++n_need]="P:" p "\t" s
-                    else if (agent_kind[p] != "" && (label=="ready" || label=="turn ended" || label=="session ended") && !sub_work[p] && notices != "none" && (pa[p] || pb[p] || pz[p]))
+                        need_ages[n_need]=wait_age(p, label)
+                    } else if (agent_kind[p] != "" && (label=="ready" || label=="turn ended" || label=="session ended") && !sub_work[p] && notices != "none" && (pa[p] || pb[p] || pz[p])) {
                         unread_rows[++n_unread]="P:" p "\t" s
+                        unread_ages[n_unread]=now-report_updated[p]
+                    }
                 }
             }
         }
+        if (n_need > 1) sort_longest_first(need_rows, need_ages, n_need)
+        if (n_unread > 1) sort_longest_first(unread_rows, unread_ages, n_unread)
         if (n_need) {
             for (i=1;i<=n_need;i++) print need_rows[i]
         } else {
@@ -1360,7 +1439,7 @@ END {
             session_style=(current_heading ? accent : bold) (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
         }
         if (appearance == "quiet") quiet_home_place(s)
-        session_body=(collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_work[s],s_done[s]) : "") dim meta reset
+        session_body=(collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_err[s],s_work[s],s_done[s]) : "") dim meta reset
         session_mark=(sm == "●" ? green (appearance == "quiet" && icons == "ascii" ? ">" : "▶") reset : "")
         # A session named after its directory gains nothing from the directory
         # alone; a branch still adds something.
@@ -1408,8 +1487,8 @@ END {
             grouped=(nul && density == "normal" && width>=56 && shown_p[w]>1 &&
                 group_count[first_p[w]] == shown_p[w] && path[first_p[w]] != "" && !collapsed[wt])
             w_name=(unnamed_w[key] ? dim wn[key] reset : wn[key])
-            window_text=dim branch reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " && wm != "●" ? mark(wm) " " : "") window_glyph window_style (appearance == "pills" || appearance == "lazygit" ? w_name : wi[key] ":" w_name) reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (appearance == "lazygit" ? "" : (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_work[w],w_done[w]) : "")) dim meta reset
-            window_edge=(appearance == "lazygit" && collapsed[wt] ? (w_need[w] > 0 ? "!" : w_work[w] > 0 ? quiet_mark("working") : collapsed_count) : collapsed_count)
+            window_text=dim branch reset " " (collapsed[wt] ? fold_closed : fold_open) (wm != " " && wm != "●" ? mark(wm) " " : "") window_glyph window_style (appearance == "pills" || appearance == "lazygit" ? w_name : wi[key] ":" w_name) reset (collapsed[wt] || !shown_unread[w] ? notice(vwa[w],vwb[w],vwz[w],shown_unread[w]) : "") (appearance == "lazygit" ? "" : (collapsed[wt] || !w_agent_shown[w] ? agent_summary(w_need[w],w_err[w],w_work[w],w_done[w]) : "")) dim meta reset
+            window_edge=(appearance == "lazygit" && collapsed[wt] ? (w_need[w] > 0 ? "!" : w_err[w] > 0 ? agent_err_badge : w_work[w] > 0 ? quiet_mark("working") : collapsed_count) : collapsed_count)
             window_text=edge_colored(edge_count(window_text,window_edge,width-3), wm == "●" ? green (appearance == "quiet" && icons == "ascii" ? ">" : "▶") reset : "", width-3)
             if (grouped) {
                 continuation=dim stem stem_mid "   "

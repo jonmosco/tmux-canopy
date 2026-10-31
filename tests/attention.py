@@ -63,8 +63,8 @@ def main():
         collapsed_work = render(collapsed='W:@0:$0\n', extra_rows=[work_pane, verified_11])
         assert '\x1b[1;36m▷\x1b[0m' in collapsed_work['W:@0:$0']
 
-        # Finished (ready/turn-ended/session-ended, and interrupted counts as
-        # needs-input) is the lowest tier, shown only when nothing outranks it.
+        # Finished (ready/turn-ended/session-ended) is the lowest tier, shown only
+        # when nothing outranks it.
         done_pane = agent_pane('%13', '@0', '5', 'pi', '114', 'turn-ended')
         verified_13 = ['V', '%13']
         collapsed_done = render(collapsed='W:@0:$0\n', extra_rows=[done_pane, verified_13])
@@ -75,7 +75,19 @@ def main():
         interrupted_pane = agent_pane('%14', '@0', '6', 'omp', '115', 'interrupted')
         verified_14 = ['V', '%14']
         collapsed_interrupted = render(collapsed='W:@0:$0\n', extra_rows=[interrupted_pane, verified_14])
-        assert '\x1b[1;33m◆\x1b[0m' in collapsed_interrupted['W:@0:$0']
+        # Interrupted has its own mark and color: red ✕, not the amber ◆ of a pane
+        # that is asking something. Both show when both are present.
+        assert '\x1b[1;31m✕\x1b[0m' in collapsed_interrupted['W:@0:$0']
+        assert '◆' not in collapsed_interrupted['W:@0:$0']
+        collapsed_need_err = render(collapsed='W:@0:$0\n', extra_rows=[need_pane, verified_10, interrupted_pane, verified_14])
+        assert '\x1b[1;33m◆\x1b[0m \x1b[1;31m✕\x1b[0m' in collapsed_need_err['W:@0:$0'], collapsed_need_err['W:@0:$0']
+        assert '✕' not in render(collapsed='W:@0:$0\n', extra_rows=[need_pane, verified_10])['W:@0:$0']
+        collapsed_err_and_work = render(collapsed='W:@0:$0\n', extra_rows=[interrupted_pane, verified_14, work_pane, verified_11])
+        assert '✕' in collapsed_err_and_work['W:@0:$0'] and '▷' not in collapsed_err_and_work['W:@0:$0']
+        ascii_err = render(collapsed='W:@0:$0\n', icons='ascii', extra_rows=[interrupted_pane, verified_14])
+        assert '\x1b[1;31mx\x1b[0m' in ascii_err['W:@0:$0'] and '✕' not in ascii_err['W:@0:$0']
+        mono_err = render(collapsed='W:@0:$0\n', theme='mono', extra_rows=[interrupted_pane, verified_14])
+        assert '✕' in mono_err['W:@0:$0'] and '\x1b' not in mono_err['W:@0:$0']
 
         # Collapsed session sees the same rollup as its collapsed window did.
         session_collapsed = render(collapsed='S:$0\n', extra_rows=[need_pane, verified_10])
@@ -96,6 +108,37 @@ def main():
         # mono theme carries the glyph without ANSI color codes.
         mono_collapsed = render(collapsed='W:@0:$0\n', theme='mono', extra_rows=[need_pane, verified_10])
         assert '◆' in mono_collapsed['W:@0:$0'] and '\x1b' not in mono_collapsed['W:@0:$0']
+
+        # Tree view preserves badges and auto-renamed window labels when tmux's
+        # pane_current_command is a standalone Claude version or wrapper shell,
+        # without letting stale unverified hooks or non-carrier editors hijack rows.
+        ver_win = ['W', '$0', '@1', '1', '2_1_201', '1', 'off', '0', '0', '0', '0', '1']
+        ver_pane = ['P', '%20', '@1', '0', '2_1_201', '', '/work', '0', '', '',
+                    '0', '0', '0', '', '', '0', '120', 'claude-hook', 'sess-v',
+                    '120', 'needs-input', '0', '', '']
+        ver_expanded = render(theme='mono', extra_rows=[ver_win, ver_pane, ['V', '%20']])
+        assert 'claude' in ver_expanded['W:@1:$0'] and '2_1_201' not in ver_expanded['W:@1:$0'], ver_expanded
+        assert 'claude' in ver_expanded['P:%20:$0'] and 'NEEDS INPUT' in ver_expanded['P:%20:$0'], ver_expanded
+        ver_collapsed = render(collapsed='W:@1:$0\n', theme='mono', extra_rows=[ver_win, ver_pane, ['V', '%20']])
+        assert '◆' in ver_collapsed['W:@1:$0'], ver_collapsed
+
+        wrap_win = ['W', '$0', '@2', '2', 'bash', '1', 'off', '0', '0', '0', '0', '1']
+        wrap_pane = ['P', '%21', '@2', '0', 'bash', '', '/work', '0', '', '',
+                     '0', '0', '0', '', '', '0', '121', 'claude-hook', 'sess-w',
+                     '121', 'needs-input', '0', '', '']
+        wrap_verified = render(theme='mono', extra_rows=[wrap_win, wrap_pane, ['V', '%21']])
+        assert 'claude' in wrap_verified['W:@2:$0'] and 'NEEDS INPUT' in wrap_verified['P:%21:$0'], wrap_verified
+        wrap_collapsed = render(collapsed='W:@2:$0\n', theme='mono', extra_rows=[wrap_win, wrap_pane, ['V', '%21']])
+        assert '◆' in wrap_collapsed['W:@2:$0'], wrap_collapsed
+        wrap_exited = render(theme='mono', extra_rows=[wrap_win, wrap_pane])
+        assert 'bash' in wrap_exited['W:@2:$0'] and 'NEEDS INPUT' not in wrap_exited['P:%21:$0'], wrap_exited
+
+        editor_win = ['W', '$0', '@3', '3', 'nvim', '1', 'off', '0', '0', '0', '0', '1']
+        editor_pane = ['P', '%22', '@3', '0', 'nvim', '', '/work', '0', '', '',
+                       '0', '0', '0', '', '', '0', '122', 'claude-hook', 'sess-e',
+                       '122', 'needs-input', '0', '', '']
+        editor_out = render(theme='mono', extra_rows=[editor_win, editor_pane, ['V', '%22']])
+        assert 'nvim' in editor_out['P:%22:$0'] and 'NEEDS INPUT' not in editor_out['P:%22:$0'], editor_out
 
         # The Agents header summarizes unique panes, including a subagent
         # request, even when the same window appears in two sessions.

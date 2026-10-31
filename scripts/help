@@ -52,7 +52,7 @@ context_help_records() {
     agents)
       section 'Current agent'
       key 'Enter' 'Focus the selected agent pane'
-      key 'n' 'Jump to the next agent needing input'
+      key 'n' 'Jump to the longest-waiting agent needing input'
       key '>' 'Reply or send a line to the selected pane'
       key 'i' 'Cycle drawer: Terminal preview, Agent inspector, or Agent list'
       key 'a' 'Open pane actions'
@@ -132,7 +132,7 @@ help_records() {
   key 'f' 'Show or hide the responsive action footer'
   [[ "$agents_enabled" != on ]] || key '4' 'Detected agent panes, grouped by session and window'
   key 'Ctrl-o' 'Move selection back to the current pane or visible parent'
-  [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the next agent needing input, across all sessions and windows'
+  [[ "$agents_enabled" != on ]] || key 'n' 'Jump to the longest-waiting agent needing input, across all sessions and windows'
   key 'p' 'Show or hide the preview drawer'
   [[ "$agents_enabled" != on ]] || key 'i' 'Cycle Terminal preview / Agent inspector / Agent list; the drawer border names the mode'
   key 'Shift-p' 'Open a larger preview; q closes, arrows scroll'
@@ -252,10 +252,10 @@ legend_records() {
 
   if [[ "$agents_enabled" == on ]]; then
     section 'Agent state labels'
-    legend_item '◆2 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, working, ready/ended, and without verified current state.' amber
+    legend_item '◆2 ✕1 ▷1 ✓1 ○1' 'Agents header: unique panes needing input, interrupted, working, ready/ended, and without verified current state.' amber
     note 'A subagent can raise the parent pane priority; linked windows count once. Narrow headers show the leading state and total, such as ◆2/5.'
     legend_item '◆ Claude Code waiting  n go' 'A waiting agent temporarily replaces the normal action footer; pending move, link, and delete operations do the same.' amber
-    legend_item '! / ▷ / ✓' 'Agent state on a pane: needs input, working (pulses while animation is on), ready or turn ended.' amber
+    legend_item '! / ✕ / ▷ / ✓' 'Agent state on a pane: needs input, interrupted (red), working (pulses while animation is on), ready or turn ended.' amber
     legend_item '  make test · Run…' 'What an agent waiting on you asks for: the command, then its description. i separates request and command; > replies.' dim
     legend_item '├─ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
     note 'Quiet moves these marks to the right edge, separate from amber unread notices; a waiting subagent takes priority. Classic spells states out instead, as the labels below show.'
@@ -264,7 +264,7 @@ legend_records() {
     legend_item '[approval·hook]' 'An agent reported an approval request. Another reviewer may handle it.' amber
     legend_item '[ready·hook]' 'An agent reported session start and is ready for a prompt.' dim
     legend_item '[turn ended·hook]' 'An agent reported a turn end; task completion is not implied.' dim
-    legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' amber
+    legend_item '[interrupted·hook]' 'An agent reported an interrupted turn.' red
     legend_item '├─ Explore WORKING' 'Classic subagent line: WORKING or NEEDS INPUT.' cyan
     legend_item '[working·plugin?]' 'OpenCode plugin event; its pane/session association may be ambiguous.' dim
     note 'Below 36 columns, reported states use wrk, req, rdy, end, int, and ? before ·hook.'
@@ -294,7 +294,7 @@ legend_records() {
 render_help() {
   { if ((legend_mode)); then legend_records; else help_records; fi; } | awk -F '\t' -v width="$1" -v color="${color:-0}" '
     BEGIN {
-      if (color) { reset="\033[0m"; heading="\033[1m"; key="\033[1;36m"; dim="\033[2m"; green="\033[1;32m"; amber="\033[1;33m" }
+      if (color) { reset="\033[0m"; heading="\033[1m"; key="\033[1;36m"; dim="\033[2m"; green="\033[1;32m"; amber="\033[1;33m"; red="\033[1;31m" }
       wide=(width >= 60); column=22
     }
     function wrap(text, indent, style, first,    available,piece,cut) {
@@ -335,7 +335,7 @@ render_help() {
     }
     $1=="L" {
       label=$2
-      style=(color ? ($4=="green" ? green : $4=="amber" ? amber : $4=="dim" ? dim : $4=="cyan" ? key : "") : "")
+      style=(color ? ($4=="green" ? green : $4=="amber" ? amber : $4=="red" ? red : $4=="dim" ? dim : $4=="cyan" ? key : "") : "")
       if (wide && length(label)<column-2) {
         indent=sprintf("%*s",column,"")
         first=style label reset sprintf("%*s",column-length(label),"")

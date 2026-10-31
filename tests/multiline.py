@@ -6,8 +6,6 @@ import json
 import os
 from pathlib import Path
 import pty
-import re
-import shlex
 import shutil
 import socket as unix_socket
 import struct

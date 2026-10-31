@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Jump to the next agent reporting needs-input, across all sessions/windows,
-# in natural tree order, wrapping around. A no-op when nothing needs input.
+# longest-waiting first (tree order among equals), wrapping around. A no-op
+# when nothing needs input.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -17,6 +18,19 @@ fi
 
 mapfile -t entries < <("$SCRIPT_DIR/tree-source" --needs-input 2>/dev/null)
 ((${#entries[@]})) || exit 0
+
+# A window linked into several sessions is listed once per session, and equal
+# waits sit side by side. The jump is per pane, so keep each pane's first (and
+# longest-waiting) entry; otherwise "advance past the current pane" can land on
+# that pane's own twin and never reach the others.
+declare -A seen=()
+unique=()
+for entry in "${entries[@]}"; do
+  [[ -z "${seen[${entry%%$'\t'*}]:-}" ]] || continue
+  seen[${entry%%$'\t'*}]=1
+  unique+=("$entry")
+done
+entries=("${unique[@]}")
 
 # If the current pane is itself one of the matches, advance past it
 # (wrapping to the first); otherwise land on the first match.

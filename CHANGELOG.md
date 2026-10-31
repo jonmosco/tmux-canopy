@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- An interrupted agent now has its own red `✕` (`x` in ASCII), no longer the amber `!` of an agent that is asking a question. It shows on the pane row, in folded window and session roll-ups (beside `◆` when both are present), as a separate count in the Agents header (`◆1 ✕1 ▷2`), in the quiet footer (`✕ Claude Code interrupted`), and in the Agents list drawer and inspector. Mono themes keep the glyph without color. `n` still jumps to interrupted agents.
+- `n` now jumps to the agent that has been waiting for you longest, then the next-longest on repeated presses, instead of following tree order. Panes that have waited equally long keep tree order, a subagent's request counts from when the subagent asked, and the unread-completion fallback is oldest first.
+
+### Fixed
+
+- Agents whose `pane_current_command` is a standalone Claude Code version binary (`2.1.201` / `2_1_201`), a Node/Bun runtime or `MainThread` (such as Homebrew Gemini CLI, npm agent CLIs, and Cursor Agent), or a wrapper shell with a verified lifecycle hook now keep their agent name, icon, Tree-view attention badges, and default auto-renamed window labels across Tree, Agents, Processes, and the `i` inspector.
+
 ## 0.6.0 - 2026-10-31
 
 ### Added

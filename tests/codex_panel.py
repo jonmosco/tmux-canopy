@@ -316,7 +316,7 @@ try:
         hook({'hook_event_name': 'Interrupt', 'session_id': 'new-session',
               'turn_id': 't2', 'error': 'connection reset'})
         err_card = report(12, columns=70)
-        assert '! Interrupted' in err_card.splitlines()[0] and 'connection reset' in err_card, err_card
+        assert '✕ Interrupted' in err_card.splitlines()[0] and 'connection reset' in err_card, err_card
         run('preview-mode')
         assert tm('show-option', '-pqv', '-t', sidebar, '@tmux_canopy_preview_mode') == 'agents'
         assert 'Agent list' in run('preview-mode', '--label')
@@ -327,7 +327,7 @@ try:
         err_list = run('sidebar-preview', 'S:' + empty_session,
                        extra={'FZF_PREVIEW_LINES': '12', 'FZF_PREVIEW_COLUMNS': '70'}).splitlines()
         assert '2 agents · 1 interrupted · 1 idle' in err_list[0], err_list
-        assert '! studio:0.1  Codex · Interrupted: connection reset' in err_list[1], err_list
+        assert '✕ studio:0.1  Codex · Interrupted: connection reset' in err_list[1], err_list
         hook({'hook_event_name': 'UserPromptSubmit', 'session_id': 'new-session', 'turn_id': 't3'})
         hook({'hook_event_name': 'PermissionRequest', 'session_id': 'new-session',
               'turn_id': 't3', 'tool_name': 'AskUserQuestion',

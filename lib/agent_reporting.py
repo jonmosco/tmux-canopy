@@ -142,7 +142,7 @@ def linux_stat(pid, proc_root=None):
 AGENT_NAMES = {"codex": {"codex"}, "claude": {"claude", "claude-code"},
                "opencode": {"opencode"}, "gemini": {"gemini"}, "pi": {"pi"},
                "omp": {"omp"}, "agy": {"agy", "antigravity"},
-               "cursor-agent": {"agent"}, "copilot": {"copilot"}, "grok": {"grok"},
+               "cursor-agent": {"agent", "cursor-agent"}, "copilot": {"copilot"}, "grok": {"grok"},
                "hermes": {"hermes"}}
 
 

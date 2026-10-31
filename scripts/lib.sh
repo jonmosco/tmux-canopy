@@ -10,19 +10,9 @@ sidebar_client_key() {
   printf '%s\n' "$CANOPY_KEY"
 }
 
-sidebar_cache_option() {
-  canopy_client_key "${1:-}"
-  printf '@tmux_canopy_client_%s\n' "$CANOPY_KEY"
-}
-
 sidebar_transition_option() {
   canopy_client_key "${1:-}"
   printf '@tmux_canopy_transition_%s\n' "$CANOPY_KEY"
-}
-
-sidebar_popup_option() {
-  canopy_client_key "${1:-}"
-  printf '@tmux_canopy_popup_%s\n' "$CANOPY_KEY"
 }
 
 set_popup_active() {
@@ -38,16 +28,6 @@ clear_popup_active() {
 popup_active() {
   canopy_client_key "${1:-}"
   [[ "$(tmux show-option -gqv "@tmux_canopy_popup_$CANOPY_KEY" 2>/dev/null || true)" == '1' ]]
-}
-
-begin_sidebar_transition() {
-  canopy_client_key "${1:-}"
-  tmux set-option -gq "@tmux_canopy_transition_$CANOPY_KEY" 1
-}
-
-end_sidebar_transition() {
-  canopy_client_key "${1:-}"
-  tmux set-option -gu "@tmux_canopy_transition_$CANOPY_KEY" 2>/dev/null || true
 }
 
 sidebar_transition_active() {
@@ -178,19 +158,6 @@ close_sidebar_pane() {
   pane_pid="$(tmux display-message -p -t "$pane_id" '#{pane_pid}' 2>/dev/null || true)"
   signal_sidebar_group "$pane_pid"
   tmux kill-pane -t "$pane_id"
-}
-
-is_sidebar_pane() {
-  local pane_id="${1:-}"
-  [[ -n "$pane_id" ]] || return 1
-  [[ "$(tmux show-option -pqv -t "$pane_id" @tmux_canopy 2>/dev/null || true)" == '1' ]]
-}
-
-slot_for_window() {
-  local window_id="${1:-}"
-  [[ -n "$window_id" ]] || return 1
-  tmux list-panes -t "$window_id" -F $'#{pane_id}\t#{@tmux_canopy_slot}' 2>/dev/null |
-    awk -F '\t' '$2 == "1" { print $1; exit }'
 }
 
 ensure_slot_for_window() {

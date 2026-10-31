@@ -90,12 +90,24 @@ exec cat "$PROCESS_FIXTURE/processes"
         hosted = process(100, 1, 'zsh', 'zsh') + process(
             200, 100, 'node', '/usr/bin/node /Users/me/.pi/agent/node_modules/.bin/pi')
         plain = process(100, 1, 'zsh', 'zsh') + process(200, 100, 'node', 'node server.js')
+        gemini = process(100, 1, 'zsh', 'zsh') + process(
+            200, 100, 'node', '/opt/homebrew/opt/node/bin/node /opt/homebrew/bin/gemini')
+        gemini_arg = process(100, 1, 'zsh', 'zsh') + process(200, 100, 'node', 'node server.js gemini')
+        claude_ver = process(100, 1, 'zsh', 'zsh') + process(
+            200, 100, '2_1_201', '/Users/me/.local/share/claude/versions/2_1_201')
         hosted_pane = pane(1, 100).replace('|bash|', '|node|')
+        ver_pane = pane(1, 100).replace('|bash|', '|2_1_201|')
         hosted_out = run(hosted, hosted_pane).stdout
         plain_out = run(plain, hosted_pane).stdout
+        gemini_out = run(gemini, hosted_pane).stdout
+        gemini_arg_out = run(gemini_arg, hosted_pane).stdout
+        ver_out = run(claude_ver, ver_pane).stdout
         assert ' 0 pi ' in hosted_out and 'X:200:%1\t    pi ' in hosted_out, hosted_out
         assert ' 0 node ' in plain_out and 'X:200:%1\t    node ' in plain_out, plain_out
-        print('ok - node is labeled pi only when it is hosting the pi agent')
+        assert ' 0 gemini ' in gemini_out and 'X:200:%1\t    gemini ' in gemini_out, gemini_out
+        assert ' 0 node ' in gemini_arg_out and 'X:200:%1\t    node ' in gemini_arg_out, gemini_arg_out
+        assert ' 0 claude ' in ver_out and 'X:200:%1\t    claude ' in ver_out, ver_out
+        print('ok - hosted Node CLIs and standalone version-named Claude resolve cleanly')
 
         for elapsed, seconds in [('00:12', 12), ('02:03', 123),
                                  ('01:02:03', 3723), ('2-01:02:03', 176523)]:

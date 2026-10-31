@@ -51,27 +51,56 @@ awk -v heading="$heading" -v process_color="$process_color" -v dim="$dim" -v res
     }
     return 0
   }
-  function hosted_name(value,    n,i,token,base) {
-    n=split(value,token,/[[:space:]]+/)
-    for (i=1;i<=n;i++) {
-      if (token[i] == "" || substr(token[i],1,1) == "-") continue
+  function is_claude_version(value) {
+    return value ~ /^([0-9]+\.[0-9]+\.[0-9]+|[0-9]+_[0-9]+_[0-9]+)([-+][0-9A-Za-z._-]+)?$/
+  }
+  function hosted_name(comm, argline,    n,i,token,base,norm,skip_next) {
+    if (is_claude_version(comm)) return "claude"
+    n=split(argline,token,/[[:space:]]+/)
+    if (n < 1) return ""
+    base=token[1]; sub(/^.*\//,"",base); sub(/\.exe$/,"",base)
+    if (is_claude_version(base)) return "claude"
+    if ((comm == "MainThread" || comm ~ /^(node|nodejs|bun)$/) &&
+        base ~ /^(claude|claude-code|codex|gemini|opencode|pi|omp|agent|cursor-agent|agy|antigravity|crush|copilot|grok)$/) {
+      if (base == "claude-code") return "claude"
+      if (base == "antigravity") return "agy"
+      return base
+    }
+    if (base ~ /^(python[0-9.]*|Python)$/) return hermes_args(argline) ? "hermes" : ""
+    if (base !~ /^(node|nodejs|bun)$/) return ""
+    skip_next=0
+    for (i=2;i<=n;i++) {
+      if (token[i] == "") continue
+      if (skip_next) { skip_next=0; continue }
+      if (token[i] ~ /^(-r|--require|--import|--loader|--experimental-loader|-C|--conditions)$/) { skip_next=1; continue }
+      if (token[i] ~ /^(-e|--eval|-p|--print|--eval=|--print=)/) return ""
+      if (substr(token[i],1,1) == "-") continue
       base=token[i]; sub(/^.*\//,"",base); sub(/\.exe$/,"",base)
-      if (base == "pi" || base == "omp") return base
-      if (index(token[i],"pi-coding-agent") > 0) return "pi"
-      if (index(token[i],"oh-my-pi") > 0) return "omp"
-      if (base ~ /^(python[0-9.]*|Python)$/ && i == 1) return hermes_args(value) ? "hermes" : ""
-      if (i == 1 && base != "node" && base != "nodejs") return ""
+      if (base ~ /^(pi|omp|codex|gemini|opencode|copilot|grok|cursor-agent|crush)$/) return base
+      if (base == "claude" || base == "claude-code") return "claude"
+      if (base == "agy" || base == "antigravity") return "agy"
+      norm=token[i]; gsub(/\\/,"/",norm)
+      if (substr(norm,1,1) != "/") norm="/" norm
+      if (index(norm,"/pi-coding-agent/") > 0) return "pi"
+      if (index(norm,"/oh-my-pi/") > 0) return "omp"
+      if (index(norm,"/@anthropic-ai/claude-code/") > 0) return "claude"
+      if (index(norm,"/@google/gemini-cli/") > 0 || index(norm,"/gemini-cli/") > 0) return "gemini"
+      if (index(norm,"/@openai/codex/") > 0) return "codex"
+      if (index(norm,"/cursor-agent/") > 0) return "cursor-agent"
+      if (index(norm,"/@github/copilot/") > 0) return "copilot"
+      if (index(norm,"/opencode-ai/") > 0 || index(norm,"/node_modules/opencode/") > 0) return "opencode"
+      return ""
     }
     return ""
   }
   function shown_command(pid,    hosted) {
-    hosted=hosted_name(command[pid] " " args[pid])
+    hosted=hosted_name(command[pid], args[pid])
     return hosted != "" ? hosted : command[pid]
   }
   function hosted_agent(root,    p,current,depth,best,found,hosted) {
     best=129; found=""
     for (p in command) {
-      hosted=hosted_name(command[p] " " args[p])
+      hosted=hosted_name(command[p], args[p])
       if (hosted == "") continue
       current=p
       for (depth=0; depth<128 && current>0; depth++) {
@@ -114,7 +143,8 @@ awk -v heading="$heading" -v process_color="$process_color" -v dim="$dim" -v res
       if (index(pane[8],home "/") == 1) path="…/" path
     }
     shown=pane[7]
-    if (shown == "node" || shown == "nodejs") {
+    if (is_claude_version(shown)) shown="claude"
+    else if (shown ~ /^(node|nodejs|bun|MainThread|python[0-9.]*|Python)$/) {
       hosted=hosted_agent(pane[6])
       if (hosted != "") shown=hosted
     }

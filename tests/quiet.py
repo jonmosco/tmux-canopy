@@ -151,6 +151,40 @@ def main():
         assert not any(k.startswith('P:') for k in folded_window)
         print('ok - quiet appearance handles widths, themes, footer visibility, agent view and subagents')
 
+        # An interrupted agent is not asking a question: it has its own red mark,
+        # separate from the amber one, in the row, header, footer and Agents view.
+        broken = render(status='interrupted')
+        assert '\x1b[1;31m\u2715\x1b[0m' in broken['P:%0:$0'] and '!' not in ANSI.sub('', broken['P:%0:$0']), broken['P:%0:$0']
+        assert ANSI.sub('', broken['H:tree']).rstrip().endswith('\u27151') and '\x1b[1;31m' in broken['H:tree'], broken['H:tree']
+        # "interrupted" is longer than "waiting", so at 42 columns the reply hint is the part that gives way.
+        assert footer(status='interrupted') == '\u2715 Claude Code interrupted  n go', footer(status='interrupted')
+        assert footer(status='interrupted', width=56) == '\u2715 Claude Code interrupted  n go  > reply'
+        assert '\x1b[1;31m' in broken['F:'] and '\x1b[1;33m' not in broken['F:'], broken['F:']
+        assert ANSI.sub('', render(status='interrupted', agent_view=True)['H:tree']).rstrip().endswith('\u27151')
+        # Waiting and interrupted at once: both are counted and both keep their color.
+        both = render(status='interrupted', second_agent=True)
+        assert ANSI.sub('', both['H:tree']).rstrip().endswith('\u25c61 \u27151'), ANSI.sub('', both['H:tree'])
+        assert footer(status='interrupted', second_agent=True) == '\u25c6 Codex waiting  \u27151  n go  > reply', \
+            footer(status='interrupted', second_agent=True)
+        assert footer(status='interrupted', second_agent=True, width=30).startswith('\u25c6 Codex waiting')
+        # ASCII uses x, and mono keeps the glyph without color.
+        ascii_broken = render(status='interrupted', icons='ascii')
+        assert '\x1b[1;31mx\x1b[0m' in ascii_broken['P:%0:$0'], ascii_broken['P:%0:$0']
+        assert footer(status='interrupted', icons='ascii') == 'x Claude Code interrupted  n go'
+        mono_broken = render(status='interrupted', theme='mono')
+        assert '\u2715' in mono_broken['P:%0:$0'] and not any('\x1b' in value for value in mono_broken.values())
+        # A folded window shows the red mark too, and more than one interrupted agent
+        # is a count rather than a repeated mark.
+        folded_broken = ANSI.sub('', render(status='interrupted', state_text='W:@0:$0\n')['W:@0:$0'])
+        assert '\u2715' in folded_broken and '\u25c6' not in folded_broken, folded_broken
+        # Every look colors the mark, not just quiet: lazygit drew it dim before.
+        for look in ('lazygit', 'places'):
+            row = render(appearance=look, status='interrupted')['P:%0:$0']
+            assert re.search(r'\x1b\[1;31m[^\x1b]*\u2715', row), (look, row)
+            window = render(appearance=look, status='interrupted', state_text='W:@0:$0\n')['W:@0:$0']
+            assert re.search(r'\x1b\[1;31m[^\x1b]*\u2715', window), (look, window)
+        print('ok - an interrupted agent has its own red mark, count and footer, apart from one that is waiting')
+
 
 if __name__ == '__main__':
     main()

@@ -4,7 +4,6 @@ import fcntl
 import os
 from pathlib import Path
 import pty
-import shlex
 import shutil
 import struct
 import subprocess as sp
