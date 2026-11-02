@@ -190,16 +190,18 @@ sidebar_pane_event="#{==:#{@tmux_canopy},1}"
 any_sidebar_event="#{S:#{W:#{P:#{?#{==:#{@tmux_canopy},1},1,}}}}"
 
 # --- Focus and window switching ---------------------------------------------
+# Both scripts have nothing to do without a sidebar (follow and refresh-sidebar
+# exit when no pane is one), so with none anywhere no shell starts for a switch.
 if [[ "$sidebar_scope" == 'global' ]]; then
   # The sidebar follows its client. Detached new-window resolves to the
   # unchanged live client, hence a no-op.
   for hook in after-select-window after-new-window client-session-changed; do
-    canopy_hook "$hook" 9001 '' '' follow '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_transition"
+    canopy_hook "$hook" 9001 "$any_sidebar_event" '' follow '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_transition"
   done
 fi
 # Mouse and keyboard changes use the same debounced, state-preserving refresh.
 for focus_hook in after-select-pane after-select-window after-new-window client-session-changed; do
-  canopy_hook "$focus_hook" 9004 '' -b refresh-sidebar '#{pane_id}' '#{client_tty}' "$focus_hook" '#{mouse_pane}'
+  canopy_hook "$focus_hook" 9004 "$any_sidebar_event" -b refresh-sidebar '#{pane_id}' '#{client_tty}' "$focus_hook" '#{mouse_pane}'
 done
 
 # --- Resizing ---------------------------------------------------------------

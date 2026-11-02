@@ -830,7 +830,7 @@ function idle_shell(p, s) {
     return command[p] ~ /^-?(sh|bash|zsh|fish|dash|ksh|mksh|tcsh|csh|nu|xonsh|elvish|pwsh)$/ &&
         !(p == current_p && s == current_s) && !pa[p] && !pb[p] && !pz[p]
 }
-function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,bases,label,dir_last,dir_branch,dir_stem,dir_key,dir_open,folder,folder_color,folder_line,wc,win_ids,win_names,win_first,win_last,windex,wlast,win_stem,wt,wm,name_disp,pt,cmd,icon,pm,cmd_disp,line,pane_last,continuation,prefix,edge,current_place,stem_blank,pane_indent) {
+function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,bases,label,dir_last,dir_branch,dir_stem,dir_key,dir_open,folder,folder_line,wc,win_ids,win_names,win_first,win_last,windex,wlast,win_stem,wt,wm,name_disp,pt,cmd,icon,pm,cmd_disp,line,pane_last,continuation,prefix,edge,current_place,stem_blank,pane_indent) {
     n=0
     # A finished branch leaves a blank stem as wide as an open one, so the last
     # folder's and window's children line up with their siblings'.
@@ -879,7 +879,6 @@ function places_panes(s,    wpos,w,key,ppos,p,place,id,idx,n,i,cnt,pn,parts,base
             else if (icons == "unicode") folder=(dir_open ? "📂" : "📁")
             else if (icons == "ascii") folder="/"
             else folder=(dir_open ? "📂" : "📁")
-            folder_color=(theme == "mono" ? "" : "\033[38;5;74m")
             folder_line=dim dir_branch reset " " (dir_open ? fold_open : fold_closed) folder_color folder reset " " label
             row(dir_key, git_line(folder_line,place_pane[id,1],width-5), dir_key ":" s)
             if (!dir_open) continue
@@ -1204,24 +1203,36 @@ END {
     if (theme != "mono") {
         reset="\033[0m"; bold="\033[1m"
         # Palette gray, not SGR faint. A dark status background replaces this
-        # with a near-white so secondary text stays readable.
+        # with a near-white (and light themes with a dark gray) so secondary
+        # text stays readable.
         dim="\033[38;5;245m"
-        if (ENVIRON["CANOPY_COLOR_MUTED_ANSI"] != "") dim=ENVIRON["CANOPY_COLOR_MUTED_ANSI"]
+        light_theme=(theme != "fixed" && ENVIRON["CANOPY_THEME_LIGHT"] == "1")
         # Neutral text and guides, with distinct application and active-location colors.
-        icon_blue="\033[94m"; icon_yellow="\033[93m"; icon_red="\033[91m"
-        icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[39m"
-        icon_white="\033[97m"
+        if (light_theme) {
+            icon_blue="\033[38;5;25m"; icon_yellow="\033[38;5;130m"; icon_red="\033[38;5;160m"
+            icon_cyan="\033[38;5;30m"; icon_purple="\033[38;5;127m"; icon_neutral="\033[39m"
+            icon_white="\033[38;5;238m"; folder_color="\033[38;5;25m"
+        } else {
+            icon_blue="\033[94m"; icon_yellow="\033[93m"; icon_red="\033[91m"
+            icon_cyan="\033[96m"; icon_purple="\033[95m"; icon_neutral="\033[39m"
+            icon_white="\033[97m"; folder_color="\033[38;5;74m"
+        }
         green="\033[1;32m"
-        accent="\033[1;36m"; attention="\033[1;33m"; error="\033[1;31m"; path_color=dim
-        # ansi (default) may inherit from tmux via the sidebar's frozen env.
-        # fixed always keeps the classic palette even when those vars are set.
+        accent="\033[1;36m"; attention="\033[1;33m"; error="\033[1;31m"
+        # ansi and named presets read resolved semantic colors from the
+        # sidebar's frozen env; fixed always keeps the classic palette.
         if (theme != "fixed") {
+            if (ENVIRON["CANOPY_COLOR_MUTED_ANSI"] != "") dim=ENVIRON["CANOPY_COLOR_MUTED_ANSI"]
             if (ENVIRON["CANOPY_COLOR_ACTIVE_ANSI"] != "") green=ENVIRON["CANOPY_COLOR_ACTIVE_ANSI"]
             if (ENVIRON["CANOPY_COLOR_ACCENT_ANSI"] != "") accent=ENVIRON["CANOPY_COLOR_ACCENT_ANSI"]
             if (ENVIRON["CANOPY_COLOR_ATTENTION_ANSI"] != "") attention=ENVIRON["CANOPY_COLOR_ATTENTION_ANSI"]
+            if (ENVIRON["CANOPY_COLOR_ERROR_ANSI"] != "") error=ENVIRON["CANOPY_COLOR_ERROR_ANSI"]
         }
-        # tmux's own green (its logo, about #1BB91F) for quiet session glyphs.
-        tmux_green="\033[38;5;34m"; tmux_green_dim="\033[2;38;5;34m"
+        path_color=dim
+        # tmux's own green (its logo, about #1BB91F) for quiet session glyphs;
+        # deeper green on light palettes so it stays legible against white/cream.
+        tmux_green=(light_theme ? "\033[38;5;28m" : "\033[38;5;34m")
+        tmux_green_dim=(light_theme ? "\033[2;38;5;28m" : "\033[2;38;5;34m")
     }
     session_icon=(icons == "nerdfont" ? "" : icons == "ascii" ? "S" : "◈")
     window_icon=(icons == "nerdfont" ? "󰖯" : icons == "ascii" ? "W" : "▣")
@@ -1439,18 +1450,35 @@ END {
             session_style=(current_heading ? accent : bold) (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
         }
         if (appearance == "quiet") quiet_home_place(s)
+        card_line=""
         session_body=(collapsed[st] ? fold_closed : fold_open) (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph session_style sname[s] reset (collapsed[st] ? notice(vsa[s],vsb[s],vsz[s],shown_unread_w[s]) agent_summary(s_need[s],s_err[s],s_work[s],s_done[s]) : "") dim meta reset
         session_mark=(sm == "●" ? green (appearance == "quiet" && icons == "ascii" ? ">" : "▶") reset : "")
         # A session named after its directory gains nothing from the directory
         # alone; a branch still adds something.
+        # A detailed session is a card: the directory and branch it claims take
+        # their own line under the name, aligned with it, so the name keeps the
+        # whole heading. Folded sessions and the legacy one-line-per-object
+        # framing keep the detail at the right edge.
+        card_ok=(appearance == "quiet" && nul && density == "detailed" && !collapsed[st])
+        if (card_ok) {
+            card_lead=fold_open (sm != " " && sm != "●" ? mark(sm) " " : "") session_glyph
+            gsub(/\033\[[0-9;]*m/,"",card_lead)
+            card_indent=text_width(card_lead)
+        }
         if (place_labels()) {
             # The session's own directory heads it; rows then say only where
             # they differ from it.
-            if (session_anchor(s) != home && !(place_name(session_anchor(s)) == sname[s] && git_branch[s] == ""))
-                session_mark=quiet_edge_path(session_body, session_anchor(s), git_branch[s], session_mark, width-3)
-        } else if (appearance == "quiet" && !(place_name(quiet_place[s]) == sname[s] && git_branch[quiet_place_pane[s]] == ""))
-            session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
-        row(st,(appearance == "quiet" ? quiet_rule_row(session_body, session_mark, width-3) : edge_colored(session_body, session_mark, width-3)),st)
+            if (session_anchor(s) != home && !(place_name(session_anchor(s)) == sname[s] && git_branch[s] == "")) {
+                if (card_ok) card_line=quiet_edge_path("", session_anchor(s), git_branch[s], "", width-3-card_indent)
+                if (card_line == "") session_mark=quiet_edge_path(session_body, session_anchor(s), git_branch[s], session_mark, width-3)
+            }
+        } else if (appearance == "quiet" && !(place_name(quiet_place[s]) == sname[s] && git_branch[quiet_place_pane[s]] == "")) {
+            if (card_ok) card_line=quiet_edge_path("", quiet_place[s], git_branch[quiet_place_pane[s]], "", width-3-card_indent)
+            if (card_line == "") session_mark=quiet_edge(session_body, quiet_place_pane[s], session_mark, width-3)
+        }
+        card_row=(appearance == "quiet" ? quiet_rule_row(session_body, session_mark, width-3) : edge_colored(session_body, session_mark, width-3))
+        if (card_line != "") card_row=card_row "\n" sprintf("%*s", card_indent, "") card_line
+        row(st,card_row,st)
         if (collapsed[st]) continue
         if (appearance == "places" || appearance == "quiet") { places_panes(s); continue }
         visible_wpos=0

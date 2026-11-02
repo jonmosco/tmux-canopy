@@ -249,7 +249,7 @@ Ordinary `Enter` or double-click navigation does not synchronously reload the li
 
 The green `●` identifies the current content pane and its window/session occurrence; the highlighted row/pointer identifies the object you are browsing. These are independent while you browse in the sidebar. Switching content panes updates the green marker (and the inspector’s place `●` on reload) but does not move the browse pointer or rewrite the Agent inspector: the drawer follows the selected sidebar row until you choose another row. Leaving the sidebar for a content pane, returning focus to the sidebar, or pressing `Ctrl-o` jumps the pointer to the current content pane, or its nearest visible window/session row when folded. That clears an active search query but leaves folds and tree filters intact. If filters hide the location entirely, it rings the bell. A collapsed active window/session retains its green marker. Entering the sidebar retains the last content pane (using native `pane_last` or the remembered target), instead of marking the sidebar as the working pane.
 
-Focus refreshes wait for approximately 75 ms of stable focus before rendering. Repeated events share one short-lived worker per sidebar; unchanged locations do not reload. The worker resolves the owning client's live session/window/pane rather than trusting stale hook targets, waits out guarded transitions, validates ownership again before publishing, and remembers linked-session occurrences. Expiring claims recover after an interrupted worker. This is event-driven, not a permanent polling process.
+Focus refreshes wait for approximately 75 ms of stable focus before rendering. Repeated events share one short-lived worker per sidebar; unchanged locations do not reload. The worker resolves the owning client's live session/window/pane rather than trusting stale hook targets, waits out guarded transitions, validates ownership again before publishing, and remembers linked-session occurrences. Expiring claims recover after an interrupted worker. With no sidebar anywhere, the `follow` and focus-refresh hooks are skipped inside tmux, so a pane or window switch starts no shell at all. This is event-driven, not a permanent polling process.
 
 Use the Window actions menu to mark a window for linking, then select a destination session/object and press `Enter`. Unlike move, link keeps the source occurrence. Use the linked occurrence's action menu to unlink only that session.
 
@@ -323,7 +323,7 @@ set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
 set -g @tmux-canopy-appearance 'quiet' # default; or 'folders', 'ascii' (classic still works)
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-footer 'on' # off: open sidebars without the action footer; f toggles it
-set -g @tmux-canopy-theme 'ansi' # inherit tmux styles; or 'fixed', 'mono'
+set -g @tmux-canopy-theme 'ansi' # 'ansi', a preset ('catppuccin-mocha', 'nord', ...), 'fixed', or 'mono'
 set -g @tmux-canopy-density 'normal'
 set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
 set -g @tmux-canopy-selection-style 'subtle'
@@ -582,7 +582,7 @@ appearance option has been updated.
 
 `@tmux-canopy-animate on` (default) adds a moving reverse-video highlight
 band across visible `WORKING` / `wrk` status words while an agent is working. The
-compact working marker breathes as a low-contrast cyan dot rather than flashing an
+compact working marker breathes as a low-contrast accent-colored dot rather than flashing an
 arrow.
 Frames come from a cached tree snapshot, not a full tmux rescan, at
 about 6-7 updates per second. A short-lived worker starts only when a working
@@ -597,20 +597,27 @@ disable it.
 `ansi` (default) inherits fzf chrome and tree semantic accents from tmux when
 those styles have real colors:
 
-| Role | tmux source (first usable) | Used for |
-|---|---|---|
-| Accent | `pane-active-border-style` → `status-style` → `message-style` fg | pointer, prompt, header accent, working badge |
-| Active | `pane-active-border-style` fg | green `●` / `▶` |
-| Attention | `message-style` → `message-command-style` fg | `!` / needs-input / warnings |
-| Selection bg | `status-style` bg when hex or 256-color (≥16) | subtle `bg+` |
-| Border | `pane-border-style` fg | fzf border, scrollbar, preview label |
+| Role | Override option | tmux source under `ansi` (first usable) | Used for |
+|---|---|---|---|
+| Accent | `@tmux-canopy-color-accent` | `pane-active-border-style` → `status-style` → `message-style` fg | pointer, prompt, header accent, working badge |
+| Active | `@tmux-canopy-color-active` | `pane-active-border-style` fg | green `●` / `▶` |
+| Attention | `@tmux-canopy-color-attention` | `message-style` → `message-command-style` fg | `!` / `◆` needs-input / warnings |
+| Error | `@tmux-canopy-color-error` | classic red (`1`) unless overridden or from a preset | interrupted `✕`, armed delete, dead panes |
+| Muted | `@tmux-canopy-color-muted` | light/dark gray from `status-style` bg luma (or `245`) | tree guides, paths, secondary metadata, labels |
+| Selection bg | `@tmux-canopy-color-selection-bg` (or `@tmux-canopy-selection-background`) | `status-style` bg when hex or 256-color (≥16) | subtle `bg+` |
+| Selection fg | `@tmux-canopy-color-selection-fg` | terminal default (`-1`), or luma-contrasted dark/light on `solid` | selected-row `fg+` |
+| Foreground | `@tmux-canopy-color-fg` | terminal default (`-1`) | base `fzf` / preview foreground |
+| Border | `@tmux-canopy-color-border` | `pane-border-style` fg | fzf border, scrollbar, preview label |
 
-`mode-style` is not an accent: its foreground is chosen for text on the mode highlight, and on a dark theme that is often the background color itself. A foreground that does not contrast with the status background is skipped. On a dark status background, secondary text is a light gray instead of a mid gray that disappears; a very dark inherited selection background is lifted so the selected row stays visible. Empty or `default` slots keep today's fixed ANSI values. Application icon colors
-stay on the terminal palette. Colors are sampled when the sidebar opens; close
-and reopen after changing a tmux theme (Ctrl-r does not restyle chrome).
-`fixed` always uses the classic cyan/green/yellow/gray palette. `mono` disables
-source styling. Explicit `@tmux-canopy-selection-background` overrides inherited
-selection. Density may be `minimal`, `normal`, `compact`, or `detailed`:
+Named built-in presets set every semantic slot and dark/light polarity without depending on tmux status-bar colors:
+
+- **Dark presets:** `catppuccin-mocha` (alias `catppuccin`), `catppuccin-macchiato`, `catppuccin-frappe`, `tokyo-night`, `tokyo-night-storm`, `dracula`, `nord`, `gruvbox-dark` (alias `gruvbox`), `github-dark`, `rose-pine`, `rose-pine-moon`, `kanagawa`, `everforest`, `one-dark`, `solarized-dark`.
+- **Light presets:** `catppuccin-latte`, `tokyo-night-day` (alias `tokyo-night-light`), `gruvbox-light`, `github-light`, `rose-pine-dawn`, `solarized-light`.
+
+Per-role `@tmux-canopy-color-<role>` options accept `#RRGGBB`, `0`–`255` (`colourN`), or named 16-color ANSI tokens, and layer on top of `ansi` or any named preset. `mode-style` is not an accent: its foreground is chosen for text on the mode highlight, and on a dark theme that is often the background color itself. A foreground that does not contrast with the status background is skipped. On a dark status background, secondary text is a light gray instead of a mid gray that disappears; on a light status background (or light preset), secondary text uses dark gray, application and folder icons step down from bright ANSI to readable dark-ink 256-color hues, and `solid` selection picks contrasting dark or white ink from the accent's brightness. Very dark inherited selection backgrounds are lifted and very light inherited selection backgrounds are shaded so the selected row stays visible, while explicit `@tmux-canopy-color-selection-bg` / `@tmux-canopy-selection-background` values are used verbatim. Empty or `default` slots keep fixed ANSI fallbacks. Colors are sampled when the sidebar opens; close
+and reopen after changing a theme or color override (`Ctrl-r` does not restyle chrome).
+`fixed` always uses the classic cyan/green/yellow/red/gray palette (ignoring tmux styles and color overrides). `mono` disables
+source styling. Density may be `minimal`, `normal`, `compact`, or `detailed`:
 
 - **Normal (default):** At 31 columns or fewer, rows show commands and statuses.
   From 32 to 55 columns, directory names appear inline once per adjacent group.
@@ -626,7 +633,12 @@ selection. Density may be `minimal`, `normal`, `compact`, or `detailed`:
   `@tmux-canopy-compact-single-panes on`.
 - **Compact:** One line per pane, retaining each shortened directory inline.
 - **Detailed:** Two lines per pane, retaining the full path, pane index, and
-  useful title. Long lines are clipped; the preview provides more room.
+  useful title. Long lines are clipped; the preview provides more room. In the
+  default `quiet` layout an expanded session becomes a card too: when every
+  visible pane shares one directory, the directory and branch it would show at
+  the right edge take their own line under the session name, aligned with it,
+  so the name keeps the whole heading. A folded session, a session whose panes
+  are in different directories, and the other densities keep the single row.
 
 The active pane has one green dot. Its session and window names are bold. The
 selected row keeps the background highlight and a one-cell accent bar (`▌`, or
@@ -686,11 +698,12 @@ Selection styles are `subtle`, `solid`, `reverse`, or `pointer`. The default sub
 style highlights the selected logical entry with a dark-gray background
 (palette index 236), or the tmux status background when `ansi` inherits a
 256-color or hex status `bg`, preserving application/notification foreground
-colors without underlining. Set `@tmux-canopy-selection-background` to a 0–255
-palette index or `#RRGGBB` to override; unset or invalid values use the theme
-default. A lighter background can suit a light terminal theme. Reopen the
+colors without underlining. Set `@tmux-canopy-color-selection-bg` (or
+`@tmux-canopy-selection-background`) to `#RRGGBB`, a `0`–`255` palette index, or
+a named ANSI color to override verbatim; unset or invalid values use the theme
+default. Reopen the
 sidebar after changing selection or theme options. `pointer` keeps selection text
-unchanged, `reverse` uses reverse video, and `solid` uses the accent color.
+unchanged, `reverse` uses reverse video, and `solid` fills the row with the accent color and contrasting dark or light text (overridable via `@tmux-canopy-color-selection-fg`).
 Monochrome mode overrides these colors and uses fzf's monochrome selection. The header
 names only the open view (`Tree`, `Agents`, `Processes`, or `Buffers`) rather than
 spending space on a permanent tab strip. Tree includes its filter (`· All`,

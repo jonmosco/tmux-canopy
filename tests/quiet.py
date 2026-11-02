@@ -19,9 +19,10 @@ def main():
 
         def render(*, appearance='quiet', width=42, icons='unicode', theme='ansi',
                    agent_view=False, agents=True, notice=True, subagent=False,
-                   verified=True, long_command=False, state_text='', status='needs-input', second_agent=False):
+                   verified=True, long_command=False, state_text='', status='needs-input', second_agent=False,
+                   density='normal', other_path='/projects/api', nul=1):
             state.write_text(state_text)
-            d = ['D', icons, 'activity,bell', theme, 'normal', '', '', '',
+            d = ['D', icons, 'activity,bell', theme, density, '', '', '',
                  '%0', '@0', '$0', str(width), 'host']
             d.extend([''] * (39 - len(d)))
             d.extend([appearance, '', 'on' if agents else 'off'])
@@ -31,10 +32,10 @@ def main():
                     f'1,Explore,needs-input,{now},' if subagent else '', '0']
             other = ['P', '%1', '@0', '1',
                      'a-very-long-application-command' if long_command else 'nvim',
-                     '', '/projects/api', '0', '', '',
+                     '', other_path, '0', '', '',
                      '1' if notice else '', '', '', '', '', '0', '101']
             if second_agent:
-                other = ['P', '%1', '@0', '1', 'codex', '', '/projects/api', '0', '', '',
+                other = ['P', '%1', '@0', '1', 'codex', '', other_path, '0', '', '',
                          '', '', '', '', '', '0', '101', 'codex-hook', 'other', '101',
                          'needs-input', str(now), '', '', '', '0']
             records = [d, ['S', '$0', 'acme-api', '1'],
@@ -46,12 +47,13 @@ def main():
             if second_agent:
                 records += [['A', '%1', 'codex'], ['V', '%1']]
             snapshot = '\n'.join(SEP.join(r) for r in records) + '\n'
-            run = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1', '-v', 'nul=1',
-                          '-v', f'agent_view={int(agent_view)}', '-v', f'now={now}',
+            run = sp.run(['awk', '-v', 'header=1', '-v', 'stable=1',
+                          '-v', f'agent_view={int(agent_view)}', '-v', f'now={now}', '-v', f'nul={nul}',
                           '-f', str(ROOT / 'lib/tree-render.awk'), str(state), '-'],
                          input=snapshot, text=True, capture_output=True, check=True,
                          env=os.environ | {'TMUX_CANOPY_RENDER_HOME': '/home/test'})
-            rows = [record.split('\t') for record in run.stdout.strip('\0').split('\0')]
+            records = run.stdout.strip('\0').split('\0') if nul else run.stdout.splitlines()
+            rows = [record.split('\t') for record in records]
             assert all(len(row) == 3 for row in rows), rows
             return {row[2]: row[1] for row in rows}
 
@@ -184,6 +186,33 @@ def main():
             window = render(appearance=look, status='interrupted', state_text='W:@0:$0\n')['W:@0:$0']
             assert re.search(r'\x1b\[1;31m[^\x1b]*\u2715', window), (look, window)
         print('ok - an interrupted agent has its own red mark, count and footer, apart from one that is waiting')
+
+        # Detailed density makes a session a card: the directory and branch it
+        # claims move from the heading's right edge to a line of their own,
+        # aligned under the name, so the name keeps the whole heading.
+        card = render(density='detailed')
+        heading, detail = ANSI.sub('', card['S:$0']).split('\n')
+        assert heading.startswith('\u25be \u25c8 acme-api \u2500') and '\u2387' not in heading, heading
+        assert detail == '    api \u2387 feature/auth' and detail.index('api') == heading.index('acme-api'), (heading, detail)
+        # The rows below still say nothing the session already claims.
+        assert not any('\u2387' in ANSI.sub('', card[key]) for key in ('W:@0:$0', 'P:%0:$0', 'P:%1:$0'))
+        # Other densities keep the single line with the detail at the right edge.
+        for density in ('normal', 'compact', 'minimal'):
+            plain = ANSI.sub('', render(density=density)['S:$0'])
+            assert '\n' not in plain and plain.rstrip().endswith('api \u2387 feature/auth'), (density, plain)
+        # A folded session is one row, and so is the legacy one-line-per-object framing.
+        assert '\n' not in render(density='detailed', state_text='S:$0\n')['S:$0']
+        assert ANSI.sub('', render(density='detailed', nul=0)['S:$0']).rstrip().endswith('api \u2387 feature/auth')
+        # Panes in different directories claim nothing at the session level: no card.
+        mixed = render(density='detailed', other_path='/projects/web')
+        assert '\n' not in mixed['S:$0'] and '\u2387' not in ANSI.sub('', mixed['S:$0'])
+        # ASCII and narrow sidebars: the branch gives way, the name does not.
+        ascii_card = ANSI.sub('', render(density='detailed', icons='ascii')['S:$0']).split('\n')
+        assert ascii_card[1] == '    api [git:feature/auth]', ascii_card
+        narrow_card = ANSI.sub('', render(density='detailed', width=24)['S:$0']).split('\n')
+        assert len(narrow_card) == 2 and narrow_card[1].endswith('\u2026') and len(narrow_card[1]) <= 21, narrow_card
+        assert 'acme-api' in narrow_card[0]
+        print('ok - a detailed session is a card: its directory and branch sit on their own line under the name')
 
 
 if __name__ == '__main__':

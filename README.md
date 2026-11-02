@@ -197,7 +197,7 @@ set -g @tmux-canopy-width '42'               # sidebar width in columns
 set -g @tmux-canopy-mode 'sidebar'           # sidebar, popup, or auto
 set -g @tmux-canopy-scope 'global'           # global or window
 set -g @tmux-canopy-appearance 'quiet'       # quiet, folders, or ascii
-set -g @tmux-canopy-density 'normal'         # normal, minimal, compact, detailed
+set -g @tmux-canopy-density 'normal'         # normal, minimal, compact, detailed (detailed adds a second line to panes and sessions)
 set -g @tmux-canopy-labels 'tmux'            # tmux or places (preview)
 set -g @tmux-canopy-git-context 'off'        # off or branch
 set -g @tmux-canopy-directory-refresh 'off'  # on + source scripts/directory-prompt.sh
@@ -227,7 +227,7 @@ See [Display modes](docs/reference.md#display-modes).
   - `quiet` (default): follows tmux's session → window → pane order, collapses single-pane windows into one row, dims idle shells, and places directory/branch details on the right.
   - `folders`: groups panes by working directory with boxed view titles and tree guides.
   - `ascii`: `quiet` layout using plain ASCII symbols instead of Unicode glyphs (or set `@tmux-canopy-icons 'nerdfont'` if your terminal uses a Nerd Font).
-- **Color themes (`@tmux-canopy-theme`):** `ansi` (default) inherits accent, border, and selection colors from your tmux theme; `fixed` uses Canopy's classic palette; `mono` disables color. See [Appearance](docs/reference.md#appearance) and [Icons](docs/reference.md#icons).
+- **Color themes (`@tmux-canopy-theme`):** `ansi` (default) inherits accent, border, and selection colors from your tmux theme; built-in dark and light presets (`catppuccin-mocha`, `catppuccin-latte`, `tokyo-night`, `tokyo-night-day`, `dracula`, `nord`, `gruvbox-dark`, `gruvbox-light`, `github-dark`, `github-light`, `rose-pine`, `rose-pine-dawn`, `kanagawa`, `everforest`, `one-dark`, `solarized-dark`, `solarized-light`, and more) provide self-contained palettes; `@tmux-canopy-color-<role>` overrides individual slots; `fixed` uses Canopy's classic palette; `mono` disables color. See [Appearance](docs/reference.md#appearance) and [Icons](docs/reference.md#icons).
 - **Git branch context (`@tmux-canopy-git-context 'branch'`):** Shows `⎇ branch` (or `detached@<commit>`) in the tree and quick switcher, and adds an on-demand worktree dirty summary (`N changed (+A −D)`) to the Agent inspector (`i`). Toggle branch or directory details live from the tmux command prompt (`prefix :`) with `canopy-branch` and `canopy-directory`. Canopy reads Git metadata without holding index locks (`--no-optional-locks`) and never modifies repository state.
 
 ### Alerts

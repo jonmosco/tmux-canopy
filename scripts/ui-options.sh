@@ -18,7 +18,7 @@ sidebar_ui_options() {
   local popup_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-popup"'
   local animate_cmd='"$TMUX_CANOPY_ROOT/scripts/animate-frame"'
   local mode_cmd='"$TMUX_CANOPY_ROOT/scripts/preview-mode"'
-  local accent border muted
+  local accent border muted fg selection_fg solid_fg
   # fzf pauses its screen when a command keeps it waiting over a second, and
   # resuming leaves mouse tracking off and the tty echoing what Canopy sends
   # the sidebar (^T, ^R). Popups, menus and prompts wait on the user, so they
@@ -29,9 +29,9 @@ sidebar_ui_options() {
   local pane_flag=()
   [[ -n "$pane" ]] && pane_flag=(-t "$pane")
   agents_format="$(canopy_agents_format "${TMUX_CANOPY_CLIENT:-}")"
-  IFS='|' read -r preview_mode preview_height selection_style pane_height selection_background theme appearance inspector_mode agents_enabled icon_theme < <(
+  IFS='|' read -r preview_mode preview_height selection_style pane_height appearance inspector_mode agents_enabled icon_theme < <(
     tmux display-message -p "${pane_flag[@]}" \
-      "#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux-canopy-selection-background}|#{@tmux-canopy-theme}|#{@tmux_canopy_appearance}|#{@tmux_canopy_preview_mode}|$agents_format|#{@tmux_canopy_icon_theme}" 2>/dev/null || true
+      "#{@tmux-canopy-preview}|#{@tmux-canopy-preview-height}|#{@tmux-canopy-selection-style}|#{pane_height}|#{@tmux_canopy_appearance}|#{@tmux_canopy_preview_mode}|$agents_format|#{@tmux_canopy_icon_theme}" 2>/dev/null || true
   )
   if [[ "$agents_enabled" == on ]]; then
     if canopy_preview_is_inspector "$inspector_mode"; then
@@ -57,6 +57,7 @@ sidebar_ui_options() {
   fi
   canopy_theme_resolve
   theme=${CANOPY_THEME:-ansi}
+  fg=${CANOPY_COLOR_FG_FZF:--1}
   accent=${CANOPY_COLOR_ACCENT_FZF:-6}
   border=${CANOPY_COLOR_BORDER_FZF:--1}
   # A pane-border color is a line, often too dark to read as text. Labels and
@@ -64,14 +65,23 @@ sidebar_ui_options() {
   [[ "$border" != -1 ]] || border=${CANOPY_COLOR_MUTED_FZF:-245}
   muted=${CANOPY_COLOR_MUTED_FZF:-245}
   selection_background=${CANOPY_COLOR_SELECTION_BG:-236}
+  selection_fg=${CANOPY_COLOR_SELECTION_FG:--1}
   # Preserve source foreground colors, including application icons and notices.
-  fzf_colors="fg:-1,bg:-1,bg+:-1,gutter:-1,header:-1,info:-1,query:-1,disabled:-1,preview-fg:-1,preview-bg:-1,border:${border},label:${muted},scrollbar:${muted},preview-scrollbar:${muted},spinner:${accent},prompt:${accent},pointer:${accent}:bold,marker:${accent},hl:${accent}:bold,hl+:${accent}:bold"
+  fzf_colors="fg:${fg},bg:-1,bg+:-1,gutter:-1,header:-1,info:-1,query:-1,disabled:-1,preview-fg:${fg},preview-bg:-1,border:${border},label:${muted},scrollbar:${muted},preview-scrollbar:${muted},spinner:${accent},prompt:${accent},pointer:${accent}:bold,marker:${accent},hl:${accent}:bold,hl+:${accent}:bold"
   case "$selection_style" in
-    solid) fzf_colors+=",bg+:${accent},fg+:0,hl+:0:bold" ;;
-    reverse) fzf_colors+=",fg+:-1:reverse,hl+:${accent}:bold:reverse" ;;
-    pointer) fzf_colors+=',fg+:-1:regular' ;;
+    solid)
+      if [[ -n "${CANOPY_COLOR_SELECTION_FG:-}" ]]; then
+        solid_fg=$CANOPY_COLOR_SELECTION_FG
+      else
+        canopy_solid_fg "$accent"
+        solid_fg=$CANOPY_REPLY
+      fi
+      fzf_colors+=",bg+:${accent},fg+:${solid_fg},hl+:${solid_fg}:bold"
+      ;;
+    reverse) fzf_colors+=",fg+:${selection_fg}:reverse,hl+:${accent}:bold:reverse" ;;
+    pointer) fzf_colors+=",fg+:${selection_fg}:regular" ;;
     *)
-      fzf_colors+=",bg+:$selection_background,fg+:-1:regular"
+      fzf_colors+=",bg+:$selection_background,fg+:${selection_fg}:regular"
       ;;
   esac
   [[ "$theme" != mono ]] || fzf_colors='bw'

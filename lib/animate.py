@@ -8,15 +8,28 @@ import os
 import re
 import sys
 
-# Only the renderer's live working badges animate: the bold-cyan accent, the
-# word (or the working mark with an optional count), then a reset. Plain text
-# such as a ~/wrk directory or a WORKING window title never matches, nor does
-# the dim mark of a stale report, which only says what an agent last reported.
-BADGE_RE = re.compile(r'(\x1b\[1;36m)(WORKING|wrk|▷)([0-9]*)(\x1b\[0m)')
-STYLES = ['\033[2;36m', '\033[2;36m', '\033[36m', '\033[36m',
-          '\033[1;36m', '\033[36m', '\033[36m', '\033[2;36m']
+# Only the renderer's live working badges animate: the theme accent, the word
+# (or the working mark with an optional count), then a reset. Plain text such
+# as a ~/wrk directory or a WORKING window title never matches, nor does the
+# dim mark of a stale report, which only says what an agent last reported.
+DEFAULT_ACCENT = '\033[1;36m'
+SGR_RE = re.compile(r'^\x1b\[[0-9;]+m$')
+# Step intensity (faint -> normal -> bold -> normal -> faint) after the accent
+# escape so 8-color, 256-color, and truecolor accents all breathe cleanly.
+STYLES = ['\033[22;2m', '\033[22;2m', '\033[22m', '\033[22m',
+          '\033[22;1m', '\033[22m', '\033[22m', '\033[22;2m']
 # LCM of the WORKING band (10), wrk band (4) and STYLES (8) periods.
 PERIOD = 40
+
+
+def accent_escape(env=None):
+    value = (os.environ if env is None else env).get('CANOPY_COLOR_ACCENT_ANSI', '')
+    return value if SGR_RE.match(value) else DEFAULT_ACCENT
+
+
+def badge_pattern(accent=None):
+    chosen = accent if accent and SGR_RE.match(accent) else accent_escape()
+    return re.compile(rf'({re.escape(chosen)})(WORKING|wrk|▷)([0-9]*)(\x1b\[0m)')
 
 
 def animate_word(word, frame):
@@ -44,12 +57,13 @@ def animate_badge(match, frame):
     return f'{style}{animate_word(word, frame)}{count}{reset}'
 
 
-def render(rows, frame):
+def render(rows, frame, pattern=None):
+    badge_re = badge_pattern() if pattern is None else pattern
     out = []
     for row in rows:
         fields = row.split('\t', 2)
         if len(fields) >= 2:
-            fields[1] = BADGE_RE.sub(lambda m: animate_badge(m, frame), fields[1])
+            fields[1] = badge_re.sub(lambda m: animate_badge(m, frame), fields[1])
             row = '\t'.join(fields)
         out.append(row + '\0')
     return ''.join(out)
@@ -64,6 +78,7 @@ def read_rows():
 
 
 def main(argv):
+    pattern = badge_pattern()
     if len(argv) > 3 and argv[1] == '--frames':
         count = int(argv[2]) if argv[2].isdigit() else PERIOD
         prefix = argv[3]
@@ -72,11 +87,11 @@ def main(argv):
             path = f'{prefix}.{frame}'
             tmp = f'{path}.tmp'
             with open(tmp, 'wb') as handle:
-                handle.write(render(rows, frame).encode('utf-8'))
+                handle.write(render(rows, frame, pattern).encode('utf-8'))
             os.replace(tmp, path)
         return
     frame = int(argv[1]) if len(argv) > 1 and argv[1].isdigit() else 0
-    sys.stdout.write(render(read_rows(), frame))
+    sys.stdout.write(render(read_rows(), frame, pattern))
     sys.stdout.flush()
 
 

@@ -14,5 +14,10 @@ frame=0
 prefix=''
 [[ -r "${cache}.prefix" ]] && prefix="$(<"${cache}.prefix")"
 [[ -n "$prefix" && -r "${prefix}.${frame}" ]] && exec cat -- "${prefix}.${frame}"
+if [[ -z "${CANOPY_COLOR_ACCENT_ANSI:-}" && -r "${cache}.accent" ]]; then
+  accent_sgr=''
+  IFS= read -r accent_sgr < "${cache}.accent" || accent_sgr=''
+  [[ "$accent_sgr" =~ ^[0-9\;]+$ ]] && export CANOPY_COLOR_ACCENT_ANSI=$'\033['"${accent_sgr}m"
+fi
 export TMUX_CANOPY_STABLE=1 TMUX_CANOPY_NUL=1
 exec python3 "$SCRIPT_DIR/../lib/animate.py" "$frame" < "$cache"

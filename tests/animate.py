@@ -2,18 +2,26 @@
 """WORKING status animation frames; static when animate is off or theme is mono."""
 import os
 from pathlib import Path
+import json
 import re
 import subprocess as sp
 import tempfile
 
+from support import install_agent_fixture
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def animate(text, frame):
+def animate(text, frame, accent=None):
     record = f'P:%1\t{text}\tP:%1:$0\0'
+    run_env = os.environ.copy()
+    if accent is None:
+        run_env.pop('CANOPY_COLOR_ACCENT_ANSI', None)
+    else:
+        run_env['CANOPY_COLOR_ACCENT_ANSI'] = accent
     result = sp.run(
         ['python3', str(ROOT / 'lib/animate.py'), str(frame)],
-        input=record, text=True, capture_output=True, check=True,
+        input=record, text=True, capture_output=True, check=True, env=run_env,
     )
     assert result.stdout.endswith('\0'), repr(result.stdout)
     return result.stdout[:-1].split('\t', 2)[1]
@@ -47,9 +55,26 @@ def main():
     marks = [animate('pi \x1b[1;36m▷\x1b[0m', frame) for frame in range(8)]
     plain_marks = [re.sub(r'\x1b\[[0-9;]*m', '', mark) for mark in marks]
     assert plain_marks == ['pi ●'] * 8, plain_marks
-    assert len(set(marks)) > 1 and all('\x1b[7m' not in mark for mark in marks), marks
+    assert len(set(marks)) == 3 and all('\x1b[7m' not in mark for mark in marks), marks
     assert marks[0] == marks[1] and marks[1] == marks[7] and marks[3] == marks[5], marks
+    assert marks[2] != marks[4], marks
     assert all('▷' not in mark for mark in plain_marks)
+
+    # Hex and 256-color theme accents animate identically; non-accent text stays static.
+    hex_accent = '\x1b[38;2;163;190;140m'
+    hex_word = f'\x1b[1m{hex_accent}WORKING\x1b[0m\x1b[2m ·hook\x1b[0m'
+    hex_frames = [animate(f'codex {hex_word}', frame, accent=hex_accent) for frame in range(4)]
+    assert any('\x1b[7m' in frame and hex_accent in frame for frame in hex_frames), hex_frames
+    hex_marks = [animate(f'pi {hex_accent}▷2\x1b[0m', frame, accent=hex_accent) for frame in range(8)]
+    assert [re.sub(r'\x1b\[[0-9;]*m', '', m) for m in hex_marks] == ['pi ●2'] * 8
+    assert len(set(hex_marks)) == 3 and all(hex_accent in m for m in hex_marks), hex_marks
+    # With a hex accent active, an unrelated cyan span is ordinary text, not a live badge.
+    cyan_span = 'note \x1b[1;36mWORKING\x1b[0m \x1b[1;36m▷\x1b[0m'
+    assert all(animate(cyan_span, frame, accent=hex_accent) == cyan_span for frame in range(3))
+
+    idx_accent = '\x1b[38;5;183m'
+    idx_narrow = animate(f'claude \x1b[1m{idx_accent}wrk\x1b[0m', 1, accent=idx_accent)
+    assert '\x1b[7m' in idx_narrow and idx_accent in idx_narrow, idx_narrow
 
     # Only styled badges animate; plain text that happens to say wrk or
     # WORKING (a directory, a window title) stays untouched.
@@ -106,6 +131,13 @@ def main():
         text = result.stdout.split(b'\t', 2)[1]
         assert b'WORKING' in text.replace(b'\x1b[7m', b'').replace(b'\x1b[27m', b'')
         assert b'\x1b[7m' in text
+        # animate-frame fallback also picks up cache.accent when env lacks CANOPY_COLOR_ACCENT_ANSI.
+        cache.write_bytes(b'P:%1\tcodex \x1b[1m\x1b[38;2;163;190;140mWORKING\x1b[0m\tP:%1\0')
+        Path(f'{cache}.accent').write_text('38;2;163;190;140\n')
+        clean_env = {k: v for k, v in os.environ.items() if k != 'CANOPY_COLOR_ACCENT_ANSI'}
+        clean_env['TMUX_CANOPY_STATE'] = str(state)
+        hex_fallback = sp.run([str(ROOT / 'scripts/animate-frame')], env=clean_env, capture_output=True, check=True).stdout
+        assert b'\x1b[38;2;163;190;140m' in hex_fallback and b'\x1b[7m' in hex_fallback, hex_fallback
 
     with tempfile.TemporaryDirectory(prefix='canopy-animate-frames-') as directory:
         state = Path(directory) / 'state'
@@ -256,10 +288,70 @@ def main():
                 tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
                 animator.wait(timeout=5)
             print('ok - agent-animate precomputes frames, cleans them up, and keeps the frame across restarts')
+
+            # End-to-end: under ansi theme with a hex accent inherited from tmux,
+            # sidebar-source detects the hex working badge and passes the accent
+            # across tmux run-shell (whose server env has no CANOPY_COLOR_*).
+            tm('set-option', '-g', '@tmux-canopy-animate', 'on')
+            tm('set-option', '-g', '@tmux-canopy-theme', 'ansi')
+            tm('set-option', '-g', '@tmux-canopy-agents', 'on')
+            tm('set-option', '-g', 'pane-active-border-style', 'fg=#a3be8c')
+            load = sp.run(['bash', str(ROOT / 'tmux-canopy.tmux')], env=env, capture_output=True, text=True, timeout=30)
+            assert load.returncode == 0, load.stderr
+            bin_dir = Path(directory) / 'agent-bin'
+            bin_dir.mkdir(exist_ok=True)
+            codex_bin = bin_dir / 'codex'
+            install_agent_fixture(codex_bin)
+            codex_pane = tm('split-window', '-t', content, '-P', '-F', '#{pane_id}', f"exec '{codex_bin}' 120")
+            for payload in (
+                {'hook_event_name': 'SessionStart', 'session_id': 'hex-anim'},
+                {'hook_event_name': 'UserPromptSubmit', 'session_id': 'hex-anim'},
+            ):
+                hook_res = sp.run(
+                    [str(ROOT / 'scripts/codex-hook')],
+                    input=json.dumps(payload), text=True, capture_output=True, timeout=10,
+                    env={**env, 'TMUX_PANE': codex_pane},
+                )
+                assert hook_res.returncode == 0, hook_res.stderr
+            hex_state = Path(directory) / 'hex-sidebar-state'
+            hex_state.write_text('VIEW\ttree\n')
+            source_env = {k: v for k, v in env.items()
+                          if not k.startswith('CANOPY_COLOR_') and k not in ('CANOPY_THEME', 'CANOPY_THEME_FROZEN')}
+            source_env.update(
+                TMUX_PANE=pane,
+                TMUX_CANOPY_STATE=str(hex_state),
+                TMUX_CANOPY_RECORD_FORMAT='nul',
+                TMUX_CANOPY_UI_HEADER='1',
+            )
+            src = sp.run(
+                [str(ROOT / 'scripts/sidebar-source'), '--stable', '--read0'],
+                env=source_env, capture_output=True, check=True, timeout=15,
+            )
+            assert b'\x1b[38;2;163;190;140m\xe2\x96\xb7\x1b[0m' in src.stdout, src.stdout
+            hex_cache = Path(f'{hex_state}.animate')
+            assert Path(f'{hex_cache}.accent').read_text().strip() == '38;2;163;190;140'
+            live_token = tm('show-option', '-pqv', '-t', pane, '@tmux_canopy_animate_token')
+            assert live_token, 'hex working badge must schedule agent-animate'
+            try:
+                prefix_path = Path(f'{hex_cache}.prefix')
+                deadline = time.time() + 5.0
+                while time.time() < deadline and not prefix_path.exists():
+                    time.sleep(0.05)
+                assert prefix_path.exists(), 'run-shell agent-animate must publish precomputed hex frames'
+                Path(f'{hex_state}.animate.frame').write_text('4\n')
+                rendered_frame = sp.run(
+                    [str(ROOT / 'scripts/animate-frame')],
+                    env=source_env, capture_output=True, check=True, timeout=10,
+                ).stdout
+                assert b'\x1b[38;2;163;190;140m\x1b[22;1m\xe2\x97\x8f\x1b[0m' in rendered_frame, rendered_frame
+            finally:
+                tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
+                time.sleep(0.25)
+            print('ok - ansi hex accent schedules and animates across tmux run-shell')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 
-    print('ok - WORKING/wrk highlight band advances; working mark breathes as a quiet cyan dot')
+    print('ok - WORKING/wrk highlight band advances; working mark breathes in active theme accent')
 
 
 if __name__ == '__main__':

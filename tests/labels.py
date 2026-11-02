@@ -30,8 +30,8 @@ def main():
         state = Path(directory) / 'state'
         state.touch()
 
-        def render(labels='places', icons='nerdfont', width=47, git=True, tmux_names=False):
-            d = ['D', icons, '', 'ansi', 'normal', '', '', '', '%9', '@9', '$9', str(width), 'host']
+        def render(labels='places', icons='nerdfont', width=47, git=True, tmux_names=False, density='normal'):
+            d = ['D', icons, '', 'ansi', density, '', '', '', '%9', '@9', '$9', str(width), 'host']
             d.extend([''] * (39 - len(d)))
             d.extend(['quiet', 'branch' if git else '', 'off'])
             records = [d,
@@ -112,6 +112,18 @@ def main():
         assert '1:zsh' in text(default, 'W:@1:$0'), text(default, 'W:@1:$0')
         assert '0:editor · nvim' in text(default, 'W:@0:$0'), text(default, 'W:@0:$0')
         print('ok - quiet keeps tmux window names unless places labels are on')
+
+        # Detailed density gives the session its place and branch on a line of its own,
+        # under the name, in places labels too. A session started in your home
+        # directory claims nothing, so it stays one row.
+        card = render(density='detailed')
+        heading, detail = ANSI.sub('', card['S:$0']).split('\n')
+        assert 'tmux-canopy' not in heading and '\u2387' not in heading, heading
+        assert detail.strip() == 'tmux-canopy \u2387 main' and detail.index('tmux-canopy') == heading.index('canopy'), (heading, detail)
+        assert '\n' not in card['S:$1']
+        plain = ANSI.sub('', render()['S:$0'])
+        assert '\n' not in plain and plain.rstrip().endswith('tmux-canopy \u2387 main'), plain
+        print('ok - detailed density gives a places-labelled session its place and branch on a second line')
 
         # A custom automatic-rename-format is your choice of window names: keep
         # them, and label only panes.

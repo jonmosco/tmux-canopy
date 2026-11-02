@@ -7,9 +7,16 @@ umask 077
 sidebar="${1:-}"
 token="${2:-}"
 state_file="${3:-}"
+accent_sgr="${4:-}"
 [[ "$sidebar" =~ ^%[0-9]+$ && -n "$token" && -n "$state_file" ]] || exit 0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cache="${state_file}.animate"
+if [[ -z "$accent_sgr" && -r "${cache}.accent" ]]; then
+  IFS= read -r accent_sgr < "${cache}.accent" || accent_sgr=''
+fi
+if [[ "$accent_sgr" =~ ^[0-9\;]+$ ]]; then
+  export CANOPY_COLOR_ACCENT_ANSI=$'\033['"${accent_sgr}m"
+fi
 frame_file="${state_file}.animate.frame"
 # One full cycle of every animated element; see PERIOD in lib/animate.py.
 FRAMES=40

@@ -203,7 +203,7 @@ help_records() {
   note 'Set @tmux-canopy-mode to sidebar (default), popup, or auto (popup on narrow screens, sidebar otherwise).'
   note 'One dock can own a tmux server. Close it from its owning terminal before opening another; other clients can use popup mode without changing dock geometry.'
   note 'Set @tmux-canopy-position to left (default) or right, then close and reopen the sidebar. Right-side mouse resizing is live; release saves the width.'
-  note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths.'
+  note 'Normal density adapts to width: narrow commands, medium inline directory names, wide grouped directory lines. Minimal combines single-pane windows and hides directories. Compact keeps inline paths; detailed keeps full paths and gives each session its directory and branch on a second line.'
   note 'Set @tmux-canopy-density, then press Ctrl-r. Both lines of a pane select the same object.'
   note 'The default appearance, quiet, lists sessions, windows and panes in tmux order with directories as details. Set @tmux-canopy-appearance folders to group panes by directory instead, or ascii for quiet without glyphs. Reload the plugin and reopen the sidebar after changing it.'
   note 'Optional: set @tmux-canopy-git-context branch for read-only Git branch labels. Narrow rows omit them; pane previews show the full branch. Ctrl-r updates branch or directory changes; or enable @tmux-canopy-directory-refresh and source scripts/directory-prompt.sh for Bash cd.'
@@ -211,7 +211,7 @@ help_records() {
   note 'Set @tmux-canopy-compact-single-panes on to combine each single-pane window into one row. Window actions stay available; Enter focuses its sole content pane. On by default in quiet; set off to keep pane rows.'
   note 'Press Shift-a to show or hide agent mode. @tmux-canopy-agents on is only the default for clients that have not chosen. Integrations stay installed either way.'
   note 'One green dot marks the active pane; bold parents show its session and window. The selected row has its own highlight and drives the inspector. Switching panes updates the dot without moving that selection.'
-  note 'ansi theme inherits pointer and accents from tmux status/border/message styles; fixed keeps the classic palette. Default selection uses dark gray (or an inherited 256-color/hex status background). @tmux-canopy-selection-background overrides; reopen after changing theme or selection.'
+  note 'Set @tmux-canopy-theme to ansi (inherits tmux styles), a built-in preset (catppuccin-mocha, catppuccin-latte, tokyo-night, dracula, nord, gruvbox-dark, github-dark, rose-pine, ...), fixed, or mono. Override individual roles with @tmux-canopy-color-<role> (or @tmux-canopy-selection-background); reopen after changing theme options.'
   note 'When the last content pane exits, tmux chooses the next window. Retained dead panes still count as content.'
 }
 

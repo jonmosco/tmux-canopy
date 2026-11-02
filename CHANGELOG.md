@@ -2,13 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- Built-in dark and light `@tmux-canopy-theme` presets (`catppuccin-mocha`, `catppuccin-macchiato`, `catppuccin-frappe`, `catppuccin-latte`, `tokyo-night`, `tokyo-night-storm`, `tokyo-night-day`, `dracula`, `nord`, `gruvbox-dark`, `gruvbox-light`, `github-dark`, `github-light`, `rose-pine`, `rose-pine-moon`, `rose-pine-dawn`, `kanagawa`, `everforest`, `one-dark`, `solarized-dark`, and `solarized-light`), per-role `@tmux-canopy-color-<role>` overrides (`accent`, `active`, `attention`, `error`, `muted`, `border`, `fg`, `selection-bg`, `selection-fg`), a semantic `error` slot in `lib/tree-render.awk`, light-palette icon contrast, and brightness-aware `solid` selection text.
+- `@tmux-canopy-density 'detailed'` turns an expanded session into a card in the default quiet layout. When every visible pane shares one directory, that directory and its branch move from the heading's right edge to a line under the session name, so the name keeps the whole heading. Folded sessions, sessions whose panes are in different directories, and the other densities are unchanged.
+
 ### Changed
 
+- Switching panes or windows no longer starts a `follow` or focus-refresh shell while no sidebar exists anywhere. The two hooks now carry the same in-tmux condition the other sidebar hooks use; both scripts already did nothing without a sidebar, so only the wasted process is gone.
 - An interrupted agent now has its own red `✕` (`x` in ASCII), no longer the amber `!` of an agent that is asking a question. It shows on the pane row, in folded window and session roll-ups (beside `◆` when both are present), as a separate count in the Agents header (`◆1 ✕1 ▷2`), in the quiet footer (`✕ Claude Code interrupted`), and in the Agents list drawer and inspector. Mono themes keep the glyph without color. `n` still jumps to interrupted agents.
 - `n` now jumps to the agent that has been waiting for you longest, then the next-longest on repeated presses, instead of following tree order. Panes that have waited equally long keep tree order, a subagent's request counts from when the subagent asked, and the unread-completion fallback is oldest first.
 
 ### Fixed
 
+- Explicit dark `@tmux-canopy-selection-background` / `@tmux-canopy-color-selection-bg` hex colors are no longer lightened by `ansi`'s inherited background adjustment, and light inherited `status-style` backgrounds under `@tmux-canopy-theme 'ansi'` are now shaded so the selection bar remains visible on light terminals.
+- The `WORKING` / `wrk` / `▷` animation now follows the active theme accent (including 256-color and `#RRGGBB` hex accents inherited from tmux under `@tmux-canopy-theme 'ansi'`, carried across `tmux run-shell` animator workers) instead of only matching bold cyan, and steps intensity across dim, normal, and bold frames.
 - Agents whose `pane_current_command` is a standalone Claude Code version binary (`2.1.201` / `2_1_201`), a Node/Bun runtime or `MainThread` (such as Homebrew Gemini CLI, npm agent CLIs, and Cursor Agent), or a wrapper shell with a verified lifecycle hook now keep their agent name, icon, Tree-view attention badges, and default auto-renamed window labels across Tree, Agents, Processes, and the `i` inspector.
 
 ## 0.6.0 - 2026-10-31
