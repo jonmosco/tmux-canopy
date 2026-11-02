@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-11-02
+
 ### Added
 
 - Built-in dark and light `@tmux-canopy-theme` presets (`catppuccin-mocha`, `catppuccin-macchiato`, `catppuccin-frappe`, `catppuccin-latte`, `tokyo-night`, `tokyo-night-storm`, `tokyo-night-day`, `dracula`, `nord`, `gruvbox-dark`, `gruvbox-light`, `github-dark`, `github-light`, `rose-pine`, `rose-pine-moon`, `rose-pine-dawn`, `kanagawa`, `everforest`, `one-dark`, `solarized-dark`, and `solarized-light`), per-role `@tmux-canopy-color-<role>` overrides (`accent`, `active`, `attention`, `error`, `muted`, `border`, `fg`, `selection-bg`, `selection-fg`), a semantic `error` slot in `lib/tree-render.awk`, light-palette icon contrast, and brightness-aware `solid` selection text.
