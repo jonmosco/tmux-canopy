@@ -434,11 +434,12 @@ printf '%scalls=%s' "$out" "${{#calls}}"
                 (pdir / "cmdline").write_bytes(argv)
             else:
                 (pdir / "cmdline").write_bytes(b"\0".join(a.encode("utf-8") for a in argv) + (b"\0" if argv else b""))
-            (tdir / "children").write_text(" ".join(str(c) for c in children) + ("\n" if children else ""), encoding="utf-8")
+            # Linux fs/proc/array.c formats children as "%d " with no trailing newline.
+            (tdir / "children").write_text("".join(f"{c} " for c in children), encoding="utf-8")
             for tid, tchildren in (extra_tid_children or {}).items():
                 etdir = pdir / "task" / str(tid)
                 etdir.mkdir(parents=True)
-                (etdir / "children").write_text(" ".join(str(c) for c in tchildren) + "\n", encoding="utf-8")
+                (etdir / "children").write_text("".join(f"{c} " for c in tchildren), encoding="utf-8")
 
         # 10: zsh -> node gemini
         add_proc(10, "zsh", ["-zsh"], children=(11,))

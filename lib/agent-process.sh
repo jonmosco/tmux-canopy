@@ -181,9 +181,9 @@ canopy_ps_snapshot_lines() {
   printf '%s' "$CANOPY_REPLY"
 }
 canopy_proc_stat() {
-  local line fields
+  local line='' fields
   [[ $1 =~ ^[1-9][0-9]*$ && -r /proc/$1/stat ]] || return 1
-  IFS= read -r line < "/proc/$1/stat" 2>/dev/null || return 1
+  IFS= read -r line < "/proc/$1/stat" 2>/dev/null || [[ -n $line ]] || return 1
   line=${line##*) }
   read -ra fields <<< "$line"
   [[ ${fields[1]:-} =~ ^[0-9]+$ && ${fields[19]:-} =~ ^[0-9]+$ ]] || return 1
@@ -192,14 +192,14 @@ canopy_proc_stat() {
 }
 # Prefer argv0 basename from cmdline so Node-based CLIs still match.
 canopy_process_name() {
-  local pid=$1 proc_root=${CANOPY_PROC_ROOT:-/proc} argv0 name arg
+  local pid=$1 proc_root=${CANOPY_PROC_ROOT:-/proc} argv0 name='' arg
   local -a args=()
   CANOPY_REPLY=''
   [[ $pid =~ ^[1-9][0-9]*$ ]] || return 1
   if [[ -r "$proc_root/$pid/cmdline" ]]; then
     while IFS= read -r -d '' arg || [[ -n $arg ]]; do
       args+=("$arg")
-    done < "$proc_root/$pid/cmdline"
+    done < "$proc_root/$pid/cmdline" 2>/dev/null
     if ((${#args[@]})); then
       if canopy_hosted_agent "${args[@]}" >/dev/null; then
         printf '%s\n' "$CANOPY_REPLY"
@@ -219,7 +219,7 @@ canopy_process_name() {
     fi
   fi
   [[ -r "$proc_root/$pid/comm" ]] || return 1
-  IFS= read -r name < "$proc_root/$pid/comm" 2>/dev/null || return 1
+  IFS= read -r name < "$proc_root/$pid/comm" 2>/dev/null || [[ -n $name ]] || return 1
   name=${name%.exe}
   canopy_is_claude_version "$name" && name=claude
   CANOPY_REPLY=$name
@@ -362,7 +362,9 @@ canopy_proc_resolve_pane_agent() {
     for cur in "${queue[@]}"; do
       for tid_file in "$proc_root/$cur/task/"*/children; do
         [[ -r "$tid_file" ]] || continue
-        IFS= read -r children < "$tid_file" 2>/dev/null || continue
+        children=''
+        # Linux emits "%d " without a trailing newline, so read returns 1 at EOF.
+        IFS= read -r children < "$tid_file" 2>/dev/null || [[ -n $children ]] || continue
         for child in $children; do
           [[ $child =~ ^[1-9][0-9]*$ && -z "${seen[$child]:-}" ]] || continue
           seen[$child]=1
