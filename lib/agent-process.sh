@@ -10,7 +10,7 @@ CANOPY_REPLY=''
 # Standalone Claude Code builds report their version (dots or underscores,
 # e.g. 2.1.201 or 2_1_201) as kernel comm / pane_current_command.
 canopy_is_claude_version() {
-  [[ ${1:-} =~ ^([0-9]+\.[0-9]+\.[0-9]+|[0-9]+_[0-9]+_[0-9]+)([-+][0-9A-Za-z._-]+)?$ ]]
+  [[ ${1:-} == [0-9]* && $1 =~ ^([0-9]+\.[0-9]+\.[0-9]+|[0-9]+_[0-9]+_[0-9]+)([-+][0-9A-Za-z._-]+)?$ ]]
 }
 # Non-Linux (no /proc) fallback: read the whole process table in one ps call
 # and cache it for the lifetime of this process, instead of spawning ps per
@@ -192,41 +192,52 @@ canopy_proc_stat() {
 }
 # Prefer argv0 basename from cmdline so Node-based CLIs still match.
 canopy_process_name() {
-  local pid=$1 argv0 name arg
+  local pid=$1 proc_root=${CANOPY_PROC_ROOT:-/proc} argv0 name arg
   local -a args=()
+  CANOPY_REPLY=''
   [[ $pid =~ ^[1-9][0-9]*$ ]] || return 1
-  if [[ -r /proc/$pid/cmdline ]]; then
-    while IFS= read -r -d '' arg; do
+  if [[ -r "$proc_root/$pid/cmdline" ]]; then
+    while IFS= read -r -d '' arg || [[ -n $arg ]]; do
       args+=("$arg")
-    done < "/proc/$pid/cmdline"
+    done < "$proc_root/$pid/cmdline"
     if ((${#args[@]})); then
-      name=$(canopy_hosted_agent "${args[@]}") && { printf '%s\n' "$name"; return 0; }
+      if canopy_hosted_agent "${args[@]}" >/dev/null; then
+        printf '%s\n' "$CANOPY_REPLY"
+        return 0
+      fi
       argv0=${args[0]##*/}
       name=${argv0%.exe}
       if [[ -n $name ]]; then
+        if [[ $name == codex && ( ${args[1]:-} == app-server || ${args[2]:-} == app-server ) ]]; then
+          name=codex-app-server
+        fi
         canopy_is_claude_version "$name" && name=claude
+        CANOPY_REPLY=$name
         printf '%s\n' "$name"
         return 0
       fi
     fi
   fi
-  [[ -r /proc/$pid/comm ]] || return 1
-  IFS= read -r name < "/proc/$pid/comm" 2>/dev/null || return 1
+  [[ -r "$proc_root/$pid/comm" ]] || return 1
+  IFS= read -r name < "$proc_root/$pid/comm" 2>/dev/null || return 1
   name=${name%.exe}
   canopy_is_claude_version "$name" && name=claude
+  CANOPY_REPLY=$name
   printf '%s\n' "$name"
 }
 canopy_process_identity() {
   local root=$1 pid=$2 birth=$3 kind=${4:-codex} current=$2 depth=0 name
   [[ $root =~ ^[1-9][0-9]*$ && $pid =~ ^[1-9][0-9]*$ ]] || return 1
   if [[ -d /proc/self ]]; then
-    name="$(canopy_process_name "$pid")" || return 1
+    canopy_process_name "$pid" >/dev/null || return 1
+    name=$CANOPY_REPLY
     canopy_agent_name_matches "$name" "$kind" || return 1
     canopy_proc_stat "$pid" || return 1
     [[ $CANOPY_BIRTH == "$birth" ]] || return 1
     while ((depth++ < 128)); do
       if [[ $current != "$pid" ]]; then
-        name="$(canopy_process_name "$current")" || return 1
+        canopy_process_name "$current" >/dev/null || return 1
+        name=$CANOPY_REPLY
         canopy_agent_carrier "$name" "$kind" || return 1
       fi
       [[ $current == "$root" ]] && return 0
@@ -327,6 +338,49 @@ canopy_agent_carrier() {
     *) return 1 ;;
   esac
 }
+# Linux /proc fast path: walk only the pane root's own carrier descendants
+# breadth-first via /proc/<pid>/task/*/children instead of spawning ps.
+canopy_proc_resolve_pane_agent() {
+  local root=$1 proc_root=${CANOPY_PROC_ROOT:-/proc} name cur tid_file children child depth=0
+  local -a queue=() next_queue=()
+  local -A seen=()
+  CANOPY_REPLY=''
+  [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
+  [[ -d "$proc_root/$root" ]] || return 1
+  [[ -r "$proc_root/$root/task/$root/children" ]] || return 2
+  canopy_process_name "$root" >/dev/null || return 1
+  name=$CANOPY_REPLY
+  if canopy_agent_kind_from_name "$name" >/dev/null; then
+    printf '%s' "$CANOPY_REPLY"
+    return 0
+  fi
+  canopy_agent_carrier "$name" '' || return 1
+  queue=("$root")
+  seen[$root]=1
+  while ((${#queue[@]} && ++depth < 128)); do
+    next_queue=()
+    for cur in "${queue[@]}"; do
+      for tid_file in "$proc_root/$cur/task/"*/children; do
+        [[ -r "$tid_file" ]] || continue
+        IFS= read -r children < "$tid_file" 2>/dev/null || continue
+        for child in $children; do
+          [[ $child =~ ^[1-9][0-9]*$ && -z "${seen[$child]:-}" ]] || continue
+          seen[$child]=1
+          canopy_process_name "$child" >/dev/null || continue
+          name=$CANOPY_REPLY
+          if canopy_agent_kind_from_name "$name" >/dev/null; then
+            printf '%s' "$CANOPY_REPLY"
+            return 0
+          fi
+          canopy_agent_carrier "$name" '' && next_queue+=("$child")
+        done
+      done
+    done
+    queue=("${next_queue[@]}")
+  done
+  CANOPY_REPLY=''
+  return 1
+}
 # Resolve the agent kind for a pane: foreground command, hosted runtime, or
 # closest matching descendant under only carrier processes (CANOPY_REPLY).
 canopy_resolve_pane_agent() {
@@ -336,10 +390,17 @@ canopy_resolve_pane_agent() {
   if canopy_agent_kind_from_name "$base" >/dev/null; then
     return 0
   fi
+  [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
+  if ((!canopy_ps_loaded)) && [[ -n "${CANOPY_PROC_ROOT:-}" || -d /proc/self ]] && ! declare -F ps >/dev/null; then
+    canopy_proc_resolve_pane_agent "$root"
+    case $? in
+      0) return 0 ;;
+      1) return 1 ;;
+    esac
+  fi
   if [[ "$base" =~ ^(node|nodejs|bun|python[0-9.]*|Python)$ ]]; then
     canopy_pane_agent "$root" >/dev/null && return 0
   fi
-  [[ $root =~ ^[1-9][0-9]*$ ]] || return 1
   canopy_load_ps_snapshot || return 1
   for pid in "${CANOPY_AGENT_PIDS[@]}"; do
     kind=${CANOPY_AGENT_KIND[$pid]:-}

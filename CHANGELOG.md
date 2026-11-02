@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- `WORKING` animation ticks (`Ctrl-t`) no longer re-run the preview drawer command 6–7 times per second, Linux pane-agent resolution now walks `/proc/<pid>/task/*/children` directly instead of spawning a full-system `ps` scan, and tmux 3.8+ pane-command monitoring ignores sidebar and slot panes, stopping `fzf` from blanking/refreshing the `Agent list` drawer and flashing `Loading ..` in the top-right corner of the agent drawer on Linux while an agent is working.
+
 ## 0.7.0 - 2026-11-02
 
 ### Added

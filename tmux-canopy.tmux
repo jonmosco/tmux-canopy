@@ -285,11 +285,13 @@ canopy_hook client-detached 9003 '' -b cleanup client '#{hook_client}'
 # Sidebars left without their terminal, by a detach Canopy did not see, close
 # when a terminal attaches. With no sidebar anywhere, no job starts.
 canopy_hook client-attached 9003 "$any_sidebar_event" -b cleanup orphans
-# tmux 3.8+ monitors pane command changes. The refresh script no-ops unless
-# a sidebar client currently has agent mode on.
+# tmux 3.8+ monitors pane command changes. Ignore sidebar and slot panes, and
+# start no worker when no sidebar exists anywhere on the server.
+content_command_format='#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},,#{pane_current_command}}'
 tmux set-hook -Bgu '@tmux_canopy_command:%*:#{pane_current_command}' 2>/dev/null || true
-tmux set-hook -B -g '@tmux_canopy_command:%*:#{pane_current_command}' \
-  "$(plugin_job -b agent-refresh)" 2>/dev/null || true
+tmux set-hook -Bgu "@tmux_canopy_command:%*:$content_command_format" 2>/dev/null || true
+tmux set-hook -B -g "@tmux_canopy_command:%*:$content_command_format" \
+  "if-shell -F $(tmux_quote "$any_sidebar_event") $(tmux_quote "$(plugin_job -b agent-refresh)")" 2>/dev/null || true
 
 # --- Alerts and notifications -----------------------------------------------
 # Canopy turns on the tmux monitoring its notices need, keeping what the

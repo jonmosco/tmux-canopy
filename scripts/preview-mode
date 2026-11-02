@@ -22,6 +22,10 @@ if [[ "${1:-}" != --label ]]; then
   fi
   tmux set-option -pq -t "$sidebar" @tmux_canopy_preview_mode "$mode" 2>/dev/null || exit 0
 fi
+state_file="${TMUX_CANOPY_STATE:-}"
+if [[ -n "$state_file" && ( -e "${state_file}.preview.key" || -e "${state_file}.preview.tick" ) ]]; then
+  rm -f -- "${state_file}.preview.tick" "${state_file}.preview.key" "${state_file}.preview.out"
+fi
 if [[ "${1:-}" == --fzf || "${1:-}" == --label ]]; then
   label='Terminal preview'
   if [[ "$agents" == on ]]; then

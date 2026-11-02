@@ -187,6 +187,9 @@ if [[ -n "$render_token" && -n "${TMUX_CANOPY_RENDER_TOKEN:-}" ]]; then
   [[ "$current_token" == "$render_token" ]] || exit 0
 fi
 if ((rc == 0)); then
+  if [[ -n "$state_file" && ( -e "${state_file}.preview.key" || -e "${state_file}.preview.tick" ) ]]; then
+    rm -f -- "${state_file}.preview.tick" "${state_file}.preview.key" "${state_file}.preview.out"
+  fi
   take_chrome
   if ((${#records[@]})); then
     if [[ "$TMUX_CANOPY_NUL" == 1 ]]; then printf '%s\0' "${records[@]}"

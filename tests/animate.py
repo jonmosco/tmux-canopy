@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import json
 import re
+import shutil
 import subprocess as sp
 import tempfile
 
@@ -348,6 +349,78 @@ def main():
                 tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
                 time.sleep(0.25)
             print('ok - ansi hex accent schedules and animates across tmux run-shell')
+
+            # Animation ticks (Ctrl-t -> animate-frame) must serve the cached
+            # drawer output with zero tmux queries so fzf never flashes
+            # "Loading .." in the top right of the agent drawer, while cursor
+            # moves, drawer mode switches (i), resizes, and Ctrl-r reloads
+            # invalidate the cache and render fresh.
+            tm('set-option', '-p', '-t', pane, '@tmux_canopy_preview_mode', 'agent')
+            real_tmux = shutil.which('tmux')
+            assert real_tmux
+            wrap_dir = Path(directory) / 'tmux-wrap'
+            wrap_dir.mkdir(exist_ok=True)
+            tmux_counter = Path(directory) / 'tmux-calls'
+            tmux_counter.write_text('')
+            tmux_wrap = wrap_dir / 'tmux'
+            tmux_wrap.write_text(
+                f'#!/usr/bin/env bash\nprintf x >> "{tmux_counter}"\nexec "{real_tmux}" "$@"\n'
+            )
+            tmux_wrap.chmod(0o755)
+            preview_env = {
+                **source_env,
+                'PATH': f"{wrap_dir}:{source_env.get('PATH', os.environ.get('PATH', ''))}",
+                'FZF_PREVIEW_LINES': '10',
+                'FZF_PREVIEW_COLUMNS': '42',
+            }
+            first_preview = sp.run(
+                [str(ROOT / 'scripts/sidebar-preview'), f'P:{codex_pane}'],
+                env=preview_env, capture_output=True, text=True, check=True, timeout=10,
+            ).stdout
+            assert 'Working' in first_preview and 'Codex' in first_preview, first_preview
+            assert len(tmux_counter.read_text()) >= 1
+
+            # Animation tick -> sidebar-preview reuses cached output with 0 tmux calls.
+            tmux_counter.write_text('')
+            sp.run([str(ROOT / 'scripts/animate-frame')], env=preview_env, capture_output=True, check=True, timeout=10)
+            tick_preview = sp.run(
+                [str(ROOT / 'scripts/sidebar-preview'), f'P:{codex_pane}'],
+                env=preview_env, capture_output=True, text=True, check=True, timeout=10,
+            ).stdout
+            assert tick_preview == first_preview, (tick_preview, first_preview)
+            assert len(tmux_counter.read_text()) == 0, f'animation tick must not query tmux: {len(tmux_counter.read_text())}'
+
+            # Moving selection to another pane token misses cache and renders fresh.
+            sp.run([str(ROOT / 'scripts/animate-frame')], env=preview_env, capture_output=True, check=True, timeout=10)
+            other_preview = sp.run(
+                [str(ROOT / 'scripts/sidebar-preview'), f'P:{content}'],
+                env=preview_env, capture_output=True, text=True, check=True, timeout=10,
+            ).stdout
+            assert 'No agent' in other_preview and 'Terminal' in other_preview, other_preview
+            assert len(tmux_counter.read_text()) >= 1
+
+            # Cycling drawer mode with preview-mode (i) invalidates cached preview.
+            sp.run([str(ROOT / 'scripts/preview-mode'), '--fzf'], env=preview_env, capture_output=True, check=True, timeout=10)
+            sp.run([str(ROOT / 'scripts/animate-frame')], env=preview_env, capture_output=True, check=True, timeout=10)
+            tmux_counter.write_text('')
+            list_preview = sp.run(
+                [str(ROOT / 'scripts/sidebar-preview'), f'P:{content}'],
+                env=preview_env, capture_output=True, text=True, check=True, timeout=10,
+            ).stdout
+            assert '1 agent' in list_preview and 'Codex' in list_preview, list_preview
+            assert len(tmux_counter.read_text()) >= 1
+
+            # Real source refresh (Ctrl-r -> sidebar-source) invalidates cached preview.
+            sp.run([str(ROOT / 'scripts/sidebar-source'), '--stable', '--read0'], env=source_env, capture_output=True, check=True, timeout=15)
+            tm('set-option', '-pu', '-t', pane, '@tmux_canopy_animate_token')
+            tmux_counter.write_text('')
+            refreshed_preview = sp.run(
+                [str(ROOT / 'scripts/sidebar-preview'), f'P:{content}'],
+                env=preview_env, capture_output=True, text=True, check=True, timeout=10,
+            ).stdout
+            assert '1 agent' in refreshed_preview, refreshed_preview
+            assert len(tmux_counter.read_text()) >= 1
+            print('ok - animation ticks reuse cached preview without spawning tmux/ps/git')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], capture_output=True)
 

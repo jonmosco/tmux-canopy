@@ -53,6 +53,26 @@ render() {
 }
 if [[ "${TMUX_CANOPY_PREVIEW_EXPANDED:-0}" == 1 ]]; then
   render
+elif [[ -n "${TMUX_CANOPY_STATE:-}" ]]; then
+  # fzf re-runs --preview on every reload-sync, including 150ms Ctrl-t animation
+  # frames. Reuse the last drawer output on animation ticks so the drawer never
+  # respawns tmux/ps/git or triggers fzf's top-right "Loading .." spinner.
+  state_file="$TMUX_CANOPY_STATE"
+  preview_key="${token}|${rows}|${FZF_PREVIEW_COLUMNS:-}"
+  if [[ -e "${state_file}.preview.tick" ]]; then
+    rm -f -- "${state_file}.preview.tick"
+    cached_key=''
+    [[ -r "${state_file}.preview.key" ]] && IFS= read -r cached_key < "${state_file}.preview.key"
+    if [[ "$cached_key" == "$preview_key" && -r "${state_file}.preview.out" ]]; then
+      exec cat -- "${state_file}.preview.out"
+    fi
+  fi
+  rm -f -- "${state_file}.preview.key"
+  render | awk -v rows="$rows" -v out="${state_file}.preview.out" '
+    BEGIN { printf "" > out }
+    NR <= rows { print; print > out }
+  '
+  printf '%s\n' "$preview_key" > "${state_file}.preview.key" 2>/dev/null || true
 else
   # Metadata and buffers obey the same fixed drawer budget as pane captures.
   render | awk -v rows="$rows" 'NR <= rows'

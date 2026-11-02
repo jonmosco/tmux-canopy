@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Cursor Agent detection must use argv0 when /proc comm is a Node thread name."""
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -416,6 +417,81 @@ printf '%scalls=%s' "$out" "${{#calls}}"
           "fast=claude:0 10=gemini 20=cursor-agent 30=claude 40= gemini-ok cursor-ok claude-ok arg-rejected calls=1",
           probe.stderr or probe.stdout)
     print("ok - version-named Claude and Node-hosted agents resolve and verify cleanly")
+
+    # Synthetic Linux /proc/<pid>/task/*/children walk: resolves native,
+    # version-named, Node/Python-hosted, multi-threaded, and codex-app-server
+    # panes while rejecting editor-owned and cross-agent children with zero ps calls.
+    with tempfile.TemporaryDirectory(prefix="canopy-proc-children-") as proc_dir:
+        proc = Path(proc_dir)
+        (proc / "self").mkdir()
+
+        def add_proc(pid, comm, argv, children=(), extra_tid_children=None):
+            pdir = proc / str(pid)
+            tdir = pdir / "task" / str(pid)
+            tdir.mkdir(parents=True)
+            (pdir / "comm").write_text(comm + "\n", encoding="utf-8")
+            if isinstance(argv, bytes):
+                (pdir / "cmdline").write_bytes(argv)
+            else:
+                (pdir / "cmdline").write_bytes(b"\0".join(a.encode("utf-8") for a in argv) + (b"\0" if argv else b""))
+            (tdir / "children").write_text(" ".join(str(c) for c in children) + ("\n" if children else ""), encoding="utf-8")
+            for tid, tchildren in (extra_tid_children or {}).items():
+                etdir = pdir / "task" / str(tid)
+                etdir.mkdir(parents=True)
+                (etdir / "children").write_text(" ".join(str(c) for c in tchildren) + "\n", encoding="utf-8")
+
+        # 10: zsh -> node gemini
+        add_proc(10, "zsh", ["-zsh"], children=(11,))
+        add_proc(11, "MainThread", ["/usr/bin/node", "/usr/lib/node_modules/@google/gemini-cli/dist/index.js"])
+        # 20: zsh -> multi-threaded carrier bash (child on worker tid 201) -> cursor-agent (no trailing NUL)
+        add_proc(20, "zsh", ["-zsh"], children=(), extra_tid_children={201: (21,)})
+        add_proc(21, "MainThread", b"/home/me/.local/bin/agent\0/home/me/.local/share/cursor-agent/index.js")
+        # 30: zsh -> claude -> bash -c codex -> codex (must keep outer claude, not inner codex)
+        add_proc(30, "zsh", ["-zsh"], children=(31,))
+        add_proc(31, "2_1_201", ["/home/me/.local/share/claude/versions/2_1_201"], children=(32,))
+        add_proc(32, "bash", ["bash", "-c", "codex"], children=(33,))
+        add_proc(33, "codex", ["codex"])
+        # 40: zsh -> nvim -> claude (editor-owned, must reject)
+        add_proc(40, "zsh", ["-zsh"], children=(41,))
+        add_proc(41, "nvim", ["nvim"], children=(42,))
+        add_proc(42, "claude", ["claude"])
+        # 50: zsh -> codex app-server (carrier) -> codex
+        add_proc(50, "zsh", ["-zsh"], children=(51,))
+        add_proc(51, "codex", ["/usr/local/bin/codex", "app-server"], children=(52,))
+        add_proc(52, "codex", ["/usr/local/bin/codex"])
+        # 60: zsh -> python3 hermes, 70: plain zsh
+        add_proc(60, "zsh", ["-zsh"], children=(61,))
+        add_proc(61, "python3", ["python3", "-m", "tui_gateway.entry"])
+        add_proc(70, "zsh", ["-zsh"], children=())
+
+        wrap_dir = proc / "bin"
+        wrap_dir.mkdir()
+        ps_counter = proc / "ps-calls"
+        ps_counter.write_text("", encoding="utf-8")
+        ps_stub = wrap_dir / "ps"
+        ps_stub.write_text(f'#!/usr/bin/env bash\nprintf x >> "{ps_counter}"\nexit 1\n', encoding="utf-8")
+        ps_stub.chmod(0o755)
+        proc_env = {
+            **os.environ,
+            "CANOPY_PROC_ROOT": str(proc),
+            "PATH": f"{wrap_dir}:{os.environ.get('PATH', '')}",
+        }
+        probe = subprocess.run(["bash", "-c", f"""
+set -u
+source {script}
+out=''
+for pair in 10:MainThread 20:MainThread 30:zsh 40:nvim 50:zsh 60:python3 70:zsh; do
+  canopy_resolve_pane_agent "${{pair%%:*}}" "${{pair#*:}}" >/dev/null
+  out+="${{pair%%:*}}=$CANOPY_REPLY "
+done
+printf '%s' "$out"
+"""], env=proc_env, capture_output=True, text=True, timeout=10)
+        check(probe.returncode == 0 and probe.stdout ==
+              "10=gemini 20=cursor-agent 30=claude 40= 50=codex 60=hermes 70= ",
+              probe.stderr or probe.stdout)
+        check(ps_counter.read_text(encoding="utf-8") == "", "Linux /proc walk must not invoke ps")
+    print("ok - Linux /proc children walk resolves pane agents without invoking ps")
+
     test_live_cursor_agent_identity()
     print("ok - process_identity finds live cursor-agent panes")
     test_live_agent_process_scan()

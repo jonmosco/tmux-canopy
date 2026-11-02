@@ -41,13 +41,15 @@ canopy_git_dirty() {
     [[ -n "$line" ]] && ((count++))
   done <<< "$status_out"
   ((count > 0)) || return 1
-  diff_out="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE; git --no-optional-locks -C "$root" diff --numstat HEAD 2>/dev/null)" ||
-    diff_out="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE; git --no-optional-locks -C "$root" diff --numstat 2>/dev/null; git --no-optional-locks -C "$root" diff --cached --numstat 2>/dev/null)" || diff_out=''
-  while IFS=$'\t' read -r a d _path; do
-    [[ "$a" =~ ^[0-9]+$ ]] && ((added += a))
-    [[ "$d" =~ ^[0-9]+$ ]] && ((deleted += d))
-  done <<< "$diff_out"
   short="${sep}${count} changed"
+  if ((budget <= 0 || ${#short} + 8 <= budget)); then
+    diff_out="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE; git --no-optional-locks -C "$root" diff --numstat HEAD 2>/dev/null)" ||
+      diff_out="$(unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE; git --no-optional-locks -C "$root" diff --numstat 2>/dev/null; git --no-optional-locks -C "$root" diff --cached --numstat 2>/dev/null)" || diff_out=''
+    while IFS=$'\t' read -r a d _path; do
+      [[ "$a" =~ ^[0-9]+$ ]] && ((added += a))
+      [[ "$d" =~ ^[0-9]+$ ]] && ((deleted += d))
+    done <<< "$diff_out"
+  fi
   if ((added > 0 || deleted > 0)); then
     full="${short} (+${added} ${minus}${deleted})"
   else
