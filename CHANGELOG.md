@@ -2,8 +2,16 @@
 
 ## Unreleased
 
+## 0.8.0 - 2026-11-04
+
+### Changed
+
+- Updated `README.md`, `docs/reference.md`, `scripts/help`, `AGENTS.md`, `ROADMAP.md`, `docs/directory-refresh.md`, and `docs/macos-install-audit.md` to document all current modules, theme presets and color overrides, Agent list drawer mode, and keybindings.
+
 ### Fixed
 
+- Codex subagent hooks (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `SubagentStop`, `Stop`, `Interrupt`, and `SessionEnd`) that report the child session's own `session_id` and `turn_id` are now attributed to the subagent without being dropped or overwriting the parent pane's `session` and `turn` state, including when routed through the shared `codex app-server` daemon.
+- Parent Codex multi-agent collaboration tool calls (`spawn_agent`, `interrupt_agent`, `close_agent`, `send_input`, `send_message`, `followup_task`, and `resume_agent`) now enrich `"default"` subagent role labels with the spawned task name or nickname and remove interrupted or closed subagent rows and pending requests even when Codex does not emit `SubagentStop`.
 - `WORKING` animation ticks (`Ctrl-t`) no longer re-run the preview drawer command 6–7 times per second, Linux pane-agent resolution now walks `/proc/<pid>/task/*/children` directly instead of spawning a full-system `ps` scan, and tmux 3.8+ pane-command monitoring ignores sidebar and slot panes, stopping `fzf` from blanking/refreshing the `Agent list` drawer and flashing `Loading ..` in the top-right corner of the agent drawer on Linux while an agent is working.
 
 ## 0.7.0 - 2026-11-02
