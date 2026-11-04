@@ -1,45 +1,8 @@
 # Roadmap
 
 Remaining work for tmux-canopy. This list does not promise a release date. The
-[README](README.md#features) describes what is available today.
-
-## Stabilization (done in 0.4.0)
-
-New features were on hold until the existing ones were dependable:
-
-- [x] Find flaky tests by running every suite repeatedly, and fix their causes
-  rather than adding retries. Ten rounds of every suite found two: the mouse
-  wheel (a real bug, fixed) and a Git test whose window names changed.
-- [x] Check each lifecycle adapter, and `>`, against the real agent, including
-  exit, restart, and pane reuse. Claude Code and Codex (approval answered with
-  `>`), Antigravity, and Pi passed; OpenCode 2 never reported from its shared
-  service (fixed). Gemini CLI could not sign in and is unchecked; Cursor Agent
-  and Oh My Pi had no Canopy integration installed, and Copilot and Grok were
-  not installed.
-- [x] Count forks and tmux calls per refresh on a realistic server and compare
-  with 0.2.0. On 10 sessions, 76 panes, and 6 working agents, a refresh starts
-  14 programs and makes 6 tmux calls in about 140 ms in both versions (16 and 8
-  in the Agents view); branch labels add one `git` per repository, with place
-  labels or without.
-- [x] Run the suite on Linux: CI runs it on Ubuntu 24.04 for every push.
-- [x] Review the README, help, and legend against the code: every bound key
-  is in help, the README, and the reference, every setting the code reads is
-  documented, and the legend describes the current footers.
-
-## Sidebar UX (done in 0.5.0)
-
-- [x] Agent inspector as a fixed field card (state, trust, directory, optional
-  git, place with green `●`), shared Terminal/Agent drawer at 25% height, `i`
-  selects mode and `p` only toggles visibility.
-- [x] Sticky browse pointer: content-pane focus updates `●` without moving the
-  sidebar selection or rewriting the inspector; `Ctrl-o` / return-to-sidebar
-  still jumps to the live pane.
-- [x] Dim application icons by default; full color for the active content pane
-  and for detected agents.
-- [x] Opt-in Bash directory-change refresh (`@tmux-canopy-directory-refresh` and
-  `scripts/directory-prompt.sh`); no polling. Ctrl-r remains the explicit refresh.
-- [x] vim-tmux-navigator: Ctrl-h / Ctrl-l leave a dock toward the adjacent pane
-  without changing the navigator's root bindings; Ctrl-h stays Backspace in search.
+[README](README.md#features) describes what is available today, and the
+[changelog](CHANGELOG.md) records what has shipped.
 
 ## Agent status reliability
 
@@ -48,18 +11,23 @@ New features were on hold until the existing ones were dependable:
   real-process tests for these (`tests/codex_panel.py`) and Pi/Oh My Pi cover
   session replacement (`tests/agent_reporting.py`); Claude Code, Gemini CLI,
   OpenCode, Cursor Agent, and Antigravity still need the same real-process
-  checks.
+  checks. A manual pass for 0.4.0 found Claude Code and Codex (approval
+  answered with `>`), Antigravity, and Pi correct, and fixed OpenCode 2 never
+  reporting from its shared service. Gemini CLI could not sign in, Cursor Agent
+  and Oh My Pi had no Canopy integration installed, and Copilot and Grok were
+  not installed, so those were not checked.
 
 ## Jump to an agent needing input
 
-- [x] Implement global jump (`n`) to the longest-waiting pane reporting needs-input (or, when none is waiting, the oldest unread settled agent pane) across all sessions and windows, with wraparound and tree-order tie-breaking.
+Global jump (`n`) ships today. Remaining work:
+
 - [ ] Extend multi-client jump tests (`tests/jump_agent.py` covers longest-waiting order, unread fallback, stale targets, agent exits, and linked windows).
 
 ## Additional subagent integrations
 
-- [x] Report Antigravity (`agy`) subagents spawned via `invoke_subagent` and
-  track their lifecycle (`manage_subagents`, `manage_task`, `Stop`).
-- [x] Report Cursor Agent (`agent`) subagents via `subagentStart` / `subagentStop` hooks.
+Antigravity, Cursor Agent, Claude Code, and Codex subagents are reported today.
+Remaining work:
+
 - [ ] Report Gemini CLI subagents if its integration exposes enough lifecycle
   and identity information.
 - [ ] Report GitHub Copilot CLI and Grok Build subagents. Copilot's
@@ -147,15 +115,11 @@ alerts today (see the README). Remaining work:
 ## Appearance and theme sources
 
 Canopy already uses the terminal's default foreground/background and ANSI
-palette for most of its UI, with a separate `mono` mode and configurable
-selection background. The remaining work is to make theme sources explicit and
-consistent across views:
+palette for most of its UI, with a separate `mono` mode, configurable selection
+background, tmux-inherited colors (`@tmux-canopy-theme 'ansi'`, with `'fixed'`
+as the escape hatch), built-in presets, and per-role overrides. The remaining
+work is to make theme sources explicit and consistent across views:
 
-- [x] **tmux:** derive fzf chrome and tree semantic accents (active / attention /
-  accent) from status, pane border, and message styles at sidebar open, with
-  per-slot fallbacks when styles are `default` or missing. Escape hatch:
-  `@tmux-canopy-theme 'fixed'`.
-- [x] **Canopy:** allow an independent palette (`@tmux-canopy-theme` built-in dark and light presets) and per-role user overrides (`@tmux-canopy-color-<role>`) for text, selection, accents, notices, tree guides, and borders without changing tmux or terminal settings.
 - [ ] Apply the chosen source consistently across Tree, Processes, Buffers,
   Agents, previews, help, and popups. Keep agent state and unread notifications
   distinguishable without relying on color alone. (Tree + fzf chrome +

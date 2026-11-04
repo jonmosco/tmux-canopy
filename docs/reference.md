@@ -563,7 +563,7 @@ unread notices as separate marks. A waiting subagent can raise its parent's
 mark; unverified process detection never claims a confirmed state. Git branches,
 when enabled, are part of the directory details above. `f` and
 `@tmux-canopy-footer` control footer visibility. The examples in
-[Quiet tree](sidebar-visual-examples.html) are illustrations, not pixel-exact
+[Quiet tree](design/sidebar-visual-examples.html) are illustrations, not pixel-exact
 screenshots.
 
 `ascii` is `quiet` without Unicode glyphs, the same as
