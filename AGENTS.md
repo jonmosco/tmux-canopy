@@ -11,11 +11,15 @@ A tmux sidebar: a tree of sessions, windows, and panes, plus optional monitoring
 | Path | What it holds |
 |---|---|
 | `tmux-canopy.tmux` | Plugin entry point: options, key bindings, and tmux hooks |
+| `canopy` | CLI for interactive setup, agent integration management, diagnostics, detail toggles, and alert testing |
 | `scripts/` | One script per action or data source (`sidebar`, `tree-source`, `sidebar-action`, `agent-refresh`, ...) |
-| `scripts/*-lib.sh`, `scripts/lib.sh` | Shared shell helpers |
+| `scripts/*-lib.sh`, `scripts/lib.sh` | Shared shell helpers (`config-lib.sh`, `theme-lib.sh`, `git-lib.sh`, `path-lib.sh`, `notification-lib.sh`, ...) |
 | `lib/tree-render.awk` | Renders the tree from one tmux snapshot |
+| `lib/content-layout.awk`, `lib/scale-layout.awk` | Checksummed content-only layouts and saved window-geometry scaling |
 | `lib/agent-hook.py`, `lib/codex-hook.py` | Agent lifecycle adapters (hook reporters) |
+| `lib/agent_reporting.py`, `lib/agent_kinds.py`, `lib/subagent_state.py` | Shared pane-option storage, canonical agent kinds, and subagent state helpers |
 | `lib/agent-process.sh`, `lib/agent-process.py` | Agent process detection |
+| `lib/animate.py` | Precomputed `WORKING` highlight frame server |
 | `tests/` | Python and Bash suites, each on its own private tmux server |
 | `docs/reference.md` | Full configuration and architecture reference |
 

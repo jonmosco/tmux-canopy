@@ -42,13 +42,15 @@ def update_subagent(entries, agent, event, state, now):
         entry = [agent, 'subagent', 'unknown' if state == 'subagent-update' else 'working', now, '']
         entries.append(entry)
     before = entry[:]
-    entry[1] = list_field(event.get('agent_type'), 40) or entry[1]
+    label = list_field(event.get('agent_type'), 40)
+    if label and label.lower() != 'default':
+        entry[1] = label
     tool = list_field(event.get('tool_name'), 80)
     if state == 'needs-input':
         entry[2], entry[4] = 'needs-input', tool
-    elif state == 'clear-request' and entry[2] == 'needs-input' and entry[4] == tool:
+    elif state == 'clear-request' and (entry[2] == 'done' or (entry[2] == 'needs-input' and entry[4] == tool)):
         entry[2], entry[4] = 'working', ''
-    elif state == 'working':
+    elif state in ('working', 'subagent-start'):
         entry[2], entry[4] = 'working', ''
     elif state == 'subagent-done':
         entry[2], entry[4] = 'done', ''

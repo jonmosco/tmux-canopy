@@ -39,7 +39,7 @@ this hardening pass should silently do.
 
 1. **Manual Ctrl-r (available now).** No integration or recurring work. Refreshes
    the directory and other metadata using the same fzf process and stable IDs.
-2. **Optional prompt notification (recommended for review).** A small Bash hook
+2. **Optional prompt notification (implemented).** A small Bash hook
    compares `$PWD` with its previous value using builtins. Only a change sends a
    local, asynchronous tmux refresh request. This is a signal, not a replacement
    prompt or a source of directory text for the renderer.
@@ -55,9 +55,9 @@ this hardening pass should silently do.
    Output is not a directory-change signal, and log/TUI output could cause
    excessive jobs and reloads. Neither approach is proposed as the default.
 
-## Proposed opt-in prompt design — approval required
+## Opt-in prompt design constraints
 
-Before implementation, agree on these constraints:
+The implementation follows these constraints:
 
 - Append an idempotent hook without replacing `PS1`, kube-ps1, Bash Git Prompt,
   or existing prompt hooks. Handle string and array `PROMPT_COMMAND` values.

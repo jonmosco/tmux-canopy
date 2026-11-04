@@ -122,5 +122,49 @@ try:
         event(session | {'hook_event_name': 'SessionEnd'})
         assert option('subagents') == ''
         print('ok - invalid child IDs are ignored and session end clears child state')
+
+        # Real Codex child sessions emit their own conversation_id as session_id
+        # and their own turn_id on turn, tool, permission, and stop hooks, while
+        # SubagentStart carries parent_thread_id.
+        event(session | {'hook_event_name': 'SessionStart'})
+        event(session | {'hook_event_name': 'UserPromptSubmit'})
+        event(session | {'hook_event_name': 'SubagentStart', 'agent_id': 'child-real', 'agent_type': 'default'})
+        # spawn_agent PostToolUse enriches a "default" subagent label with task_name/nickname.
+        event(session | {'hook_event_name': 'PostToolUse', 'tool_name': 'spawn_agent',
+                         'tool_input': {'task_name': 'auth_audit'},
+                         'tool_response': {'agent_id': 'child-real', 'nickname': 'Dalton'}})
+        assert any('auth_audit' in line and 'WORKING' in line for line in rows()['P:' + pane].split('\n')[1:])
+        child_session = {'session_id': 'child-real', 'turn_id': 'child-turn-99',
+                         'agent_id': 'child-real', 'agent_type': 'default'}
+        event(child_session | {'hook_event_name': 'UserPromptSubmit'})
+        assert option('session') == 'codex-main' and option('turn') == 'turn-1'
+        event(child_session | {'hook_event_name': 'PermissionRequest', 'tool_name': 'Bash',
+                               'tool_input': {'description': 'Run audit', 'command': 'pytest'}})
+        assert option('status') == 'needs-input' and option('request_agent') == 'child-real'
+        assert 'auth_audit: Run audit' in option('summary'), option('summary')
+        event(child_session | {'hook_event_name': 'PreToolUse', 'tool_name': 'Bash',
+                               'tool_input': {'command': 'pytest'}})
+        assert option('status') == 'working' and option('request_agent') == ''
+        event(child_session | {'hook_event_name': 'SubagentStop'})
+        assert option('subagents') == ''
+        assert option('session') == 'codex-main' and option('turn') == 'turn-1'
+        event(session | {'hook_event_name': 'Stop'})
+        assert option('status') == 'turn-ended'
+        print('ok - child-scoped session_id/turn_id hooks and default label enrichment preserve parent session')
+
+        # interrupt_agent and close_agent clean up child rows even when Codex
+        # does not emit SubagentStop (Codex issue #38142).
+        event(session | {'hook_event_name': 'UserPromptSubmit', 'turn_id': 'turn-2'})
+        event(session | {'hook_event_name': 'SubagentStart', 'turn_id': 'turn-2',
+                         'agent_id': 'child-int', 'agent_type': 'worker'})
+        event({'session_id': 'child-int', 'turn_id': 'child-t2', 'agent_id': 'child-int',
+               'agent_type': 'worker', 'hook_event_name': 'PermissionRequest',
+               'tool_name': 'Bash', 'tool_input': {'command': 'cargo test'}})
+        assert option('status') == 'needs-input' and option('request_agent') == 'child-int'
+        event({'session_id': 'codex-main', 'turn_id': 'turn-2', 'hook_event_name': 'PostToolUse',
+               'tool_name': 'interrupt_agent', 'tool_input': {'id': 'child-int'}, 'tool_response': {}})
+        assert option('subagents') == ''
+        assert option('status') == 'working' and option('request_agent') == ''
+        print('ok - interrupt_agent and close_agent clean up child rows and pending requests')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

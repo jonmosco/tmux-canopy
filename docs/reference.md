@@ -100,10 +100,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
 | `Esc` | Leave fuzzy search; keep Tree filters |
 | `Ctrl-r` | Refresh |
-1: | `Ctrl-h` / `Ctrl-l` | Focus the left / right pane from a dock; `Ctrl-h` edits the query while searching |
-| `Ctrl-j` / `Ctrl-k` | Move the selection down / up |
-| `?` | Scrollable help popup, starting with actions for the current view and selection (wheel or `j`/`k` to scroll) |
-2: | `Ctrl-h` / `Ctrl-l` | Focus the pane to the left / right from a dock; Ctrl-h remains Backspace while searching |
+| `Ctrl-h` / `Ctrl-l` | Focus the pane to the left / right from a dock; Ctrl-h remains Backspace while searching |
 | `Ctrl-j` / `Ctrl-k` | Move selection down / up |
 | `?` | Open scrollable Help, starting with actions for the current view and selection; the wheel, `j`/`k`, or arrows scroll, Space pages, `q`/Esc closes |
 | `g` | Open the scrollable legend of tree symbols, colors, badges, and labels |
@@ -117,11 +114,11 @@ When vim-tmux-navigator forwards Ctrl-h/j/k/l into fzf, Canopy handles these
 keys without changing the navigator's root bindings. Use Ctrl-l to leave a left
 dock, Ctrl-h to leave a right dock, and normal tmux navigation to return.
 
-Press `A` to turn agent mode on or off for this client. Tree stays on `1`. While the mode is on, the header shows `Agents` beside `Tree`, `4` opens it, `n` jumps to the longest-waiting pane reporting needs-input, and `i` toggles the Agent inspector drawer. While it is off, those controls do nothing extra and the tree does not scan or label agents. The choice is remembered for this client. `@tmux-canopy-agents on` is only the default for a client that has not chosen yet.
+Press `A` to turn agent mode on or off for this client. Tree stays on `1`. While the mode is on, the header shows `Agents` beside `Tree`, `4` opens it, `n` jumps to the longest-waiting pane reporting needs-input (or interrupted, falling back to the oldest unread settled agent), and `i` cycles the docked drawer through Terminal preview, Agent inspector, and Agent list. While it is off, those controls do nothing extra and the tree does not scan or label agents. The choice is remembered for this client. `@tmux-canopy-agents on` is only the default for a client that has not chosen yet.
 
 `H` collapses every branch, leaving only session rows; `L` opens every branch again. These commands affect the whole tree, including linked windows, and leave move/link/delete state intact. They do nothing in Processes or Buffers view. While searching, uppercase `H` and `L` are ordinary search text.
 
-Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use `prefix + h` to return to it.
+Creation is relative to the selected object. Selecting a session or window resolves its active non-sidebar pane; selecting a pane uses that pane directly. Splits and new windows inherit that pane's working directory. Creation focuses the new object while leaving the sidebar visible; use your pane-navigation binding (such as `prefix + Left` or `prefix + Right`) to return to it.
 
 Help opens in an overlay sized for your terminal, with highlighted command keys and wrapped descriptions. Narrow views stack each key above its description; wider views align them side by side. Use the mouse wheel to scroll three lines at a time, `b` to page back, and `g`/`G` for the beginning/end. The same wheel controls work in the Legend. Clicks do not activate help entries; press `q` or Esc to close. The sidebar keeps its current view behind the overlay, and all pane sizes stay unchanged. Running `scripts/help --render` directly also supports Help in the current terminal.
 
@@ -190,11 +187,7 @@ pending move or link; that operation stays pending. Removed targets are ignored.
 
 ### Compact single-pane windows
 
-Set `@tmux-canopy-compact-single-panes` to `on`, then press **Ctrl-r**. The default
-is `off`. A window containing exactly one content pane becomes one line with its
-window name, application icon, command, and notification badge. The directory
-appears when the sidebar is wide enough. The `minimal` density enables this
-automatically.
+In the default `quiet` appearance, single-pane windows are combined into one row by default; set `@tmux-canopy-compact-single-panes` to `off` and press **Ctrl-r** to keep separate pane rows. In `folders` and `classic` appearances, the default is `off`; set `@tmux-canopy-compact-single-panes` to `on` (or use the `minimal` density, which enables it automatically) and press **Ctrl-r**. A window containing exactly one content pane becomes one line with its window name, application icon, command, and notification badge. The directory appears when the sidebar is wide enough.
 Sidebar and slot panes do not count; filtering does not change pane counts.
 
 The combined row keeps its window identity: **Enter** focuses the sole content
@@ -220,15 +213,15 @@ The same long-running fzf process switches among three built-in sources, plus Ag
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
 3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste, yank to the system clipboard, or arm deletion; `x`, `x` deletes the selected buffer.
-4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent` → `cursor-agent`), GitHub Copilot CLI (`copilot`), Grok Build (`grok`), Crush, or Hermes Agent process. The header summarizes unique agent panes by reported state: `◆` needs input, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. When space is tight, the header shows the leading state and total (such as `◆2/5`). ASCII uses `!`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's Agent inspector. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. An agent counts for a pane only when it runs directly in that pane or under shells, runtimes, and sandbox wrappers (`bash`, `zsh`, `env`, `node`, `python`, `npx`, `uv`, `bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, and similar); one started by another foreground program, such as an editor plugin inside Neovim, belongs to that program, so the pane is not an agent pane. Ctrl-r refreshes the process inventory.
+4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent` → `cursor-agent`), GitHub Copilot CLI (`copilot`), Grok Build (`grok`), Crush, or Hermes Agent process. The header summarizes unique agent panes by reported state: `◆` needs input, `✕` interrupted, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. When space is tight, the header shows the leading state and total (such as `◆2/5`). ASCII uses `!`, `x`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's Agent inspector. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. An agent counts for a pane only when it runs directly in that pane or under shells, runtimes, and sandbox wrappers (`bash`, `zsh`, `env`, `node`, `python`, `npx`, `uv`, `bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, and similar); one started by another foreground program, such as an editor plugin inside Neovim, belongs to that program, so the pane is not an agent pane. Ctrl-r refreshes the process inventory.
 
 The footer is a responsive action rail for the open view. Tree starts with
 `↵ focus  a actions  / search  ? help`; Agents with
-`↵ focus  n waiting  > reply  i inspect`; Processes with
-`↵ focus  a actions  p preview`; and Buffers with
-`↵ paste  a actions  x delete  / search`. Lower-priority actions disappear
+`↵ focus  n waiting  > reply  i summary`; Processes with
+`↵ focus  a actions  p preview  / search  ? help`; and Buffers with
+`↵ paste  a actions  x delete  / search  ? help`. Lower-priority actions disappear
 from the right as the sidebar narrows. ASCII mode spells `Enter` instead of
-using `↵`. A waiting agent or pending move, link, or delete temporarily
+using `↵`. A waiting or interrupted agent or pending move, link, or delete temporarily
 replaces the normal rail with the action needed to continue or cancel. Search
 continues to show `Esc clear  Enter focus`. Press `f` to hide or restore the
 footer in any view.
@@ -293,6 +286,7 @@ Set options before loading the plugin:
 
 ```tmux
 set -g @tmux-canopy-mode 'sidebar' # 'sidebar', 'popup', or 'auto'
+set -g @tmux-canopy-agents 'off' # 'on' enables AI agent monitoring by default
 set -g @tmux-canopy-git-context 'off' # 'branch' to show read-only Git context
 set -g @tmux-canopy-directory 'on' # 'off' hides quiet's directory details
 set -g @tmux-canopy-directory-refresh 'off' # 'on' + source scripts/directory-prompt.sh: refresh after cd
@@ -321,11 +315,12 @@ set -g @tmux-canopy-alert-events 'agents' # add bell, silence, or activity for t
 set -g @tmux-canopy-alert-sound 'off' # default or a sound name for desktop alerts
 set -g @tmux-canopy-alert-detail 'brief' # full: include the agent's last reply
 set -g @tmux-canopy-appearance 'quiet' # default; or 'folders', 'ascii' (classic still works)
+set -g @tmux-canopy-icon-theme 'unicode' # 'unicode' (or 'auto'), 'nerdfont', or 'ascii'
 set -g @tmux-canopy-animate 'on' # off: disable the moving WORKING highlight
 set -g @tmux-canopy-footer 'on' # off: open sidebars without the action footer; f toggles it
 set -g @tmux-canopy-theme 'ansi' # 'ansi', a preset ('catppuccin-mocha', 'nord', ...), 'fixed', or 'mono'
 set -g @tmux-canopy-density 'normal'
-set -g @tmux-canopy-compact-single-panes 'off' # optional combined window/pane rows
+set -g @tmux-canopy-compact-single-panes 'off' # 'off' splits single-pane windows in quiet; 'on' combines them in folders/classic
 set -g @tmux-canopy-selection-style 'subtle'
 set -g @tmux-canopy-preview 'off'
 set -g @tmux-canopy-preview-height '25%'
@@ -377,7 +372,7 @@ dies; the pane publishes its ownership even if the opener dies after splitting.
 
 In popup mode:
 - The popup is ephemeral: it exits when closed without leaving any background daemon or process running.
-- State is preserved: active view (Tree, Processes, Buffers, Agents), tree folds, footer visibility, and search queries are cached per client across popup invocations.
+- State is preserved: active view (Tree, Processes, Buffers, Agents), footer visibility, and tree filters (All/Session/Unread, window-name, and pane-title rules) are cached per client across popup invocations.
 - Closing: press `q` or `Esc` (when not actively editing search input), re-press the toggle key (`prefix + T`), or press `Enter` to focus the selected session, window, or pane.
 - Responsive preview: on terminals with 100 or more columns, the preview drawer appears on the right (`right,45%`); on narrower displays, it sits below the list.
 - Sizing is configured with `@tmux-canopy-popup-width` (default `85%`) and `@tmux-canopy-popup-height` (default `80%`). Both percentages and column/row counts are supported.
@@ -614,7 +609,7 @@ Named built-in presets set every semantic slot and dark/light polarity without d
 - **Dark presets:** `catppuccin-mocha` (alias `catppuccin`), `catppuccin-macchiato`, `catppuccin-frappe`, `tokyo-night`, `tokyo-night-storm`, `dracula`, `nord`, `gruvbox-dark` (alias `gruvbox`), `github-dark`, `rose-pine`, `rose-pine-moon`, `kanagawa`, `everforest`, `one-dark`, `solarized-dark`.
 - **Light presets:** `catppuccin-latte`, `tokyo-night-day` (alias `tokyo-night-light`), `gruvbox-light`, `github-light`, `rose-pine-dawn`, `solarized-light`.
 
-Per-role `@tmux-canopy-color-<role>` options accept `#RRGGBB`, `0`–`255` (`colourN`), or named 16-color ANSI tokens, and layer on top of `ansi` or any named preset. `mode-style` is not an accent: its foreground is chosen for text on the mode highlight, and on a dark theme that is often the background color itself. A foreground that does not contrast with the status background is skipped. On a dark status background, secondary text is a light gray instead of a mid gray that disappears; on a light status background (or light preset), secondary text uses dark gray, application and folder icons step down from bright ANSI to readable dark-ink 256-color hues, and `solid` selection picks contrasting dark or white ink from the accent's brightness. Very dark inherited selection backgrounds are lifted and very light inherited selection backgrounds are shaded so the selected row stays visible, while explicit `@tmux-canopy-color-selection-bg` / `@tmux-canopy-selection-background` values are used verbatim. Empty or `default` slots keep fixed ANSI fallbacks. Colors are sampled when the sidebar opens; close
+Per-role `@tmux-canopy-color-<role>` options accept `#RRGGBB`, `0`–`255` (`colourN`), or named 16-color ANSI tokens, and layer on top of `ansi` or any named preset. `mode-style` is not an accent: its foreground is chosen for text on the mode highlight, and on a dark theme that is often the background color itself. A foreground that does not contrast with the status background is skipped. On a dark status background, secondary text is a light gray instead of a mid gray that disappears; on a light status background (or light preset), secondary text uses dark gray, application and folder icons step down from bright ANSI to readable dark-ink 256-color hues, and `solid` selection picks contrasting dark or white ink from the accent's brightness. Very dark inherited selection backgrounds are lifted and very light inherited selection backgrounds are shaded so the selected row stays visible, while explicit `@tmux-canopy-color-selection-bg` / `@tmux-canopy-selection-background` values are used verbatim. Empty or `default` slots keep fixed ANSI fallbacks. The semantic role overrides (`accent`, `active`, `attention`, and `error`) style the fzf chrome, Tree and Agents rows, and view headers; the Agent inspector and Agent list drawer inherits `@tmux-canopy-color-muted` for secondary text and uses fixed ANSI colors for state glyphs and headings (unless `theme` is `mono`). Colors are sampled when the sidebar opens; close
 and reopen after changing a theme or color override (`Ctrl-r` does not restyle chrome).
 `fixed` always uses the classic cyan/green/yellow/red/gray palette (ignoring tmux styles and color overrides). `mono` disables
 source styling. Density may be `minimal`, `normal`, `compact`, or `detailed`:
@@ -687,7 +682,7 @@ Canopy registers two tmux commands for switching these while tmux runs: `canopy-
 
 In the directory-grouped appearances, the label appears on the directory row (`⎇ feature/name`, or `[git:feature/name]` in ASCII). In `quiet`, it follows its directory as a right-aligned detail on the highest row whose panes share it, shortened when space is tight. In other appearances it appears beside the relevant pane/combined window row when width allows; the pane preview shows its full branch, and `Ctrl-g` quick switching includes it. A pane in a different repository in the same window keeps its own branch; sessions and mixed windows do not claim one branch. Git labels do not displace existing narrow-row content or alter tree identities, folds, filters, notifications, or agent badges. Git branch names and detached commits are not interpreted as shell commands or tmux formats.
 
-Changing this option or switching branches takes effect on the next Tree reload; press `Ctrl-r` if nothing else triggers one. A directory-only change can likewise require `Ctrl-r` (see [Directory-change refresh investigation](#directory-change-refresh-investigation)). A directory whose control bytes have been replaced in the tmux snapshot may not resolve reliably and is unsupported for Git context. This setting does not install Git or add worktree actions.
+Changing this option or switching branches takes effect on the next Tree reload; press `Ctrl-r` if nothing else triggers one. A directory-only change can likewise require `Ctrl-r` (see [directory-refresh.md](directory-refresh.md)). A directory whose control bytes have been replaced in the tmux snapshot may not resolve reliably and is unsupported for Git context. This setting does not install Git or add worktree actions.
 
 Paths use the terminal's default foreground with dim styling rather than a
 fixed light text color. Lines do not wrap or horizontally scroll on selection.
@@ -723,9 +718,9 @@ The drawer keeps a consistent configured height (25% by default) while browsing.
 
 `Shift-p` opens an 85%-wide, 80%-high native tmux popup for the selected object. It uses `less -R -S` in secure mode: arrows scroll vertically/horizontally and `q` closes it. TUI snapshots include the whole current screen; shell snapshots include up to 300 recent physical rows. Popup sizing uses its own PTY dimensions, not the narrow drawer's inherited dimensions. Buffers and session/window/process metadata can also be inspected there.
 
-The **Agent inspector** is a read-only identity card for detected Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent`), GitHub Copilot CLI, Grok Build, Crush, and Hermes Agent processes, and **Agent list** is an all-sessions overview in the same drawer. Press `i` to cycle the drawer through **Terminal preview**, **Agent inspector** (for the selected pane), and **Agent list** (a live counts header followed by detected agents sorted by attention priority — `needs-input`/`interrupted`, then `working`, then unread notification activity, then idle/detected — with each pane's state glyph, `session:window.pane`, agent name, brief status, question, or error reason, a right-edge unread notification badge, and an overflow count when truncated). The inspector follows the selected sidebar row (sticky browse: content-pane focus updates the green `●` without rewriting the card). Press `p` to hide or show the drawer. The choice belongs to the sidebar pane and lasts until it closes. A single-content-pane window also resolves to its pane. `Shift-p` continues to open the enlarged terminal preview.
+The **Agent inspector** is a read-only identity card for detected Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent`), GitHub Copilot CLI, Grok Build, Crush, and Hermes Agent processes, and **Agent list** is an all-sessions overview in the same drawer. In a docked sidebar pane, press `i` to cycle the drawer through **Terminal preview**, **Agent inspector** (for the selected pane), and **Agent list** (a live counts header followed by detected agents sorted by attention priority — `needs-input`/`interrupted`, then `working`, then unread notification activity, then idle/detected — with each pane's state glyph, `session:window.pane`, agent name, brief status, question, or error reason, a right-edge unread notification badge, and an overflow count when truncated). The inspector follows the selected sidebar row (sticky browse: content-pane focus updates the green `●` without rewriting the card). Press `p` to hide or show the drawer. The chosen mode is stored on the docked sidebar pane (`@tmux_canopy_preview_mode`) and lasts until it closes; popup mode always displays the **Terminal preview** (on the right at 100 or more columns, or below on narrower displays). A single-content-pane window also resolves to its pane. `Shift-p` continues to open the enlarged terminal preview.
 
-The native sharp frame identifies the selected mode: **Terminal preview**, **Agent inspector**, or **Agent list**. `i` selects the mode and opens a hidden drawer; `p` changes visibility without switching modes. All three modes use the same framed panel and fixed drawer geometry (default height 25%), in the dock and the side preview of a wide popup. Inspector mode stays structured even when a pane has no supported agent. Turning agent awareness off with `A` temporarily uses the terminal mode and label; turning it back on restores the chosen agent drawer mode. Close and reopen an existing sidebar once after upgrading; reloading tmux alone does not replace its running fzf options or bindings.
+The native sharp frame identifies the selected mode: **Terminal preview**, **Agent inspector**, or **Agent list**. In a docked sidebar, `i` selects the mode and opens a hidden drawer; `p` changes visibility without switching modes. All three modes use the same framed panel and fixed drawer geometry (default height 25%). Inspector mode stays structured even when a pane has no supported agent. Turning agent awareness off with `A` temporarily uses the terminal mode and label; turning it back on restores the chosen agent drawer mode. Close and reopen an existing sidebar once after upgrading; reloading tmux alone does not replace its running fzf options or bindings.
 
 fzf draws the frame and handles terminal-cell clipping and ANSI styling. Preview overflow keeps its scrollbar but hides fzf's scroll-position counter (`noinfo`), so the counter cannot cover a right-aligned identity. This applies to both docked drawers and the side preview in a wide popup.
 
@@ -752,7 +747,8 @@ An agent pane whose adapter reports **needs input** gets a dim line beneath it, 
 The default `quiet` Tree header carries the agent summary. In every appearance,
 the footer remains an action rail until higher-priority context replaces it:
 `◆ Claude Code waiting  n go  > reply` when one agent needs you
-(`◆ 2 waiting  n next  > reply` for more),
+(`◆ 2 waiting  n next  > reply` for more, or `◆ Claude Code waiting  ✕1  n go  > reply` when an interrupted agent is also present),
+`✕ Claude Code interrupted  n go  > reply` when one agent is interrupted (`✕ 2 interrupted  n next  > reply` for more),
 `Moving  ↵ move here  c cancel` during a move,
 `Linking  ↵ link here  c cancel` during a link,
 `x again within 5 s to delete` while deletion is armed, and
@@ -773,7 +769,7 @@ OpenCode uses a plugin rather than a shell hook. `canopy integration install ope
 
 Antigravity's documented hooks support Canopy's observational `PreInvocation`, `PostInvocation`, `PostToolUse`, and `Stop` reports. Invocation hooks keep a long-running turn's report fresh between tool calls. A fully idle stop appears as **turn ended**; a stop with background work still active remains **working**; a stop with an error appears as **interrupted**. Antigravity subagents spawned via `invoke_subagent` appear as child lines with their role and working status; subagent conversation IDs are resolved from session metadata. Terminating subagents via `manage_subagents` removes them immediately, and fully idle stops transition active subagents to completed before they are pruned on the next prompt. The hook contract has no dedicated permission-request event, so Canopy does not show verified Antigravity needs-input rows. Canopy never registers `PreToolUse` or sends an allow/deny tool decision. Reinstall an earlier Antigravity integration with `canopy integration install agy`, then restart `agy` and check `/hooks`.
 
-For Pi, copy [pi-canopy.extension.ts](pi-canopy.extension.ts) into `~/.pi/agent/extensions/`, set its reporter path, and reload Pi (`canopy integration install pi` writes that file). For Oh My Pi, put a separate copy in its extension directory and set `kind` to `omp`. The extension reports session start, agent start, tool execution (to keep a long turn fresh), extension UI prompts as **needs input**, an aborted or errored settle as **interrupted**, agent end / settled as **turn ended**, and shutdown. It never blocks a tool or answers a prompt. Built-in tool confirmations that do not emit `ui_prompt_start` stay unverified. For OpenCode, copy [opencode-canopy.plugin.js](opencode-canopy.plugin.js) into `~/.config/opencode/plugins/` (or `~/.config/opencode/plugin/` on older installs), set its reporter path, and restart OpenCode (`canopy integration install opencode` writes that file). OpenCode V2 loads the default export: `setup` subscribes to the public event stream and registers `session.prompt`, `tool.execute.before`, and `permission.evaluate` hooks. OpenCode V1 still loads `CanopyPlugin` / `server()`. The adapter reports session creation, prompts, tool calls, busy/retry/idle status, permission and question requests, step failures, and session deletion. It never changes a permission `effect`, blocks a tool, or rewrites a prompt. Because a server plugin may observe multiple sessions, Canopy binds a session only when its project directory matches one live OpenCode pane; later events must match that pane's session and process identity. Permission and question replies clear only the matching request ID. Sessions that cannot be tied to one pane are ignored rather than attributed by guesswork. Reinstall an older OpenCode plugin with `canopy integration install opencode` so V2 `setup()` is present.
+For Pi, copy [pi-canopy.extension.ts](pi-canopy.extension.ts) into `~/.pi/agent/extensions/`, set its reporter path, and reload Pi (`canopy integration install pi` writes that file). For Oh My Pi, put a separate copy in its extension directory and set `kind` to `omp`. The extension reports session start, agent start, tool execution (to keep a long turn fresh), extension UI prompts as **needs input**, an aborted or errored settle as **interrupted**, agent end / settled as **turn ended**, and shutdown. It never blocks a tool or answers a prompt. Built-in tool confirmations that do not emit `ui_prompt_start` stay unverified. For OpenCode, copy [opencode-canopy.plugin.js](opencode-canopy.plugin.js) into `~/.config/opencode/plugins/` (or `~/.config/opencode/plugin/` on older installs), set its reporter path, and restart OpenCode (`canopy integration install opencode` writes that file). The plugin exports an async plugin function (`export default plugin` and `export const CanopyPlugin = plugin`) that returns `{ event, 'chat.message', 'tool.execute.before', 'permission.ask' }` hooks. The adapter reports session creation, prompts, tool calls, busy/retry/idle status, permission and question requests, step failures, and session deletion. It never changes a permission decision, blocks a tool, or rewrites a prompt. Because a server plugin may observe multiple sessions, Canopy binds a session only when its project directory matches one live OpenCode pane; later events must match that pane's session and process identity. Permission and question replies clear only the matching request ID. Sessions that cannot be tied to one pane are ignored rather than attributed by guesswork. Reinstall an older OpenCode plugin with `canopy integration install opencode` so the current export and event handlers are present.
 
 GitHub Copilot CLI and Grok Build load every hook file in a directory, so `canopy integration install copilot` writes `~/.copilot/hooks/canopy.json` and `canopy integration install grok` writes `~/.grok/hooks/canopy.json` (or `$GROK_HOME/hooks/canopy.json`), next to any hook files of your own. Canopy owns those files outright: uninstalling deletes them, and a file you have edited is left alone and reported as modified. Restart the agent inside tmux afterward. Copilot reports session start, prompts, tool completion, `notification` events of type `permission_prompt` or `elicitation_dialog` as **needs input**, `agentStop` as **turn ended**, an unrecoverable `errorOccurred` as **interrupted**, and session end; its hook payload carries no event name, so each hook passes it as an argument. Grok reports the same states from its Claude-style events, plus `StopFailure` and `StopCancelled` as **interrupted**. Grok events from a subagent's own session (`subagentType`) are ignored, a report for an older turn (`promptId`) cannot overwrite the current one, and the observe-only `Stop` Grok sends while a session closes is not a turn end. Neither adapter shows subagent lines yet. Grok also runs the hooks in `~/.claude/settings.json` and `~/.cursor/hooks.json` by default; Canopy's Claude and Cursor reporters ignore those events in a Grok pane, because each report must come from its own agent's process.
 
@@ -854,7 +850,7 @@ External integrations can report normalized state without implementing an agent-
 {"agent":"pi","session_id":"session-123","state":"needs-input","request":{"id":"request-9","tool":"shell","summary":"Confirm command","command":"make test"}}
 ```
 
-`agent` must identify a supported live process (`claude`, `codex`, `opencode`, `gemini`, `pi`, `omp`, `agy`, `cursor-agent`, `copilot`, or `grok`), and `session_id` must remain stable for that agent session. Send `ready` to begin or replace a session, then `working`, `needs-input`, `turn-ended`, `interrupted`, or `session-ended` as lifecycle events occur. A needs-input report must include a request ID, tool, or summary. The optional request object accepts `id`, `tool`, `summary`, and `command`; Canopy bounds and sanitizes these fields. Send a later lifecycle state to clear the pending request. Reports are accepted only when `TMUX_PANE` identifies a live pane containing the matching agent process. The endpoint is observational: it cannot approve, deny, or send input to an agent. Unknown agent kinds, malformed states, stale sessions, and unverified panes are ignored.
+`agent` must identify a supported live process (`claude`, `codex`, `opencode`, `gemini`, `pi`, `omp`, `agy` or `antigravity`, `cursor-agent`, `copilot`, `grok`, or `hermes`), and `session_id` must remain stable for that agent session. Send `ready` to begin or replace a session, then `working`, `needs-input`, `turn-ended`, `interrupted`, or `session-ended` as lifecycle events occur. A needs-input report must include a request ID, tool, or summary. The optional request object accepts `id`, `tool`, `summary`, and `command`; Canopy bounds and sanitizes these fields. Send a later lifecycle state to clear the pending request. Reports are accepted only when `TMUX_PANE` identifies a live pane containing the matching agent process. The endpoint is observational: it cannot approve, deny, or send input to an agent. Unknown agent kinds, malformed states, stale sessions, and unverified panes are ignored.
 
 ### Codex hook setup
 
@@ -870,7 +866,7 @@ Previews are on-demand snapshots, not continuously polled terminals. Neither pre
 
 ### Content layouts
 
-`prefix + Space` (currently **Ctrl-a Space**) cycles content-only layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, tiled, and the two mirrored main layouts. The sidebar's width, full height, and configured left/right edge stay fixed. The sidebar's **Layouts** action menu uses the same mechanism. With one content pane, there is nothing to rearrange; without a sidebar/slot, ordinary native layout commands are used.
+`prefix + Space` (`Ctrl-b Space` with the default prefix) cycles content-only layouts: even-horizontal, even-vertical, main-horizontal, main-vertical, tiled, and the two mirrored main layouts. The sidebar's width, full height, and configured left/right edge stay fixed. The sidebar's **Layouts** action menu uses the same mechanism. With one content pane, there is nothing to rearrange; without a sidebar/slot, ordinary native layout commands are used.
 
 The implementation generates one checksummed native layout for the existing panes and applies it directly—no temporary windows, pane recreation, or whole-window layout followed by a repair. Stable placeholder slots are protected too. Layouts that cannot fit are skipped during cycling or refused for explicit selection. Zoomed windows are left alone; unzoom before cycling. Multiple docks or a dock already reordered by other commands are refused rather than risking an application's position; reopen a displaced sidebar to restore normal ordering.
 
@@ -928,6 +924,11 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | Component | Responsibility |
 |---|---|
 | `tmux-canopy.tmux` | Configuration, toggle binding, and window/session hooks |
+| `canopy` | CLI for interactive setup, agent integration management, diagnostics, detail toggles, and alert testing |
+| `scripts/config-lib.sh` | Batched state loading, key/option ownership records, and command queueing |
+| `scripts/theme-lib.sh` | Resolve `ansi` inherited tmux colors, built-in theme presets, `fixed`, `mono`, and `@tmux-canopy-color-*` overrides |
+| `scripts/path-lib.sh` | Home-directory path shortening (`~/…`) |
+| `scripts/git-lib.sh` | Lock-free Git root discovery, branch lookup, and worktree dirty summary |
 | `scripts/toggle` | Create or close the invoking client's sidebar |
 | `scripts/follow` | Move an existing sidebar pane to the client's selected or newly created window |
 | `scripts/navigate` | Dispatch next/previous/last/numeric window navigation |
@@ -935,21 +936,32 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `scripts/sync-width` | Debounce legacy live-mode resizes and synchronize inactive slots |
 | `scripts/resize` | Commit one-shot and preset widths to the sidebar and slots |
 | `scripts/mouse-resize` | Detect sidebar-border drags and commit on mouse release |
+| `scripts/edge-refresh` | Debounced reload after sidebar resize so right-edge marks realign |
 | `scripts/refresh-sidebar` | Remember the live content target and debounce owner-only active-location updates |
 | `scripts/responsive-width` | Re-clamp fixed/percentage widths after terminal resizing |
 | `scripts/cleanup` | Repair stale ownership/targets and remove orphan slots |
 | `scripts/reap-empty` | Finish content-empty windows while preserving the dock and native successor selection |
 | `scripts/balance-window` | Restore sidebar width and resize remaining content pane when multiple panes are closed down to one |
+| `scripts/restore-window-layout` | Scale and restore saved content-pane layout geometry when closing a dock or slot |
+| `lib/scale-layout.awk` | Scale tmux layout strings to new window dimensions and recompute layout checksums |
 | `scripts/notify` | Validate/deduplicate events, batch unread clears, and coalesce refresh workers |
 | `scripts/notification-lib.sh` | Native hook predicates and expiring clear claims |
+| `scripts/details` | Toggle or set Git branch and directory detail visibility at runtime (`canopy-branch` / `canopy-directory`) |
+| `scripts/directory-prompt.sh` | Opt-in Bash `PROMPT_COMMAND` notifier for directory changes |
+| `scripts/directory-refresh` | Debounced sidebar refresh helper for directory changes |
 | `scripts/tree-filter` | Tree filter menu, literal text prompts, and per-sidebar overrides |
+| `scripts/quick-switch` | Global `Ctrl-g` fzf switcher across all sessions, windows, and panes |
+| `scripts/jump-current` | Return selection pointer to the current content pane or visible parent (`Ctrl-o`) |
+| `scripts/jump-agent` | Jump to the longest-waiting or oldest unread completed agent across all sessions (`n`) |
 | `scripts/view-header` | Render the current-view title and row count for Processes and Buffers, quiet's contextual footer, and operation mode state |
 | `scripts/sidebar-source` | Publish complete in-memory view snapshots or a recoverable error row |
 | `scripts/launch-lib.sh` | Shell/tmux quoting, preflight checks, and bounded owner-targeted failures |
 | `scripts/ui-options.sh` | Shared preflight and runtime fzf options/bindings |
 | `scripts/doctor` | CLI and contextual-popup diagnostics |
 | `scripts/sidebar-action` | Dispatch view-specific focus, buffer, process, and action-menu operations |
+| `scripts/preview-mode` | Cycle docked preview drawer mode (`Terminal preview`, `Agent inspector`, `Agent list`) |
 | `scripts/sidebar-preview` | Dispatch and row-budget object, process, pane, and buffer previews |
+| `scripts/agent-preview` (`scripts/codex-preview`) | Render the Agent inspector card and Agent list drawer |
 | `scripts/pane-preview` | Capture recent shell rows or the active TUI screen without resizing |
 | `scripts/preview-popup` | Open an owner-targeted enlarged read-only snapshot |
 | `scripts/content-layout` | Cycle/apply content-only layouts with native fallback |
@@ -963,7 +975,16 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `lib/tree-render.awk` | Render hierarchy, badges, state and occurrence-aware row identities |
 | `scripts/tree-action` | Navigate, create, rename, delete, move, and manage selected objects |
 | `scripts/tree-preview` | Render metadata and captured pane output |
-| `scripts/help` | Display responsive, scrollable Help in an overlay or the current pane |
+| `scripts/help` | Display responsive, scrollable Help and Legend in an overlay or the current pane |
+| `scripts/agent-hook`, `scripts/codex-hook`, `scripts/agent-report` | Shell entrypoints for lifecycle adapters and the common reporter contract |
+| `lib/agent-hook.py`, `lib/codex-hook.py` | Lifecycle event normalizers and reporters (including Codex `app-server` routing) |
+| `lib/agent_reporting.py` | Shared pane-option storage, process identity checks, per-pane locking, and alert triggers |
+| `lib/agent_kinds.py` | Canonical agent names, carrier-process allowlist, and hosted Node/Bun/Python/Hermes argv resolution |
+| `lib/subagent_state.py` | Parse, update, and format per-pane subagent records |
+| `lib/agent-process.sh`, `lib/agent-process.py` | Portable `ps` and Linux `/proc` agent process tree detection |
+| `scripts/agent-refresh`, `scripts/agent-expiry` | Debounced agent-event refresh and 15-minute stale-report expiry workers |
+| `scripts/agent-animate`, `scripts/animate-frame`, `lib/animate.py` | Short-lived `WORKING` highlight animator and precomputed frame server |
+| `scripts/alert` | Desktop (`terminal-notifier`, `osascript`, `notify-send`) and `tmux` alert delivery |
 | `scripts/lib.sh` | Shared sidebar ownership and pane helpers |
 
 Canopy's tmux hooks sit at array indexes it owns, 9000 to 9099 (`after-select-window[9001]` and so on), and its command aliases at 9100 to 9199. Every plugin load first removes whatever is at those indexes, then adds what the current settings need, so a hook a setting no longer needs never outlives it and entries left by an older version are cleared. Hooks and aliases of your own at other indexes are never touched; avoid those two ranges for them.
@@ -1005,7 +1026,7 @@ The rendering suite additionally verifies snapshot field safety, linked-row uniq
 
 The focus suite uses real client keystrokes and SGR mouse clicks to check live pane/window/session markers, remembered content on sidebar focus, pointer return on same-pane departure and pane switches, clearing a search when jumping to the active pane, collapsed branches, rapid pane-switch coalescing, stale hook targets, new windows, linked-session occurrences, and rejection of refresh requests from a non-owning client. The stability suite captures the real sidebar terminal stream to detect pre-reload erases, holds a background snapshot to verify newer refreshes win, checks header replacement through empty views and failure/recovery, checks selected-command contrast on light/dark black-and-white palettes, and exercises navigator routing and search backspace on both edges.
 
-The preview suite checks row budgets, real fzf no-wrap rendering with ANSI/Unicode, the `p` toggle, fixed drawer height, alternate-screen capture, popup safety, and zero application resize signals from previews. It also exercises actual Ctrl-a Space keystrokes against the persistent sidebar. The layout suite covers all presets, reverse cycling, focus/ID preservation, slots, single content panes, zoom refusal, native fallback, and insufficient space.
+The preview suite checks row budgets, real fzf no-wrap rendering with ANSI/Unicode, the `p` toggle, fixed drawer height, alternate-screen capture, popup safety, and zero application resize signals from previews. It also exercises actual `prefix + Space` keystrokes against the persistent sidebar. The layout suite covers all presets, reverse cycling, focus/ID preservation, slots, single content panes, zoom refusal, native fallback, and insufficient space.
 
 The multiline suite checks NUL framing and legacy compatibility, one identity per two-line pane, aligned/subdued paths, no spacer rows, real second-line mouse selection, one-object keyboard movement, path filtering, reload/density-change tracking, and Enter targeting a non-first content pane.
 
@@ -1022,6 +1043,8 @@ rows, linked-session targets, pending operations, cancellation, and deleted targ
 It verifies that sidebar state and the running fzf process survive navigation.
 
 The buffer suite checks encoded identities, preview/paste/delete targeting, Unicode and separator-bearing names. The configuration suite checks binding/monitor restoration and later user overrides.
+
+Additional suites in `tests/run.sh` cover hook gating (`hook_gating`), CLI setup and integration installation (`setup`), Git branch and dirty context (`git_context`), `quiet` appearance and layout (`quiet`, `quiet_layout`), place labels (`labels`), runtime detail toggles (`details`), view headers and footers (`view_headers`, `footer`), icon themes and alignment (`icons`, `icon_alignment`), notifications and attention rollups (`notifications`, `attention`), global agent jump (`jump_agent`), desktop and tmux alerts (`alerts`), subagent tracking and Codex `app-server` routing (`subagents`, `codex_subagents`, `codex_daemon`), pane-less hook attribution (`agent_no_pane`), agent actions (`agent_actions`), orphan process and report cleanup (`orphans`), lifecycle reporters and process detection (`agent_reporting`, `agent_detection`, `codex_panel`, `harnesses`), Help and Legend overlays (`help`), layout scaling (`layout_scaling`), directory grouping and refresh (`directories`, `create_refresh`, `directory_refresh`), automatic session naming (`session_names`), themes and presets (`theme`), working-badge animation (`animate`), mouse wheel and resize behavior (`mouse`), wide CJK/emoji truncation (`wide_text`), and popup display mode (`popup`).
 
 None of these suites alters the developer's active tmux server.
 

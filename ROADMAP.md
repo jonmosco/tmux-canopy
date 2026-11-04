@@ -26,7 +26,7 @@ New features were on hold until the existing ones were dependable:
   is in help, the README, and the reference, every setting the code reads is
   documented, and the legend describes the current footers.
 
-## Sidebar UX (done, unreleased)
+## Sidebar UX (done in 0.5.0)
 
 - [x] Agent inspector as a fixed field card (state, trust, directory, optional
   git, place with green `●`), shared Terminal/Agent drawer at 25% height, `i`
@@ -52,9 +52,8 @@ New features were on hold until the existing ones were dependable:
 
 ## Jump to an agent needing input
 
-- [x] Implement global jump (`n`) to the next pane reporting needs-input across all
-  sessions and windows, with wraparound and tree-order traversal.
-- [ ] Test stale targets, agent exits, linked windows, and multiple clients.
+- [x] Implement global jump (`n`) to the longest-waiting pane reporting needs-input (or, when none is waiting, the oldest unread settled agent pane) across all sessions and windows, with wraparound and tree-order tie-breaking.
+- [ ] Extend multi-client jump tests (`tests/jump_agent.py` covers longest-waiting order, unread fallback, stale targets, agent exits, and linked windows).
 
 ## Additional subagent integrations
 
@@ -156,9 +155,7 @@ consistent across views:
   accent) from status, pane border, and message styles at sidebar open, with
   per-slot fallbacks when styles are `default` or missing. Escape hatch:
   `@tmux-canopy-theme 'fixed'`.
-- [ ] **Canopy:** allow an independent palette for text, selection, accents,
-  notices, tree guides, preview, help, and the scrollbar. Provide documented
-  defaults and user overrides without changing tmux or terminal settings.
+- [x] **Canopy:** allow an independent palette (`@tmux-canopy-theme` built-in dark and light presets) and per-role user overrides (`@tmux-canopy-color-<role>`) for text, selection, accents, notices, tree guides, and borders without changing tmux or terminal settings.
 - [ ] Apply the chosen source consistently across Tree, Processes, Buffers,
   Agents, previews, help, and popups. Keep agent state and unread notifications
   distinguishable without relying on color alone. (Tree + fzf chrome +

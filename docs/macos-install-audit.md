@@ -1,5 +1,7 @@
 # macOS installation and lifecycle audit
 
+> **Historical note:** This document records a point-in-time pre-`0.1.0` audit on `2026-09-26` (`c89a528`). The eight suite failures listed below were subsequently resolved prior to the `0.1.0` release.
+
 Date: 2026-09-26. Result: installation checks pass; the complete release gate
 does **not** pass on this machine.
 

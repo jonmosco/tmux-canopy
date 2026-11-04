@@ -85,6 +85,18 @@ try:
         hook('Stop', 'web-1', 'web', turn_id='t1', last_assistant_message='done')
         assert state(web) == 'codex-hook|web-1|turn-ended', state(web)
 
+        # Subagent hooks routed through app-server reach the parent pane even
+        # when the child hook reports its own conversation_id as session_id.
+        hook('UserPromptSubmit', 'web-1', 'web', turn_id='t2')
+        hook('SubagentStart', 'web-1', 'web', turn_id='t2', agent_id='web-child-1', agent_type='explorer')
+        assert 'web-child-1,explorer,working' in tm('display-message', '-p', '-t', web, '#{@tmux_canopy_agent_subagents}')
+        hook('UserPromptSubmit', 'web-child-1', 'web', turn_id='ct1', agent_id='web-child-1', agent_type='explorer')
+        assert state(web) == 'codex-hook|web-1|working', state(web)
+        hook('SubagentStop', 'web-child-1', 'web', turn_id='ct1', agent_id='web-child-1', agent_type='explorer')
+        assert tm('display-message', '-p', '-t', web, '#{@tmux_canopy_agent_subagents}') == ''
+        hook('Stop', 'web-1', 'web', turn_id='t2', last_assistant_message='done')
+        assert state(web) == 'codex-hook|web-1|turn-ended', state(web)
+
         # Two Codex panes in one directory: no guess, no report.
         hook('SessionStart', 'shared-1', 'shared', source='startup')
         hook('UserPromptSubmit', 'shared-1', 'shared', turn_id='t1')
