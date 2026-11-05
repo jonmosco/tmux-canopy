@@ -13,7 +13,7 @@ import termios
 import threading
 import time
 
-from support import install_fzf_probe
+from support import TerminalAnswers, install_fzf_probe
 
 ROOT = Path(__file__).resolve().parents[1]
 socket = f'canopy-mouse-{os.getpid()}'
@@ -65,10 +65,12 @@ def main():
                               stderr=slave, env=base, start_new_session=True)
             os.close(slave)
             output = bytearray()
+            answers = TerminalAnswers(master)
 
             def drain():
                 try:
                     while data := os.read(master, 65536):
+                        answers.feed(data)
                         output.extend(data)
                         del output[:-65536]
                 except OSError:

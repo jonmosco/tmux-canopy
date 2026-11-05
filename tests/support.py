@@ -1,8 +1,40 @@
 """Test-only instrumentation; production never accepts ambient fzf bindings."""
+import os
 import shlex
 import re
 import shutil
 import sys
+
+# tmux asks its client terminal for colors and capabilities when it attaches,
+# and forwards a pane's own color queries (fzf asks) to that terminal. A real
+# terminal always answers; a bare pty never does, which leaves the pane
+# unpainted until something resizes it. These are the queries tmux sends and
+# canned replies for a dark xterm-like terminal.
+TERMINAL_REPLIES = {
+    b'\x1b]10;?\x1b\\': b'\x1b]10;rgb:cccc/cccc/cccc\x1b\\',
+    b'\x1b]11;?\x1b\\': b'\x1b]11;rgb:1111/1111/1111\x1b\\',
+    b'\x1b[c': b'\x1b[?62;c',
+    b'\x1b[>c': b'\x1b[>1;10;0c',
+    b'\x1b[>q': b'\x1bP>|xterm(388)\x1b\\',
+    b'\x1b[?996n': b'\x1b[?997;1n',
+}
+
+
+class TerminalAnswers:
+    """Answer terminal queries found in the output tmux writes to a pty client."""
+
+    def __init__(self, master_fd):
+        self.master_fd = master_fd
+        self.tail = b''
+
+    def feed(self, data):
+        data = self.tail + data
+        for query, reply in TERMINAL_REPLIES.items():
+            for _ in range(data.count(query)):
+                os.write(self.master_fd, reply)
+            data = data.replace(query, b'')
+        # A query split across two reads completes on the next feed.
+        self.tail = data[-16:]
 
 
 def install_agent_fixture(destination):
