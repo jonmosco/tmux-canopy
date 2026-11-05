@@ -9,11 +9,12 @@ Remaining work for tmux-canopy. This list does not promise a release date. The
 - [ ] Extend lifecycle regression coverage beyond Codex to verify that agent
   exit, restart, and pane reuse cannot leave misleading status behind. Codex has
   real-process tests for these (`tests/codex_panel.py`) and Pi/Oh My Pi cover
-  session replacement (`tests/agent_reporting.py`); Claude Code, Gemini CLI,
-  OpenCode, Cursor Agent, and Antigravity still need the same real-process
-  checks. A manual pass for 0.4.0 found Claude Code and Codex (approval
-  answered with `>`), Antigravity, and Pi correct, and fixed OpenCode 2 never
-  reporting from its shared service. Gemini CLI could not sign in, Cursor Agent
+  session replacement (`tests/agent_reporting.py`), and Claude Code has them in
+  `tests/claude_lifecycle.py` (exit, restart by the same shell, session
+  replacement, and pane reuse); Gemini CLI, OpenCode, Cursor Agent, and
+  Antigravity still need the same real-process checks. A manual pass for 0.4.0
+  found Claude Code and Codex (approval answered with `>`), Antigravity, and Pi
+  correct, and fixed OpenCode 2 never reporting from its shared service. Gemini CLI could not sign in, Cursor Agent
   and Oh My Pi had no Canopy integration installed, and Copilot and Grok were
   not installed, so those were not checked.
 

@@ -10,7 +10,9 @@
 8. Publish the release and announcement only after the above gates pass.
 
 For a local TPM installation check, run
-`python3 tests/tpm_install.py /path/to/tpm`. This uses the real TPM scripts
+`python3 tests/tpm_install.py /path/to/tpm`. `tests/run.sh` runs it when a TPM
+checkout exists at `$TMUX_CANOPY_TPM` or `~/.tmux/plugins/tpm`, and prints a
+`skip` line otherwise. It uses the real TPM scripts
 with a disposable snapshot of the working tree, temporary home, and private
 tmux server. It checks install, reload, view providers, removal, and manual
 installation without modifying the user's configuration. It does not test
