@@ -6,6 +6,11 @@
 
 - Switching windows by clicking a tab on the status line, or by scrolling the wheel over it, no longer makes the sidebar blink. Those mouse bindings now use the same one-step transition as `prefix + n`, `p`, and the number keys, instead of showing the new window first and moving the sidebar in from a follow hook. Canopy only replaces tmux's default `MouseDown1Status`, `WheelUpStatus`, and `WheelDownStatus` bindings (a binding of yours is left alone, a click off the tabs keeps its default action, and `@tmux-canopy-smooth-navigation 'off'` keeps all three native), and restores the previous bindings when turned off.
 
+### Changed
+
+- Running the plugin under Bash older than 4.4 (stock macOS ships 3.2) now stops at once with one message that says to install a newer Bash with `brew install bash` and put it on tmux's `PATH`, and exits non-zero without installing anything. Before, it printed two dozen `declare: -A: invalid option` and syntax errors and returned success after a partial load. `tests/old_bash.py` covers it where an old Bash exists.
+- `README.md` has a "How Canopy compares" section.
+
 ### Added
 
 - `tests/status_mouse.py` clicks and scrolls the status line of a real attached client, `tests/claude_lifecycle.py` checks Claude Code's exit, restart, and pane reuse against a real process, and `tests/run.sh` runs the real-TPM install check when a TPM checkout exists.

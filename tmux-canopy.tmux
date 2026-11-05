@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# Stock macOS ships Bash 3.2. The libraries below need 4.4 (associative arrays,
+# NUL-delimited reads) and would fail with dozens of cryptic errors, so stop
+# first with one clear message. This block must parse under Bash 3.2.
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
+  canopy_old_bash="tmux-canopy needs Bash 4.4 or newer, but this is Bash ${BASH_VERSION%%[( ]*}. On macOS run: brew install bash (and put /opt/homebrew/bin or /usr/local/bin before /bin in the PATH that tmux starts with)."
+  printf '%s\n' "$canopy_old_bash" >&2
+  tmux display-message "$canopy_old_bash" 2>/dev/null
+  exit 1
+fi
+
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$CURRENT_DIR/scripts/notification-lib.sh"

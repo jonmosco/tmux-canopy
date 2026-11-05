@@ -61,46 +61,17 @@ tmux run-shell "$HOME/.tmux/plugins/tmux-canopy/tmux-canopy.tmux"
 Add `~/.tmux/plugins/tmux-canopy` to your `PATH` if you want the short `canopy` CLI command.
 </details>
 
+## How Canopy compares
+
+Several good tools watch coding agents inside tmux. Pick by what you want to see and how you want it to run.
+
+- **Canopy** shows one persistent tree of every session, window, pane, and agent (11 agents today), with folding and search, `n` to jump to the agent that has waited longest for you, and `>` to answer it without leaving the tree. It is Bash, awk, and fzf driven by tmux hooks: no daemon and no compiled binary (the optional agent hook adapters use Python 3). It watches the tmux you already have; it does not launch agents.
+- [tmux-agent-sidebar](https://github.com/hiroppy/tmux-agent-sidebar) is an agents-first sidebar for Claude Code, Codex, and OpenCode, with a Git tab and worktree spawn and teardown from the sidebar. It ships as a prebuilt Rust binary.
+- [tmux-pane-tree](https://github.com/sandudorogan/tmux-pane-tree) is a lighter session, window, and pane tree with agent badges, in shell and Python.
+- [workmux](https://github.com/raine/workmux) is built around one git worktree per tmux window, with a dashboard, a sidebar, and sandboxing. Choose it if worktree-per-task is how you work. Canopy shows the branch and a dirty summary but does not create worktrees.
+- [claude-squad](https://github.com/smtg-ai/claude-squad) and [agent-deck](https://github.com/asheshgoplani/agent-deck) start and manage agent sessions for you in their own interface. Canopy only observes and navigates.
+
 <a id="features"></a>
-
-## The sidebar at a glance
-
-A sidebar with agent mode on, one agent waiting for approval, and a folded session:
-
-```text
-Tree · All                         ◆1 ▷1   ① ②
-▾ ◈ acme ─────────────────────────────     ③
-   ▾ ▣ 0:server             api ⎇ main     ④ ⑤
-   ●  ✳  1:claude                    !     ⑥ ⑦ ⑧
-            Explore                  ▷     ⑨
-            Plan                     !
-             2:zsh                         ⑩
-      ✳ 1:ui · claude      web ⎇ ui  ▷     ⑪
-▾ ◈ notes ────────────────────────────
-      ▣ 0:today · zsh                ●     ⑫
-▸ ◈ scratch [2w] ─────────────────────     ⑬
-───────────────────────────────────
- ◆ Claude Code waiting  n go  > reply      ⑭
-```
-
-| | What it shows | Keys |
-|---|---|---|
-| ① | **View and filter.** Open view (`Tree`, `Agents`, `Processes`, `Buffers`) and filter (`All`, `Session`, or `Unread`; `+W` / `+T` when window-name or pane-title filters are active). | `1` Tree, `4` Agents, `2` Processes, `3` Buffers; `F` or `Ctrl-f` filters |
-| ② | **Agent summary.** Counts by state: `◆` needs input, `✕` interrupted, `▷` working, `✓` ended, `○` process-only (or `◆1/3` when narrow). Processes and Buffers views show row counts here. | `n` jump to the agent waiting |
-| ③ | **Session heading**, followed by a dim rule. Your current session has a tmux-green glyph and cyan name. | `h` / `l` fold and unfold, `H` / `L` all |
-| ④ | **Window**, in tmux's order; each window appears once. | `Enter` focus, `r` rename, `t` new window, `a` actions |
-| ⑤ | **Directory and branch**, dim at the right of the highest row whose panes all share them (session, window, or pane). | `canopy-branch`, `canopy-directory` at `prefix :` |
-| ⑥ | **Your current pane** (green `●`). The highlighted row is what you are browsing; switching content panes does not move your browse cursor. | `Ctrl-o` jump back to your pane |
-| ⑦ | **Pane:** application icon, pane index, and running command. | `Enter` focus, `s` / `v` split, `z` zoom, `x` `x` delete |
-| ⑧ | **Agent state** at the right edge: `!` needs input, `✕` interrupted (red, `x` in ASCII), `▷` working, `✓` turn ended. A waiting agent shows its question or command on a dim line beneath. | `n` next waiting agent, `i` Agent inspector, `>` send reply |
-| ⑨ | **Subagents** of the pane above, each with its own state while running. | |
-| ⑩ | **An idle shell**, dimmed so running programs stand out. | |
-| ⑪ | **A single-pane window**, shown on one row. | |
-| ⑫ | **Unread output** (dim `●`); a bell or silence alert is amber. | `u` clear, `U` clear all |
-| ⑬ | **Folded session**, with the number of windows inside. | `l` unfold |
-| ⑭ | **Action footer:** view-specific hints (or an urgent waiting-agent / pending-action prompt). | `f` hide or show |
-
-Press `g` in the sidebar for the full symbol and color legend, and `?` for the interactive help popup.
 
 ## Essential controls
 
