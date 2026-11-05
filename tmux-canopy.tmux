@@ -157,6 +157,30 @@ if [[ "$smooth_navigation" != 'off' ]]; then
     canopy_bind prefix "$last_window_key" run-shell \
       "$(plugin_command navigate '#{client_tty}' last "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
   fi
+
+  # Switching windows from the status line (a click on a tab, or the wheel)
+  # would otherwise show the new window first and move the sidebar in from a
+  # follow hook, which makes it blink. Route them through the same transition
+  # as the keys above. Only tmux's own bindings are replaced: a binding of the
+  # user's is left alone, and a click that is not on a window tab keeps its
+  # default action.
+  canopy_bind_status() {
+    local key="$1" default="$2" current
+    shift 2
+    current=${CANOPY_KEYS["root"$'\037'"$key"]:-}
+    # CANOPY_KEYS holds the whole "bind-key -T root ... KEY command" text.
+    if [[ -z "$current" || "$current" == *" $key $default" || "$current" == *'/scripts/navigate'* ]]; then
+      canopy_bind root "$key" "$@"
+    fi
+  }
+  canopy_bind_status MouseDown1Status 'switch-client -t =' \
+    if-shell -F '#{==:#{mouse_status_range},window}' \
+      "$(plugin_job '-t =' navigate '#{client_tty}' 'window:#{session_id}:#{window_id}' "$sidebar_width" "$sidebar_scope" "$sidebar_transition")" \
+      'switch-client -t ='
+  canopy_bind_status WheelUpStatus 'previous-window' run-shell \
+    "$(plugin_command navigate '#{client_tty}' previous "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
+  canopy_bind_status WheelDownStatus 'next-window' run-shell \
+    "$(plugin_command navigate '#{client_tty}' next "$sidebar_width" "$sidebar_scope" "$sidebar_transition")"
 fi
 
 # ---------------------------------------------------------------------------

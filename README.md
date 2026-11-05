@@ -256,7 +256,7 @@ Run the test suite: make test
 - **No daemon.** Canopy is Bash, awk, and fzf driven by tmux hooks. Between events, only short-lived bounded helpers run.
 - **One snapshot per refresh.** A single tmux call collects every session, window, pane, and client; `awk` renders the tree and `fzf` reloads in place in tens of milliseconds.
 - **Event-driven & verified.** Hooks for ordinary panes are gated inside tmux with `if-shell -F` so they start no shell at all. Agent hook reports are verified against the live pane process ID and start time, so a restarted agent never inherits stale state.
-- **Clean tmux integration.** Canopy wraps `prefix + n`, `p`, `0`–`9`, `Tab`, and `Space` for sidebar-aware navigation and layouts (disable with `@tmux-canopy-smooth-navigation 'off'`), and restores previous bindings and options when turned off.
+- **Clean tmux integration.** Canopy wraps `prefix + n`, `p`, `0`–`9`, `Tab`, and `Space`, and clicking or scrolling the status line, for sidebar-aware navigation and layouts (disable with `@tmux-canopy-smooth-navigation 'off'`), and restores previous bindings and options when turned off.
 - **Limitations:**
   - Only one client can own a docked sidebar per tmux server; other clients can use `@tmux-canopy-mode 'popup'`.
   - A `cd` inside a shell without another tmux event needs `Ctrl-r` to update the directory label unless you enable the opt-in prompt notifier (`@tmux-canopy-directory-refresh 'on'`).
