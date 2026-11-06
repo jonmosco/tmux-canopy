@@ -257,7 +257,7 @@ legend_records() {
     legend_item '◆ Claude Code waiting  n go' 'A waiting or interrupted (✕) agent temporarily replaces the normal action footer; pending move, link, and delete operations do the same.' amber
     legend_item '! / ✕ / ▷ / ✓' 'Agent state on a pane: needs input, interrupted (red), working (pulses while animation is on), ready or turn ended.' amber
     legend_item '  make test · Run…' 'What an agent waiting on you asks for: the command, then its description. i separates request and command; > replies.' dim
-    legend_item '├─ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
+    legend_item '├ Explore ▷' 'A running subagent of the pane above, with its state and age. It disappears when it stops.' cyan
     note 'Quiet moves these marks to the right edge, separate from amber unread notices; a waiting subagent takes priority. Classic spells states out instead, as the labels below show.'
     legend_item '[process]' 'An agent process was found in this pane; no lifecycle state is available.' dim
     legend_item '[working·hook]' 'A live agent recently reported a running turn.' cyan

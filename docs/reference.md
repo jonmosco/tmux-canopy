@@ -537,7 +537,7 @@ panes all share it: the session heading when the whole session is in one
 directory, otherwise each window whose panes agree, otherwise each pane of a mixed
 window. Nothing mixed claims one directory or branch. On a narrow row the detail
 gives way first: the branch is shortened, then dropped, then the directory, so the
-name and marks always fit. Sessions are bold one-line headings, each followed by a
+name and marks always fit. Sessions are bold one-line headings (the one you are in is bold and accent-coloured), each followed by a
 dim rule to the right edge (or to its detail) that separates it from the session
 above, so a selection never covers a blank line. Session glyphs are tmux green; the
 session you are in has a full green glyph and an accent-coloured name, and the others
@@ -553,8 +553,8 @@ short header naming only the open view instead of a permanent tab strip:
 `Tree · All`/`Agents · All` (`Tree | All` with ASCII icons), `Processes`, or
 `Buffers`. The Agents header counts agents in each state (`◆1 ✕1 ▷2 ✓1 ○1`),
 shortened to the most urgent state and total (`◆1/5`) when narrow. The `quiet`
-Tree header carries the same global summary and says `agent mode off` when
-awareness is disabled. Processes and Buffers put their row count on the right
+Tree header carries the same global summary and shows an `A enable agents` hint (the
+key in the accent colour, as in the footer) when awareness is disabled. Processes and Buffers put their row count on the right
 (`12 processes`). Every appearance and view uses the responsive action footer
 described above instead of workspace or agent counts. In Tree view, `quiet`
 subdues guides, uses small chevrons for folds, places the green active-pane dot

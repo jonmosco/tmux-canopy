@@ -52,7 +52,7 @@ try:
         assert view('tree')[0] == 'Tree · All', view('tree')
         assert view('agents')[0].startswith('Agents · All'), view('agents')
         tm('set-option', '-g', '@tmux-canopy-agents', 'off')
-        assert view('tree') == ('Tree · All' + ' ' * 15 + 'agent mode off', '↵ focus  a actions  / search  ? help'), \
+        assert view('tree') == ('Tree · All' + ' ' * 14 + 'A enable agents', '↵ focus  a actions  / search  ? help'), \
             view('tree')
         tm('delete-buffer', '-b', 'two')
         assert view('buffers')[0].endswith('1 buffer'), view('buffers')

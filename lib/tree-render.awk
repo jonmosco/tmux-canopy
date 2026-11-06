@@ -416,9 +416,9 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
             else summary=(icons == "ascii" ? "o" : "○") quiet_total
         }
     }
-    # With agent mode off the Tree says so, rather than looking like a
-    # server where no agent is running.
-    if (!agent_view && !agents_enabled) { summary="agent mode off"; style=dim }
+    # With agent mode off the Tree names the key that turns it on, in the footer's key-then-verb style, rather than
+    # looking like a server where no agent is running.
+    if (!agent_view && !agents_enabled) { summary="A enable agents"; style=dim; summary_color=accent "A" reset dim " enable agents" reset }
     if (summary != "" && summary_color == "") summary_color=style summary reset
     available=width-3
     # Every state at a glance ("◆1 ▷1 ○1") when it fits beside the title and
@@ -695,7 +695,7 @@ function request_line(p, continuation,    text,generic,plain,more) {
 # after the pane's own request line. A subagent line speaks the same status
 # language as its parent row: words in classic and pills, the quiet glyphs
 # (▷ working, ! needs input) in places, and lazygit's edge glyph alone.
-function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed,glyph,status) {
+function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed,glyph,status,guide) {
     if (!agents_enabled || !subagent_lines_shown()) return ""
     lines=request_line(p, continuation)
     n=load_subagents(p)
@@ -708,7 +708,8 @@ function subagent_lines(p, continuation, n,i,state,style,text,lines,elapsed,glyp
         if (appearance == "lazygit" || appearance == "quiet" || state == "unknown") status=""
         else if (appearance == "places") status=(glyph == "" ? "" : " " style glyph reset)
         else status=" " style subagent_word(state,width<36) reset
-        text=continuation dim (i == n ? branch_end : branch_mid) reset " " sub_type[p,i] status
+        guide=(appearance == "quiet" ? (i == n ? (icons == "ascii" ? " `" : " └") : (icons == "ascii" ? " |" : " ├")) : (i == n ? branch_end : branch_mid))
+        text=continuation dim guide reset " " sub_type[p,i] status
         lines=lines "\n" edge_count(text, appearance == "lazygit" || appearance == "quiet" ? glyph : elapsed, width-3)
     }
     return lines
@@ -1447,7 +1448,7 @@ END {
             # where you are even when folded; the others' glyphs are dimmed.
             current_heading=(s == current_s)
             session_glyph=(show_session_glyph ? (current_heading ? bold tmux_green : tmux_green_dim) session_icon reset " " : "")
-            session_style=(current_heading ? accent : bold) (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
+            session_style=(current_heading ? bold accent : bold) (sname[s] ~ /^[0-9]+$/ || sname[s] ~ /^session-[0-9]+$/ ? dim : "")
         }
         if (appearance == "quiet") quiet_home_place(s)
         card_line=""

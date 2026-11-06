@@ -88,7 +88,7 @@ def main():
         assert footer(status='working') == '↵ focus  a actions  / search  ? help', footer(status='working')
         assert footer(status='working', agents=False) == '↵ focus  a actions  / search  ? help'
         off = ANSI.sub('', render(agents=False)['H:tree']).rstrip()
-        assert off.endswith('agent mode off'), off
+        assert off.endswith('A enable agents') and 'agent mode off' not in off, off
         assert footer(second_agent=True) == '◆ 2 waiting  n next  > reply', footer(second_agent=True)
         assert footer(icons='ascii') == '! Claude Code waiting  n go  > reply', footer(icons='ascii')
         assert footer(state_text='MOVE\tP:%0\n') == 'Moving  ↵ move here  c cancel'
@@ -127,6 +127,9 @@ def main():
         narrow = render(width=24, long_command=True)
         pane = ANSI.sub('', narrow['P:%1:$0'])
         assert pane.endswith('●') and len(pane) <= 21, pane
+        # The session you are in is bold like the others, with its accent colour on top.
+        current = render(theme='fixed')['S:$0']
+        assert '\x1b[1m\x1b[1;36macme-api' in current, repr(current)
         mono = render(theme='mono')
         assert not any('\x1b' in value for value in mono.values()), mono
         hidden = render(state_text='FOOTER\toff\n')
@@ -142,6 +145,8 @@ def main():
         assert '○' in ANSI.sub('', unknown['P:%0:$0']) and '!' not in unknown['P:%0:$0']
         work = render(subagent=True)
         assert '!' in ANSI.sub('', work['P:%0:$0']) and 'Explore' in work['P:%0:$0']
+        # A subagent hangs off its pane with a dim connector; the last one closes it.
+        assert '└ Explore' in ANSI.sub('', work['P:%0:$0']), ANSI.sub('', work['P:%0:$0'])
         # A folder folded in another appearance does not hide panes in quiet.
         folded_folder = render(state_text='DIR:%0\n')
         assert 'DIR:%0:$0' not in folded_folder and 'P:%0:$0' in folded_folder, sorted(folded_folder)

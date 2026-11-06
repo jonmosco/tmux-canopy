@@ -62,7 +62,7 @@ def main():
                 return result.stdout
 
             # Agent mode controls whether the Agents view can be rendered.
-            agent_mode = lambda text: 'agent mode off' not in re.sub(r'\x1b\[[0-9;]*m', '', text)
+            agent_mode = lambda text: 'A enable agents' not in re.sub(r'\x1b\[[0-9;]*m', '', text)
             assert not agent_mode(source()) and 'Agents' not in source('--agents')
             assert source('--needs-input') == ''
             binds = ui_options()
