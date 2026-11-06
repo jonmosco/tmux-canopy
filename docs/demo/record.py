@@ -15,13 +15,18 @@ check the .cast files for private data before copying assets into docs/assets.
 The .cast files are ignored by git and can be played with `asciinema play`.
 """
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
+import pty
 import shutil
+import struct
 import subprocess as sp
 import sys
 import tempfile
+import termios
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,13 +35,24 @@ STAGE_SOCKET = f'{SOCKET}-stage'
 COLS, ROWS = 120, 32
 
 
+def drain_pty(master):
+    """Read and discard what the recorded terminal prints so the pty never fills."""
+    while True:
+        try:
+            if not os.read(master, 65536):
+                return
+        except OSError:
+            return
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', default=str(ROOT / 'docs' / 'assets'), help='directory for the .cast and .gif')
     parser.add_argument('--font-family', default='Hack Nerd Font Mono,JetBrains Mono,Menlo')
     parser.add_argument('--theme', default='dracula')
     parser.add_argument('--poster', type=float, default=7.5, help='preview GIF time in seconds for the still')
-    parser.add_argument('--demo', choices=('both', 'preview', 'walkthrough'), default='both')
+    parser.add_argument('--demo', choices=('both', 'preview', 'walkthrough', 'tour'), default='both')
+    parser.add_argument('--speed', type=float, default=None, help='GIF playback speed (the tour defaults to 1.25)')
     parser.add_argument('--smoke', action='store_true', help='run attached PTY actions and assertions without agg')
     args = parser.parse_args()
     if args.demo == 'both':
@@ -46,6 +62,9 @@ def main():
                     '--font-family', args.font_family, '--theme', args.theme,
                     '--poster', str(args.poster), *extra], check=True)
         return
+    # GitHub shows the GIF about 830 px wide, so on-page text size follows the column
+    # count, not agg's font size. The tour is narrower so its text reads larger.
+    cols = 100 if args.demo == 'tour' else COLS
     required = ('tmux', 'fzf', 'git', 'asciinema') if args.smoke else ('tmux', 'fzf', 'git', 'asciinema', 'agg')
     for tool in required:
         if not shutil.which(tool):
@@ -59,7 +78,8 @@ def main():
     real_home = str(Path.home().resolve())
     output = Path('/tmp/canopy-demo-smoke' if args.smoke else args.output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    name = 'canopy-demo' if args.demo == 'preview' else 'canopy-walkthrough'
+    name = {'preview': 'canopy-demo', 'walkthrough': 'canopy-walkthrough', 'tour': 'canopy-tour'}[args.demo]
+    still_name = name
     cast, gif = output / f'{name}.cast', output / f'{name}.gif'
 
     with tempfile.TemporaryDirectory(prefix='canopy-demo-') as directory:
@@ -125,7 +145,7 @@ def main():
                     '-c', 'user.email=demo@example.com', 'add', '.'], check=True)
             sp.run(['git', '-C', str(project), '-c', 'user.name=Canopy Demo',
                     '-c', 'user.email=demo@example.com', 'commit', '-q', '-m', 'demo fixture'], check=True)
-        if args.demo == 'preview':
+        if args.demo in ('preview', 'tour'):
             (home / 'projects' / 'web' / 'src' / 'session' / 'store.ts').write_text(
                 'export interface CacheOptions {\n  url?: string;\n  ttlSeconds: number;\n  prefix: string;\n}\n\n'
                 'export class SessionStore {\n  ttlSeconds = 3600;\n  prefix = "sess:";\n'
@@ -167,7 +187,7 @@ def main():
         editor_script.write_text(
             '#!/bin/bash\n'
             f'exec "{editor_bin}" --clean -n "+syntax on" '
-            '"+set number signcolumn=no laststatus=2 noshowmode cursorline background=dark" '
+            '"+set number signcolumn=no laststatus=2 noshowmode cursorline nowrap background=dark" '
             '"+call cursor(10, 17)" src/auth/login.ts\n'
         )
         editor_script.chmod(0o755)
@@ -223,11 +243,23 @@ def main():
 - review the rate limit PR
 - ship v2.4 release notes''', shell)
 
+        server = program('server', '''\033[32m~/acme-api\033[0m $ api-server --port 3000
+
+ \033[2m[12:04:11]\033[0m listening on \033[1m:3000\033[0m
+ \033[2m[12:04:19]\033[0m \033[32mGET\033[0m  /health            \033[2m200  2ms\033[0m
+ \033[2m[12:04:23]\033[0m \033[32mPOST\033[0m /login             \033[2m200  48ms\033[0m''', f'exec {bin_dir}/api-server 3600')
+        logs = program('logs', '''\033[32m~/projects/payments\033[0m $ tail -f stripe.log
+
+ \033[2m12:05:02\033[0m invoice.paid        \033[32mok\033[0m
+ \033[2m12:05:09\033[0m charge.refunded     \033[32mok\033[0m
+ \033[2m12:05:14\033[0m invoice.failed      \033[33mretry in 30s\033[0m''', shell)
+
         shell_rc = Path(directory) / 'demo.bashrc'
         shell_rc.write_text('PS1=\'\\[\\033[32m\\]\\w\\[\\033[0m\\] $ \'\n')
 
-        alerts_mode = 'off' if args.demo == 'preview' else 'tmux'
-        sidebar_width = 42 if args.demo == 'preview' else 40
+        alerts_mode = 'off' if args.demo in ('preview', 'tour') else 'tmux'
+        sidebar_width = 42 if args.demo in ('preview', 'tour') else 40
+        agents_default = 'off' if args.demo == 'tour' else 'on'
         config = Path(directory) / 'tmux.conf'
         config.write_text(f'''
 set -g default-terminal tmux-256color
@@ -249,7 +281,7 @@ set -g window-status-current-format '#[fg=#282a36,bg=#50fa7b,bold] #I:#W #[defau
 set -g pane-border-style 'fg=#44475a'
 set -g pane-active-border-style 'fg=#6272a4'
 set -g @tmux-canopy-icon-theme nerdfont
-set -g @tmux-canopy-agents on
+set -g @tmux-canopy-agents {agents_default}
 set -g @tmux-canopy-width {sidebar_width}
 set -g @tmux-canopy-preview-height 30%
 set -g @tmux-canopy-animate on
@@ -314,7 +346,73 @@ run-shell '{ROOT / "tmux-canopy.tmux"}'
                 hook_codex(billing, 'billing', {'hook_event_name': 'SessionStart'})
                 hook_codex(billing, 'billing', {'hook_event_name': 'UserPromptSubmit'})
                 time.sleep(.6)
-            else:
+            elif args.demo == 'tour':
+                editor = tm('-f', str(config), 'new-session', '-d', '-s', 'acme-api', '-x', str(cols), '-y', str(ROWS),
+                            '-n', 'editor', '-c', str(home / 'acme-api'),
+                            '-P', '-F', '#{pane_id}', str(editor_script))
+                api = tm('new-window', '-d', '-t', 'acme-api:', '-n', 'api',
+                         '-c', str(home / 'acme-api' / 'src' / 'auth'), '-P', '-F', '#{pane_id}', api_agent)
+                srv = tm('new-window', '-d', '-t', 'acme-api:', '-n', 'server',
+                         '-c', str(home / 'acme-api'), '-P', '-F', '#{pane_id}', server)
+                tm('split-window', '-d', '-v', '-l', '45%', '-t', srv,
+                   '-c', str(home / 'acme-api' / 'tests' / 'integration'), tests)
+                tm('new-window', '-d', '-t', 'acme-api:', '-n', 'release', '-c', str(home / 'acme-api'), codex)
+                web_ui = tm('new-session', '-d', '-s', 'acme-web', '-n', 'ui',
+                            '-c', str(home / 'acme-web' / 'src' / 'pages'), '-P', '-F', '#{pane_id}', web_agent)
+                tm('split-window', '-d', '-h', '-l', '45%', '-t', web_ui, '-c', str(home / 'acme-web'), git)
+                web = tm('new-window', '-d', '-t', 'acme-web:', '-n', 'cache',
+                         '-c', str(home / 'projects' / 'web'), '-P', '-F', '#{pane_id}', cache_agent)
+                billing = tm('new-session', '-d', '-s', 'billing', '-n', 'webhooks',
+                             '-c', str(home / 'projects' / 'payments'), '-P', '-F', '#{pane_id}', billing_agent)
+                tm('new-window', '-d', '-t', 'billing:', '-n', 'logs', '-c', str(home / 'projects' / 'payments'), logs)
+                tm('new-session', '-d', '-s', 'notes', '-n', 'today', '-c', str(home / 'notes'), notes)
+                tm('select-window', '-t', 'acme-api:0')
+                tm('select-pane', '-t', editor)
+                tm('set-option', '-g', '@demo_caption', f'{key}prefix T{plain}  dock Canopy beside your work')
+                for _ in range(60):
+                    if tm('display-message', '-p', '-t', editor, '#{pane_current_command}') in ('nvim', 'vim') and \
+                       tm('display-message', '-p', '-t', api, '#{pane_current_command}') == 'claude' and \
+                       tm('display-message', '-p', '-t', web, '#{pane_current_command}') == 'opencode' and \
+                       tm('display-message', '-p', '-t', billing, '#{pane_current_command}') == 'codex':
+                        break
+                    time.sleep(.05)
+                base = env | {'TMUX': tm('display-message', '-p', '-t', api, '#{socket_path},#{pid},0')}
+
+                def hook_claude(pane, session, payload):
+                    sp.run([str(ROOT / 'scripts' / 'agent-hook'), 'claude'], env=base | {'TMUX_PANE': pane},
+                           input=json.dumps({'session_id': session} | payload), capture_output=True, text=True,
+                           timeout=10, check=True)
+
+                def hook_opencode(pane, payload):
+                    sp.run([str(ROOT / 'scripts' / 'agent-hook'), 'opencode'], env=base | {'TMUX_PANE': pane},
+                           input=json.dumps(payload), capture_output=True, text=True, timeout=10, check=True)
+
+                def hook_codex(pane, session, payload):
+                    sp.run([str(ROOT / 'scripts' / 'codex-hook')], env=base | {'TMUX_PANE': pane},
+                           input=json.dumps({'session_id': session} | payload), capture_output=True, text=True,
+                           timeout=10, check=True)
+
+                # Agents report while agent mode is off, so pressing A reveals them all at once.
+                hook_claude(api, 'api', {'hook_event_name': 'SessionStart'})
+                hook_claude(api, 'api', {'hook_event_name': 'UserPromptSubmit'})
+                hook_claude(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's1', 'agent_type': 'Explore'})
+                hook_claude(api, 'api', {'hook_event_name': 'SubagentStart', 'agent_id': 's2', 'agent_type': 'Plan'})
+                hook_claude(web_ui, 'ui', {'hook_event_name': 'SessionStart'})
+                hook_claude(web_ui, 'ui', {'hook_event_name': 'UserPromptSubmit'})
+                hook_opencode(web, {'type': 'session.created',
+                                    'properties': {'sessionID': 'web',
+                                                   'info': {'id': 'web', 'directory': str(home / 'projects' / 'web')}}})
+                hook_opencode(web, {'type': 'session.status',
+                                    'properties': {'sessionID': 'web', 'status': {'type': 'busy'}}})
+                with open(tm('display-message', '-p', '-t', web, '#{pane_tty}'), 'wb', buffering=0) as pane:
+                    pane.write(b'\r\n\r\n ? Use Redis or memory cache?\r\n')
+                hook_opencode(web, {'type': 'question.asked',
+                                    'properties': {'sessionID': 'web',
+                                                   'questions': [{'question': 'Use Redis or memory cache?'}]}})
+                hook_codex(billing, 'billing', {'hook_event_name': 'SessionStart'})
+                hook_codex(billing, 'billing', {'hook_event_name': 'UserPromptSubmit'})
+                time.sleep(.6)
+            elif args.demo == 'walkthrough':
                 api = tm('-f', str(config), 'new-session', '-d', '-s', 'acme-api', '-x', str(COLS), '-y', str(ROWS),
                          '-n', 'server', '-c', str(home / 'acme-api' / 'src' / 'auth'),
                          '-P', '-F', '#{pane_id}', api_agent)
@@ -342,11 +440,23 @@ run-shell '{ROOT / "tmux-canopy.tmux"}'
             record_target = 'acme-api'
             control = tm
 
-            recorder = sp.Popen(['asciinema', 'rec', '--headless', '--overwrite', '--quiet',
-                                 '--window-size', f'{COLS}x{ROWS}', '--idle-time-limit', '2',
-                                 '--title', 'tmux-canopy', '-c',
-                                 f'tmux -L {record_socket} attach -t {record_target}', str(cast)],
-                                env=env)
+            attach = f'tmux -L {record_socket} attach -t {record_target}'
+            term_master = None
+            if args.demo == 'tour':
+                # The tour clicks the status line, so asciinema runs on a pty this script
+                # holds and can write mouse reports into (as tests/status_mouse.py does).
+                term_master, term_slave = pty.openpty()
+                fcntl.ioctl(term_slave, termios.TIOCSWINSZ, struct.pack('HHHH', ROWS, cols, 0, 0))
+                threading.Thread(target=drain_pty, args=(term_master,), daemon=True).start()
+                recorder = sp.Popen(['asciinema', 'rec', '--overwrite', '--quiet', '--idle-time-limit', '2',
+                                     '--title', 'tmux-canopy', '-c', attach, str(cast)],
+                                    stdin=term_slave, stdout=term_slave, stderr=term_slave, env=env,
+                                    preexec_fn=lambda: (os.setsid(), fcntl.ioctl(0, termios.TIOCSCTTY, 0)))
+            else:
+                recorder = sp.Popen(['asciinema', 'rec', '--headless', '--overwrite', '--quiet',
+                                     '--window-size', f'{cols}x{ROWS}', '--idle-time-limit', '2',
+                                     '--title', 'tmux-canopy', '-c', attach, str(cast)],
+                                    env=env)
             control_client = ''
             for _ in range(100):
                 control_client = control('list-clients', '-F', '#{client_name}')
@@ -443,6 +553,126 @@ run-shell '{ROOT / "tmux-canopy.tmux"}'
                 time.sleep(2.2)
                 if tm('display-message', '-p', '-t', client, '#{session_name}') != 'billing':
                     raise RuntimeError('n did not jump to waiting billing session')
+            elif args.demo == 'tour':
+                def tree():
+                    return tm('capture-pane', '-p', '-t', sidebar)
+
+                def goto(text, pause=.3, limit=40):
+                    """Move the selection with j/k until the selected row contains text."""
+                    for _ in range(limit):
+                        lines = tree().splitlines()
+                        selected = next((i for i, line in enumerate(lines) if line.startswith('▌')), None)
+                        target = next((i for i, line in enumerate(lines) if text in line), None)
+                        if target is None:
+                            raise RuntimeError(f'{text!r} is not in the tree:\n' + '\n'.join(lines))
+                        if selected == target:
+                            return
+                        keys('j' if target > selected else 'k', pause=pause)
+                    raise RuntimeError(f'could not select {text!r}:\n{tree()}')
+
+                def enter_and_look(hold):
+                    """Enter focuses the target; give it time on screen, then return to the sidebar."""
+                    keys('Enter', pause=.2)
+                    time.sleep(hold)
+                    tm('select-pane', '-t', sidebar)
+                    time.sleep(.35)
+
+                time.sleep(.9)
+                keys('C-b', 'T', pause=.15)
+                sidebar = ''
+                for _ in range(60):
+                    sidebar = find_sidebar()
+                    if sidebar:
+                        break
+                    time.sleep(.05)
+                if not sidebar:
+                    raise RuntimeError('sidebar did not open')
+                time.sleep(1.6)
+                shown = tree()
+                for needle in ('acme-api', 'acme-web', 'billing', 'notes', 'server', 'release', 'logs'):
+                    if needle not in shown:
+                        raise RuntimeError(f'{needle} missing from the tree:\n{shown}')
+
+                caption(f'{key}j k{plain}  walk every session, window and pane')
+                keys('j', 'j', 'j', 'j', 'j', 'j', pause=.34)
+                time.sleep(.5)
+                keys('k', 'k', 'k', pause=.34)
+                time.sleep(.5)
+
+                caption(f'{key}Enter{plain}  jump to any window; the tree follows you')
+                goto('ui')
+                time.sleep(.4)
+                enter_and_look(1.9)
+                goto('release')
+                time.sleep(.3)
+                enter_and_look(1.5)
+                goto('editor')
+                time.sleep(.3)
+                enter_and_look(1.5)
+
+                def click_tab(window):
+                    """Click a window's tab on the status line with a real SGR mouse report."""
+                    session = tm('display-message', '-p', '-c', control_client, '#{session_name}')
+                    column = len(f' {session} ')  # status-left is ' #S '
+                    for line in tm('list-windows', '-t', session, '-F', '#{window_index}:#{window_name}').splitlines():
+                        index, name = line.split(':', 1)
+                        width = len(f' {index}:{name} ')  # window-status-format, then a one-space separator
+                        if name == window:
+                            x = column + width // 2 + 1
+                            break
+                        column += width + 1
+                    else:
+                        raise RuntimeError(f'no tab for {window!r}')
+                    os.write(term_master, f'\x1b[<0;{x};{ROWS}M'.encode())
+                    time.sleep(.07)
+                    os.write(term_master, f'\x1b[<0;{x};{ROWS}m'.encode())
+                    for _ in range(40):
+                        if tm('display-message', '-p', '-c', control_client, '#{window_name}') == window:
+                            return
+                        time.sleep(.05)
+                    raise RuntimeError(f'clicking the {window!r} tab at column {x} did not switch to it')
+
+                caption(f'{key}mouse{plain}  click a window tab on the status line')
+                time.sleep(.8)
+                click_tab('api')
+                time.sleep(1.5)
+                click_tab('release')
+                time.sleep(1.3)
+                click_tab('editor')
+                time.sleep(1.4)
+                tm('select-pane', '-t', sidebar)
+                time.sleep(.3)
+
+                caption(f'{key}h l{plain}  fold a branch   {key}H L{plain}  fold all')
+                goto('acme-web')
+                time.sleep(.4)
+                keys('h', pause=1.1)
+                keys('l', pause=1.1)
+                keys('H', pause=1.4)
+                keys('L', pause=1.4)
+
+                caption(f'{key}A{plain}  agent mode on: state, subagents, questions')
+                keys('A', pause=.2)
+                time.sleep(2.0)
+                if 'Explore' not in tree():
+                    raise RuntimeError(f'agent mode did not show subagents:\n{tree()}')
+                goto('cache')
+                time.sleep(1.0)
+                caption(f'{key}A{plain}  agent mode off: just the tree')
+                keys('A', pause=.2)
+                time.sleep(1.8)
+                caption(f'{key}A{plain}  and on again')
+                keys('A', pause=.2)
+                time.sleep(1.8)
+                goto('cache')
+                caption(f'{key}i{plain}  read the question without leaving your editor')
+                keys('i', pause=.25)
+                time.sleep(2.2)
+                if 'Agent inspector' not in tree():
+                    raise RuntimeError(f'inspector did not open:\n{tree()}')
+                keys('p', pause=.3)
+                goto('editor')
+                time.sleep(1.6)
             else:
                 def permission():
                     tty = tm('display-message', '-p', '-t', web, '#{pane_tty}')
@@ -518,12 +748,13 @@ run-shell '{ROOT / "tmux-canopy.tmux"}'
         return
     sp.run(['agg', '--quiet', '--font-family', args.font_family, '--font-size', '20', '--line-height', '1.25',
             '--theme', args.theme, '--idle-time-limit', '2', '--fps-cap', '30', '--last-frame-duration', '2',
+            '--speed', str(args.speed or (1.25 if args.demo == 'tour' else 1.0)),
             str(cast), str(gif)], check=True)
     print(f'wrote {cast}\nwrote {gif}')
     # A still for the README link and for viewers that do not animate GIFs:
     # project paths and branches visible, sidebar open with subagents.
-    if args.demo == 'preview' and shutil.which('ffmpeg'):
-        png = output / 'canopy-demo.png'
+    if args.demo in ('preview', 'tour') and shutil.which('ffmpeg'):
+        png = output / f'{still_name}.png'
         sp.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-ss', str(args.poster), '-i', str(gif),
                 '-frames:v', '1', str(png)], check=True)
         print(f'wrote {png}')

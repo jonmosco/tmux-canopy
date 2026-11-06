@@ -10,7 +10,13 @@ Canopy keeps your sessions, windows, and panes in a persistent tree that follows
 
 ## Preview
 
+[![Canopy tour: dock the sidebar beside Neovim, walk a four-session tree with j and k, jump between windows with Enter or by clicking the status-line tabs while the tree follows, fold branches, and turn agent mode on and off with A](docs/assets/canopy-tour.gif?v=12)](docs/assets/canopy-tour.gif?v=12)
+
+<details>
+<summary><strong>Agent workflow (questions, inline reply, and jumping to a waiting agent)</strong></summary>
+
 [![Canopy demo: three agents working across tmux sessions while you stay in Neovim, inspect a question and git diff with i, reply inline with >, and jump to a waiting agent with n](docs/assets/canopy-demo.gif?v=11)](docs/assets/canopy-demo.gif?v=11)
+</details>
 
 <details>
 <summary><strong>Full UI walkthrough (folding, <code>/</code> search, <code>4</code> Agents view, and popup mode)</strong></summary>

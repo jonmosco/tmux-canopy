@@ -12,6 +12,22 @@ The recorder is [`record.py`](record.py), not a mockup. It builds fictional proj
 | Inline reply (`>`) | `>` sends `Use Redis so workers share sessions` to `acme-web:0.0` | Right pane never leaves Neovim; `acme-web` flips from `!` back to `▷` (`Working · edit`). |
 | Attention jump (`n`) | `billing`'s Codex requests `pytest tests/webhooks.py` (`!`); `n` jumps across sessions to `billing` | Active session switches to `billing` showing the approval prompt; final frame holds on the live UI, never a detach screen. |
 
+## README tour (~41 seconds)
+
+`python3 docs/demo/record.py --demo tour` records the README hero (100 columns wide, since GitHub scales the GIF to about 830 px and text size on the page follows the column count, not agg's font size; rendered at 1.25x, and `--speed 1` plays it at real time): a fuller workspace (four sessions, multi-pane windows, three agents and two subagents) with agent mode starting off. The agents report their state before recording, so pressing `A` reveals them all at once.
+
+| Beat | On screen | Evidence to review |
+|---|---|---|
+| Dock | `prefix T` opens Canopy beside Neovim; the whole tree is expanded | Sessions `acme-api`, `acme-web`, `billing`, `notes`, with multi-pane `server` and `ui` windows nested under their windows. |
+| Walk | `j` x6, `k` x3 | Selection moves one row per key at a readable pace. |
+| Jump | `Enter` on `ui`, `release`, then `editor` | The content area changes each time and the sidebar stays docked; the status line follows. |
+| Mouse | Clicks on the `1:api`, `3:release` and `0:editor` tabs of the status line | Real SGR mouse reports sent to the recorded client. The tab highlight, the content area and the tree all move together; the pointer itself is not drawn, so the caption says what is being clicked. |
+| Fold | `h`, `l`, `H`, `L` | One session folds with its `[2w]` roll-up, then all fold and unfold. |
+| Agent mode | `A` on, off, on | `A enable agents` becomes `◆1 ▷3 ○1`, subagents hang off `1:api` with `├`/`└`, and the OpenCode question shows beneath `1:cache`. |
+| Inspect | `i` on `1:cache`, then `p` | The inspector shows the question and `2 changed (+15 -3)`. |
+
+The driver moves the selection with a `goto` helper that reads the real sidebar, so a changed row layout fails the recording instead of producing a wrong take. After `Enter` it returns focus to the sidebar with `select-pane`, which is not shown in the captions.
+
 ## Longer walkthrough
 
 Open the Tree; browse and fold with `j/k/h/l`; search with `/`, clear search, and open the preview with `p`; watch the API subagents appear; use `4` for Agents view; show the web agent's request and `n` jump; close the sidebar and reopen Canopy in popup mode. Each new view should remain onscreen long enough to read at README width. If a key starts acting differently, change the storyboard *and* the driver rather than publishing the wrong view.

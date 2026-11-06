@@ -14,6 +14,7 @@
 
 ### Added
 
+- A new README hero recording (`python3 docs/demo/record.py --demo tour`): a four-session workspace with multi-pane windows, walking the tree, jumping between windows, folding, and clicking status-line tabs, and turning agent mode on and off. The earlier agent-workflow demo moved into a collapsible section.
 - `tests/status_mouse.py` clicks and scrolls the status line of a real attached client, `tests/claude_lifecycle.py` checks Claude Code's exit, restart, and pane reuse against a real process, and `tests/run.sh` runs the real-TPM install check when a TPM checkout exists.
 - `scripts/navigate` accepts a `window:$session:@window` target.
 
