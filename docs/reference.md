@@ -414,7 +414,7 @@ Keyboard navigation, tree activation, and fallback follow hooks share `scripts/n
 - Window/session selection settles before a fresh destination snapshot and slot exchange. This matters with `aggressive-resize`: hidden windows may retain old terminal dimensions, and tmux's automatic sizing occurs after the selection command queue.
 - Destination slots are reused; width correction is queued with the swap. The preferred width—not a pane width accidentally crushed by automatic sizing—is authoritative. Slot initialization batches its option/title writes. Warm switches remain resize-free when the window dimensions and preferred width have not changed.
 
-These paths do not synchronously reload fzf; a separate debounced worker publishes settled active-location changes without moving the sidebar cursor. Structural navigation suppresses intermediate notification-clear hooks and schedules at most one quiet clear for the final destination when it has unread state. Windows with no unread state do not start notification-clear processes.
+These paths do not synchronously reload fzf; a pane change inside the published window repaints at once, and a separate debounced worker publishes window and session changes and any later settled change, without moving the sidebar cursor. Structural navigation suppresses intermediate notification-clear hooks and schedules at most one quiet clear for the final destination when it has unread state. Windows with no unread state do not start notification-clear processes.
 
 ### Empty windows and native fallback
 
@@ -474,8 +474,10 @@ changed marker reached the client's PTY, not when physical pixels were displayed
 The source process/tmux-call budgets are unchanged; these noisy wall-time samples
 do not establish a computation speedup. The stability improvement is eliminating
 the blank paint and redundant input-header resets, with a separate terminal-stream
-regression check. General focus refresh intentionally waits 75 ms, agent refresh
-120 ms, and settled-width refresh 60 ms; explicit settled focus has no debounce.
+regression check. When these were sampled, general focus refresh waited 75 ms and
+agent refresh 120 ms; pane changes inside a window now repaint on the first event
+and use the 75 ms wait only to catch later ones. Agent refresh still waits 120 ms. Settled-width refresh waits 60 ms; explicit settled focus has
+no debounce.
 Subtracting those waits still leaves startup, dispatch, fzf and scheduling costs,
 not pure computation time.
 
@@ -937,7 +939,7 @@ When smooth navigation is enabled, the plugin wraps `prefix + n`, `prefix + p`, 
 | `scripts/resize` | Commit one-shot and preset widths to the sidebar and slots |
 | `scripts/mouse-resize` | Detect sidebar-border drags and commit on mouse release |
 | `scripts/edge-refresh` | Debounced reload after sidebar resize so right-edge marks realign |
-| `scripts/refresh-sidebar` | Remember the live content target and debounce owner-only active-location updates |
+| `scripts/refresh-sidebar` | Remember the live content target and publish owner-only active-location updates, at once and then debounced |
 | `scripts/responsive-width` | Re-clamp fixed/percentage widths after terminal resizing |
 | `scripts/cleanup` | Repair stale ownership/targets and remove orphan slots |
 | `scripts/reap-empty` | Finish content-empty windows while preserving the dock and native successor selection |

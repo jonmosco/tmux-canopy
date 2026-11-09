@@ -125,9 +125,10 @@ def main():
             bindings = [f'alt-a:pos({pos})', f"alt-z:execute-silent(printf '%s|%s|%s\\n' {{1}} {{3}} {{q}} > {selected})"]
             install_fzf_probe(temp, bindings, script_env)
             wrapper = temp / 'tmux'
-            # Log focus deliveries, and count tree renders by tree-source's one
-            # batched snapshot call.
-            wrapper.write_text('#!/bin/bash\nif [[ "$1" == if-shell && "$*" == *tmux_canopy_focus_pending* && "$*" == *send-keys* ]]; then printf "%s\\n" "$6" >> ' + shlex.quote(str(deliveries)) + '; fi\n'
+            # Log the debounce worker's focus deliveries (a request's commit
+            # also starts that worker, so it names run-shell), and count tree
+            # renders by tree-source's one batched snapshot call.
+            wrapper.write_text('#!/bin/bash\nif [[ "$1" == if-shell && "$*" == *tmux_canopy_focus_pending* && "$*" == *send-keys* && "$*" != *run-shell* ]]; then printf "%s\\n" "$6" >> ' + shlex.quote(str(deliveries)) + '; fi\n'
                                'if [[ "$*" == *list-sessions*list-windows*list-panes* ]]; then printf x >> ' + shlex.quote(str(renders)) + '; fi\n'
                                'exec ' + shlex.join([executable, '-L', socket]) + ' "$@"\n')
             wrapper.chmod(0o755)
@@ -196,12 +197,21 @@ def main():
             os.write(master, b'\x1b[17~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{peer}', 'prepare pane burst')
             time.sleep(.2)
+            # Browse away first: the burst ends on pane_a, so a stray jump there
+            # would otherwise be invisible.
+            tm('send-keys', '-t', sidebar, 'M-a')
+            wait(lambda: probe(sidebar).startswith('P:' + last + '|'), 'browse away before pane burst')
+            browsed = probe(sidebar)
             count = len(deliveries.read_text().splitlines())
+            rendered = renders.stat().st_size
             os.write(master, (b'\x1b[15~\x1b[17~' * 4) + b'\x1b[15~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{pane_a}', 'rapid pane burst')
             time.sleep(.25)
             assert len(deliveries.read_text().splitlines()) == count + 1
-            print('ok - rapid real pane switches publish only the settled target')
+            # The first switch repaints at once and the settled target at most once more.
+            assert 1 <= renders.stat().st_size - rendered <= 2, renders.stat().st_size - rendered
+            assert probe(sidebar) == browsed, 'a pane burst must not move the browse pointer'
+            print('ok - rapid real pane switches repaint at most twice, keep the browse pointer and end on the settled target')
 
             # Collapse the active window in the *actual* UI state file.
             # Use the existing window row and h, not a filesystem side channel.

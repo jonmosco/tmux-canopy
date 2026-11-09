@@ -194,7 +194,9 @@ if [[ "$hook" == after-select-pane && "$location" == "$(tmux show-option -pqv -t
   # The user may browse elsewhere in the tree and then return to the *same*
   # content pane. There is no location change to refresh, but its row still
   # needs the pointer. A changed location takes the debounced worker below.
-  commit "#{!=:#{$guard},1}" "send-keys -t $sidebar C-o"
+  # While a worker holds the claim this is a burst passing through the location
+  # the leading repaint just published, not a return, so the pointer stays.
+  commit "#{&&:#{!=:#{$guard},1},#{!:#{@tmux_canopy_focus_pending}}}" "send-keys -t $sidebar C-o"
   exit 0
 fi
 printf -v now '%(%s)T' -1
@@ -203,6 +205,13 @@ expired="#{||:#{!:#{@tmux_canopy_focus_pending}},#{<:#{@tmux_canopy_focus_deadli
 changed="#{!=:#{@tmux_canopy_focus_location},$location}"
 commands="set-option -p -t $sidebar @tmux_canopy_target '$target' ; set-option -p -t $sidebar @tmux_canopy_target_session '$session' ; "
 worker="run-shell -b $(tmux_quote "$(tmux_shell "$SCRIPT_DIR/refresh-sidebar" worker "$sidebar" "$client" "$token" "$location")")"
-claim="set-option -p -t $sidebar @tmux_canopy_focus_pending '$token' ; set-option -p -t $sidebar @tmux_canopy_focus_deadline '$((now+3))' ; $worker"
+# Leading edge: a pane switch inside the published window repaints now, so a
+# single switch does not pay the debounce. The worker reloads again only if
+# the location moves on during a burst. A window or session change stays with
+# the worker: navigation sends its own C-o, and a C-r here would start a newer
+# render that discards that jump. A first publish matches nothing, for the same
+# reason.
+leading="set-option -p -t $sidebar @tmux_canopy_focus_location '$location' ; send-keys -t $sidebar C-r"
+claim="set-option -p -t $sidebar @tmux_canopy_focus_pending '$token' ; set-option -p -t $sidebar @tmux_canopy_focus_deadline '$((now+3))' ; if-shell -F -t $sidebar '#{m:$session|$window|*,#{@tmux_canopy_focus_location}}' $(tmux_quote "$leading") ; $worker"
 commands+="if-shell -F -t $sidebar '#{&&:$changed,$expired}' $(tmux_quote "$claim")"
 commit "#{!=:#{$guard},1}" "$commands"
