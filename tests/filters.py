@@ -314,10 +314,13 @@ def live():
             menu(title=b'Agent filters');os.write(master,b'w')
             wait(lambda:'Claude Code' in screen() and 'Working' in screen(),'working filter includes live report')
             menu(title=b'Agent filters');os.write(master,b'a')
-            wait(lambda:'Claude Code' in screen(),'agent filter recovers from empty results')
+            wait(lambda:'FILTER_AGENT_STATUS\tall\n' in state.read_text() and
+                 'Agents · All' in screen() and 'Claude Code' in screen(),
+                 'all-agent filter committed and rendered')
             menu(title=b'Agent filters');os.write(master,b'r')
             wait(lambda:b'Repository root contains' in output,'repository prompt')
             os.write(master,b'REPO WITH SPACES\r')
+            wait(lambda:'FILTER_AGENT_REPO\tREPO WITH SPACES\n' in state.read_text(),'repository prompt saved')
             wait(lambda:'+R' in screen() and 'Claude Code' in screen(),'case-insensitive repository root filter includes nested directory')
             run('tree-filter','set-repository','no-such-repo')
             wait(lambda:'No matching agents' in screen(),'repository excludes agent')
