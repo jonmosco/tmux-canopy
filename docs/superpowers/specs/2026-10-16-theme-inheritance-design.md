@@ -1,7 +1,9 @@
 # Theme inheritance (soft palette)
 
 Date: 2026-10-16  
-Status: approved for implementation
+Status: historical design record (implemented; see current behavior below)
+
+> **Current status (2026-11-09):** Theme inheritance has shipped. This document preserves the original design. Colors are sampled when the sidebar opens; remaining theme consistency and live-restyling work is tracked in [the roadmap](../../../ROADMAP.md#appearance-and-theme-sources). See [Appearance](../../reference.md#appearance) for current settings.
 
 ## Problem
 

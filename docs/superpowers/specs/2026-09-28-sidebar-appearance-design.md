@@ -1,7 +1,9 @@
 # Lazygit appearance, create-refresh, and WORKING animation
 
 Date: 2026-09-28  
-Status: approved for planning
+Status: historical design record (implemented; see current behavior below)
+
+> **Current status (2026-11-09):** The appearance work, pane-creation refresh, and WORKING animation have shipped. This document preserves the original rollout plan. The default is now quiet, animation defaults on when available, and the old lazygit appearance name resolves to quiet. See [Appearance](../../reference.md#appearance) for current settings.
 
 ## Problem
 

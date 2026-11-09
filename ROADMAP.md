@@ -26,7 +26,7 @@ Global jump (`n`) ships today. Remaining work:
 
 ## Additional subagent integrations
 
-Antigravity, Cursor Agent, Claude Code, and Codex subagents are reported today.
+Antigravity, Cursor Agent, Claude Code, Codex, and OpenCode subagents are reported today.
 Remaining work:
 
 - [ ] Report Gemini CLI subagents if its integration exposes enough lifecycle

@@ -1,7 +1,9 @@
 # Cursor Agent (`cursor-agent`) lifecycle adapter
 
 Date: 2026-09-28  
-Status: approved for planning
+Status: historical design record (implemented; see current behavior below)
+
+> **Current status (2026-11-09):** The Cursor Agent adapter and process detection have shipped. This document preserves the original design context; current hook coverage and limitations are in [Agent lifecycle adapters](../../reference.md#agent-lifecycle-adapters).
 
 ## Problem
 

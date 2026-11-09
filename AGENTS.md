@@ -4,7 +4,7 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, and others) working i
 
 ## What Canopy is
 
-A tmux sidebar: a tree of sessions, windows, and panes, plus optional monitoring of AI coding agents. It is Bash, awk, and fzf driven by tmux hooks. Python 3 is used only by the optional agent adapters and the test suite. There is no daemon.
+A tmux sidebar: a tree of sessions, windows, and panes, plus optional monitoring of AI coding agents. It is Bash, awk, and fzf driven by tmux hooks. Python 3 is used by the `canopy` CLI, optional agent adapters, animation, the optional Linux process scanner, and the test suite; the basic sidebar works without it. There is no daemon.
 
 ## Where things are
 
@@ -54,7 +54,7 @@ Canopy runs on every refresh, focus change, and resize, on the user's own machin
 - **No `$(...)` in loops or per-row code.** Each one forks a subshell, and a subshell also throws away anything the function cached. Return results in variables instead, as `canopy_client_key` (`CANOPY_KEY`) and `canopy_pane_agent` (`CANOPY_REPLY`) do.
 - **One tmux call per batch.** Chain commands with `\;`, and read several values with one `display-message` format, rather than one `show-option` per value. Let `tree-render.awk` do aggregation instead of looping over tmux in the shell. During plugin load there may be no session yet, where `display-message` fails: use `canopy_load_state` and `canopy_queue` in `scripts/config-lib.sh`, which also keep each batch under tmux's command-size limit.
 - **Decide inside tmux when you can.** Gate hooks with `if-shell -F` and tmux formats so events that do not concern Canopy start no shell at all (`canopy_hook` in `tmux-canopy.tmux` takes the condition and writes the quoting), and debounce bursts with the existing claim pattern (`scripts/notify`, `scripts/agent-refresh`).
-- **No new runtime dependencies.** The sidebar needs only tmux, fzf, Bash, awk, and standard system tools such as `ps`. Python 3 is optional and limited to agent adapters, the animation, and the tests; check for an optional tool with `command -v` and degrade gracefully without it.
+- **No new runtime dependencies.** The sidebar needs only tmux, fzf, Bash, awk, and standard system tools such as `ps`. Python 3 is optional for the sidebar and limited to the CLI, agent adapters, animation, the optional Linux process scanner, and tests; check for an optional tool with `command -v` and degrade gracefully without it.
 - **No polling.** React to events; a background worker must be bounded and exit when it has nothing left to do.
 - **Measure when it matters.** Time a path with `$EPOCHREALTIME` on a private tmux server with realistic panes, and count forks or tmux calls before and after; the tests' tmux wrappers show how to count calls.
 

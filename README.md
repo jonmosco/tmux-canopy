@@ -31,7 +31,7 @@ Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled bi
 
 ## Quick start
 
-**Requirements:** Linux or macOS with **tmux** (tested with 3.7c), **fzf** (tested with 0.74.4), **Bash 4.4+** (tested with 5.3.9), standard `awk` and `ps`, and `less` for the optional enlarged preview. Default Unicode icons need no Nerd Font.
+**Requirements:** Linux or macOS with **tmux** (tested with 3.7c), **fzf** (tested with 0.74.4), **Bash 4.4+** (tested with 5.3.9), standard `awk` and `ps`, and `less` for the optional enlarged preview. Default Unicode icons need no Nerd Font. **Python 3** is required for the `canopy` CLI (including setup and diagnostics), lifecycle adapters, and optional working-state animation; the basic sidebar works without it.
 
 1. With [TPM](https://github.com/tmux-plugins/tpm), add this before its `run '~/.tmux/plugins/tpm/tpm'` line:
 
@@ -140,7 +140,7 @@ Several good tools watch coding agents inside tmux. Pick by what you want to see
 
 Turn agent monitoring on globally with `set -g @tmux-canopy-agents 'on'` in `.tmux.conf`, or toggle it per client with `A` in the sidebar.
 
-- **Status & subagents in the tree:** Working agents show an animated `▷`, waiting agents show `!` with the pending command or question on a dim line underneath, and folded windows/sessions roll counts up as `◆` and `▷`. Running subagents appear indented beneath their parent pane.
+- **Status & subagents in the tree:** In the default quiet appearance, working agents show `▷` (a pulsing `●` when animation is enabled), waiting agents show `!` with the pending command or question on a dim line underneath, and folded windows/sessions roll counts up as `◆` and `▷`. Running subagents appear indented beneath their parent pane.
 - **Jump (`n`) and inline reply (`>`):** Press `n` to jump to the agent that has been waiting for you longest (or the oldest unread finished agent if none are waiting) across all sessions; repeated presses move to the next-longest. Press `>` to send a prompt or confirmation to the selected pane without switching focus; the preview refreshes immediately.
 - **Agent filters (`4`, then `F`):** Show all agents, those needing input, working agents, completed agents with unread notifications, or interrupted agents. Combine a status with a repository root filter. Filters stay separate from Tree filters; `n` still finds waiting agents across all sessions.
 - **Agent inspector & Agent list (`i`):** Press `i` to cycle the bottom drawer (default height **25%**, toggled with `p`) between **Terminal preview**, **Agent inspector** (a structured card for the selected pane showing state, verification trust, working directory, optional Git repo/branch with an on-demand `N changed (+A −D)` dirty summary, location, and active request/command), and **Agent list** (a compact list of every agent across all sessions showing its state glyph, `session:window.pane`, agent name, brief status/request, and a right-edge notification badge when there is unread activity). See [Preview and Agent inspector](docs/reference.md#preview) for details.

@@ -1,7 +1,9 @@
 # Agent inspector field card
 
 Date: 2026-10-16  
-Status: approved for planning
+Status: historical design record (implemented; see current behavior below)
+
+> **Current status (2026-11-09):** The inspector field card and 25% preview-height default have shipped. This document preserves the original proposal. See [Preview](../../reference.md#preview) for the current card, stale-report behavior, and drawer controls.
 
 ## Problem
 

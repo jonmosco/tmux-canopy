@@ -8,6 +8,8 @@
 
 ### Changed
 
+- Updated documentation for current headers, immediate pane-focus repainting, quiet state marks and animation, Python requirements, Agent filter persistence, OpenCode subagents, and the implemented status of historical design specs.
+
 - The README opening now emphasizes workspace navigation, finding agents that need attention, and replying without leaving the current pane.
 
 - The sidebar reacts sooner. Switching panes inside a window repaints the active-pane marker on the first event instead of after a 75 ms wait. The wait now only catches later events, so a rapid burst can repaint twice, once at the start and once where it settles.
