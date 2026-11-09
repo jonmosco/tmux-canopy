@@ -8,12 +8,16 @@
 
 ### Changed
 
+- The README opening now emphasizes workspace navigation, finding agents that need attention, and replying without leaving the current pane.
+
 - The sidebar reacts sooner. Switching panes inside a window repaints the active-pane marker on the first event instead of after a 75 ms wait. The wait now only catches later events, so a rapid burst can repaint twice, once at the start and once where it settles.
 - Quiet tree polish: the session you are in is now bold as well as accent-coloured, like the other session headings; with agent mode off the Tree header shows an `A enable agents` hint (the key that turns it on, in the footer's key-then-verb style) instead of `agent mode off`; and subagent lines in the quiet appearance hang off their pane with a dim `├` / `└` connector.
 - Running the plugin under Bash older than 4.4 (stock macOS ships 3.2) now stops at once with one message that says to install a newer Bash with `brew install bash` and put it on tmux's `PATH`, and exits non-zero without installing anything. Before, it printed two dozen `declare: -A: invalid option` and syntax errors and returned success after a partial load. `tests/old_bash.py` covers it where an old Bash exists.
 - `README.md` has a "How Canopy compares" section.
 
 ### Added
+
+- Agents view has its own `F` / `Ctrl-f` filters for needs input, working, completed and unread, interrupted, and repository root paths. Rules combine with search, preserve Tree filters, and leave global agent jumps and the quick switcher unrestricted.
 
 - A new README hero recording (`python3 docs/demo/record.py --demo tour`): a four-session workspace with multi-pane windows, walking the tree, jumping between windows, folding, and clicking status-line tabs, and turning agent mode on and off. The earlier agent-workflow demo moved into a collapsible section.
 - `tests/status_mouse.py` clicks and scrolls the status line of a real attached client, `tests/claude_lifecycle.py` checks Claude Code's exit, restart, and pane reuse against a real process, and `tests/run.sh` runs the real-TPM install check when a TPM checkout exists.

@@ -76,7 +76,7 @@ def main():
 
             tm('set-option', '-g', '@tmux-canopy-agents', 'on')
             assert footer(wide) == 'Enter focus  a actions  / search  ? help', footer(wide)
-            assert footer(wide, '--agents') == 'Enter focus  n waiting  > reply  i summary'
+            assert footer(wide, '--agents') == 'F filters  Enter focus  n waiting  > reply  i summary'
             print('ok - Tree and Agents expose their own stable action rails')
         finally:
             sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

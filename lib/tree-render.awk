@@ -6,6 +6,8 @@ FILENAME == ARGV[1] {
     else if (state[1] == "LINK" && link == "") link=state[2]
     else if (state[1] == "DELETE" && now-state[3] <= 5) del=state[2]
     else if (state[1] == "FILTER") { filter_set=1; filter=state[2] }
+    else if (state[1] == "FILTER_AGENT_STATUS") agent_filter=state[2]
+    else if (state[1] == "FILTER_AGENT_REPO") agent_repo_filter=state[2]
     else if (state[1] == "FOOTER") footer_hidden=(state[2] == "off")
     else if (state[1] == "FILTER_WINDOW") { window_set=1; window_filter=state[2] }
     else if (state[1] == "FILTER_TITLE") { title_set=1; title_filter=state[2] }
@@ -52,6 +54,7 @@ $1 == "P" {
     }
 }
 $1 == "A" { agent_kind[$2]=$3; any_agent=1 }
+$1 == "R" { agent_repo[$2]=$3 }
 $1 == "G" { git_branch[$2]=$3 }
 $1 == "V" { verified[$2]=1 }
 agent_view && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+/ {
@@ -97,6 +100,27 @@ function find_agents( pid,current,depth,p,root) {
         }
     }
 }
+# Agent filters use the same verified state and subagent priority as the header.
+function agent_matches(p,    label,done) {
+    if (agent_kind[p] == "") return 0
+    if (switcher || ENVIRON["TMUX_CANOPY_NEEDS_INPUT"] != "") return 1
+    if (agent_repo_filter != "" && (agent_repo[p] == "" || !index(tolower(agent_repo[p]),tolower(agent_repo_filter)))) return 0
+    label=agent_label(p)
+    load_subagents(p)
+    if (agent_filter == "needs-input") return label == "approval" || sub_need[p]
+    if (agent_filter == "working") return label != "approval" && label != "interrupted" && !sub_need[p] && (label == "working" || sub_work[p])
+    if (agent_filter == "interrupted") return label == "interrupted" && !sub_need[p]
+    if (agent_filter == "completed") {
+        done=(label == "ready" || label == "turn ended" || label == "session ended")
+        return done && !sub_need[p] && !sub_work[p] && notices != "none" && (pa[p] || pb[p] || pz[p])
+    }
+    return 1
+}
+function agent_filter_label(short,    label) {
+    label=(agent_filter == "needs-input" ? "Needs input" : agent_filter == "working" ? "Working" : agent_filter == "completed" ? "Completed unread" : agent_filter == "interrupted" ? "Interrupted" : "All")
+    if (short) label=(agent_filter == "needs-input" ? "Input" : agent_filter == "working" ? "Work" : agent_filter == "completed" ? "Done" : agent_filter == "interrupted" ? "Stopped" : "All")
+    return label (agent_repo_filter != "" ? "+R" : "")
+}
 # Build visibility before folding. Counts and compact eligibility still use the
 # full content inventory; text constraints are literal, case-insensitive substrings.
 function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first,label,window_needle,title_needle) {
@@ -114,7 +138,7 @@ function prepare_filter( si,s,wpos,w,key,ppos,p,keep,alert,first,label,window_ne
                 counted[w]=1
                 for (ppos=1;ppos<=np[w];ppos++) {
                     p=panes[w,ppos]
-                    keep=(agent_view ? agent_kind[p] != "" : !filtered ||
+                    keep=(agent_view ? agent_matches(p) : !filtered ||
                         ((title_filter == "" || index(tolower(title[p]),title_needle)) &&
                         (filter != "unread" || (notices != "none" && (pa[p] || pb[p] || pz[p])))))
                     if (!keep) continue
@@ -392,7 +416,7 @@ function agent_footer(    si,s,wpos,w,ppos,p,label,need,err,work,settled,unknown
 function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,text,available,full_plain,full_color) {
     title=(agent_view ? "Agents" : "Tree")
     joiner=(icons == "ascii" ? " - " : " · ")
-    scope=(agent_view ? "All" : filter_label)
+    scope=(agent_view ? agent_filter_label() : filter_label)
     summary=""; summary_color=""; style=dim
     if (agent_view) {
         agent_overview()
@@ -427,7 +451,9 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
         summary=full_plain; summary_color=full_color
     }
     if (mode != "") { summary=mode; summary_color=mode_color mode reset }
+    if (agent_view && text_width(title joiner scope) > width-5) scope=agent_filter_label(1)
     plain=title joiner scope
+    if (agent_view && mode == "" && scope != "All" && text_width(plain)+text_width(summary)+2 > width-5) { summary=""; summary_color="" }
     if (text_width(plain)+text_width(summary)+2>available) {
         if (scope != "All") sub(/^(Session|Unread|All)/,substr(scope,1,1),scope)
         plain=title joiner scope
@@ -444,7 +470,7 @@ function quiet_header(    title,scope,joiner,summary,summary_color,style,plain,t
 function current_view_header(    title,scope,joiner,summary,summary_color,plain,text,budget,prefix) {
     title=(agent_view ? "Agents" : "Tree")
     joiner=(icons == "ascii" ? " | " : appearance == "lazygit" || appearance == "places" ? " ─ " : " · ")
-    scope=(agent_view ? "All" : filter_label)
+    scope=(agent_view ? agent_filter_label() : filter_label)
     summary=""; summary_color=""
     if (agent_view) {
         agent_overview()
@@ -458,7 +484,9 @@ function current_view_header(    title,scope,joiner,summary,summary_color,plain,
     if (mode != "") { summary=mode; summary_color=mode_color mode reset }
     prefix=(appearance == "lazygit" || appearance == "places" ? "╭─ " : "")
     budget=width-2-text_width(prefix)
+    if (agent_view && text_width(title joiner scope) > width-5) scope=agent_filter_label(1)
     plain=title joiner scope
+    if (agent_view && mode == "" && scope != "All" && text_width(plain)+text_width(summary)+2 > width-5) { summary=""; summary_color="" }
     if (text_width(plain)+text_width(summary)+2 > budget && scope != "All") {
         sub(/^(Session|Unread|All)/,substr(scope,1,1),scope)
         plain=title joiner scope
@@ -496,7 +524,7 @@ function action_footer(    n,i,part,status,short,text,plain,budget,enter_key,gap
         status=error agent_err_badge " " quiet_err " interrupted" reset
         n=split("n|next|>|reply", part, "|")
     } else if (agent_view) {
-        n=split(enter_key "|focus|n|waiting|>|reply|i|summary", part, "|")
+        n=split("F|filters|" enter_key "|focus|n|waiting|>|reply|i|summary", part, "|")
     } else {
         n=split(enter_key "|focus|a|actions|/|search|?|help", part, "|")
     }
@@ -1428,7 +1456,7 @@ END {
         }
         exit
     }
-    if (agent_view && !total_visible) row("V:agents-empty","No supported agent processes detected","V:agents-empty")
+    if (agent_view && !total_visible) row("V:agents-empty",(agent_filter != "" && agent_filter != "all" || agent_repo_filter != "" ? "No matching agents; F to change filters" : "No supported agent processes detected"),"V:agents-empty")
     else if (filtered && !total_visible) row("V:empty","No matches · F filters","V:empty")
     for (si=1;si<=ns;si++) {
         s=sessions[si]; st="S:" s

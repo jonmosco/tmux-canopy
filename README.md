@@ -2,11 +2,13 @@
 
 [![Release](https://img.shields.io/github/v/release/jonmosco/tmux-canopy?sort=semver)](https://github.com/jonmosco/tmux-canopy/releases/latest) [![Test](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml/badge.svg)](https://github.com/jonmosco/tmux-canopy/actions/workflows/test.yml)
 
-**A tmux workspace tree and AI-agent monitor in one sidebar, with no daemon.**
+**See your whole tmux workspace, find what needs you, and respond without losing your place.**
 
-Keep tmux. Keep your sessions. Keep your workflow. Canopy gives you the view from above: every session, window, pane, and agent at a glance.
+Canopy puts your sessions, windows, and panes in one persistent sidebar. Search, fold branches, and move between targets while keeping your selection and folded branches as the sidebar follows you across windows and sessions. It works with the tmux workspace you already have.
 
-Canopy keeps your sessions, windows, and panes in a persistent tree that follows you as you switch windows and sessions, with the same selection and the same folded branches. Turn on agent mode and the same tree shows what every Claude Code, Codex, OpenCode, Gemini, Cursor, Antigravity, Pi, GitHub Copilot CLI, Grok Build, Crush, and Hermes session is doing: which agents are working, which subagents they started, and which are waiting for you. Press `n` to jump straight to the next one that needs input.
+Turn on optional AI-agent monitoring to see which agents are working and which need your input. Press `n` to jump to the longest-waiting agent, inspect its request with `i`, or send a reply with `>` without leaving your current pane. Agent details depend on the integration; see the [support matrix](#ai-agent-monitoring).
+
+Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled binary. Optional agent lifecycle adapters use Python 3.
 
 ## Preview
 
@@ -94,7 +96,7 @@ Several good tools watch coding agents inside tmux. Pick by what you want to see
 | `/`, then `Esc` | Filter rows by search query, then clear |
 | `Ctrl-g` | Global quick switcher across all sessions, windows, and panes (including folded branches) |
 | `1` / `2` / `3` / `4` | Switch view: Tree / Processes / Buffers / Agents |
-| `F` / `Ctrl-f` | Cycle tree filters: All / Current session / Unread, plus window name and pane title |
+| `F` / `Ctrl-f` | Open filters for the current Tree or Agents view |
 | Mouse | Click selects, double-click focuses, wheel scrolls (`set -g mouse on`) |
 
 ### Sessions, windows & panes
@@ -140,6 +142,7 @@ Turn agent monitoring on globally with `set -g @tmux-canopy-agents 'on'` in `.tm
 
 - **Status & subagents in the tree:** Working agents show an animated `▷`, waiting agents show `!` with the pending command or question on a dim line underneath, and folded windows/sessions roll counts up as `◆` and `▷`. Running subagents appear indented beneath their parent pane.
 - **Jump (`n`) and inline reply (`>`):** Press `n` to jump to the agent that has been waiting for you longest (or the oldest unread finished agent if none are waiting) across all sessions; repeated presses move to the next-longest. Press `>` to send a prompt or confirmation to the selected pane without switching focus; the preview refreshes immediately.
+- **Agent filters (`4`, then `F`):** Show all agents, those needing input, working agents, completed agents with unread notifications, or interrupted agents. Combine a status with a repository root filter. Filters stay separate from Tree filters; `n` still finds waiting agents across all sessions.
 - **Agent inspector & Agent list (`i`):** Press `i` to cycle the bottom drawer (default height **25%**, toggled with `p`) between **Terminal preview**, **Agent inspector** (a structured card for the selected pane showing state, verification trust, working directory, optional Git repo/branch with an on-demand `N changed (+A −D)` dirty summary, location, and active request/command), and **Agent list** (a compact list of every agent across all sessions showing its state glyph, `session:window.pane`, agent name, brief status/request, and a right-edge notification badge when there is unread activity). See [Preview and Agent inspector](docs/reference.md#preview) for details.
 
 | Agent | Found by process | Lifecycle adapter | Needs input | Subagents |

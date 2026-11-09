@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tree visibility, filtered parent navigation, and real native filter controls."""
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -12,7 +13,7 @@ import tempfile
 import termios
 import threading
 import time
-from support import install_fzf_probe
+from support import install_fzf_probe, install_agent_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -95,6 +96,65 @@ def snapshots():
     print('ok - scope, unread, literal text, config overrides, linked identities, folds, compact counts, empty results and parent targets')
 
 
+def agent_snapshots():
+    from attention import agent_pane
+    with tempfile.TemporaryDirectory(prefix='canopy-agent-filter-') as folder:
+        state=Path(folder)/'state'
+        data=[['D','ascii','all','mono','normal','','','','%0','@0','$0','80','host'],
+              ['S','$0','one','1'],['S','$1','linked','1'],
+              ['W','$0','@0','0','agents','2','off','0','0','0'],
+              ['W','$1','@0','0','agents','2','off','0','0','0']]
+        data[0].extend(['']*(40-len(data[0]))+['on'])
+        for index,status in enumerate(['needs-input','working','turn-ended','interrupted','ready','working','working']):
+            pane=agent_pane(f'%{index}','@0',str(index),'claude',str(100+index),status)
+            pane[21]='100'
+            if index==2: pane[10]='1'
+            if index==6: pane[21]='1' # stale
+            data.extend([pane,['A',f'%{index}','claude'],['R',f'%{index}','/work/Canopy' if index<3 else '/other/project']])
+            if index!=5: data.append(['V',f'%{index}'])
+        def render(saved='',agents=True,needs=False,target=''):
+            state.write_text(saved)
+            raw=sp.check_output(['awk','-v',f'agent_view={int(agents)}','-v','stable=1','-v','nul=1','-v','header=1','-v','now=1000','-f',str(ROOT/'lib/tree-render.awk'),str(state),'-'],
+                input='\n'.join('\x1f'.join(row) for row in data)+'\n',text=True,
+                env=os.environ|{'TMUX_CANOPY_NEEDS_INPUT':'1' if needs else '', 'TMUX_CANOPY_FILTER_TARGET':target})
+            return raw
+        def panes(raw):
+            return [r.split('\t')[0] for r in raw.split('\0') if r.startswith('P:')]
+        for mode,expected in [('needs-input','%0'),('working','%1'),('completed','%2'),('interrupted','%3')]:
+            result=render(f'FILTER_AGENT_STATUS\t{mode}\n')
+            assert panes(result)==['P:'+expected]*2,(mode,result)
+        assert len(panes(render()))==14
+        assert render('FILTER_AGENT_STATUS\tworking\nW:@0:$0\n',target='W:@0:$0')=='P:%1\t$0\n'
+        data[0][2]='none'
+        assert not panes(render('FILTER_AGENT_STATUS\tcompleted\n'))
+        data[0][2]='all'
+        for width in (24,30,42,80):
+            data[0][11]=str(width)
+            header=render('FILTER_AGENT_STATUS\tcompleted\nFILTER_AGENT_REPO\tCanopy\n').split('\0')[0]
+            assert '+R' in header and len(header.split('\t')[1])<=width-2,header
+        data[0][11]='80'
+        assert panes(render('FILTER_AGENT_STATUS\tworking\nFILTER_AGENT_REPO\tCANOPY\n'))==['P:%1']*2
+        assert not panes(render('FILTER_AGENT_REPO\t.*\n'))
+        assert 'F to change filters' in render('FILTER_AGENT_REPO\tabsent\n')
+        assert len(panes(render('FILTER_AGENT_STATUS\tworking\n',agents=False)))==14
+        # A parent's completed state must not hide an active child.
+        completed=next(row for row in data if row[:2]==['P','%2'])
+        completed.extend(['']*(25-len(completed)))
+        completed[24]='child,Explore,needs-input,1000,Bash'
+        assert panes(render('FILTER_AGENT_STATUS\tneeds-input\n'))==['P:%0','P:%2']*2
+        assert not panes(render('FILTER_AGENT_STATUS\tcompleted\n'))
+        completed[24]='child,Explore,working,1000,Bash'
+        assert panes(render('FILTER_AGENT_STATUS\tworking\n'))==['P:%1','P:%2']*2
+        completed[24]=''
+        completed[10]='0'
+        assert not panes(render('FILTER_AGENT_STATUS\tcompleted\n')), 'read completions disappear'
+        completed[10]='1'
+        # Jump-to-waiting remains global even with active agent filters.
+        jump=render('FILTER_AGENT_STATUS\tworking\nFILTER_AGENT_REPO\tabsent\n',needs=True)
+        assert 'P:%0' in jump and 'P:%3' in jump
+    print('ok - verified status filters, unread completion, stale/process-only exclusion, linked panes, repository composition and global jump')
+
+
 def live():
     executable = shutil.which('tmux')
     socket = f'canopy-filters-{os.getpid()}'
@@ -114,21 +174,21 @@ def live():
             while time.monotonic() < deadline:
                 if predicate(): return
                 time.sleep(.04)
-            raise AssertionError(message)
+            raise AssertionError((message, screen()))
         def display(pane, fmt): return tm('display-message', '-p', '-t', pane, fmt)
         def run(name, *args):
             result = sp.run([str(ROOT/'scripts'/name), *args], env=script_env, text=True, capture_output=True, timeout=15)
             assert result.returncode == 0, (name, result.stderr)
             return result.stdout
         def screen(): return tm('capture-pane', '-p', '-t', sidebar)
-        def menu(key='F'):
+        def menu(key='F', title=b'Tree filters'):
             output.clear()
             deadline = time.monotonic()+8
             while time.monotonic() < deadline:
                 tm('send-keys', '-t', sidebar, key)
                 pulse = time.monotonic()+1.5
                 while time.monotonic() < pulse:
-                    if b'Tree filters' in output:
+                    if title in output:
                         return
                     time.sleep(.04)
             raise AssertionError(('filter menu opens',screen(),bytes(output[-2500:])))
@@ -227,6 +287,46 @@ def live():
             os.write(master,b'\x15'+hostile.encode()+b'\r');time.sleep(.3)
             assert not sentinel.exists() and hostile in state.read_text(), (sentinel.exists(), hostile, state.read_text(), bytes(output[-2500:]))
             run('tree-filter','clear')
+            # Agent filters share the binding but keep separate state and view.
+            install_agent_fixture(temp/'claude')
+            repo=temp/'repo with spaces'; (repo/'.git').mkdir(parents=True)
+            (repo/'nested').mkdir()
+            tm('respawn-pane','-k','-t',other,'-c',str(repo/'nested'),str(temp/'claude')+' 600')
+            wait(lambda:display(other,'#{pane_current_command}')=='claude','agent fixture running')
+            def agents_ready():
+                if 'Agents' in screen() and 'Claude Code' in screen(): return True
+                tm('send-keys','-t',sidebar,'4');time.sleep(.15)
+                return False
+            wait(agents_ready,'agents view')
+            tree_saved=[line for line in state.read_text().splitlines() if line.startswith(('FILTER\t','FILTER_WINDOW\t','FILTER_TITLE\t'))]
+            menu(title=b'Agent filters');os.write(master,b'n')
+            wait(lambda:'No matching agents' in screen(),'process-only agent has no verified needs-input state')
+            assert 'VIEW\tagents' in state.read_text()
+            def agent_event(event):
+                result=sp.run([str(ROOT/'scripts/agent-hook'),'claude'],
+                    input=json.dumps({'session_id':'filter-test','hook_event_name':event}),
+                    env=script_env|{'TMUX_PANE':other},text=True,capture_output=True,timeout=15)
+                assert result.returncode==0,result.stderr
+            agent_event('SessionStart');agent_event('UserPromptSubmit');agent_event('PermissionRequest')
+            wait(lambda:'Claude Code' in screen() and 'No matching agents' not in screen(),'verified needs-input event enters filtered list')
+            agent_event('UserPromptSubmit')
+            wait(lambda:'No matching agents' in screen(),'working event leaves needs-input list')
+            menu(title=b'Agent filters');os.write(master,b'w')
+            wait(lambda:'Claude Code' in screen() and 'Working' in screen(),'working filter includes live report')
+            menu(title=b'Agent filters');os.write(master,b'a')
+            wait(lambda:'Claude Code' in screen(),'agent filter recovers from empty results')
+            menu(title=b'Agent filters');os.write(master,b'r')
+            wait(lambda:b'Repository root contains' in output,'repository prompt')
+            os.write(master,b'REPO WITH SPACES\r')
+            wait(lambda:'+R' in screen() and 'Claude Code' in screen(),'case-insensitive repository root filter includes nested directory')
+            run('tree-filter','set-repository','no-such-repo')
+            wait(lambda:'No matching agents' in screen(),'repository excludes agent')
+            menu('C-f',title=b'Agent filters');os.write(master,b'c')
+            wait(lambda:'Claude Code' in screen() and '+R' not in screen(),'clear agent filters')
+            assert tree_saved==[line for line in state.read_text().splitlines() if line.startswith(('FILTER\t','FILTER_WINDOW\t','FILTER_TITLE\t'))]
+            tm('send-keys','-t',sidebar,'1')
+            wait(lambda:'Tree' in screen(),'return to tree')
+            print('ok - attached Agents filters, empty recovery, repository prompt/root matching and independent Tree state')
             assert sp.check_output(['pgrep','-P',display(sidebar,'#{pane_pid}'),'-x','fzf'],text=True).strip()==ui_pid
             print('ok - empty recovery, defaults, owner session following, literal menu text and persistent fzf')
         finally:
@@ -237,4 +337,5 @@ def live():
 
 if __name__=='__main__':
     snapshots()
+    agent_snapshots()
     if '--snapshots-only' not in sys.argv:live()

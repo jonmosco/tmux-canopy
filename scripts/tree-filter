@@ -8,13 +8,18 @@ sidebar="${TMUX_PANE:-}"
 client="${TMUX_CANOPY_CLIENT:-}"
 action="${1:-menu}"
 [[ -r "$state_file" ]] || exit 0
+view=tree
+while IFS=$'\t' read -r kind value _; do
+  [[ "$kind" != VIEW ]] || { view=$value; break; }
+done < "$state_file"
+[[ "$view" == agents ]] || view=tree
 
 set_field() {
   local field="$1" value="$2" tmp
   value="${value//[[:cntrl:]]/ }"
   tmp="$(mktemp "${state_file}.XXXXXX")" || return 1
   if awk -F '\t' -v key="$field" '$1 != key && $1 != "VIEW"' "$state_file" > "$tmp" &&
-     printf '%s\t%s\nVIEW\ttree\n' "$field" "$value" >> "$tmp"; then
+     printf '%s\t%s\nVIEW\t%s\n' "$field" "$value" "$view" >> "$tmp"; then
     mv -- "$tmp" "$state_file"
   else
     rm -f -- "$tmp"
@@ -42,6 +47,7 @@ field_value() {
   while IFS=$'\t' read -r kind value rest; do
     if [[ "$kind" == "$field" ]]; then printf '%s' "$value"; return; fi
   done < "$state_file"
+  [[ -n "$option" ]] || return 0
   tmux show-option -gqv "$option" 2>/dev/null || true
 }
 
@@ -69,6 +75,43 @@ menu_command() {
     "TMUX_PANE=$sidebar" "$BASH" "$SCRIPT_DIR/tree-filter" "$1")"
   sidebar_menu_job "$command"
 }
+
+if [[ "$view" == agents ]]; then
+  case "$action" in
+    menu)
+      mode="$(field_value FILTER_AGENT_STATUS '')"
+      repo="$(field_value FILTER_AGENT_REPO '')"
+      repo="${repo//[[:cntrl:]]/ }"; repo="${repo:0:50}"; repo="${repo//#/##}"
+      all_label='All agents'; need_label='Needs input'; work_label='Working'
+      done_label='Completed and unread'; interrupted_label='Interrupted'
+      case "${mode:-all}" in
+        all) all_label="* $all_label" ;;
+        needs-input) need_label="* $need_label" ;;
+        working) work_label="* $work_label" ;;
+        completed) done_label="* $done_label" ;;
+        interrupted) interrupted_label="* $interrupted_label" ;;
+      esac
+      sidebar_display_menu "$client" "$sidebar" -x C -y C -T ' Agent filters ' \
+        "$all_label" a "$(menu_command all)" \
+        "$need_label" n "$(menu_command needs-input)" \
+        "$work_label" w "$(menu_command working)" \
+        "$done_label" d "$(menu_command completed)" \
+        "$interrupted_label" i "$(menu_command interrupted)" \
+        "Repository contains: ${repo:-any}" r "$(menu_command repository)" \
+        'Clear agent filters' c "$(menu_command clear)" 'Cancel' q ''
+      exit 0
+      ;;
+    all|needs-input|working|completed|interrupted) set_field FILTER_AGENT_STATUS "$action" || exit 1 ;;
+    repository) prompt_field FILTER_AGENT_REPO '' 'Repository root contains (empty clears):' ;;
+    set-repository) set_field FILTER_AGENT_REPO "${2:-}" || exit 1 ;;
+    clear|defaults)
+      set_field FILTER_AGENT_STATUS all && set_field FILTER_AGENT_REPO '' || exit 1
+      ;;
+    *) exit 1 ;;
+  esac
+  [[ -z "$sidebar" ]] || tmux send-keys -t "$sidebar" C-r 2>/dev/null || true
+  exit 0
+fi
 
 case "$action" in
   menu)

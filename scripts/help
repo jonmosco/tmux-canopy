@@ -55,6 +55,7 @@ context_help_records() {
       key 'n' 'Jump to the longest-waiting agent needing input'
       key '>' 'Reply or send a line to the selected pane'
       key 'i' 'Cycle drawer: Terminal preview, Agent inspector, or Agent list'
+      key 'F / Ctrl-f' 'Filter agents by status and repository'
       key 'a' 'Open pane actions'
       ;;
     *)
@@ -113,7 +114,7 @@ help_records() {
   key 'Shift-h' 'Collapse all sessions and windows'
   key 'Shift-l' 'Expand all sessions and windows'
   key '/' 'Search the current view'
-  key 'F / Ctrl-f' 'Tree filters: All, Current session, Unread, window name and pane title; Ctrl-f also works while searching'
+  key 'F / Ctrl-f' 'Filters for Tree or Agents view; Ctrl-f also works while searching'
   key 'Ctrl-g' 'Search all sessions, windows and panes, including collapsed branches; Enter switches, Esc cancels'
   key 'Esc' 'Leave search and clear its query'
   key 'Ctrl-r' 'Refresh; retry if data is unavailable'
@@ -149,7 +150,8 @@ help_records() {
   key 'x, then x' 'Confirm deletion of a pane, window, session or buffer'
   key 'a, then D' 'Open diagnostics'
   if [[ "$agents_enabled" == on ]]; then
-    note 'Agents view detects live processes, not working or waiting state. Tree filters do not narrow it; / searches its visible rows.'
+    note 'Agents view: F filters All, Needs input, Working, Completed and unread, or Interrupted; combine with a literal repository-root substring. +R marks a repository rule. Tree filters stay separate; / searches visible rows.'
+    note 'Status filters require verified reports; process-only or stale agents remain in All. Subagent requests take priority. Completed and unread needs pane notifications. Clear agent filters restores all; n and Ctrl-g remain global.'
     note 'Optional agent hooks or plugins report lifecycle events. Without them, screen-based request hints remain unverified.'
     note 'The inspector is a fixed field card: state (including Working · <tool>) and agent, one trust line, directory, optional git repo/branch (plus dirty summary when branch labels are on), and place (green ● when that pane is your active content target). A request and command appear only when present. In a dock, i cycles Terminal preview, Agent inspector, and Agent list.'
     note 'Short drawers keep state, then a present request/command, ahead of trust and place; lines clip, never wrap. No blank filler rows. Default drawer height is 25% (@tmux-canopy-preview-height).'
@@ -284,9 +286,10 @@ legend_records() {
   fi
 
   section 'Views and filters'
-  legend_item '· All' 'All sessions and panes. F changes Tree filters.' dim
+  legend_item '· All' 'All targets in the current view. F changes Tree or Agent filters.' dim
   legend_item '· Session' 'Only the current session.' dim
   legend_item '· Unread' 'Only panes with unread notices and their parents.' dim
+  legend_item '+R' 'An Agents repository-root filter is active; F shows its value.' dim
   legend_item '+W / +T' 'Window-name / pane-title text filter is active.' dim
   note 'Press ? for command help. Press g for this legend. q or Esc closes either popup.'
 }

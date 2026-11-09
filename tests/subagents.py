@@ -91,7 +91,7 @@ try:
                     for record in result.stdout.split('\0') if '\t' in record}
 
         assert plain(header_rows()['F:']) == '↵ focus  a actions  / search  ? help', header_rows()
-        assert plain(header_rows('--agents')['F:']) == '↵ focus  n waiting  > reply  i summary'
+        assert plain(header_rows('--agents')['F:']) == 'F filters  ↵ focus  n waiting  > reply  i summary'
         assert 'F:' not in rows(), 'only the sidebar render carries a footer'
         footer = Path(str(state) + '.footer')
 

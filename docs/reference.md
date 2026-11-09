@@ -95,10 +95,10 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `S` | Create a session named for the git repository, or the next `session-N` |
 | `N` | Create a named session with a prompt |
 | `/` | Enter fuzzy-filter mode |
-| `F` / `Ctrl-f` | Open Tree filters; Ctrl-f also works while searching |
+| `F` / `Ctrl-f` | Open filters for Tree or Agents; Ctrl-f also works while searching |
 | `Ctrl-g` | Open the global quick switcher, including collapsed panes |
 | `Ctrl-o` | Return the selection pointer to the current pane or its visible parent |
-| `Esc` | Leave fuzzy search; keep Tree filters |
+| `Esc` | Leave fuzzy search; keep Tree and Agent filters |
 | `Ctrl-r` | Refresh |
 | `Ctrl-h` / `Ctrl-l` | Focus the pane to the left / right from a dock; Ctrl-h remains Backspace while searching |
 | `Ctrl-j` / `Ctrl-k` | Move selection down / up |
@@ -150,7 +150,7 @@ active window-name and pane-title rules; open the filter menu to inspect or edit
 those values. Very narrow sidebars abbreviate the scope to A/S/U. No matches shows
 an explicit hint to reopen the filter menu. Counts show matching/total objects.
 
-Selecting a filter returns to Tree view. Filters survive window changes and view
+Outside Agents view, selecting a filter returns to Tree view. Filters survive window changes and view
 switches for the lifetime of that sidebar; Processes and Buffers remain independent.
 `/` searches the rendered filtered tree, and **j/k/arrows** traverse those results.
 **Enter** on a session/window focuses a matching descendant, including inside a
@@ -172,6 +172,30 @@ set -g @tmux-canopy-filter-title '' # e.g. orch:
 
 Reload configuration and press Ctrl-r to read changed defaults. A menu choice
 keeps precedence until **Use configured defaults** or the sidebar is reopened.
+
+### Agent filters
+
+In Agents view (`4`), **F / Ctrl-f** opens a separate menu:
+
+- **All agents** includes detected processes with unknown or stale state.
+- **Needs input** includes verified waiting agents or parents with a waiting subagent.
+- **Working** includes verified working agents or parents with working subagents,
+  excluding agents needing input or interrupted.
+- **Completed and unread** includes ready/ended agents with unread pane notifications,
+  excluding parents with active subagents. With notifications disabled, this filter
+  has no results. Focusing a pane clears its notifications and can remove it.
+- **Interrupted** includes verified interrupted agents, unless a subagent needs input.
+- **Repository contains** matches a case-insensitive literal substring of the pane's
+  Git root path, including its folder name. Nested directories match their root;
+  worktrees use their own root paths. Panes outside Git repositories do not match.
+  Empty text clears the rule. This works with Git branch labels off and runs no Git commands.
+- **Clear agent filters** resets both agent rules without changing Tree filters.
+
+Status and repository rules combine with `/` search and preserve folds. The header
+names the status and marks a repository rule with **+R**; open **F** to inspect its
+value. Empty results show a hint to reopen the menu. Agent filters persist across
+view/window switches for the sidebar's lifetime. The global **n** jump and **Ctrl-g**
+quick switcher ignore them. Filtering does not change the workspace tree's order.
 
 ### Global quick switcher
 
@@ -213,11 +237,11 @@ The same long-running fzf process switches among three built-in sources, plus Ag
 1. **Tree** — sessions, windows, panes, creation, movement, and native object actions.
 2. **Processes** — one `ps` snapshot attributed beneath each live tmux pane PID. `Enter` focuses the owning pane; `a` offers validated `TERM` and confirmed `KILL` actions.
 3. **Buffers** — native tmux paste buffers with previews. `Enter` pastes into the sidebar's current content target; `a` can paste, yank to the system clipboard, or arm deletion; `x`, `x` deletes the selected buffer.
-4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent` → `cursor-agent`), GitHub Copilot CLI (`copilot`), Grok Build (`grok`), Crush, or Hermes Agent process. The header summarizes unique agent panes by reported state: `◆` needs input, `✕` interrupted, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. When space is tight, the header shows the leading state and total (such as `◆2/5`). ASCII uses `!`, `x`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's Agent inspector. Tree filters do not narrow this view; `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. An agent counts for a pane only when it runs directly in that pane or under shells, runtimes, and sandbox wrappers (`bash`, `zsh`, `env`, `node`, `python`, `npx`, `uv`, `bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, and similar); one started by another foreground program, such as an editor plugin inside Neovim, belongs to that program, so the pane is not an agent pane. Ctrl-r refreshes the process inventory.
+4. **Agents (opt-in)** — only sessions, windows, and panes containing a live Codex, Claude Code, OpenCode, Gemini CLI, Antigravity (agy), Pi, Oh My Pi, Cursor Agent (`agent` → `cursor-agent`), GitHub Copilot CLI (`copilot`), Grok Build (`grok`), Crush, or Hermes Agent process. The header summarizes unique agent panes by reported state: `◆` needs input, `✕` interrupted, `▷` working, `✓` ready/ended, and `○` detected without a verified current state (including stale reports). An active subagent can raise its parent's priority but is not counted as another pane. Linked window occurrences are counted once. When space is tight, the header shows the leading state and total (such as `◆2/5`). ASCII uses `!`, `x`, `+`, `d`, and `o` instead. Parent rows count detected agent panes. Tree folds and native object actions still work, and `i` opens the selected pane's Agent inspector. Tree filters do not narrow this view; **F / Ctrl-f** opens its own status and repository filters (see [Agent filters](#agent-filters)), and `/` searches the visible agents. A process being present does not establish whether an agent is working or needs input. An agent counts for a pane only when it runs directly in that pane or under shells, runtimes, and sandbox wrappers (`bash`, `zsh`, `env`, `node`, `python`, `npx`, `uv`, `bwrap`, `firejail`, `sandbox-exec`, `nono`, `fence`, and similar); one started by another foreground program, such as an editor plugin inside Neovim, belongs to that program, so the pane is not an agent pane. Ctrl-r refreshes the process inventory.
 
 The footer is a responsive action rail for the open view. Tree starts with
 `↵ focus  a actions  / search  ? help`; Agents with
-`↵ focus  n waiting  > reply  i summary`; Processes with
+`F filters  ↵ focus  n waiting  > reply  i summary`; Processes with
 `↵ focus  a actions  p preview  / search  ? help`; and Buffers with
 `↵ paste  a actions  x delete  / search  ? help`. Lower-priority actions disappear
 from the right as the sidebar narrows. ASCII mode spells `Enter` instead of

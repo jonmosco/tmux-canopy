@@ -136,6 +136,28 @@ if [[ "$labels" == places ]]; then
   snapshot=${resolved_snapshot%$'\n'}
   builtin cd -- "$origin" 2>/dev/null || true
 fi
+# Agent roots use filesystem checks only, cached per directory for this snapshot.
+# Include them before any rule is selected: the menu may change the state while
+# the snapshot is in flight, before awk reads it. A new rule still has its roots.
+if [[ "$agent_view" == 1 && -z "$TMUX_CANOPY_NEEDS_INPUT" ]]; then
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/git-lib.sh"
+  declare -A agent_roots=()
+  repo_rows=''
+  while IFS= read -r line; do
+    [[ "$line" == P$sep* ]] || continue
+    IFS="$sep" read -ra fields <<< "$line"
+    [[ "${fields[7]:-}" != 1 && "${fields[8]:-}" != 1 && "${fields[9]:-}" != 1 ]] || continue
+    directory=${fields[6]:-}
+    [[ -n "$directory" ]] || continue
+    if [[ -z ${agent_roots[x$directory]+set} ]]; then
+      canopy_git_root "$directory" || true
+      agent_roots[x$directory]=$CANOPY_GIT_ROOT
+    fi
+    repo_rows+=$'\n'"R${sep}${fields[1]}${sep}${agent_roots[x$directory]}"
+  done <<< "$snapshot"
+  snapshot+=$repo_rows
+fi
 # Git is strictly opt-in. Find roots with shell builtins and ask git once per
 # distinct repository; no process is started for unrelated directories.
 if [[ "$git_mode" == branch ]] && command -v git >/dev/null 2>&1; then

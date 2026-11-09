@@ -99,10 +99,10 @@ def main():
         assert footer(width=24) == '◆ 1 waiting  n go', footer(width=24)
         assert footer(width=24, status='working') == '↵ focus  a actions', footer(width=24, status='working')
         # Agents advertises its own actions; a waiting request still overrides it.
-        assert footer(agent_view=True, status='working') == '↵ focus  n waiting  > reply  i summary', \
+        assert footer(agent_view=True, status='working') == 'F filters  ↵ focus  n waiting  > reply', \
             footer(agent_view=True, status='working')
         assert footer(agent_view=True) == '◆ Claude Code waiting  n go  > reply', footer(agent_view=True)
-        assert footer(agent_view=True, status='working', width=30) == '↵ focus  n waiting', \
+        assert footer(agent_view=True, status='working', width=30) == 'F filters  ↵ focus', \
             footer(agent_view=True, status='working', width=30)
         assert footer(appearance='places', status='working') == '↵ focus  a actions  / search  ? help'
         assert footer(agent_view=True, status='working', state_text='FOOTER\toff\n') == ''
