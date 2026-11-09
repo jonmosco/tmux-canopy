@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The focus regression test counts only debounce-worker commits; conditional same-pane requests during a burst no longer produce false CI failures.
 - Switching windows by clicking a tab on the status line, or by scrolling the wheel over it, no longer makes the sidebar blink. Those mouse bindings now use the same one-step transition as `prefix + n`, `p`, and the number keys, instead of showing the new window first and moving the sidebar in from a follow hook. Canopy only replaces tmux's default `MouseDown1Status`, `WheelUpStatus`, and `WheelDownStatus` bindings (a binding of yours is left alone, a click off the tabs keeps its default action, and `@tmux-canopy-smooth-navigation 'off'` keeps all three native), and restores the previous bindings when turned off.
 
 ### Changed

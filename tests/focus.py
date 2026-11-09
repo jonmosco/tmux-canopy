@@ -125,10 +125,10 @@ def main():
             bindings = [f'alt-a:pos({pos})', f"alt-z:execute-silent(printf '%s|%s|%s\\n' {{1}} {{3}} {{q}} > {selected})"]
             install_fzf_probe(temp, bindings, script_env)
             wrapper = temp / 'tmux'
-            # Log the debounce worker's focus deliveries (a request's commit
-            # also starts that worker, so it names run-shell), and count tree
-            # renders by tree-source's one batched snapshot call.
-            wrapper.write_text('#!/bin/bash\nif [[ "$1" == if-shell && "$*" == *tmux_canopy_focus_pending* && "$*" == *send-keys* && "$*" != *run-shell* ]]; then printf "%s\\n" "$6" >> ' + shlex.quote(str(deliveries)) + '; fi\n'
+            # Only the worker emits focus-committed. Requests can also name
+            # focus_pending and send-keys, including conditional no-ops during
+            # a burst. Count renders by tree-source's one batched snapshot.
+            wrapper.write_text('#!/bin/bash\nif [[ "$1" == if-shell && "$*" == *focus-committed* ]]; then printf "%s\\n" "$6" >> ' + shlex.quote(str(deliveries)) + '; fi\n'
                                'if [[ "$*" == *list-sessions*list-windows*list-panes* ]]; then printf x >> ' + shlex.quote(str(renders)) + '; fi\n'
                                'exec ' + shlex.join([executable, '-L', socket]) + ' "$@"\n')
             wrapper.chmod(0o755)
@@ -202,12 +202,20 @@ def main():
             tm('send-keys', '-t', sidebar, 'M-a')
             wait(lambda: probe(sidebar).startswith('P:' + last + '|'), 'browse away before pane burst')
             browsed = probe(sidebar)
+            # A repeated hook at the leading location is a no-op while a
+            # worker holds the claim. It must not be logged as a worker commit.
+            count = len(deliveries.read_text().splitlines())
+            tm('set-option', '-p', '-t', sidebar, '@tmux_canopy_focus_pending', '1.1.1')
+            run('refresh-sidebar', peer, client, 'after-select-pane')
+            assert len(deliveries.read_text().splitlines()) == count, deliveries.read_text().splitlines()[count:]
+            assert probe(sidebar) == browsed
+            tm('set-option', '-pu', '-t', sidebar, '@tmux_canopy_focus_pending')
             count = len(deliveries.read_text().splitlines())
             rendered = renders.stat().st_size
             os.write(master, (b'\x1b[15~\x1b[17~' * 4) + b'\x1b[15~')
             wait(lambda: location(sidebar) == f'{session}|{wa}|{pane_a}', 'rapid pane burst')
             time.sleep(.25)
-            assert len(deliveries.read_text().splitlines()) == count + 1
+            assert len(deliveries.read_text().splitlines()) == count + 1, deliveries.read_text().splitlines()[count:]
             # The first switch repaints at once and the settled target at most once more.
             assert 1 <= renders.stat().st_size - rendered <= 2, renders.stat().st_size - rendered
             assert probe(sidebar) == browsed, 'a pane burst must not move the browse pointer'
