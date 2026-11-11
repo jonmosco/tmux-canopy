@@ -9,6 +9,8 @@
 
 ### Changed
 
+- Expired needs-input reports retain their last request in dim, explicitly stale context in the tree and inspector. They remain excluded from actionable attention, filters, rollups, and `n` jumps; the inspector advises verifying in the live agent before acting.
+- Added a first-steps guide to the README, reference, and in-app help covering selection versus active pane, focus return, search, and help/legend shortcuts.
 - Updated documentation for current headers, immediate pane-focus repainting, quiet state marks and animation, Python requirements, Agent filter persistence, OpenCode subagents, and the implemented status of historical design specs.
 
 - The README opening now emphasizes workspace navigation, finding agents that need attention, and replying without leaving the current pane.

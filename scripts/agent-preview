@@ -364,6 +364,11 @@ if ((verified_hook)); then
     fi
   else
     state='Stale report'
+    if [[ "$report_status" == needs-input ]]; then
+      request=$report_summary
+      request_command=$report_command
+    fi
+    trust="stale lifecycle hook · ${age}s"
   fi
 fi
 git_line=''
@@ -417,7 +422,7 @@ fi |
     used++
   }
   function req_lines() {
-    return (infer && request!="") + (request!="") + (command!="")
+    return (infer && request!="") + (request!="") + (command!="") + (ENVIRON["CANOPY_PREVIEW_STATE"]=="Stale report" && request!="")
   }
   { line[++n]=$0 }
   END {
@@ -483,9 +488,10 @@ fi |
     }
     if (need>0 && used < limit) {
       if (limit-used > need) emit("", "")
-      if (infer && request!="") emit("Possible input requested (unverified):", dim)
+      if (state=="Stale report" && request!="") emit("Last reported request (stale; verify before acting):", dim)
+      else if (infer && request!="") emit("Possible input requested (unverified):", dim)
       if (request!="") emit(request, "")
-      if (command!="") emit(attention (icons=="ascii" ? "| " : "│ ") reset command, "")
+      if (command!="") emit((state=="Stale report" ? dim : attention) (icons=="ascii" ? "| " : "│ ") reset command, "")
     }
   }
 '

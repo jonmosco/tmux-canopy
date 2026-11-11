@@ -708,14 +708,16 @@ function subagent_word(state, narrow) {
 # What an agent waiting on you asks for, on a dim line beneath its pane: the
 # command it wants to run, then its own words when they say more than that it
 # wants approval. The drawer keeps the full text.
-function request_line(p, continuation,    text,generic,plain,more) {
-    if (agent_label(p) != "approval") return ""
+function request_line(p, continuation,    text,generic,plain,more,label) {
+    label=agent_label(p)
+    if (label != "approval" && !(label == "stale" && report_status[p] == "needs-input")) return ""
     generic=(request_summary[p] ~ /(^|: )(Approval|Input) requested/ || request_summary[p] ~ / permission requested$/)
     text=request_command[p]
     if (request_summary[p] != "" && !generic) text=text (text == "" ? "" : " · ") request_summary[p]
     if (text == "") return ""
     plain=continuation; gsub(/\033\[[0-9;]*m/,"",plain)
     more=(icons == "ascii" ? "~" : "…")
+    if (label == "stale") text="Last reported (stale; verify before acting): " text
     if (text_width(plain)+text_width(text) <= width-3) return "\n" continuation dim text reset
     return "\n" quiet_clip(continuation dim text, width-3-text_width(more)) dim more reset
 }

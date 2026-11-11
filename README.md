@@ -43,6 +43,13 @@ Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled bi
 2. Press **prefix + I** to install.
 3. Press **prefix + T** to open or close the sidebar (with the default prefix: **Ctrl-b**, then **Shift-t**). Press `?` inside it for context-sensitive actions and the full key reference.
 
+### First steps
+
+- **Browse:** `j` / `k` (or arrow keys) moves the highlighted selection. The green marker shows the active tmux pane; it can be different from the selected row while you browse.
+- **Go to a pane:** select a pane and press `Enter`. To return to the sidebar, use your tmux pane-navigation keys (by default, `prefix` + an arrow key). `prefix + T` closes the sidebar; it does not return focus to it.
+- **Find anything:** press `/` to filter the current view, or `Ctrl-g` to search all sessions, windows, and panes, including folded branches. Press `Esc` to leave a filter.
+- **Get help:** press `?` for keys and actions for the current view, or `g` for the symbol and color legend. Press `q` or `Esc` to close either overlay.
+
 For rich agent lifecycle state (working, needs-input, subagents), run `~/.tmux/plugins/tmux-canopy/canopy setup` and pick your agents (see [AI agent monitoring](#ai-agent-monitoring)). Run `~/.tmux/plugins/tmux-canopy/canopy doctor` to verify requirements and inspect active bindings, options, and hooks.
 
 <details>

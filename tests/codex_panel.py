@@ -245,9 +245,10 @@ try:
         tm('set-option', '-pq', '-t', agent, '@tmux_canopy_agent_updated', '1')
         stale = report()
         assert 'Stale report' in stale.splitlines()[0] and 'lifecycle hook ·' in stale, stale
-        assert 'Install fixture dependency 7b2' not in stale and 'npm install example' not in stale
+        assert 'Last reported request (stale; verify before acting):' in stale
+        assert 'Install fixture dependency 7b2' in stale and 'npm install example' in stale
         assert 'Possible input requested' not in stale
-        assert not re.search(r'^\s*[│|] ', stale, re.MULTILINE), stale
+        assert re.search(r'^\s*[│|] npm install example$', stale, re.MULTILINE), stale
         assert_screen_excluded(agent)
         assert 'UNKNOWN' not in tree_row(agent) and '·hook' not in tree_row(agent)
         timer = tm('show-option', '-pqv', '-t', agent, '@tmux_canopy_agent_timer')

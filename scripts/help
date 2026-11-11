@@ -121,6 +121,8 @@ help_records() {
   key 'Ctrl-h / Ctrl-l' 'In a dock, focus the left / right pane; Ctrl-h is Backspace while searching'
   key 'Ctrl-j / Ctrl-k' 'Move the selection down / up'
   note 'The green dot shows the active location. The highlighted row is your selection; pane focus alone does not move it (Ctrl-o or returning to the sidebar does).'
+  note 'First time here? j/k browses; Enter focuses the selected pane. Return with your tmux pane-navigation keys (for example, prefix + Left/Right); prefix + T closes the sidebar.'
+  note 'Use / to filter this view or Ctrl-g to search every session, window, and pane. Press ? for help or g for the legend; q/Esc closes either overlay.'
 
   note 'Text-filter prompts use tmux prompt keys; Ctrl-c cancels.'
   note 'Tree filters combine with search and preserve folds. +W/+T in the header means a window-name/pane-title rule; F shows the values. Clear all filters restores everything. Ctrl-g always searches all targets.'
@@ -156,7 +158,7 @@ help_records() {
     note 'The inspector is a fixed field card: state (including Working · <tool>) and agent, one trust line, directory, optional git repo/branch (plus dirty summary when branch labels are on), and place (green ● when that pane is your active content target). A request and command appear only when present. In a dock, i cycles Terminal preview, Agent inspector, and Agent list.'
     note 'Short drawers keep state, then a present request/command, ahead of trust and place; lines clip, never wrap. No blank filler rows. Default drawer height is 25% (@tmux-canopy-preview-height).'
     note 'Process-only agents show Detected with snapshot-only trust; other panes show No agent / Terminal with their command and place, without request inference. Agent screen hints stay unverified; the inspector does not approve requests.'
-    note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. Turn ended is not task completion. Stale hook state clears after 15 minutes.'
+    note 'Reported state appears beside live pane rows. Approval means a request was reported; it may be resolved elsewhere. After 15 minutes, old requests remain labeled stale for context, but are not current attention or n targets. Verify them in the live agent before acting.'
   fi
   note 'The actions menu also has reorder, link, unlink, layout, zoom, swap, synchronization and dead-pane respawn.'
 
