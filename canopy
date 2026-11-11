@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Canopy setup and diagnostics. Run from the repository or add it to PATH."""
+
 import argparse
 import importlib.util
 import json
