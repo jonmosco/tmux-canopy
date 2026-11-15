@@ -130,6 +130,7 @@ def main():
         load()
         assert tm('show-option', '-gqv', '@tmux_canopy_animate') == 'on'
         assert 'navigate' in binding('n') and 'toggle' in binding('T')
+        assert 'toggle' in binding('M-t') and 'focus' in binding('M-t')
         assert 'global' in binding('T') and 'slot' in binding('T')
         installed = binding('n')
         load()
@@ -137,12 +138,14 @@ def main():
         tm('set-option', '-g', '@tmux-canopy-smooth-navigation', 'off')
         tm('set-option', '-g', '@tmux-canopy-last-window-key', 'off')
         tm('set-option', '-g', '@tmux-canopy-key', 'Y')
+        tm('set-option', '-g', '@tmux-canopy-focus-key', 'off')
         tm('set-option', '-g', '@tmux-canopy-notifications', 'none')
         load()
         assert binding('n') == original_n, (binding('n'), original_n)
         assert binding('T') == original_t
         assert binding('Tab') == ''
         assert 'toggle' in binding('Y')
+        assert binding('M-t') == ''
         assert tm('show-window-option', '-gv', 'monitor-activity') == 'off'
         assert tm('show-window-option', '-gv', 'monitor-bell') == 'on'
         assert tm('show-window-option', '-gv', 'monitor-silence') == '17'

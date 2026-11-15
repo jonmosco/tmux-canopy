@@ -34,7 +34,7 @@ plugin_job() {
 # ---------------------------------------------------------------------------
 # Read every setting, Canopy's ownership records, and the options it may own
 # in two tmux calls (see canopy_load_state); unset settings read as empty.
-settings=(key width scope smooth-navigation last-window-key transition notifications notification-target
+settings=(key focus-key width scope smooth-navigation last-window-key transition notifications notification-target
   silence-seconds icon-theme appearance animate resize-mode width-presets mode popup-threshold popup-width popup-height
   alerts alert-events alert-sound alert-detail directory-refresh)
 canopy_load_state "${settings[@]/#/@tmux-canopy-}" \
@@ -42,7 +42,7 @@ canopy_load_state "${settings[@]/#/@tmux-canopy-}" \
   session:activity-action session:bell-action session:silence-action \
   window:monitor-activity window:monitor-bell window:monitor-silence
 setting() { printf -v "$1" '%s' "${CANOPY_STATE["@tmux-canopy-$2"]:-}"; }
-setting sidebar_key key; setting sidebar_width width; setting sidebar_scope scope
+setting sidebar_key key; setting focus_key focus-key; setting sidebar_width width; setting sidebar_scope scope
 setting smooth_navigation smooth-navigation; setting last_window_key last-window-key
 setting sidebar_transition transition; setting notification_sources notifications
 setting notification_target notification-target; setting silence_seconds silence-seconds
@@ -56,6 +56,7 @@ setting directory_refresh directory-refresh
 
 # Free-form settings take a default when unset.
 : "${sidebar_key:=T}"
+: "${focus_key:=M-t}"
 : "${last_window_key:=Tab}"
 : "${smooth_navigation:=on}"
 : "${notification_sources:=activity,bell}"
@@ -149,6 +150,11 @@ canopy_queue set-option -gq @tmux-canopy-directory-refresh "$directory_refresh"
 # ---------------------------------------------------------------------------
 canopy_bind prefix "$sidebar_key" run-shell \
   "$(plugin_command toggle '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_scope" "$sidebar_key" "$last_window_key" "$sidebar_transition")"
+
+if [[ "$focus_key" != off && "$focus_key" != "$sidebar_key" ]]; then
+  canopy_bind prefix "$focus_key" run-shell \
+    "$(plugin_command toggle '#{client_tty}' '#{pane_id}' "$sidebar_width" "$sidebar_scope" "$sidebar_key" "$last_window_key" "$sidebar_transition" focus)"
+fi
 
 # Native next-layout includes every pane, which would shuffle the dock too.
 canopy_bind prefix Space run-shell \

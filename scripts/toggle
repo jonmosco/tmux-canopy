@@ -12,6 +12,7 @@ scope="${4:-window}"
 toggle_key="${5:-T}"
 last_window_key="${6:-Tab}"
 transition="${7:-move}"
+action="${8:-toggle}"
 
 if [[ -n "$client" ]] && popup_active "$client"; then
   clear_popup_active "$client"
@@ -20,6 +21,27 @@ if [[ -n "$client" ]] && popup_active "$client"; then
 fi
 
 sidebar_pane="$(sidebar_for_client "$client")"
+
+if [[ "$action" == focus && -n "$sidebar_pane" ]]; then
+  # Resolve the invoking client's live pane, not a format captured before a
+  # concurrent focus change. Never select a dock in another window/client.
+  live_pane="$(client_pane "$client")"
+  IFS='|' read -r sidebar_window remembered < <(tmux display-message -p -t "$sidebar_pane" '#{window_id}|#{@tmux_canopy_target}' 2>/dev/null || true)
+  live_window="$(tmux display-message -p -t "$live_pane" '#{window_id}' 2>/dev/null || true)"
+  [[ "$live_pane" =~ ^%[0-9]+$ && -n "$sidebar_window" && "$sidebar_window" == "$live_window" ]] || exit 0
+  if [[ "$live_pane" == "$sidebar_pane" ]]; then
+    # pane_last is updated synchronously by tmux, unlike the debounced marker.
+    destination="$(tmux list-panes -t "$sidebar_pane" -f '#{&&:#{pane_last},#{&&:#{!=:#{@tmux_canopy},1},#{!=:#{@tmux_canopy_slot},1}}}' -F '#{pane_id}' 2>/dev/null || true)"
+    [[ "$destination" =~ ^%[0-9]+$ ]] || destination="$remembered"
+    [[ "$destination" =~ ^%[0-9]+$ ]] || exit 0
+    # A remembered pane can have been removed or moved since it was recorded.
+    [[ "$(tmux display-message -p -t "$destination" '#{window_id}|#{@tmux_canopy}|#{@tmux_canopy_slot}' 2>/dev/null || true)" == "$sidebar_window||" ]] || exit 0
+    tmux select-pane -t "$destination" 2>/dev/null || true
+  else
+    tmux set-option -pq -t "$sidebar_pane" @tmux_canopy_target "$live_pane" \; select-pane -t "$sidebar_pane" 2>/dev/null || true
+  fi
+  exit 0
+fi
 
 toggle_close_sidebar() {
   local restore_zoom_pane

@@ -46,7 +46,7 @@ Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled bi
 ### First steps
 
 - **Browse:** `j` / `k` (or arrow keys) moves the highlighted selection. The green marker shows the active tmux pane; it can be different from the selected row while you browse.
-- **Go to a pane:** select a pane and press `Enter`. To return to the sidebar, use your tmux pane-navigation keys (by default, `prefix` + an arrow key). `prefix + T` closes the sidebar; it does not return focus to it.
+- **Go to a pane:** select a pane and press `Enter`. Press `prefix + Alt-t` to return to Canopy; press it again to return to your previous content pane. If Canopy is closed, this shortcut opens it. `prefix + T` still opens or closes it.
 - **Find anything:** press `/` to filter the current view, or `Ctrl-g` to search all sessions, windows, and panes, including folded branches. Press `Esc` to leave a filter.
 - **Get help:** press `?` for keys and actions for the current view, or `g` for the symbol and color legend. Press `q` or `Esc` to close either overlay.
 
@@ -142,6 +142,7 @@ Several good tools watch coding agents inside tmux. Pick by what you want to see
 | `g` | Open scrollable symbol and color Legend |
 | `Ctrl-r` | Refresh tree and preview |
 | `Ctrl-q` (`q` / `Esc` in popup) | Close Canopy |
+| `prefix + Alt-t` | Focus Canopy or return to the previous content pane; open Canopy if closed |
 
 ## AI agent monitoring
 

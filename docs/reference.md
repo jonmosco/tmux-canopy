@@ -58,12 +58,12 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 - When no sidebar exists, the binding opens it at the configured edge (left by default) and focuses it, regardless of which pane was active.
 - When the sidebar is open, the same binding closes it from any pane.
 - `Ctrl-q` also closes the sidebar from inside it.
-- After focusing a target with `Enter`, use your pane-navigation binding to return to the sidebar (for example, `prefix + Left` or `prefix + Right`).
+- After focusing a target with `Enter`, press `prefix + Alt-t` to return to the sidebar. Press it from the sidebar to return to the previous content pane. If Canopy is closed, it opens; in popup mode, it closes the popup. Configure the prefix key with `@tmux-canopy-focus-key` (default `M-t`, `off` disables it), then reload the plugin. If it equals the toggle key, the toggle binding takes precedence.
 
 ### First steps
 
 - **Browse:** `j` / `k` or the arrow keys move the highlighted selection. The green marker identifies the active content pane; it is independent of the row you are browsing.
-- **Go to a pane:** select it and press `Enter`. To return, use your tmux pane-navigation keys (for example, `prefix + Left` or `prefix + Right`). `prefix + T` closes the sidebar; it does not return focus to it.
+- **Go to a pane:** select it and press `Enter`. Press `prefix + Alt-t` to return to the sidebar, and again to return to your previous pane. `prefix + T` closes the sidebar; it does not return focus to it.
 - **Find something:** `/` filters the current view. `Ctrl-g` searches across all sessions, windows, and panes, including folded branches. Press `Esc` to leave search.
 - **Get help:** `?` opens key help for the current view; `g` opens the symbol and color legend. Press `q` or `Esc` to close either overlay.
 
@@ -114,6 +114,7 @@ The default binding is `prefix + T`. With tmux’s default prefix, press `Ctrl-b
 | `Ctrl-q` | Close |
 | `q` / `Esc` | Close popup (in popup mode) |
 | `prefix + T` | Toggle the sidebar or popup open or closed |
+| `prefix + Alt-t` | Focus the sidebar or return to the previous content pane; open if closed |
 
 Tree navigation starts in a normal mode so navigation and creation keys remain available. Press `/` before typing a fuzzy query; normal-mode letter bindings are temporarily disabled while filtering. Expanded state lasts for the lifetime of each sidebar process.
 

@@ -144,6 +144,21 @@ def main():
             jump_action = run('jump-current')
             assert 'reload-sync' in jump_action and 'clear-screen' not in jump_action, jump_action
             print('ok - focus pointer refresh does not clear the sidebar before reloading')
+            # Exercise the real prefix binding, including an immediate return
+            # before the debounced active-location marker necessarily catches up.
+            def focus_key():
+                os.write(master, b'\x02\x1bt')
+            focus_key()
+            wait(lambda: tm('display-message', '-p', '-c', client, '#{pane_id}') == pane_a, 'focus shortcut returns to content')
+            tm('select-pane', '-t', peer)
+            focus_key()
+            wait(lambda: tm('display-message', '-p', '-c', client, '#{pane_id}') == sidebar, 'focus shortcut enters sidebar')
+            focus_key()
+            wait(lambda: tm('display-message', '-p', '-c', client, '#{pane_id}') == peer, 'focus shortcut returns to latest pane')
+            tm('select-pane', '-t', pane_a)
+            focus_key()
+            wait(lambda: tm('display-message', '-p', '-c', client, '#{pane_id}') == sidebar, 'focus shortcut restores sidebar')
+            print('ok - prefix focus shortcut toggles focus without closing the sidebar')
             time.sleep(.3)
             tm('send-keys', '-t', sidebar, 'M-a')
             before, row_before = probe(sidebar), pointer_line(sidebar)

@@ -121,7 +121,7 @@ help_records() {
   key 'Ctrl-h / Ctrl-l' 'In a dock, focus the left / right pane; Ctrl-h is Backspace while searching'
   key 'Ctrl-j / Ctrl-k' 'Move the selection down / up'
   note 'The green dot shows the active location. The highlighted row is your selection; pane focus alone does not move it (Ctrl-o or returning to the sidebar does).'
-  note 'First time here? j/k browses; Enter focuses the selected pane. Return with your tmux pane-navigation keys (for example, prefix + Left/Right); prefix + T closes the sidebar.'
+  note 'First time here? j/k browses; Enter focuses the selected pane. prefix + Alt-t returns to the sidebar or previous pane; prefix + T closes the sidebar. The focus key is configurable.'
   note 'Use / to filter this view or Ctrl-g to search every session, window, and pane. Press ? for help or g for the legend; q/Esc closes either overlay.'
 
   note 'Text-filter prompts use tmux prompt keys; Ctrl-c cancels.'
@@ -201,6 +201,7 @@ help_records() {
   key 'Ctrl-q' 'Close the sidebar'
   key 'q / Esc' 'Close the popup (in popup mode)'
   key "prefix + $toggle_key" 'Toggle the sidebar or popup from any pane'
+  key 'prefix + Alt-t' 'Focus sidebar or return to previous pane (default; @tmux-canopy-focus-key changes it)'
   key 'prefix + Left / Right' 'Return focus to the left / right sidebar'
 
   section 'Appearance and behavior'

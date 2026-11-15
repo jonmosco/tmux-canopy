@@ -22,6 +22,7 @@
 
 ### Added
 
+- `prefix + Alt-t` focuses the sidebar or returns to the previous content pane without closing it; it opens Canopy when closed. Set `@tmux-canopy-focus-key` to change the key or `off` to disable it.
 - Agents view has its own `F` / `Ctrl-f` filters for needs input, working, completed and unread, interrupted, and repository root paths. Rules combine with search, preserve Tree filters, and leave global agent jumps and the quick switcher unrestricted.
 
 - A new README hero recording (`python3 docs/demo/record.py --demo tour`): a four-session workspace with multi-pane windows, walking the tree, jumping between windows, folding, and clicking status-line tabs, and turning agent mode on and off. The earlier agent-workflow demo moved into a collapsible section.
