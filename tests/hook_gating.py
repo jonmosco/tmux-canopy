@@ -22,7 +22,11 @@ def main():
         return result.stdout.strip()
 
     try:
-        with tempfile.TemporaryDirectory(prefix='canopy-hook-gating-') as directory:
+        # This suite exists to make hooks start real workers, and one of them
+        # writing into the directory while Python removes it fails the teardown
+        # after every check has passed.
+        with tempfile.TemporaryDirectory(prefix='canopy-hook-gating-',
+                                         ignore_cleanup_errors=True) as directory:
             # Load the plugin from a copy whose follow and refresh-sidebar only
             # record that they ran, so the test sees every shell the hooks start.
             plugin = Path(directory) / 'plugin'
