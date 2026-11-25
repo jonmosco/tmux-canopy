@@ -12,8 +12,9 @@ $signature" 2>/dev/null)" || exit 0
 current="${snapshot%%$'\n'*}"; expected="${snapshot#*$'\n'}"
 IFS='|' read -r window total _ zoomed _ <<< "$expected"
 [[ "$window" =~ ^@[0-9]+$ && "$zoomed" == 0 ]] || exit 0
-old_box="${saved#*,}"; new_box="${current#*,}"
-[[ "${old_box%%,*}" != "${new_box%%,*}" ]] || exit 0
+# Whether the window actually changed size is decided by scale-layout.awk,
+# which reads both layout formats; slicing the string here only worked for the
+# checksummed one tmux 3.7c emitted.
 dock_width=''
 if [[ -n "$dock" ]]; then
   dock_width="$(clamp_sidebar_width_for_total "$total" "${4:-42}" "${5:-24}" "${6:-0}" "${7:-40}")" || exit 0

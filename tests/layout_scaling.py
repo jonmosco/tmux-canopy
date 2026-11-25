@@ -64,9 +64,50 @@ try:
     print('ok - zoomed windows and changed pane inventories are left untouched')
 
     parser = ['awk', '-f', str(ROOT / 'lib/scale-layout.awk')]
-    for invalid in ('broken', '0000,10x4,0,0{', original.replace('510x100', '0x100')):
-        result = sp.run(parser, input=invalid + '\n' + layout() + '\n', text=True, capture_output=True)
-        assert result.returncode != 0 and not result.stdout
+
+    def scale(saved, current):
+        return sp.run(parser, input=f'{saved}\n{current}\n', text=True, capture_output=True)
+
+    # A server reports one of two formats and cannot be asked for the other:
+    # tmux 3.7c the checksummed string, tmux 3.8 JSON. Both must read the same,
+    # including a saved snapshot taken before the server was upgraded.
+    V1_WIDE = 'f09b,120x30,0,0{60x30,0,0,0,59x30,61,0,1}'
+    V1_NARROW = 'abcd,100x30,0,0{50x30,0,0,0,49x30,51,0,1}'
+    V2_WIDE = ('{"V":2,"L":{"t":"h","w":120,"h":30,"x":0,"y":0,"c":['
+               '{"t":"p","w":60,"h":30,"x":0,"y":0,"l":0,"i":0,"I":"%0"},'
+               '{"t":"p","w":59,"h":30,"x":61,"y":0,"a":true,"i":1,"I":"%1"}]}}')
+    V2_NARROW = ('{"V":2,"L":{"t":"h","w":100,"h":30,"x":0,"y":0,"c":['
+                 '{"t":"p","w":50,"h":30,"x":0,"y":0,"l":0,"i":0,"I":"%0"},'
+                 '{"t":"p","w":49,"h":30,"x":51,"y":0,"a":true,"i":1,"I":"%1"}]}}')
+    expected = scale(V1_WIDE, V1_NARROW).stdout
+    assert expected.strip(), 'the checksummed format still scales'
+    for saved, current in ((V2_WIDE, V2_NARROW), (V1_WIDE, V2_NARROW), (V2_WIDE, V1_NARROW)):
+        assert scale(saved, current).stdout == expected, (saved[:40], current[:40])
+    # Key order is tmux's choice, not part of the format.
+    reordered = ('{"L":{"w":120,"t":"h","h":30,"y":0,"x":0,"c":['
+                 '{"I":"%0","t":"p","h":30,"w":60,"x":0,"y":0},'
+                 '{"t":"p","w":59,"h":30,"x":61,"y":0,"I":"%1"}]},"V":2}')
+    assert scale(reordered, V2_NARROW).stdout == expected, 'reordered keys'
+    # Negative offsets are written with %d and must still be consumed.
+    assert scale(V2_WIDE.replace('"x":0,"y":0,"c"', '"x":-2,"y":-1,"c"'),
+                 V2_NARROW).stdout == expected, 'negative offsets'
+    assert scale(V2_WIDE, V2_WIDE).returncode != 0, 'an unchanged window needs no layout'
+    print('ok - both tmux layout formats scale to the same result')
+
+    # The checksummed format cannot describe a floating pane, and tmux drops
+    # floaters when it writes that format, so such a window is left alone.
+    def with_floater(text):
+        return text.replace(']}}', ',{"t":"p","w":20,"h":7,"x":4,"y":2,"i":2,"z":0,"I":"%2"}]}}')
+    assert scale(with_floater(V2_WIDE), with_floater(V2_NARROW)).returncode != 0, 'floating pane'
+    print('ok - windows holding a floating pane are left untouched')
+
+    live = layout()
+    for invalid in ('broken', '0000,10x4,0,0{', '{"V":2,"L":', live[:-3],
+                    V1_WIDE.replace('120x30', '0x30'),
+                    V2_WIDE + 'xx', V2_WIDE.replace('"w":120', '"w":0'),
+                    V2_WIDE.replace(',"I":"%0"', '')):
+        result = scale(invalid, V2_NARROW)
+        assert result.returncode != 0 and not result.stdout, invalid[:60]
     print('ok - malformed layout snapshots are rejected')
 finally:
     sp.run(['tmux', '-L', socket, 'kill-server'], env=env, capture_output=True)

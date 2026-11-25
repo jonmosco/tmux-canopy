@@ -236,7 +236,7 @@ create_session_prompt() {
   trap 'exit 143' TERM HUP
 
   tmux if-shell -F 1 \
-    "command-prompt -l $prompt_target -p $(tmux_quote "New session name:") { set-option -g $response_key %% }"
+    "command-prompt -l $prompt_target -p $(tmux_quote "New session name:") { set-option -g $response_key %1 }"
   if response="$(tmux show-option -gv "$response_key" 2>/dev/null)"; then
     tmux set-option -gu "$response_key" 2>/dev/null || true
     if [[ -n "$response" ]]; then
@@ -282,8 +282,17 @@ send_to_pane() {
   trap 'exit 130' INT
   trap 'exit 143' TERM HUP
   # -p is a format; the block is parsed before the response is substituted.
+  # The placeholder must be %1, not %%. A brace block is parsed into argv once,
+  # then tmux substitutes into each finished argv string without reparsing it
+  # (args_copy_copy_value), so the response stays data and never becomes command
+  # syntax. %1 is inserted verbatim on both 3.7c and 3.8; %% is only unescaped
+  # on 3.7c, because tmux 3.8 made it escape single quotes for use inside '...',
+  # which left a literal '\'' in place of every apostrophe typed here.
+  # The substitution rewrites *every* argv string, so a literal %1..%9 anywhere
+  # in the block (a pane id) would be overwritten by the response as well; keep
+  # pane targets out of these blocks.
   tmux if-shell -F 1 \
-    "command-prompt -l $prompt_target -p $(tmux_quote "Send to ${label//#/##}:") { set-option -g $response_key %% }"
+    "command-prompt -l $prompt_target -p $(tmux_quote "Send to ${label//#/##}:") { set-option -g $response_key %1 }"
   response="$(tmux show-option -gv "$response_key" 2>/dev/null)" || return 0
   [[ -n "$response" ]] || return 0
   # The pane may have exited while the prompt was open.
@@ -416,13 +425,16 @@ rename_token() {
   # without -F, then read it after the prompt returns. rename-* itself expands
   # formats, so escape # before applying even an already safely parsed name.
   # -l preserves commas; -I performs one format expansion of its initial value.
+  # %1, not %%: see the send prompt above. The -t target is safe to name here
+  # because only sessions ($0) and windows (@0) reach this point; a pane id
+  # (%0) would be rewritten by the response along with the placeholder.
   # shellcheck disable=SC2064 # Capture safely quoted locals before this function returns.
   trap "$(shell_join tmux set-option "${scope_args[@]}" -u -t "$object_id" "$response_key") 2>/dev/null || true" EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM HUP
   current="${current//#/##}"
   tmux if-shell -F 1 \
-    "command-prompt -l $prompt_target -I $(tmux_quote "$current") -p $(tmux_quote "$label") { set-option $scope -t $(tmux_quote "$object_id") $response_key %% }"
+    "command-prompt -l $prompt_target -I $(tmux_quote "$current") -p $(tmux_quote "$label") { set-option $scope -t $(tmux_quote "$object_id") $response_key %1 }"
   if response="$(tmux show-option "${scope_args[@]}" -v -t "$object_id" "$response_key" 2>/dev/null)"; then
     tmux "$command" -t "$object_id" -- "${response//#/##}"
   fi

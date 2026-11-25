@@ -328,9 +328,14 @@ canopy_hook client-attached 9003 "$any_sidebar_event" -b cleanup orphans
 # tmux 3.8+ monitors pane command changes. Ignore sidebar and slot panes, and
 # start no worker when no sidebar exists anywhere on the server.
 content_command_format='#{?#{||:#{==:#{@tmux_canopy},1},#{==:#{@tmux_canopy_slot},1}},,#{pane_current_command}}'
-tmux set-hook -Bgu '@tmux_canopy_command:%*:#{pane_current_command}' 2>/dev/null || true
-tmux set-hook -Bgu "@tmux_canopy_command:%*:$content_command_format" 2>/dev/null || true
-tmux set-hook -B -g "@tmux_canopy_command:%*:$content_command_format" \
+# set-hook's -B takes the name:what:format argument, so it cannot be bundled
+# with other flags: "-Bgu" made tmux read "gu" as the subscription ("invalid
+# subscription: gu") and "-B -g" made it read "-g" ("too many arguments"), so
+# this monitor never installed. With -B the single remaining operand is the
+# command; the hook name comes from the name field. -u keys on that name
+# alone, so one unset covers any previously registered format.
+tmux set-hook -gu -B '@tmux_canopy_command:%*:#{pane_current_command}' 2>/dev/null || true
+tmux set-hook -g -B "@tmux_canopy_command:%*:$content_command_format" \
   "if-shell -F $(tmux_quote "$any_sidebar_event") $(tmux_quote "$(plugin_job -b agent-refresh)")" 2>/dev/null || true
 
 # --- Alerts and notifications -----------------------------------------------
