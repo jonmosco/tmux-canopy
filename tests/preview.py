@@ -202,8 +202,11 @@ while True:
             # Directories under HOME read as ~/..., leaving room for the rest.
             where = Path(display(pane, '#{pane_current_path}'))
             # Guard the decoupling above: a shallow path would silently make
-            # HOME / and turn the abbreviation checks into no-ops.
-            assert where == workspace, (where, workspace)
+            # HOME / and turn the abbreviation checks into no-ops. Compare both
+            # resolved, since tmux reports the pane's directory resolved and on
+            # macOS /var is a symlink to /private/var. The checks below use what
+            # tmux reported, which is also what the preview script is given.
+            assert where.resolve() == workspace.resolve(), (where, workspace)
             window_rows = run('sidebar-preview', 'W:' + window, extra={'HOME': str(where.parent)})
             assert f'  ~/{where.name}' in window_rows and str(where) not in window_rows, window_rows
             pane_rows = run('sidebar-preview', 'P:' + pane, extra={'HOME': str(where.parent)}).splitlines()
