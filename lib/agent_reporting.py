@@ -23,10 +23,24 @@ def tmux(*args):
 
 
 def pane_lock(pane_id):
-    """Acquire a per-pane file lock. The kernel releases it on process death."""
+    """Acquire a file lock for one pane of this tmux server.
+
+    The kernel releases it on process death. Serializing hooks for the same
+    pane is the point; colliding with a different server is not. Pane ids
+    restart at %0 on every tmux server, so a name built from the pane number
+    alone is shared by every server on the machine, and a hook that cannot
+    take the lock within the retries below gives up and drops its report
+    while still telling the agent it succeeded. Name the server too.
+    """
     lock_dir = os.environ.get("TMPDIR", "/tmp")
+    # tmux sets TMUX to "socket_path,server_pid,session_id". The server pid is
+    # unique on the machine, so it separates servers without another tmux call.
+    server = os.environ.get("TMUX", "").split(",")
+    server = server[1] if len(server) > 1 else ""
+    if not re.fullmatch(r"[0-9]+", server):
+        server = "noserver"
     try:
-        fd = open(os.path.join(lock_dir, f"tmux-canopy-agent-{pane_id}.lock"), "w")
+        fd = open(os.path.join(lock_dir, f"tmux-canopy-agent-{server}-{pane_id}.lock"), "w")
         for _ in range(6):
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)

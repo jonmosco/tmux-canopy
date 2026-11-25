@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("canopy_agent_hook", ROOT / "lib" / "agent-hook.py")
@@ -589,3 +590,48 @@ codex.report({"hook_event_name": "Stop", "session_id": "c3", "turn_id": "t1", "l
 check(texts[-1]["CANOPY_ALERT_REPLY"] == "Fixed it.", f"Codex passes its last reply: {texts[-1]}")
 
 print("ok - agent alerts fire once per transition, only when enabled")
+
+# The pane lock serializes hooks for one pane of one server. Pane ids restart
+# at %0 on every tmux server, so a name built from the pane number alone is
+# shared by every server on the machine; a hook that cannot take the lock
+# gives up and drops its report while still telling the agent it succeeded,
+# so a collision loses state silently.
+with tempfile.TemporaryDirectory(prefix="canopy-pane-lock-") as lock_dir:
+    saved = {name: os.environ.get(name) for name in ("TMPDIR", "TMUX")}
+    try:
+        os.environ["TMPDIR"] = lock_dir
+
+        def lock_for(server_pid, pane="0"):
+            os.environ["TMUX"] = f"/tmp/tmux-1000/default,{server_pid},0"
+            return core.pane_lock(pane)
+
+        held = lock_for("111")
+        check(held is not None, "a free pane lock is granted")
+        other_server = lock_for("222")
+        check(other_server is not None,
+              "another tmux server with the same pane number is not blocked")
+        # flock treats separate file descriptors independently, even in one
+        # process, so this is the real intra-server exclusion.
+        same_server = lock_for("111")
+        check(same_server is None, "the same pane of the same server stays serialized")
+        core.pane_unlock(held)
+        core.pane_unlock(other_server)
+        check(sorted(os.listdir(lock_dir)) ==
+              ["tmux-canopy-agent-111-0.lock", "tmux-canopy-agent-222-0.lock"],
+              f"lock names carry the server: {sorted(os.listdir(lock_dir))}")
+
+        # Without TMUX there is no server to name, and no tmux to report to.
+        os.environ.pop("TMUX", None)
+        anonymous = core.pane_lock("0")
+        check(anonymous is not None, "a lock is still granted with no TMUX")
+        core.pane_unlock(anonymous)
+        check("tmux-canopy-agent-noserver-0.lock" in os.listdir(lock_dir),
+              f"unidentified server has its own name: {sorted(os.listdir(lock_dir))}")
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+print("ok - pane locks separate tmux servers and still serialize one server")
