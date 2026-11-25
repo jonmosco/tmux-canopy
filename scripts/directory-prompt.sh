@@ -7,7 +7,7 @@
 #   source /path/to/tmux-canopy/scripts/directory-prompt.sh
 #
 # Unchanged-directory prompts use only builtins. A change schedules the
-# plugin helper asynchronously with the pane id alone — never $PWD.
+# plugin helper asynchronously with the pane id alone - never $PWD.
 
 # Allow tests (or a relocated helper) to override before sourcing.
 if [[ -z ${_CANOPY_DIRECTORY_REFRESH:-} ]]; then

@@ -16,6 +16,30 @@ from datetime import datetime
 ROOT = Path(__file__).resolve().parent
 
 
+def version():
+    """The newest released heading in the changelog, which the release process
+    already updates, so there is no second place to forget. Entries sitting
+    above it under Unreleased mean this checkout is ahead of that release."""
+    changelog = ROOT / "CHANGELOG.md"
+    released, unreleased = None, False
+    try:
+        with changelog.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.startswith("## "):
+                    continue
+                heading = line[3:].strip()
+                if heading.lower().startswith("unreleased"):
+                    unreleased = True
+                    continue
+                released = heading.split(" - ")[0].strip()
+                break
+    except OSError:
+        return "unknown"
+    if released is None:
+        return "unreleased"
+    return f"{released}+unreleased" if unreleased else released
+
+
 def _install_root():
     override = os.environ.get("TMUX_CANOPY_INSTALL_ROOT", "").strip()
     if override:
@@ -595,6 +619,8 @@ def show_status(kinds):
 
 def main():
     parser = argparse.ArgumentParser(description="Canopy tmux diagnostics and agent integrations")
+    parser.add_argument("--version", action="version", version=f"tmux-canopy {version()}",
+                        help="show the installed Canopy version and exit")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("doctor", help="check Canopy and show tmux ownership")
     commands.add_parser("setup", help="choose optional agent integrations")

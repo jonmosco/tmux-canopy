@@ -366,7 +366,7 @@ check("s1," not in state.get("subagents", ""), f"cursor-agent subagentStop by id
 send("cursor-agent", {"hook_event_name": "subagentStart", "conversation_id": "c1",
                       "subagent_id": "s2", "subagent_type": "shell"})
 send("cursor-agent", {"hook_event_name": "subagentStop", "conversation_id": "c1",
-                      "subagent_type": "shell"})  # id omitted — unique type fallback
+                      "subagent_type": "shell"})  # id omitted - unique type fallback
 check("s2," not in state.get("subagents", ""), f"cursor-agent subagentStop by type: {state}")
 send("cursor-agent", {"hook_event_name": "stop", "conversation_id": "c1"})
 check(state.get("status") == "turn-ended", "cursor-agent stop")

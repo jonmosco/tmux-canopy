@@ -1,0 +1,9 @@
+# GitHub language statistics only. Canopy is a tmux plugin in Bash, awk and
+# fzf; Python is optional and limited to the CLI, the agent adapters, the
+# animation server and the tests. The test suite alone is around 85% of the
+# Python bytes here, which is enough to present the whole repository as a
+# Python project and bury what it actually is.
+#
+# Linguist already ignores docs/ (documentation.yml), but its vendor list
+# covers testdata/ rather than tests/, so the suite counts in full.
+tests/** -linguist-detectable

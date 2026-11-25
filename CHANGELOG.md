@@ -29,6 +29,12 @@
 
 ### Added
 
+- `canopy --version` reports the newest released heading in `CHANGELOG.md`, suffixed `+unreleased` when the checkout carries entries above it, so a bug report can name a build. The changelog is already part of releasing, so there is no second place to forget to bump; a `canopy` without its changelog beside it prints `unknown`.
+
+- A `.gitattributes` that keeps `tests/**` out of GitHub's language statistics. The suite is around 85% of the Python bytes here, enough to label a tmux plugin written in Bash, awk and fzf as a Python project. Linguist already ignores `docs/`, but its vendor list covers `testdata/` rather than `tests/`.
+
+- The release gate rejects an em dash (U+2014) in tracked text, so the plain-dash convention holds without anyone policing it; en dashes stay allowed for number ranges and the README's capability matrix. It is skipped, loudly, outside a git checkout.
+
 - `tests/monitor_hook.py` covers the tmux 3.8 pane-command monitor, which had no test and so was registered with unparseable `set-hook -B` flags for as long as it existed. It probes the capability rather than the version, then checks that one subscription is registered, that reloading replaces it instead of stacking another, that the format tmux stored reports a content pane's command but nothing for sidebar and slot panes, and that `canopy doctor` surfaces it. It skips where `set-hook -B` does not exist.
 
 - `prefix + Alt-t` focuses the sidebar or returns to the previous content pane without closing it; it opens Canopy when closed. Set `@tmux-canopy-focus-key` to change the key or `off` to disable it.

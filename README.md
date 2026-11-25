@@ -31,7 +31,7 @@ Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled bi
 
 ## Quick start
 
-**Requirements:** Linux or macOS with **tmux** (tested with 3.7c), **fzf** (tested with 0.74.4), **Bash 4.4+** (tested with 5.3.9), standard `awk` and `ps`, and `less` for the optional enlarged preview. Default Unicode icons need no Nerd Font. **Python 3** is required for the `canopy` CLI (including setup and diagnostics), lifecycle adapters, and optional working-state animation; the basic sidebar works without it.
+**Requirements:** Linux or macOS with **tmux** (tested with 3.7c and 3.8), **fzf** (tested with 0.74.4), **Bash 4.4+** (tested with 5.3.9), standard `awk` and `ps`, and `less` for the optional enlarged preview. Default Unicode icons need no Nerd Font. **Python 3** is required for the `canopy` CLI (including setup and diagnostics), lifecycle adapters, and optional working-state animation; the basic sidebar works without it.
 
 1. With [TPM](https://github.com/tmux-plugins/tpm), add this before its `run '~/.tmux/plugins/tpm/tpm'` line:
 
@@ -220,7 +220,7 @@ See [Display modes](docs/reference.md#display-modes).
 
 ### Alerts
 
-Canopy can notify you when an agent needs input, finishes, or is interrupted—or when a pane rings the bell or goes silent—even when the sidebar is closed. Alerts are off by default and skipped while you are looking at that pane:
+Canopy can notify you when an agent needs input, finishes, or is interrupted-or when a pane rings the bell or goes silent-even when the sidebar is closed. Alerts are off by default and skipped while you are looking at that pane:
 
 ```tmux
 set -g @tmux-canopy-alerts 'both'         # off, desktop, tmux, or both

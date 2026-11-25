@@ -7,9 +7,9 @@ Status: historical design record (implemented; see current behavior below)
 
 ## Problem
 
-The agent drawer recently became a structured **Agent inspector** (separate from Terminal preview), but tall drawers still feel empty, identity is scattered, and Git place is missing. Competing tools (Herdr, AIHerd, agenmux) treat the sidebar as an attention surface: who needs you, and where you are — not a transcript dump.
+The agent drawer recently became a structured **Agent inspector** (separate from Terminal preview), but tall drawers still feel empty, identity is scattered, and Git place is missing. Competing tools (Herdr, AIHerd, agenmux) treat the sidebar as an attention surface: who needs you, and where you are - not a transcript dump.
 
-Users want an explicit, glanceable summary: directory, agent, git repo/branch, and agent state — without noise.
+Users want an explicit, glanceable summary: directory, agent, git repo/branch, and agent state - without noise.
 
 ## Goals
 

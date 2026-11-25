@@ -33,7 +33,7 @@ Canopy’s sidebar works well but looks dated next to modern terminal TUIs (lazy
 | Perf/cleanup depth | Create-refresh + light double-rebuild cleanup; not a full audit |
 | Default appearance | `classic` |
 
-## Section 1 — Appearance preset
+## Section 1 - Appearance preset
 
 ### Option
 
@@ -46,9 +46,9 @@ Place before the Canopy `run-shell` / TPM plugin line. After changing: reload tm
 
 ### Behavior
 
-**classic** — current tree: ▸/▾ folds, `├─`/`└─`/`│` guides, header `[Tree] Proc Buff · All`, session/window glyphs only when customized, app icons from `@tmux-canopy-icon-theme`.
+**classic** - current tree: ▸/▾ folds, `├─`/`└─`/`│` guides, header `[Tree] Proc Buff · All`, session/window glyphs only when customized, app icons from `@tmux-canopy-icon-theme`.
 
-**lazygit** — box-style header (`╭─ Tree Proc Buff ─ All ╮`), rounded end branches (`╰─`), cyan-leaning fold chevrons, session/window/pane structural glyphs when icon theme is `nerdfont` (unicode stand-ins `◈`/`▣`/`▹` otherwise). Active `●`, unread, and agent badges keep the same meaning.
+**lazygit** - box-style header (`╭─ Tree Proc Buff ─ All ╮`), rounded end branches (`╰─`), cyan-leaning fold chevrons, session/window/pane structural glyphs when icon theme is `nerdfont` (unicode stand-ins `◈`/`▣`/`▹` otherwise). Active `●`, unread, and agent badges keep the same meaning.
 
 `@tmux-canopy-icon-theme` (`auto`/`unicode`/`ascii`/`nerdfont`) still controls app glyphs and ASCII fallbacks. Appearance only changes chrome and which structural glyphs are shown by default.
 
@@ -59,7 +59,7 @@ Place before the Canopy `run-shell` / TPM plugin line. After changing: reload tm
 - Adjust fzf pointer/prompt/scrollbar chrome in `scripts/ui-options.sh` when appearance is `lazygit`.
 - Non-tree headers (`scripts/view-header`) follow the same preset for tab chrome consistency.
 
-## Section 2 — Structural refresh on create
+## Section 2 - Structural refresh on create
 
 ### Problem evidence
 
@@ -75,7 +75,7 @@ Focus hooks today: `after-select-pane`, `after-select-window`, `after-new-window
 
 Hook install needs a **plugin/config reload** once. An already-open sidebar picks up the new hook without closing. Appearance still requires close/reopen.
 
-## Section 3 — WORKING animation (follow-up)
+## Section 3 - WORKING animation (follow-up)
 
 - Option: `@tmux-canopy-animate on` (default off).
 - When a visible row shows WORKING, a short-lived worker redraws only that status word with a moving highlight (~5–8 fps) from a cached snapshot (~2–3ms), not a full source reload (~60ms).
@@ -83,7 +83,7 @@ Hook install needs a **plugin/config reload** once. An already-open sidebar pick
 - `mono` and animate-off stay static; all existing tests remain static unless an animate-specific suite is added.
 - Ship after appearance + create-refresh are stable; may be a separate PR/plan step.
 
-## Section 4 — Testing and docs
+## Section 4 - Testing and docs
 
 - Appearance: classic vs lazygit × unicode/nerdfont/ascii (extend `tests/icons.py` and a rendering case for header/guides).
 - Create refresh: assert a split makes the new pane row visible without selecting another pane first.

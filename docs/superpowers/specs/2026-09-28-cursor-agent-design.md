@@ -64,7 +64,7 @@ Event name source: Cursor’s `hook_event_name` (camelCase), same field Claude/G
 
 **Not installed:** permission-shaped tool/shell hooks; any path that returns deny/ask for user actions.
 
-**CLI caveat:** Cursor Agent CLI hook coverage is still partial and version-dependent. Missing events leave the pane as `[process]` until a supported lifecycle event arrives. Hooks load at process start — restart `agent` after install.
+**CLI caveat:** Cursor Agent CLI hook coverage is still partial and version-dependent. Missing events leave the pane as `[process]` until a supported lifecycle event arrives. Hooks load at process start - restart `agent` after install.
 
 ## Installer & config shape
 

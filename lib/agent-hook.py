@@ -568,7 +568,7 @@ def main():
     # Cursor can treat a missing allow as a block, so stdin is read/parsed
     # (bounded, same as always) and this decision is made before any
     # TMUX/pane gating below, ensuring every exit path for a subagentStart
-    # event — including missing TMUX or an invalid pane — prints allow.
+    # event - including missing TMUX or an invalid pane - prints allow.
     cursor_response = '{}'
 
     def emit():

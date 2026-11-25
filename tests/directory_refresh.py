@@ -157,7 +157,7 @@ def main():
             tm('set-option', '-g', '@tmux-canopy-directory-refresh', 'on')
 
             # Sidebar / slot panes are ignored (mark the content pane as a slot
-            # briefly — creating a real split would fire the plugin's split refresh).
+            # briefly - creating a real split would fire the plugin's split refresh).
             deliveries.write_text('')
             assert helper(sidebar).returncode == 0
             tm('set-option', '-p', '-t', pane, '@tmux_canopy_slot', '1')

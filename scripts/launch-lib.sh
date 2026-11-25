@@ -186,7 +186,7 @@ sidebar_preflight() {
         ! "$commands" =~ (^|$'\n')display-menu\  ||
         ! "$commands" =~ (^|$'\n')command-prompt\ .*\[-[^\]]*l ||
         "$(tmux display-message -p -t "$target" '#{e|>=:211,65}' 2>/dev/null)" != 1 ]]; then
-    sidebar_failure "$owner" tmux-capabilities 'tmux lacks required commands/formats (tested with 3.7c). See scripts/doctor.'
+    sidebar_failure "$owner" tmux-capabilities 'tmux lacks required commands/formats (tested with 3.7c and 3.8). See scripts/doctor.'
     return 1
   fi
   # Parse the actual UI options/bindings with a fixed, non-sensitive input.
