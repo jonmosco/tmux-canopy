@@ -53,7 +53,10 @@ def main():
     environment = os.environ | {'TERM': 'xterm-256color'}
     environment.pop('TMUX', None)
     attached = None
-    with tempfile.TemporaryDirectory(prefix='canopy-prompt-targets-') as folder:
+    # Canopy's short-lived hook workers can write into the directory while it
+    # is being removed, which fails the teardown even when every check passed.
+    with tempfile.TemporaryDirectory(prefix='canopy-prompt-targets-',
+                                     ignore_cleanup_errors=True) as folder:
         temp = Path(folder)
         output = bytearray()
         try:
