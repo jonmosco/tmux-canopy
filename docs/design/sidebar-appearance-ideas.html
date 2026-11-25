@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canopy sidebar - appearance ideas</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #101114;
+    --paper: #181b21;
+    --term: #0c0d10;
+    --ink: #d7dbe2;
+    --dim: #9aa3b2;
+    --faint: #7d8794;
+    --line: #2a2e36;
+    --cyan: #7fdbda;
+    --green: #7dcea0;
+    --green-dim: #3f6e52;
+    --amber: #e6c07b;
+    --yellow: #e5c07b;
+    --blue: #7aa2f7;
+    --red: #e07a7a;
+    --sel: #243044;
+    --shelf: #2a2418;
+  }
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f3f1ec;
+    --paper: #fffdf9;
+    --term: #fbfbfa;
+    --ink: #1c2430;
+    --dim: #4a5966;
+    --faint: #5e6a74;
+    --line: #ddd6cb;
+    --cyan: #0c6e78;
+    --green: #1d6b3a;
+    --green-dim: #6a9478;
+    --amber: #8a5a10;
+    --yellow: #8a5a10;
+    --blue: #2d5aa8;
+    --red: #a33b3b;
+    --sel: #e3eef0;
+    --shelf: #f8f1e2;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 58px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 Palatino, "Palatino Linotype", Georgia, serif;
+  }
+  a { color: var(--cyan); text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  button {
+    font: 14px/1.2 Palatino, Georgia, serif;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--cyan); }
+  code, kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 36px 28px 72px; }
+  header.top { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }
+  .eyebrow {
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-weight: 500;
+    font-size: clamp(32px, 4vw, 46px);
+    letter-spacing: -0.03em;
+    line-height: 1.12;
+    margin: 0 0 12px;
+  }
+  h2 {
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  h3 { font-weight: 600; font-size: 18px; margin: 0 0 6px; }
+  .lede { max-width: 68ch; color: var(--dim); margin: 0; font-size: 18px; }
+  .answer {
+    margin: 22px 0 8px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--cyan);
+    background: var(--paper);
+    max-width: 78ch;
+  }
+  .answer p { margin: 0; }
+  nav.toc {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 12px 0;
+    margin: 8px 0 28px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  nav.toc a { color: var(--dim); text-decoration: none; }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--ink); }
+  section { margin: 42px 0; }
+  .section-lead { max-width: 70ch; color: var(--dim); margin: 0 0 18px; }
+  .grid, .sketches { display: grid; gap: 22px; align-items: start; justify-content: start; }
+  .grid { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); }
+  .sketches { grid-template-columns: repeat(2, minmax(0, 400px)); }
+  .span2 { grid-column: 1 / -1; width: min(100%, 822px); }
+  figure {
+    margin: 0;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 16px 14px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  figcaption { margin-top: 12px; color: var(--dim); font-size: 15px; overflow-wrap: anywhere; }
+  figcaption strong { color: var(--ink); font-weight: 600; }
+  figcaption p { color: var(--ink); }
+  .tag {
+    display: block;
+    margin-bottom: 4px;
+    font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .peers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 22px; align-items: start; }
+  .screen {
+    width: 100%;
+    max-width: 368px;
+    background: var(--term);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: auto;
+    font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--ink);
+  }
+  .screen .head, .screen .foot {
+    display: flex;
+    gap: 0.7ch;
+    align-items: baseline;
+    padding: 6px 12px;
+    white-space: nowrap;
+  }
+  .screen .head { border-bottom: 1px solid var(--line); }
+  .screen .foot { border-top: 1px solid var(--line); color: var(--dim); }
+  .push { margin-left: auto; }
+  .rows { padding: 6px 0 8px; }
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 1ch;
+    align-items: baseline;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+  .gutter .row { grid-template-columns: minmax(0, 1fr) auto 2.2ch; }
+  .gutter .row.ask { grid-template-columns: minmax(0, 1fr); }
+  .lhs { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .spread { display: flex; align-items: baseline; gap: 0.55ch; min-width: 0; }
+  .spread .nm { flex: none; }
+  .rule {
+    flex: 1;
+    min-width: 1.2ch;
+    border-bottom: 1px solid var(--line);
+    transform: translateY(-0.28em);
+  }
+  .rhs { color: var(--dim); }
+  .mark {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 1.35em;
+    color: var(--dim);
+    border-left: 1px solid var(--faint);
+    padding-left: 0.45ch;
+  }
+  .w { padding-left: 2.4ch; }
+  .sub { padding-left: 4.6ch; }
+  .child { padding-left: 6.6ch; }
+  .sel { background: var(--sel); box-shadow: inset 2px 0 var(--cyan); }
+  .gutter .sel { box-shadow: inset 2px 0 var(--cyan); }
+  .ask { color: var(--dim); }
+  .ask.loud { color: var(--ink); }
+  .ask.loud .tick { color: var(--amber); margin-right: 0.4ch; }
+  .shelf {
+    margin: 6px 10px 4px;
+    padding: 4px 8px 5px;
+    border-left: 2px solid var(--amber);
+    background: var(--shelf);
+  }
+  .shelf .q { padding-left: 1.6ch; }
+  .dim { color: var(--dim); }
+  .faint { color: var(--faint); }
+  .cyan { color: var(--cyan); }
+  .green { color: var(--green); }
+  .gd { color: var(--green-dim); }
+  .amber { color: var(--amber); }
+  .yellow { color: var(--yellow); }
+  .blue { color: var(--blue); }
+  .red { color: var(--red); }
+  .b { font-weight: 700; }
+  .ink .ic, .ink .sg { color: var(--dim); }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0 0 18px;
+    color: var(--dim);
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .chips { display: flex; gap: 1.2ch; padding: 7px 12px 2px; color: var(--dim); }
+  .chips .on { color: var(--cyan); }
+  .tile { padding: 4px 12px 6px; border-left: 2px solid var(--amber); margin: 4px 10px; }
+  .tile.work { border-left-color: var(--cyan); }
+  .tile .top, .tile .bot { display: flex; gap: 1ch; }
+  .pair { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 22px; align-items: start; }
+  #inspector .pair { grid-template-columns: repeat(2, minmax(0, 400px)); justify-content: start; }
+  .kv { display: grid; grid-template-columns: 6ch minmax(0, 1fr) auto; column-gap: 1ch; padding: 0 12px; }
+  .plain { padding: 0 12px; }
+  .hline { display: flex; gap: 1ch; padding: 0 12px; align-items: baseline; }
+  .gap { height: 0.6em; }
+  .note { margin: 0 0 12px; }
+  ol.steps { margin: 16px 0 0; padding-left: 1.2em; max-width: 68ch; }
+  ol.steps li { margin: 6px 0; }
+  ol.steps li span { color: var(--dim); }
+  .leave { max-width: 70ch; }
+  .leave li { margin: 8px 0; }
+  .sources { color: var(--dim); font-size: 14px; max-width: 78ch; }
+  .sources ul { padding-left: 1.2em; }
+  @media (max-width: 900px) {
+    .grid, .sketches, .peers, .pair, #inspector .pair { grid-template-columns: 1fr; }
+    .span2 { grid-column: auto; }
+    header.top { flex-wrap: wrap; }
+    .wrap { padding: 24px 16px 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Canopy · appearance study</p>
+      <h1>The last column should be the mark.</h1>
+      <p class="lede">Quiet is already the default, and it is the right idea: a session, window, and pane tree, with idle shells dimmed and agent state reduced to a glyph. Next to the other sidebars people leave open, it still reads as busier than the job requires. The path, the branch, and the status glyph take turns being the last thing on the line, and brand color paints icons that are not asking for anything.</p>
+    </div>
+    <button id="theme" type="button">Light colors</button>
+  </header>
+
+  <div class="answer">
+    <p>Reserve a blank column for <span class="amber">!</span> and <span class="cyan">▷</span>, and draw icons in the same dim ink as a path. Keep the question in normal ink, under its pane. Those three changes use the layout Canopy already has. A pinned “someone is waiting” shelf is worth adding only when that question can scroll off a long tree.</p>
+  </div>
+
+  <nav class="toc" aria-label="On this page">
+    <a href="#neighbors">Neighbors</a>
+    <a href="#today">Today</a>
+    <a href="#column">Mark column</a>
+    <a href="#color">Color</a>
+    <a href="#question">Question</a>
+    <a href="#shelf">Shelf</a>
+    <a href="#together">Together</a>
+    <a href="#inspector">Inspector</a>
+    <a href="#leave">Leave out</a>
+  </nav>
+
+  <section id="neighbors">
+    <h2>What the other sidebars spend a narrow pane on</h2>
+    <p class="section-lead">Each of these is a reduction of the published UI, at about the width of a docked sidebar. Canopy is the only one whose job is the whole tmux workspace and the agents inside it. The useful borrowings are alignment, a single status color, and age. The dashboards themselves belong to tools that do not have to show the editor.</p>
+    <div class="peers">
+      <figure>
+        <span class="tag">tmux-agent-sidebar</span>
+        <h3>Agents, then metadata</h3>
+        <div class="screen" aria-label="Reduction of the tmux-agent-sidebar agent list">
+          <div class="chips"><span class="on">≡ 5</span><span class="green">● 2</span><span class="amber">◐ 1</span><span>○ 2</span></div>
+          <div class="rows">
+            <div class="row"><span class="lhs dim">▾ web</span></div>
+            <div class="row w"><span class="lhs"><span class="amber">◐</span> ▦ opencode</span><span class="rhs amber">! plan</span></div>
+            <div class="row sub"><span class="lhs dim">web ⎇ redis</span><span class="rhs">2m</span></div>
+            <div class="row sub"><span class="lhs">Use Redis or memory…</span></div>
+            <div class="row child"><span class="lhs dim">├ Explore</span></div>
+            <div class="row child"><span class="lhs dim">└ Plan</span></div>
+            <div class="row w"><span class="lhs"><span class="green">●</span> ✳ claude</span><span class="rhs dim">edit</span></div>
+            <div class="row sub"><span class="lhs dim">api ⎇ main</span><span class="rhs">4m</span></div>
+          </div>
+        </div>
+        <figcaption>A filter row with live counts, then one agent per block: status, permission, branch, age, the prompt, and a short subagent tree. Rust and ratatui, so it can draw panels. It does not list the shell or Neovim beside them. Three agents.</figcaption>
+      </figure>
+      <figure>
+        <span class="tag">workmux</span>
+        <h3>One stripe per agent</h3>
+        <div class="screen" aria-label="Reduction of the workmux tile sidebar">
+          <div class="rows">
+            <div class="tile">
+              <div class="top"><span>opencode</span><span class="push dim">2m</span></div>
+              <div class="dim">web / cache</div>
+              <div><span class="green">+15</span> <span class="amber">−3</span></div>
+              <div>Use Redis or memory cache?</div>
+            </div>
+            <div class="tile work">
+              <div class="top"><span>codex</span><span class="push dim">9m</span></div>
+              <div class="dim">billing / webhooks</div>
+              <div><span class="green">+2</span> <span class="amber">−0</span></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>Tiles are the default; <kbd>v</kbd> switches to one line. The stripe is the status color, the clock is how long this state has lasted, and the git counts are the work. A top-bar variant turns the same tokens into chips. There is no pane tree.</figcaption>
+      </figure>
+      <figure>
+        <span class="tag">lazygit · yazi</span>
+        <h3>A column per fact</h3>
+        <div class="screen" aria-label="Reduction of a lazygit file list">
+          <div class="head"><span class="cyan">╭ Files</span><span class="dim">───────────────╮</span></div>
+          <div class="rows">
+            <div class="row"><span class="lhs"><span class="amber">M</span> auth.ts</span><span class="rhs green">+12</span></div>
+            <div class="row sel"><span class="lhs"><span class="amber">M</span> cache.ts</span><span class="rhs"><span class="green">+15</span> <span class="red">−3</span></span></div>
+            <div class="row"><span class="lhs"><span class="amber">M</span> login.ts</span><span class="rhs green">+4</span></div>
+            <div class="row"><span class="lhs"><span class="dim">?</span> notes.md</span><span class="rhs"></span></div>
+          </div>
+        </div>
+        <figcaption>The letter <span class="amber">M</span> is always in the same cell, and the counts are always at the end. Selection changes the row’s ground, and the counts stay colored. Yazi does the same with size and time. That is the whole lesson, and it survives 42 columns.</figcaption>
+      </figure>
+    </div>
+    <p class="section-lead" style="margin-top:16px">Zellij’s session switcher is a short modal list, name and tab count, which is the same family as Canopy’s popup. <code>sesh</code> and tmux-sessionx are wide fzf windows with a preview beside the list. Canopy’s popup mode already has that room. The appearance problem is the dock that stays open at 42 columns while you edit. tmux-pane-tree stays a compact tree with badges; quiet is already that shape, with more in the edge than the edge can hold.</p>
+  </section>
+
+  <section id="today">
+    <h2>Today, in one dock</h2>
+    <p class="legend" aria-label="Glyph legend">
+      <span><span class="green">◈</span> session</span>
+      <span><span class="green">●</span> you are here</span>
+      <span><span class="cyan">▌</span> row you are browsing</span>
+      <span><span class="amber">◆</span> / <span class="amber">!</span> waiting</span>
+      <span><span class="cyan">▷</span> working</span>
+      <span><span class="blue">✎</span> nvim</span>
+      <span><span class="yellow">✳</span> claude</span>
+      <span>▦ opencode</span>
+      <span><span class="cyan">❋</span> codex</span>
+    </p>
+    <div class="grid">
+      <figure>
+        <span class="tag">42 columns · quiet · as shipped</span>
+        <div class="screen" aria-label="Illustration of the current quiet sidebar">
+          <div class="head"><span class="cyan b">Tree</span><span class="dim">· All</span><span class="push"><span class="amber">◆1</span> <span class="cyan">▷2</span></span></div>
+          <div class="rows">
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="sg green b">◈</span> <span class="nm cyan b">acme-api</span><span class="rule"></span></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="green">●</span> <span class="ic blue">✎</span> <span class="dim">0:</span>editor <span class="dim">· nvim</span></span>
+              <span class="rhs">acme-api ⎇ main</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="ic yellow">✳</span> <span class="dim">1:</span>api <span class="dim">· claude</span></span>
+              <span class="rhs">auth ⎇ main <span class="cyan">▷</span></span>
+            </div>
+            <div class="row child"><span class="lhs dim">Explore</span><span class="rhs cyan">▷</span></div>
+            <div class="row child"><span class="lhs dim">Plan</span><span class="rhs cyan">▷</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="sg gd">◈</span> <span class="nm b">acme-web</span><span class="rule"></span></span>
+              <span class="rhs">web ⎇ redis</span>
+            </div>
+            <div class="row w sel">
+              <span class="lhs"><span class="faint">▸</span> <span class="ic">▦</span> <span class="dim">0:</span>cache <span class="dim">· opencode</span></span>
+              <span class="rhs amber">!</span>
+            </div>
+            <div class="row sel ask"><span class="lhs sub">Use Redis or memory cache?</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="sg gd">◈</span> <span class="nm b">billing</span><span class="rule"></span></span>
+              <span class="rhs">payments ⎇ retry</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▸</span> <span class="ic cyan">❋</span> <span class="dim">0:</span>webhooks <span class="dim">· codex</span></span>
+              <span class="rhs cyan">▷</span>
+            </div>
+          </div>
+          <div class="foot"><span class="amber">◆</span> OpenCode waiting <span class="push"><span class="cyan">n</span> go <span class="cyan">&gt;</span> reply</span></div>
+        </div>
+        <figcaption><strong>The session you are in is already clear</strong> - accent name, green glyph - and the row you are browsing is a different signal from the green dot. That split should stay. What fights it is the right edge: <span class="dim">main</span>, <span class="cyan">▷</span>, and <span class="amber">!</span> are all last, so the eye cannot learn a column. Claude is yellow because it is Claude. The question is dim, and the selection fill covers it, because that line is part of the same fzf entry as the pane.</figcaption>
+      </figure>
+      <figure>
+        <span class="tag">Where the pixels go</span>
+        <h3>Four facts, one edge</h3>
+        <figcaption style="margin-top:0">
+          <p>On a mixed session the directory lands on the window. On a session that shares a directory it lands on the heading. A waiting pane puts <span class="amber">!</span> last and drops the path if the row is tight. A working pane puts <span class="cyan">▷</span> last. The rule under a session with no shared path runs to the same cell. After a minute of looking, the last glyph is not a reliable kind of thing.</p>
+          <p>Age is already computed for the other appearances (<span class="dim">2m</span>, <span class="dim">&lt;1m</span>) and left off the quiet row. Workmux’s tiles feel alive because of that clock. Canopy’s working dot already breathes, and it holds still while the sidebar is focused, which is the better motion. The missing piece is the number, not another spinner.</p>
+          <p>The header’s <span class="amber">◆1</span> <span class="cyan">▷2</span> is the same idea as tmux-agent-sidebar’s filter chips, in one line. It should stay one line. The footer already says who is waiting. It does not have room for the question, which is the sentence you came to read.</p>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="sketches">
+    <h2>Sketches on the same workspace</h2>
+    <p class="section-lead">Same sessions, same selection on OpenCode, same active pane in Neovim. Each sketch changes one thing. The hairline before the mark is drawn so the empty cells show up on this page; in the terminal that column is blank.</p>
+    <div class="sketches">
+      <figure id="column">
+        <span class="tag">01 · alignment</span>
+        <h3>A column that stays empty</h3>
+        <div class="screen gutter" aria-label="Sidebar with a reserved mark column">
+          <div class="head"><span class="cyan b">Tree</span><span class="dim">· All</span><span class="push"><span class="amber">◆1</span> <span class="cyan">▷2</span></span></div>
+          <div class="rows">
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="green b">◈</span> <span class="nm cyan b">acme-api</span><span class="rule"></span></span>
+              <span class="rhs"></span><span class="mark"></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="green">●</span> <span class="blue">✎</span> <span class="dim">0:</span>editor <span class="dim">· nvim</span></span>
+              <span class="rhs">acme-api ⎇ main</span><span class="mark"></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="yellow">✳</span> <span class="dim">1:</span>api <span class="dim">· claude</span></span>
+              <span class="rhs">auth ⎇ main</span><span class="mark cyan">▷</span>
+            </div>
+            <div class="row child"><span class="lhs dim">Explore</span><span class="rhs"></span><span class="mark cyan">▷</span></div>
+            <div class="row child"><span class="lhs dim">Plan</span><span class="rhs"></span><span class="mark cyan">▷</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="gd">◈</span> <span class="nm b">acme-web</span><span class="rule"></span></span>
+              <span class="rhs">web ⎇ redis</span><span class="mark"></span>
+            </div>
+            <div class="row w sel">
+              <span class="lhs"><span class="faint">▸</span> ▦ <span class="dim">0:</span>cache <span class="dim">· opencode</span></span>
+              <span class="rhs"></span><span class="mark amber">!</span>
+            </div>
+            <div class="row sel ask"><span class="lhs sub">Use Redis or memory cache?</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="gd">◈</span> <span class="nm b">billing</span><span class="rule"></span></span>
+              <span class="rhs">payments ⎇ retry</span><span class="mark"></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▸</span> <span class="cyan">❋</span> <span class="dim">0:</span>webhooks <span class="dim">· codex</span></span>
+              <span class="rhs"></span><span class="mark cyan">▷</span>
+            </div>
+          </div>
+          <div class="foot"><span class="amber">◆</span> OpenCode waiting <span class="push"><span class="cyan">n</span> go <span class="cyan">&gt;</span> reply</span></div>
+        </div>
+        <figcaption><strong>Paths end before the mark, including on rows with no mark.</strong> <span class="dim">web ⎇ redis</span> no longer sits in the same cell as <span class="amber">!</span>. The renderer already prefers the name and the mark over the path; this only stops the path from taking the mark’s cell when the mark is absent. Two cells, every row.</figcaption>
+      </figure>
+
+      <figure id="color">
+        <span class="tag">02 · ink</span>
+        <h3>Color means state</h3>
+        <div class="screen ink" aria-label="Sidebar with icons dimmed and color reserved for state">
+          <div class="head"><span class="cyan b">Tree</span><span class="dim">· All</span><span class="push"><span class="amber">◆1</span> <span class="cyan">▷2</span></span></div>
+          <div class="rows">
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="sg">◈</span> <span class="nm cyan b">acme-api</span><span class="rule"></span></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="green">●</span> <span class="ic">✎</span> <span class="dim">0:</span>editor <span class="dim">· nvim</span></span>
+              <span class="rhs">acme-api ⎇ main</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="ic">✳</span> <span class="dim">1:</span>api <span class="dim">· claude</span></span>
+              <span class="rhs">auth ⎇ main <span class="cyan">▷</span></span>
+            </div>
+            <div class="row child"><span class="lhs dim">Explore</span><span class="rhs cyan">▷</span></div>
+            <div class="row child"><span class="lhs dim">Plan</span><span class="rhs cyan">▷</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="sg">◈</span> <span class="nm b">acme-web</span><span class="rule"></span></span>
+              <span class="rhs">web ⎇ redis</span>
+            </div>
+            <div class="row w sel">
+              <span class="lhs"><span class="faint">▸</span> <span class="ic">▦</span> <span class="dim">0:</span>cache <span class="dim">· opencode</span></span>
+              <span class="rhs amber">!</span>
+            </div>
+            <div class="row sel ask"><span class="lhs sub">Use Redis or memory cache?</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="sg">◈</span> <span class="nm b">billing</span><span class="rule"></span></span>
+              <span class="rhs">payments ⎇ retry</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▸</span> <span class="ic">❋</span> <span class="dim">0:</span>webhooks <span class="dim">· codex</span></span>
+              <span class="rhs cyan">▷</span>
+            </div>
+          </div>
+          <div class="foot"><span class="amber">◆</span> OpenCode waiting <span class="push"><span class="cyan">n</span> go <span class="cyan">&gt;</span> reply</span></div>
+        </div>
+        <figcaption><strong>Icons stay dim, including on the active pane and on agents.</strong> Full app color is currently turned on for both of those, which is why a quiet tree still carries blue, yellow, and cyan before any agent has asked for you. The current session name, the green dot, <span class="amber">!</span>, and <span class="cyan">▷</span> are enough color. This is a style change in <code>icon_style</code>.</figcaption>
+      </figure>
+
+      <figure id="question">
+        <span class="tag">03 · the sentence</span>
+        <h3>The question stays readable</h3>
+        <div class="screen" aria-label="Sidebar with the waiting question in normal ink">
+          <div class="head"><span class="cyan b">Tree</span><span class="dim">· All</span><span class="push"><span class="amber">◆1</span> <span class="cyan">▷2</span></span></div>
+          <div class="rows">
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="green b">◈</span> <span class="nm cyan b">acme-api</span><span class="rule"></span></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="green">●</span> <span class="blue">✎</span> <span class="dim">0:</span>editor <span class="dim">· nvim</span></span>
+              <span class="rhs">acme-api ⎇ main</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="yellow">✳</span> <span class="dim">1:</span>api <span class="dim">· claude</span></span>
+              <span class="rhs">auth ⎇ main <span class="cyan">▷</span></span>
+            </div>
+            <div class="row child"><span class="lhs dim">Explore</span><span class="rhs cyan">▷</span></div>
+            <div class="row child"><span class="lhs dim">Plan</span><span class="rhs cyan">▷</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="gd">◈</span> <span class="nm b">acme-web</span><span class="rule"></span></span>
+              <span class="rhs">web ⎇ redis</span>
+            </div>
+            <div class="row w sel">
+              <span class="lhs"><span class="faint">▸</span> ▦ <span class="dim">0:</span>cache <span class="dim">· opencode</span></span>
+              <span class="rhs amber">!</span>
+            </div>
+            <div class="row ask loud"><span class="lhs sub"><span class="tick">│</span>Use Redis or memory cache?</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="gd">◈</span> <span class="nm b">billing</span><span class="rule"></span></span>
+              <span class="rhs">payments ⎇ retry</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▸</span> <span class="cyan">❋</span> <span class="dim">0:</span>webhooks <span class="dim">· codex</span></span>
+              <span class="rhs cyan">▷</span>
+            </div>
+          </div>
+          <div class="foot"><span class="amber">◆</span> OpenCode waiting <span class="push"><span class="cyan">n</span> go <span class="cyan">&gt;</span> reply</span></div>
+        </div>
+        <figcaption><strong>Normal ink, an amber bar, and the selection fill stops on the pane line.</strong> Today fzf paints the whole entry, question included, which is why the sentence goes gray. A brighter line survives that paint. Leaving the fill off the second line means rendering the question outside the highlighted entry, which fzf will not do for a body row. The header can, which is the next sketch.</figcaption>
+      </figure>
+
+      <figure id="shelf">
+        <span class="tag">04 · only when the tree scrolls</span>
+        <h3>Pin the one waiting agent</h3>
+        <div class="screen" aria-label="Sidebar with a pinned waiting shelf in the header">
+          <div class="head"><span class="cyan b">Tree</span><span class="dim">· All</span><span class="push"><span class="amber">◆1</span> <span class="cyan">▷2</span></span></div>
+          <div class="shelf">
+            <div><span class="amber">!</span> OpenCode · cache · 2m</div>
+            <div class="q">Use Redis or memory cache?</div>
+          </div>
+          <div class="rows">
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="green b">◈</span> <span class="nm cyan b">acme-api</span><span class="rule"></span></span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="green">●</span> <span class="blue">✎</span> <span class="dim">0:</span>editor <span class="dim">· nvim</span></span>
+              <span class="rhs">acme-api ⎇ main</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▾</span> <span class="yellow">✳</span> <span class="dim">1:</span>api <span class="dim">· claude</span></span>
+              <span class="rhs">auth ⎇ main <span class="cyan">▷</span></span>
+            </div>
+            <div class="row child"><span class="lhs dim">Explore</span><span class="rhs cyan">▷</span></div>
+            <div class="row child"><span class="lhs dim">Plan</span><span class="rhs cyan">▷</span></div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="gd">◈</span> <span class="nm b">acme-web</span><span class="rule"></span></span>
+              <span class="rhs">web ⎇ redis</span>
+            </div>
+            <div class="row w sel">
+              <span class="lhs"><span class="faint">▸</span> ▦ <span class="dim">0:</span>cache <span class="dim">· opencode</span></span>
+              <span class="rhs amber">!</span>
+            </div>
+            <div class="row">
+              <span class="lhs spread"><span class="faint">▾</span> <span class="gd">◈</span> <span class="nm b">billing</span><span class="rule"></span></span>
+              <span class="rhs">payments ⎇ retry</span>
+            </div>
+            <div class="row w">
+              <span class="lhs"><span class="faint">▸</span> <span class="cyan">❋</span> <span class="dim">0:</span>webhooks <span class="dim">· codex</span></span>
+              <span class="rhs cyan">▷</span>
+            </div>
+          </div>
+          <div class="foot"><span><span class="cyan">↵</span> focus</span><span><span class="cyan">n</span> go</span><span class="push"><span class="cyan">&gt;</span> reply</span></div>
+        </div>
+        <figcaption><strong>Two header lines, present only while someone is waiting, and gone when nobody is.</strong> fzf already pins the view header, so the question stays put as you scroll. The tree keeps the mark and drops the repeated sentence. The footer can go back to keys, because the shelf is now the sentence. This costs two rows on the days it matters, and nothing on the days it does not.</figcaption>
+      </figure>
+
+      <figure class="span2" id="together">
+        <span class="tag">05 · the set to ship</span>
+        <h3>Column, dim icons, a readable question, and an age</h3>
+        <div class="pair">
+          <div class="screen ink gutter" aria-label="Recommended combination of the sidebar sketches">
+            <div class="head"><span class="cyan b">Tree</span><span class="dim">· All</span><span class="push"><span class="amber">◆1</span> <span class="cyan">▷2</span></span></div>
+            <div class="rows">
+              <div class="row">
+                <span class="lhs spread"><span class="faint">▾</span> <span class="sg">◈</span> <span class="nm cyan b">acme-api</span><span class="rule"></span></span>
+                <span class="rhs"></span><span class="mark"></span>
+              </div>
+              <div class="row w">
+                <span class="lhs"><span class="faint">▾</span> <span class="green">●</span> <span class="ic">✎</span> editor <span class="dim">· nvim</span></span>
+                <span class="rhs">acme-api ⎇ main</span><span class="mark"></span>
+              </div>
+              <div class="row w">
+                <span class="lhs"><span class="faint">▾</span> <span class="ic">✳</span> api <span class="dim">· claude</span></span>
+                <span class="rhs dim">4m</span><span class="mark cyan">▷</span>
+              </div>
+              <div class="row child"><span class="lhs dim">Explore</span><span class="rhs"></span><span class="mark cyan">▷</span></div>
+              <div class="row child"><span class="lhs dim">Plan</span><span class="rhs"></span><span class="mark cyan">▷</span></div>
+              <div class="row">
+                <span class="lhs spread"><span class="faint">▾</span> <span class="sg">◈</span> <span class="nm b">acme-web</span><span class="rule"></span></span>
+                <span class="rhs">web ⎇ redis</span><span class="mark"></span>
+              </div>
+              <div class="row w sel">
+                <span class="lhs"><span class="faint">▸</span> <span class="ic">▦</span> cache <span class="dim">· opencode</span></span>
+                <span class="rhs dim">2m</span><span class="mark amber">!</span>
+              </div>
+              <div class="row ask loud"><span class="lhs sub"><span class="tick">│</span>Use Redis or memory cache?</span></div>
+              <div class="row">
+                <span class="lhs spread"><span class="faint">▾</span> <span class="sg">◈</span> <span class="nm b">billing</span><span class="rule"></span></span>
+                <span class="rhs">payments ⎇ retry</span><span class="mark"></span>
+              </div>
+              <div class="row w">
+                <span class="lhs"><span class="faint">▸</span> <span class="ic">❋</span> webhooks <span class="dim">· codex</span></span>
+                <span class="rhs dim">9m</span><span class="mark cyan">▷</span>
+              </div>
+            </div>
+            <div class="foot"><span class="amber">◆</span> OpenCode waiting <span class="push"><span class="cyan">n</span> go <span class="cyan">&gt;</span> reply</span></div>
+          </div>
+          <div>
+            <p class="note">Indexes leave the row. <span class="dim">0:editor</span> becomes <span class="dim">editor</span>. The status line still has the index for <kbd>prefix</kbd>+number, and detailed density can keep it for people who want the tmux name in the tree.</p>
+            <p class="note">On an agent row the age takes the path’s place. The session or window already carries the directory, and <span class="dim">4m</span> tells you more than a second copy of <span class="dim">auth</span>. A shell or an editor keeps the path, because that row has no age and no mark.</p>
+            <p class="note">Subagents stay one dim line with a mark in the column. Giving them their own cards would turn the tree into the workmux tile list, and the parent row already says the agent is working.</p>
+          </div>
+        </div>
+        <ol class="steps">
+          <li>Dim icons unless you later decide the active pane still wants its color. <span>Style only.</span></li>
+          <li>Reserve the mark cell on every row, and stop the session rule in front of it. <span>Same strings, different padding.</span></li>
+          <li>Draw the request line in normal ink with an amber bar. <span>It still lives on the fzf entry, so the fill may tint it; the ink has to win.</span></li>
+          <li>Show the report age on quiet agent rows, in the path’s slot. <span>The number already exists.</span></li>
+          <li>Add the shelf only if a scrolled tree still hides the question. <span>Header lines, not a new view.</span></li>
+        </ol>
+      </figure>
+    </div>
+  </section>
+
+  <section id="inspector">
+    <h2>The inspector is a card that doesn’t line up</h2>
+    <p class="section-lead">The drawer already has the right fields: state, trust, directory, git, place, then the request. They are printed as a stack of dim lines, so the card looks like a log. A label column is the same information with a straight edge. No new chrome.</p>
+    <div class="pair">
+      <figure>
+        <span class="tag">Inspector · today</span>
+        <div class="screen" aria-label="Illustration of the current agent inspector">
+          <div class="head"><span class="dim">Agent inspector</span></div>
+          <div class="rows">
+            <div class="hline"><span class="amber b">! Needs input · question</span><span class="push dim">OpenCode</span></div>
+            <div class="plain dim">plugin · 2s</div>
+            <div class="plain dim">~/projects/web</div>
+            <div class="plain dim">web ⎇ redis · 2 changed (+15 −3)</div>
+            <div class="plain dim"><span class="green">●</span> acme-web:0 cache</div>
+            <div class="gap"></div>
+            <div class="plain">Use Redis or memory cache?</div>
+          </div>
+        </div>
+        <figcaption>The heading is strong. Everything under it starts at a different mental column, and the diff counts hide inside a sentence.</figcaption>
+      </figure>
+      <figure>
+        <span class="tag">Inspector · aligned</span>
+        <div class="screen" aria-label="Proposed agent inspector with an aligned label column">
+          <div class="head"><span class="dim">Agent inspector</span></div>
+          <div class="rows">
+            <div class="hline"><span class="amber b">! Needs input · question</span><span class="push dim">OpenCode</span></div>
+            <div class="kv"><span class="dim">trust</span><span>plugin · 2s</span><span></span></div>
+            <div class="kv"><span class="dim">dir</span><span>~/projects/web</span><span></span></div>
+            <div class="kv"><span class="dim">git</span><span>web ⎇ redis</span><span><span class="green">+15</span> <span class="amber">−3</span></span></div>
+            <div class="kv"><span class="dim">place</span><span><span class="green">●</span> acme-web:0 cache</span><span></span></div>
+            <div class="gap"></div>
+            <div class="plain">Use Redis or memory cache?</div>
+          </div>
+        </div>
+        <figcaption><strong>Labels in one column, values in the next, the diff at the edge.</strong> Color only the signs. The request stays the body of the card, under a blank line, which the inspector already does when the drawer is tall enough.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="leave">
+    <h2>Leave these with the tools that need them</h2>
+    <ul class="leave">
+      <li><strong>A permanent row of filter chips.</strong> <span class="dim">◆1 ▷2</span> is that row, already fitted to the header. Chips earn a line in a sidebar that contains only agents.</li>
+      <li><strong>A tile for every pane.</strong> Neovim and a shell are not tasks. Two lines is the right height for an agent that has a question, and one line is the right height for everything else. The <code>folders</code> appearance already has the boxed header for people who want lazygit’s chrome.</li>
+      <li><strong>Emoji, and a braille spinner beside the working mark.</strong> The age is the calmer clock. The working mark already moves, and it already stops while you are typing in the sidebar.</li>
+      <li><strong>A different color per directory.</strong> That study is next to this one. Painting the scaffolding makes the mark harder to find, which is the problem this page is trying to shrink.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Sources</h2>
+    <div class="sources">
+      <ul>
+        <li>Canopy’s quiet tree, as described in <a href="../reference.md#appearance">Appearance</a>, and the docked demo. Session glyph <span class="green">◈</span>, active dot beside the name, marks at the right, request line folded into the same fzf entry.</li>
+        <li><a href="https://hiroppy.github.io/tmux-agent-sidebar/features/agent-pane/">tmux-agent-sidebar’s agent pane</a>: status filters, permission badges, branch, elapsed time, task glyphs, subagent tree. Agents across sessions, not the rest of the workspace.</li>
+        <li><a href="https://workmux.dev/guide/sidebar/">workmux’s sidebar</a>: tiles or compact, a status stripe, elapsed time, git stats, optional PR. Templates are a token line with <code>{fill}</code> splitting left from right.</li>
+        <li>lazygit’s file list and yazi’s size column, for a narrow list whose right edge is one fact. Zellij, sesh, and tmux-sessionx, for modal switchers that have more than 42 columns and do not stay docked.</li>
+      </ul>
+      <p>Illustrations, not screenshots. Spacing and the exact palette follow a dark terminal; the light switch is the same layout in ink that works on a light preset. Earlier studies: <a href="sidebar-visual-examples.html">quiet tree</a>, <a href="sidebar-nav.html">navigation</a>, <a href="directory-colors.html">directory color</a>.</p>
+    </div>
+  </section>
+</div>
+<script>
+  const root = document.documentElement;
+  const button = document.getElementById('theme');
+  const stored = sessionStorage.getItem('canopy-appearance-theme');
+  function apply(theme) {
+    root.dataset.theme = theme;
+    const light = theme === 'light';
+    button.textContent = light ? 'Dark colors' : 'Light colors';
+    button.setAttribute('aria-label', light ? 'Switch to dark colors' : 'Switch to light colors');
+    try { sessionStorage.setItem('canopy-appearance-theme', theme); } catch (e) { /* file pages may block storage */ }
+  }
+    const query = new URLSearchParams(location.search).get('theme');
+    let theme = 'dark';
+    try { theme = query || stored || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }
+    catch (e) { theme = query || 'dark'; }
+    apply(theme);
+  button.addEventListener('click', () => apply(root.dataset.theme === 'light' ? 'dark' : 'light'));
+</script>
+</body>
+</html>
