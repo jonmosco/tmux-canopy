@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- `tests/preview.py` no longer depends on how deep the checkout sits. Its path-abbreviation checks set `HOME` to the parent of the pane's directory, and the pane inherited the repository directory, so a checkout at the root of a filesystem left `HOME` as `/`, which `scripts/path-lib.sh` deliberately declines to shorten. The pane now gets a directory under the suite's own temporary root, and the test asserts it did.
 - The tmux 3.8 pane-command monitor is actually installed now. `set-hook`'s `-B` takes the `name:what:format` subscription as its own argument, so it cannot be bundled with other flags: `-Bgu` made tmux read `gu` as the subscription and `-B -g` made it read `-g` as the command, and both failed silently behind `2>/dev/null`. On tmux 3.8 the Agents view therefore still refreshed only on focus changes and `Ctrl-r`, as it does on 3.7c. `canopy doctor` reports the monitor under `monitor:`.
 - Saved sidebar geometry is restored again on tmux 3.8. `#{window_layout}` now reports a JSON layout instead of the checksummed string, and tmux offers the old string only to control-mode clients, so `lib/scale-layout.awk` rejected every layout it was given and closing a dock or moving between windows left content panes at whatever width tmux had picked. It now reads both formats, keeps writing the checksummed form that 3.8 still accepts on `select-layout`, and leaves a window holding a floating pane untouched, because that form cannot describe one. Whether the window changed size is also decided there rather than by slicing the layout string in `scripts/restore-window-layout`, which only ever worked for the old format.
 - Text typed at Canopy's prompts arrives literally again on tmux 3.8. Replying to an agent with `>`, filtering by window name or pane title, renaming a session or window, and naming a new session all turned a typed apostrophe into `'\''`, because tmux 3.8 made the `%%` response placeholder escape single quotes for use inside `'...'`. The placeholder is now `%1`, which both 3.7c and 3.8 insert verbatim; it stays safe from command injection because tmux substitutes into an already-parsed argument rather than into command text.
@@ -14,6 +15,7 @@
 
 ### Changed
 
+- CI runs the release gate against both supported tmux releases instead of one. A single pinned version (3.7c) hid three tmux 3.8 breakages for months, so the Linux job is now a matrix over 3.7c and 3.8, each pinned by tarball checksum, with `fail-fast` off so a version-specific failure does not hide the other. A macOS job joins it for platform coverage that no Linux runner can give: BSD `ps` and `awk`, no `/proc`, and a real stock Bash 3.2 at `/bin/bash` for the refused-load check. Homebrew cannot pin versions the way the Linux job does, so the macOS job tracks whatever it installs and the matrix remains what guards specific tmux releases.
 - Expired needs-input reports retain their last request in dim, explicitly stale context in the tree and inspector. They remain excluded from actionable attention, filters, rollups, and `n` jumps; the inspector advises verifying in the live agent before acting.
 - Added a first-steps guide to the README, reference, and in-app help covering selection versus active pane, focus return, search, and help/legend shortcuts.
 - Updated documentation for current headers, immediate pane-focus repainting, quiet state marks and animation, Python requirements, Agent filter persistence, OpenCode subagents, and the implemented status of historical design specs.
@@ -26,6 +28,8 @@
 - `README.md` has a "How Canopy compares" section.
 
 ### Added
+
+- `tests/monitor_hook.py` covers the tmux 3.8 pane-command monitor, which had no test and so was registered with unparseable `set-hook -B` flags for as long as it existed. It probes the capability rather than the version, then checks that one subscription is registered, that reloading replaces it instead of stacking another, that the format tmux stored reports a content pane's command but nothing for sidebar and slot panes, and that `canopy doctor` surfaces it. It skips where `set-hook -B` does not exist.
 
 - `prefix + Alt-t` focuses the sidebar or returns to the previous content pane without closing it; it opens Canopy when closed. Set `@tmux-canopy-focus-key` to change the key or `off` to disable it.
 

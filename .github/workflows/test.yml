@@ -6,11 +6,25 @@ on:
 permissions:
   contents: read
 jobs:
+  # One job per supported tmux release. Pinning a single version hid three
+  # tmux 3.8 changes for months: the JSON layout format, %% escaping single
+  # quotes in command-prompt templates, and a dead pane reporting no pid.
   linux:
+    name: linux (tmux ${{ matrix.tmux }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
+    strategy:
+      # Report both versions; a failure on one is usually specific to it.
+      fail-fast: false
+      matrix:
+        include:
+          - tmux: 3.7c
+            sha256: 7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf
+          - tmux: '3.8'
+            sha256: e79c699c7e949dccd0a4a125e17b8d1261e311b16979dbc8eb34542f3966d82e
     env:
-      TMUX_VERSION: 3.7c
+      TMUX_VERSION: ${{ matrix.tmux }}
+      TMUX_SHA256: ${{ matrix.sha256 }}
       FZF_VERSION: 0.74.4
       TERM: xterm-256color
       PYTHONDONTWRITEBYTECODE: '1'
@@ -27,7 +41,7 @@ jobs:
           build_dir=$(mktemp -d)
           cd "$build_dir"
           curl --fail --location --retry 3 "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" -o tmux.tar.gz
-          echo "7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf  tmux.tar.gz" | sha256sum --check
+          echo "${TMUX_SHA256}  tmux.tar.gz" | sha256sum --check
           tar -xzf tmux.tar.gz
           cd "tmux-${TMUX_VERSION}"
           ./configure --prefix=/usr/local
@@ -42,5 +56,38 @@ jobs:
           fzf --version
       - name: Show ShellCheck version
         run: shellcheck --version
+      - name: Run release checks
+        run: bash tests/run.sh
+
+  # Platform coverage, not version coverage: BSD ps and awk, no /proc, and a
+  # real stock Bash 3.2 at /bin/bash for the refused-load check. Homebrew
+  # cannot pin these the way the Linux job pins tmux and fzf, so the versions
+  # here move; the matrix above is what guards specific tmux releases.
+  macos:
+    name: macos (homebrew tmux)
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      TERM: xterm-256color
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        # coreutils supplies gsleep, which the agent fixtures copy because
+        # Apple's protected sleep cannot be. fish is one of the shells the
+        # launch suite starts the sidebar under.
+        run: brew install tmux fzf coreutils shellcheck bash fish
+      - name: Put Homebrew's Bash ahead of /bin
+        # The suite needs Bash 4.4+, and macOS ships 3.2 at /bin/bash. Scripts
+        # resolve bash through `env`, so Homebrew's has to come first. The 3.2
+        # at /bin/bash stays where tests/old_bash.py looks for it.
+        run: echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      - name: Show versions
+        run: |
+          tmux -V
+          fzf --version
+          shellcheck --version | sed -n '2p'
+          bash --version | sed -n '1p'
+          /bin/bash --version | sed -n '1p'
       - name: Run release checks
         run: bash tests/run.sh
