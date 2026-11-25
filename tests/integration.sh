@@ -295,16 +295,18 @@ printf 'ok - resizes remaining window and preserves original sidebar size when p
 # Count what the pane's own command records rather than comparing #{pane_pid}:
 # tmux 3.8 reports no pid for a dead pane, and respawn reruns the original
 # command, so a command that exits is dead again before it can be observed.
+# awk rather than wc -l: BSD wc pads its count with leading spaces, which an
+# exact string comparison then fails on macOS.
 respawn_log="$(mktemp)"
 "${TMUX_TEST[@]}" set-window-option -t "$pane_ops_window" remain-on-exit on
 dead_pane="$("${TMUX_TEST[@]}" split-window -d -t "$pane_ops" -P -F '#{pane_id}' \
   "printf 'run\n' >> '$respawn_log'; exit 0")"
 sleep 0.2
 assert_eq '1' "$("${TMUX_TEST[@]}" display-message -p -t "$dead_pane" '#{pane_dead}')" 'test pane exits and remains visible'
-assert_eq '1' "$(wc -l < "$respawn_log")" 'the test pane ran its command once'
+assert_eq '1' "$(awk 'END { print NR }' "$respawn_log")" 'the test pane ran its command once'
 run_in_server "$sidebar" "TMUX_CANOPY_STATE='$state_file' TMUX_CANOPY_CLIENT='client-a' TMUX_PANE='$sidebar' '$PROJECT_DIR/scripts/tree-action' respawn 'P:$dead_pane'"
 sleep 0.4
-assert_eq '2' "$(wc -l < "$respawn_log")" 'respawn starts a new process for a dead pane'
+assert_eq '2' "$(awk 'END { print NR }' "$respawn_log")" 'respawn starts a new process for a dead pane'
 rm -f "$respawn_log"
 # A live pane keeps its process: respawn is offered only for dead panes.
 live_pane="$("${TMUX_TEST[@]}" split-window -d -t "$pane_ops" -P -F '#{pane_id}' 'sleep 600')"
