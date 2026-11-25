@@ -108,8 +108,16 @@ while True:
     key = os.read(0, 1)
     if key in (b'n', b't'): draw(key)
 ''')
+        # The path-abbreviation checks below set HOME to the parent of the
+        # pane's directory, so give the pane one of our own. Inheriting the
+        # checkout directory made the suite depend on how deep that is: a
+        # repository at the root of a filesystem left HOME as /, which
+        # scripts/path-lib.sh declines to abbreviate.
+        workspace = Path(directory) / 'home' / 'workspace'
+        workspace.mkdir(parents=True)
         try:
             pane = tm('-f', '/dev/null', 'new-session', '-d', '-s', 'preview', '-x', '160', '-y', '44',
+                      '-c', str(workspace),
                       '-P', '-F', '#{pane_id}', shlex.join(['python3', str(fixture), str(signals)]))
             server_pid = int(display(pane, '#{pid}'))
             tm('set-option', '-g', 'status', 'off')
@@ -193,6 +201,9 @@ while True:
             print('ok - preview lists all notification types without exceeding its row budget')
             # Directories under HOME read as ~/..., leaving room for the rest.
             where = Path(display(pane, '#{pane_current_path}'))
+            # Guard the decoupling above: a shallow path would silently make
+            # HOME / and turn the abbreviation checks into no-ops.
+            assert where == workspace, (where, workspace)
             window_rows = run('sidebar-preview', 'W:' + window, extra={'HOME': str(where.parent)})
             assert f'  ~/{where.name}' in window_rows and str(where) not in window_rows, window_rows
             pane_rows = run('sidebar-preview', 'P:' + pane, extra={'HOME': str(where.parent)}).splitlines()
