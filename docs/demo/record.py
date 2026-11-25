@@ -62,8 +62,17 @@ def main():
                     '--font-family', args.font_family, '--theme', args.theme,
                     '--poster', str(args.poster), *extra], check=True)
         return
-    # GitHub shows the GIF about 830 px wide, so on-page text size follows the column
-    # count, not agg's font size. The tour is narrower so its text reads larger.
+    # GitHub shows the GIF about 830 px wide, which makes column count and font size
+    # two separate levers. Columns decide how large the text looks on the page: fewer
+    # columns, bigger glyphs. Font size decides the resolution agg renders at, so a
+    # larger one is downsampled into the same 830 px and arrives antialiased rather
+    # than soft; see the agg call at the end, where the tour asks for more.
+    #
+    # Columns cannot go much below 100 here. Captions live in status-right and share
+    # the status line with the window tabs, which take 52 columns for this session
+    # (10 for status-left plus editor/api/server/release). The longest caption is 48,
+    # so under 100 columns tmux starts truncating them and the status-line click
+    # stops landing on the tab it aims at.
     cols = 100 if args.demo == 'tour' else COLS
     required = ('tmux', 'fzf', 'git', 'asciinema') if args.smoke else ('tmux', 'fzf', 'git', 'asciinema', 'agg')
     for tool in required:
@@ -746,7 +755,8 @@ run-shell '{ROOT / "tmux-canopy.tmux"}'
     if args.smoke:
         print(f'smoke ok ({args.demo})')
         return
-    sp.run(['agg', '--quiet', '--font-family', args.font_family, '--font-size', '20', '--line-height', '1.25',
+    sp.run(['agg', '--quiet', '--font-family', args.font_family,
+            '--font-size', '32' if args.demo == 'tour' else '20', '--line-height', '1.25',
             '--theme', args.theme, '--idle-time-limit', '2', '--fps-cap', '30', '--last-frame-duration', '2',
             '--speed', str(args.speed or (1.25 if args.demo == 'tour' else 1.0)),
             str(cast), str(gif)], check=True)

@@ -8,11 +8,11 @@ Canopy puts your sessions, windows, and panes in one persistent sidebar. Search,
 
 Turn on optional AI-agent monitoring to see which agents are working and which need your input. Press `n` to jump to the longest-waiting agent, inspect its request with `i`, or send a reply with `>` without leaving your current pane. Agent details depend on the integration; see the [support matrix](#ai-agent-monitoring).
 
-Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled binary. Optional agent lifecycle adapters use Python 3.
+Canopy runs on tmux hooks with Bash, awk, and fzf, with no daemon or compiled binary. Optional agent lifecycle adapters use Python 3. It watches and navigates the agents you start yourself, and never launches or manages them.
 
 ## Preview
 
-[![Canopy tour: dock the sidebar beside Neovim, walk a four-session tree with j and k, jump between windows with Enter or by clicking the status-line tabs while the tree follows, fold branches, and turn agent mode on and off with A](docs/assets/canopy-tour.gif?v=12)](docs/assets/canopy-tour.gif?v=12)
+[![Canopy tour: dock the sidebar beside Neovim, walk a four-session tree with j and k, jump between windows with Enter or by clicking the status-line tabs while the tree follows, fold branches, and turn agent mode on and off with A](docs/assets/canopy-tour.gif?v=13)](docs/assets/canopy-tour.gif?v=13)
 
 <details>
 <summary><strong>Agent workflow (questions, inline reply, and jumping to a waiting agent)</strong></summary>
@@ -75,16 +75,6 @@ tmux run-shell "$HOME/.tmux/plugins/tmux-canopy/tmux-canopy.tmux"
 
 Add `~/.tmux/plugins/tmux-canopy` to your `PATH` if you want the short `canopy` CLI command.
 </details>
-
-## How Canopy compares
-
-Several good tools watch coding agents inside tmux. Pick by what you want to see and how you want it to run.
-
-- **Canopy** shows one persistent tree of every session, window, pane, and agent (11 agents today), with folding and search, `n` to jump to the agent that has waited longest for you, and `>` to answer it without leaving the tree. It is Bash, awk, and fzf driven by tmux hooks: no daemon and no compiled binary (the optional agent hook adapters use Python 3). It watches the tmux you already have; it does not launch agents.
-- [tmux-agent-sidebar](https://github.com/hiroppy/tmux-agent-sidebar) is an agents-first sidebar for Claude Code, Codex, and OpenCode, with a Git tab and worktree spawn and teardown from the sidebar. It ships as a prebuilt Rust binary.
-- [tmux-pane-tree](https://github.com/sandudorogan/tmux-pane-tree) is a lighter session, window, and pane tree with agent badges, in shell and Python.
-- [workmux](https://github.com/raine/workmux) is built around one git worktree per tmux window, with a dashboard, a sidebar, and sandboxing. Choose it if worktree-per-task is how you work. Canopy shows the branch and a dirty summary but does not create worktrees.
-- [claude-squad](https://github.com/smtg-ai/claude-squad) and [agent-deck](https://github.com/asheshgoplani/agent-deck) start and manage agent sessions for you in their own interface. Canopy only observes and navigates.
 
 <a id="features"></a>
 

@@ -26,7 +26,8 @@
 - The sidebar reacts sooner. Switching panes inside a window repaints the active-pane marker on the first event instead of after a 75 ms wait. The wait now only catches later events, so a rapid burst can repaint twice, once at the start and once where it settles.
 - Quiet tree polish: the session you are in is now bold as well as accent-coloured, like the other session headings; with agent mode off the Tree header shows an `A enable agents` hint (the key that turns it on, in the footer's key-then-verb style) instead of `agent mode off`; and subagent lines in the quiet appearance hang off their pane with a dim `├` / `└` connector.
 - Running the plugin under Bash older than 4.4 (stock macOS ships 3.2) now stops at once with one message that says to install a newer Bash with `brew install bash` and put it on tmux's `PATH`, and exits non-zero without installing anything. Before, it printed two dozen `declare: -A: invalid option` and syntax errors and returned success after a partial load. `tests/old_bash.py` covers it where an old Bash exists.
-- `README.md` has a "How Canopy compares" section.
+- The README describes what Canopy is rather than how it compares to other tools; the opening now carries the scope boundary that the comparison used to state.
+- The tour recording reads more clearly. GitHub scales it to about 830 px wide, which makes column count and font size separate levers: columns set how large the glyphs look, font size sets the resolution agg renders at. The tour was rendered at 1228 px and arrived soft after that scaling, so it now renders at 1965 px and is downsampled into the same space, which antialiases the sidebar text instead of blurring it. The file grows from 1.2 MB to 2.1 MB. Columns stay at 100: captions share the status line with the window tabs, and narrowing the frame truncates them and makes the status-line click miss its tab (`docs/demo/record.py` records the arithmetic).
 
 ### Added
 
